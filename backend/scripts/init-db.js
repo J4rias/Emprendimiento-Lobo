@@ -1,0 +1,218 @@
+const { sequelize } = require('../config/database');
+const bcrypt = require('bcrypt');
+const { User, Role, Permission, RolePermission, Category, Warehouse } = require('../models');
+require('dotenv').config();
+
+const initializeDatabase = async () => {
+  try {
+    console.log('🔄 Initializing database...\n');
+
+    // Sync database
+    console.log('📊 Syncing database schema...');
+    await sequelize.sync({ force: true }); // WARNING: This will drop all tables
+    console.log('✅ Database schema synced\n');
+
+    // Create Roles
+    console.log('👥 Creating roles...');
+    const adminRole = await Role.create({
+      name: 'Administrador',
+      description: 'Acceso total al sistema'
+    });
+
+    const despachadorRole = await Role.create({
+      name: 'Despachador',
+      description: 'Gestión de inventario y despachos'
+    });
+
+    const cajeroRole = await Role.create({
+      name: 'Cajero',
+      description: 'Punto de venta y cobros'
+    });
+
+    const contadorRole = await Role.create({
+      name: 'Contador',
+      description: 'Reportes financieros y facturación'
+    });
+    console.log('✅ Roles created\n');
+
+    // Create Permissions
+    console.log('🔐 Creating permissions...');
+    const permissions = [
+      // Products
+      { name: 'products.view', description: 'Ver productos', module: 'products', action: 'view' },
+      { name: 'products.create', description: 'Crear productos', module: 'products', action: 'create' },
+      { name: 'products.update', description: 'Actualizar productos', module: 'products', action: 'update' },
+      { name: 'products.delete', description: 'Eliminar productos', module: 'products', action: 'delete' },
+
+      // Inventory
+      { name: 'inventory.view', description: 'Ver inventario', module: 'inventory', action: 'view' },
+      { name: 'inventory.adjust', description: 'Ajustar inventario', module: 'inventory', action: 'adjust' },
+      { name: 'inventory.transfer', description: 'Realizar traslados', module: 'inventory', action: 'transfer' },
+      { name: 'inventory.receive', description: 'Recibir traslados', module: 'inventory', action: 'receive' },
+
+      // Sales
+      { name: 'sales.view', description: 'Ver ventas', module: 'sales', action: 'view' },
+      { name: 'sales.create', description: 'Crear ventas', module: 'sales', action: 'create' },
+      { name: 'sales.cancel', description: 'Cancelar ventas', module: 'sales', action: 'cancel' },
+      { name: 'sales.return', description: 'Procesar devoluciones', module: 'sales', action: 'return' },
+
+      // Purchases
+      { name: 'purchases.view', description: 'Ver compras', module: 'purchases', action: 'view' },
+      { name: 'purchases.create', description: 'Crear órdenes de compra', module: 'purchases', action: 'create' },
+      { name: 'purchases.approve', description: 'Aprobar órdenes de compra', module: 'purchases', action: 'approve' },
+      { name: 'purchases.receive', description: 'Recibir compras', module: 'purchases', action: 'receive' },
+
+      // Reports
+      { name: 'reports.view', description: 'Ver reportes', module: 'reports', action: 'view' },
+      { name: 'reports.export', description: 'Exportar reportes', module: 'reports', action: 'export' },
+      { name: 'reports.financial', description: 'Ver reportes financieros', module: 'reports', action: 'financial' },
+
+      // Users
+      { name: 'users.view', description: 'Ver usuarios', module: 'users', action: 'view' },
+      { name: 'users.create', description: 'Crear usuarios', module: 'users', action: 'create' },
+      { name: 'users.update', description: 'Actualizar usuarios', module: 'users', action: 'update' },
+      { name: 'users.delete', description: 'Eliminar usuarios', module: 'users', action: 'delete' },
+      { name: 'roles.manage', description: 'Gestionar roles y permisos', module: 'roles', action: 'manage' },
+      { name: 'settings.manage', description: 'Gestionar configuraciones', module: 'settings', action: 'manage' }
+    ];
+
+    const createdPermissions = await Permission.bulkCreate(permissions);
+    console.log(`✅ ${createdPermissions.length} permissions created\n`);
+
+    // Assign all permissions to Admin role
+    console.log('🔗 Assigning permissions to roles...');
+    for (const permission of createdPermissions) {
+      await RolePermission.create({
+        role_id: adminRole.id,
+        permission_id: permission.id
+      });
+    }
+
+    // Assign permissions to Despachador
+    const despachadorPerms = createdPermissions.filter(p =>
+      ['products.view', 'inventory.view', 'inventory.adjust', 'inventory.transfer',
+       'inventory.receive', 'purchases.view', 'purchases.receive', 'reports.view'].includes(p.name)
+    );
+    for (const permission of despachadorPerms) {
+      await RolePermission.create({
+        role_id: despachadorRole.id,
+        permission_id: permission.id
+      });
+    }
+
+    // Assign permissions to Cajero
+    const cajeroPerms = createdPermissions.filter(p =>
+      ['products.view', 'inventory.view', 'sales.view', 'sales.create',
+       'sales.return', 'reports.view'].includes(p.name)
+    );
+    for (const permission of cajeroPerms) {
+      await RolePermission.create({
+        role_id: cajeroRole.id,
+        permission_id: permission.id
+      });
+    }
+
+    // Assign permissions to Contador
+    const contadorPerms = createdPermissions.filter(p =>
+      ['products.view', 'inventory.view', 'sales.view', 'purchases.view',
+       'reports.view', 'reports.export', 'reports.financial'].includes(p.name)
+    );
+    for (const permission of contadorPerms) {
+      await RolePermission.create({
+        role_id: contadorRole.id,
+        permission_id: permission.id
+      });
+    }
+    console.log('✅ Permissions assigned to roles\n');
+
+    // Create Admin User
+    console.log('👤 Creating admin user...');
+    const hashedPassword = await bcrypt.hash('Admin123!', 10);
+    await User.create({
+      username: 'admin',
+      email: 'admin@viveres.com',
+      password: hashedPassword,
+      first_name: 'Admin',
+      last_name: 'Sistema',
+      role_id: adminRole.id,
+      is_active: true
+    });
+    console.log('✅ Admin user created\n');
+
+    // Create Categories
+    console.log('📂 Creating categories...');
+    const categories = [
+      { code: 'LAC', name: 'Lácteos', description: 'Productos lácteos y derivados' },
+      { code: 'GRA', name: 'Granos', description: 'Granos, legumbres y cereales' },
+      { code: 'ACE', name: 'Aceites', description: 'Aceites comestibles' },
+      { code: 'BEB', name: 'Bebidas', description: 'Bebidas no alcohólicas' },
+      { code: 'ENL', name: 'Enlatados', description: 'Productos enlatados y conservas' },
+      { code: 'LIM', name: 'Limpieza', description: 'Productos de limpieza' },
+      { code: 'HIG', name: 'Higiene', description: 'Productos de higiene personal' },
+      { code: 'CHU', name: 'Chucherías', description: 'Dulces y golosinas' },
+      { code: 'PAN', name: 'Panadería', description: 'Productos de panadería' },
+      { code: 'CAR', name: 'Carnes', description: 'Carnes y embutidos' }
+    ];
+    await Category.bulkCreate(categories);
+    console.log(`✅ ${categories.length} categories created\n`);
+
+    // Create Warehouses
+    console.log('🏢 Creating warehouses...');
+    const warehouses = [
+      {
+        code: 'MAIN',
+        name: 'Depósito Principal',
+        description: 'Almacén principal de distribución',
+        city: 'Caracas',
+        state: 'Miranda',
+        is_main: true
+      },
+      {
+        code: 'SUC01',
+        name: 'Sucursal 1',
+        description: 'Punto de venta sucursal 1',
+        city: 'Caracas',
+        state: 'Miranda',
+        is_main: false
+      },
+      {
+        code: 'SUC02',
+        name: 'Sucursal 2',
+        description: 'Punto de venta sucursal 2',
+        city: 'Maracay',
+        state: 'Aragua',
+        is_main: false
+      }
+    ];
+    await Warehouse.bulkCreate(warehouses);
+    console.log(`✅ ${warehouses.length} warehouses created\n`);
+
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('✅ Database initialized successfully!');
+    console.log('='.repeat(60));
+    console.log('');
+    console.log('📝 Login credentials:');
+    console.log('   Username: admin');
+    console.log('   Password: Admin123!');
+    console.log('');
+    console.log('⚠️  IMPORTANT: Change the admin password on first login!');
+    console.log('='.repeat(60));
+    console.log('');
+
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+    throw error;
+  } finally {
+    await sequelize.close();
+  }
+};
+
+// Run if called directly
+if (require.main === module) {
+  initializeDatabase()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
+}
+
+module.exports = initializeDatabase;
