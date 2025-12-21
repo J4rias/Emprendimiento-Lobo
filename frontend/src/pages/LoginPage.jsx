@@ -44,7 +44,7 @@ const LoginPage = () => {
         <div className="bg-white rounded-lg shadow-xl p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900">
-              Sistema de Gestión de Víveres
+              Emprendimiento Lobo 4
             </h2>
             <p className="mt-2 text-sm text-gray-600">
               Ingrese sus credenciales para continuar
@@ -103,11 +103,6 @@ const LoginPage = () => {
               </button>
             </div>
           </form>
-
-          <div className="mt-6 text-center text-xs text-gray-500">
-            <p>Usuario por defecto: admin</p>
-            <p>Contraseña por defecto: Admin123!</p>
-          </div>
         </div>
       </div>
     </div>

@@ -11,6 +11,8 @@ import {
   Warehouse,
   DollarSign,
   X,
+  FileSpreadsheet,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -35,6 +37,18 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: Warehouse,
       path: '/productos',
       permission: 'products.view',
+    },
+    {
+      name: 'Clientes',
+      icon: UserCheck,
+      path: '/clientes',
+      permission: 'sales.view',
+    },
+    {
+      name: 'Cotizaciones',
+      icon: FileSpreadsheet,
+      path: '/cotizaciones',
+      permission: 'sales.quotes.view',
     },
     {
       name: 'Ventas',

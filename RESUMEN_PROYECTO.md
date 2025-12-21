@@ -1,6 +1,6 @@
 # 📊 Resumen del Proyecto - Sistema de Gestión de Víveres
 
-## ✅ Estado Actual: Módulo de Inventario (Core) - COMPLETADO
+## ✅ Estado Actual: Módulo de Inventario + Módulo de Cotizaciones - COMPLETADO
 
 ---
 
@@ -17,7 +17,7 @@
 - Manejo centralizado de errores
 - Validación de datos con express-validator
 
-#### ✅ Modelos de Base de Datos (13 tablas)
+#### ✅ Modelos de Base de Datos (17 tablas)
 
 **Administración:**
 - `users` - Usuarios del sistema
@@ -35,6 +35,12 @@
 - `batches` - Lotes con fechas de vencimiento
 - `transfers` - Traslados entre depósitos
 - `transfer_details` - Detalle de traslados
+
+**Ventas:**
+- `customers` - Clientes del sistema
+- `price_lists` - Listas de precios
+- `quotes` - Cotizaciones
+- `quote_details` - Detalle de cotizaciones
 
 #### ✅ APIs Implementadas
 
@@ -60,6 +66,14 @@
 - `GET /valuation` - Valorización de inventario
 - `POST /adjust` - Ajustar inventario
 
+**Cotizaciones (`/api/quotes`):**
+- `GET /` - Listar cotizaciones (paginado, búsqueda, filtros)
+- `GET /stats` - Estadísticas de cotizaciones
+- `GET /:id` - Obtener cotizaci\u00f3n por ID con detalles
+- `POST /` - Crear nueva cotización
+- `PUT /:id` - Actualizar cotización
+- `DELETE /:id` - Eliminar cotización (soft delete)
+
 #### ✅ Características de Seguridad
 - Contraseñas encriptadas con bcrypt (10 rounds)
 - JWT con expiración configurable
@@ -70,10 +84,12 @@
 
 #### ✅ Datos Iniciales
 - 4 roles predefinidos: Administrador, Despachador, Cajero, Contador
-- 26 permisos configurados
+- 30 permisos configurados (incluyendo cotizaciones)
 - Usuario admin por defecto (admin/Admin123!)
 - 10 categorías de productos
 - 3 depósitos de ejemplo
+- 3 listas de precios
+- 3 clientes de ejemplo
 
 ---
 

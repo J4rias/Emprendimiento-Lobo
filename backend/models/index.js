@@ -14,6 +14,10 @@ const Inventory = require('./Inventory');
 const Batch = require('./Batch');
 const Transfer = require('./Transfer');
 const TransferDetail = require('./TransferDetail');
+const Customer = require('./Customer');
+const PriceList = require('./PriceList');
+const Quote = require('./Quote');
+const QuoteDetail = require('./QuoteDetail');
 
 // Define associations
 
@@ -100,6 +104,34 @@ Product.hasMany(TransferDetail, { foreignKey: 'product_id', as: 'transferDetails
 TransferDetail.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
 Batch.hasMany(TransferDetail, { foreignKey: 'batch_id', as: 'transferDetails' });
 
+// Customer - PriceList (Many to One)
+Customer.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
+PriceList.hasMany(Customer, { foreignKey: 'priceListId', as: 'customers' });
+
+// Quote - Customer (Many to One)
+Quote.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+Customer.hasMany(Quote, { foreignKey: 'customerId', as: 'quotes' });
+
+// Quote - PriceList (Many to One)
+Quote.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
+PriceList.hasMany(Quote, { foreignKey: 'priceListId', as: 'quotes' });
+
+// Quote - User (Many to One)
+Quote.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(Quote, { foreignKey: 'userId', as: 'quotes' });
+
+// QuoteDetail - Quote (Many to One)
+QuoteDetail.belongsTo(Quote, { foreignKey: 'quoteId', as: 'quote' });
+Quote.hasMany(QuoteDetail, { foreignKey: 'quoteId', as: 'details' });
+
+// QuoteDetail - Product (Many to One)
+QuoteDetail.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Product.hasMany(QuoteDetail, { foreignKey: 'productId', as: 'quoteDetails' });
+
+// QuoteDetail - ProductPresentation (Many to One)
+QuoteDetail.belongsTo(ProductPresentation, { foreignKey: 'productPresentationId', as: 'presentation' });
+ProductPresentation.hasMany(QuoteDetail, { foreignKey: 'productPresentationId', as: 'quoteDetails' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -115,5 +147,9 @@ module.exports = {
   Inventory,
   Batch,
   Transfer,
-  TransferDetail
+  TransferDetail,
+  Customer,
+  PriceList,
+  Quote,
+  QuoteDetail
 };

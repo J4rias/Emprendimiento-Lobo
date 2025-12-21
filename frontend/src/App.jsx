@@ -6,6 +6,10 @@ import Sidebar from './components/common/Sidebar';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import InventoryPage from './pages/InventoryPage';
+import QuotesPage from './pages/QuotesPage';
+import CustomersPage from './pages/CustomersPage';
+import UsersPage from './pages/UsersPage';
+import SettingsPage from './pages/SettingsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -67,6 +71,46 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <InventoryPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/cotizaciones"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <QuotesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/clientes"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <CustomersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/usuarios"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <UsersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/configuracion"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SettingsPage />
             </AppLayout>
           </PrivateRoute>
         }

@@ -1,6 +1,6 @@
 const { sequelize } = require('../config/database');
 const bcrypt = require('bcrypt');
-const { User, Role, Permission, RolePermission, Category, Warehouse } = require('../models');
+const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList } = require('../models');
 require('dotenv').config();
 
 const initializeDatabase = async () => {
@@ -49,6 +49,12 @@ const initializeDatabase = async () => {
       { name: 'inventory.adjust', description: 'Ajustar inventario', module: 'inventory', action: 'adjust' },
       { name: 'inventory.transfer', description: 'Realizar traslados', module: 'inventory', action: 'transfer' },
       { name: 'inventory.receive', description: 'Recibir traslados', module: 'inventory', action: 'receive' },
+
+      // Quotes
+      { name: 'sales.quotes.view', description: 'Ver cotizaciones', module: 'sales', action: 'view' },
+      { name: 'sales.quotes.create', description: 'Crear cotizaciones', module: 'sales', action: 'create' },
+      { name: 'sales.quotes.update', description: 'Actualizar cotizaciones', module: 'sales', action: 'update' },
+      { name: 'sales.quotes.delete', description: 'Eliminar cotizaciones', module: 'sales', action: 'delete' },
 
       // Sales
       { name: 'sales.view', description: 'Ver ventas', module: 'sales', action: 'view' },
@@ -102,8 +108,8 @@ const initializeDatabase = async () => {
 
     // Assign permissions to Cajero
     const cajeroPerms = createdPermissions.filter(p =>
-      ['products.view', 'inventory.view', 'sales.view', 'sales.create',
-       'sales.return', 'reports.view'].includes(p.name)
+      ['products.view', 'inventory.view', 'sales.quotes.view', 'sales.quotes.create',
+       'sales.view', 'sales.create', 'sales.return', 'reports.view'].includes(p.name)
     );
     for (const permission of cajeroPerms) {
       await RolePermission.create({
@@ -127,11 +133,10 @@ const initializeDatabase = async () => {
 
     // Create Admin User
     console.log('👤 Creating admin user...');
-    const hashedPassword = await bcrypt.hash('Admin123!', 10);
     await User.create({
       username: 'admin',
       email: 'admin@viveres.com',
-      password: hashedPassword,
+      password: 'Admin123!',  // El hook beforeCreate se encargará del hash
       first_name: 'Admin',
       last_name: 'Sistema',
       role_id: adminRole.id,
@@ -186,6 +191,100 @@ const initializeDatabase = async () => {
     ];
     await Warehouse.bulkCreate(warehouses);
     console.log(`✅ ${warehouses.length} warehouses created\n`);
+
+    // Create Price Lists
+    console.log('💰 Creating price lists...');
+    const priceLists = [
+      {
+        code: 'LP-0001',
+        name: 'Precio Público',
+        description: 'Lista de precios para clientes minoristas',
+        currency: 'PEN',
+        basePercentage: 30,
+        isDefault: true,
+        status: 'active'
+      },
+      {
+        code: 'LP-0002',
+        name: 'Precio Mayorista',
+        description: 'Lista de precios para clientes mayoristas',
+        currency: 'PEN',
+        basePercentage: 20,
+        isDefault: false,
+        status: 'active'
+      },
+      {
+        code: 'LP-0003',
+        name: 'Precio Distribuidor',
+        description: 'Lista de precios para distribuidores',
+        currency: 'PEN',
+        basePercentage: 15,
+        isDefault: false,
+        status: 'active'
+      }
+    ];
+    const createdPriceLists = await PriceList.bulkCreate(priceLists);
+    console.log(`✅ ${priceLists.length} price lists created\n`);
+
+    // Create Sample Customers
+    console.log('👥 Creating sample customers...');
+    const customers = [
+      {
+        code: 'CLI-00001',
+        type: 'natural',
+        documentType: 'DNI',
+        documentNumber: '12345678',
+        firstName: 'Juan',
+        lastName: 'Pérez',
+        email: 'juan.perez@example.com',
+        phone: '987654321',
+        address: 'Av. Principal 123',
+        city: 'Lima',
+        country: 'Perú',
+        creditLimit: 5000,
+        creditDays: 30,
+        priceListId: createdPriceLists[0].id,
+        status: 'active'
+      },
+      {
+        code: 'CLI-00002',
+        type: 'juridical',
+        documentType: 'RUC',
+        documentNumber: '20123456789',
+        businessName: 'Comercial El Buen Precio SAC',
+        tradeName: 'El Buen Precio',
+        email: 'ventas@buenprecio.com',
+        phone: '014567890',
+        address: 'Jr. Comercio 456',
+        city: 'Lima',
+        country: 'Perú',
+        creditLimit: 20000,
+        creditDays: 60,
+        priceListId: createdPriceLists[1].id,
+        discountPercentage: 5,
+        status: 'active'
+      },
+      {
+        code: 'CLI-00003',
+        type: 'juridical',
+        documentType: 'RUC',
+        documentNumber: '20987654321',
+        businessName: 'Distribuidora Norte EIRL',
+        tradeName: 'Distri Norte',
+        email: 'contacto@distrinorte.com',
+        phone: '019876543',
+        address: 'Av. Industrial 789',
+        city: 'Trujillo',
+        country: 'Perú',
+        creditLimit: 50000,
+        creditDays: 90,
+        priceListId: createdPriceLists[2].id,
+        discountPercentage: 10,
+        status: 'active'
+      }
+    ];
+    await Customer.bulkCreate(customers);
+    console.log(`✅ ${customers.length} customers created\n`);
 
     console.log('');
     console.log('='.repeat(60));
