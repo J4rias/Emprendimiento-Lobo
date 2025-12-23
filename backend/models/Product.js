@@ -42,11 +42,6 @@ const Product = sequelize.define('Product', {
     defaultValue: 'UND',
     comment: 'UND, KG, LT, MT, etc.'
   },
-  tax_rate: {
-    type: DataTypes.DECIMAL(5, 2),
-    allowNull: false,
-    defaultValue: 16.00
-  },
   is_perishable: {
     type: DataTypes.BOOLEAN,
     defaultValue: false

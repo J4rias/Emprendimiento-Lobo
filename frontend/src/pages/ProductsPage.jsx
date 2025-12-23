@@ -40,7 +40,6 @@ const ProductsPage = () => {
     brand: '',
     manufacturer: '',
     unit_of_measure: 'UND',
-    tax_rate: 16,
     is_perishable: false,
     has_batch_control: false,
     min_stock: 0,
@@ -158,7 +157,6 @@ const ProductsPage = () => {
       brand: product.brand || '',
       manufacturer: product.manufacturer || '',
       unit_of_measure: product.unit_of_measure || 'UND',
-      tax_rate: product.tax_rate || 16,
       is_perishable: product.is_perishable || false,
       has_batch_control: product.has_batch_control || false,
       min_stock: parseInt(product.min_stock) || 0,
@@ -202,7 +200,6 @@ const ProductsPage = () => {
       brand: '',
       manufacturer: '',
       unit_of_measure: 'UND',
-      tax_rate: 16,
       is_perishable: false,
       has_batch_control: false,
       min_stock: 0,
@@ -715,22 +712,6 @@ const ProductsPage = () => {
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-900 mb-3">Configuración Adicional</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tasa de Impuesto (%)
-                    </label>
-                    <input
-                      type="number"
-                      name="tax_rate"
-                      value={formData.tax_rate}
-                      onChange={handleChange}
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      className="input"
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <label className="flex items-center">
                       <input

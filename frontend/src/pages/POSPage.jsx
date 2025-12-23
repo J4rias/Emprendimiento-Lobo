@@ -54,7 +54,7 @@ const POSPage = () => {
         presentation_name: presentation.name,
         quantity: 1,
         unit_price: presentation.sale_price || 0,
-        tax_percent: product.tax_rate || 16,
+        tax_percent: 16,
         discount_percent: 0
       }]);
     }
