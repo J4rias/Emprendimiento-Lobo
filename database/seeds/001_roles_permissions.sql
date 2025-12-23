@@ -38,8 +38,17 @@ INSERT INTO permissions (name, description, module, action) VALUES
 INSERT INTO permissions (name, description, module, action) VALUES
 ('sales.view', 'Ver ventas', 'sales', 'view'),
 ('sales.create', 'Crear ventas', 'sales', 'create'),
-('sales.cancel', 'Cancelar ventas', 'sales', 'cancel'),
-('sales.return', 'Procesar devoluciones', 'sales', 'return');
+('sales.update', 'Actualizar ventas', 'sales', 'update'),
+('sales.delete', 'Cancelar ventas', 'sales', 'delete'),
+('sales.return', 'Procesar devoluciones', 'sales', 'return'),
+('quotes.view', 'Ver cotizaciones', 'quotes', 'view'),
+('quotes.create', 'Crear cotizaciones', 'quotes', 'create'),
+('quotes.update', 'Actualizar cotizaciones', 'quotes', 'update'),
+('quotes.delete', 'Eliminar cotizaciones', 'quotes', 'delete'),
+('customers.view', 'Ver clientes', 'customers', 'view'),
+('customers.create', 'Crear clientes', 'customers', 'create'),
+('customers.update', 'Actualizar clientes', 'customers', 'update'),
+('customers.delete', 'Eliminar clientes', 'customers', 'delete');
 
 -- ========================================
 -- PERMISOS - MÓDULO DE COMPRAS
@@ -101,6 +110,10 @@ SELECT 3, id FROM permissions WHERE name IN (
   'sales.view',
   'sales.create',
   'sales.return',
+  'quotes.view',
+  'quotes.create',
+  'customers.view',
+  'customers.create',
   'reports.view'
 );
 

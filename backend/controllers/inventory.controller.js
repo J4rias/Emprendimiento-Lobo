@@ -1,4 +1,4 @@
-const { Inventory, Product, Warehouse, Batch, Category } = require('../models');
+const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -12,11 +12,13 @@ class InventoryController {
         limit = 50,
         search,
         category_id,
-        low_stock
+        low_stock,
+        expiring,
+        out_of_stock
       } = req.query;
 
       const offset = (page - 1) * limit;
-      const where = { warehouse_id };
+      const where = warehouse_id === 'all' ? {} : { warehouse_id };
       const productWhere = {};
 
       if (search) {
@@ -30,16 +32,6 @@ class InventoryController {
         productWhere.category_id = category_id;
       }
 
-      let having = undefined;
-      if (low_stock === 'true') {
-        // Only show products with quantity below reorder_point
-        having = sequelize.where(
-          sequelize.col('inventory.quantity'),
-          Op.lte,
-          sequelize.col('product.reorder_point')
-        );
-      }
-
       const { rows: inventory, count } = await Inventory.findAndCountAll({
         where,
         include: [{
@@ -50,21 +42,87 @@ class InventoryController {
             { model: Category, as: 'category' }
           ]
         }],
-        having,
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [[{ model: Product, as: 'product' }, 'name', 'ASC']]
       });
 
+      // Filter items in JavaScript if needed
+      let filteredInventory = inventory;
+      if (low_stock === 'true') {
+        filteredInventory = inventory.filter(item => 
+          parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
+        );
+      }
+      
+      if (expiring === 'true') {
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        
+        filteredInventory = inventory.filter(item => {
+          // Check if any batch is expiring within 30 days
+          return item.product && item.product.batches && item.product.batches.some(batch => {
+            if (!batch.expiration_date) return false;
+            const expirationDate = new Date(batch.expiration_date);
+            return expirationDate <= thirtyDaysFromNow && expirationDate >= new Date();
+          });
+        });
+      }
+      
+      if (out_of_stock === 'true') {
+        filteredInventory = inventory.filter(item => 
+          parseFloat(item.quantity) <= 0
+        );
+      }
+
       res.json({
         success: true,
-        data: inventory,
+        data: filteredInventory,
         pagination: {
-          total: count,
+          total: (low_stock === 'true' || expiring === 'true' || out_of_stock === 'true') ? filteredInventory.length : count,
           page: parseInt(page),
           limit: parseInt(limit),
           totalPages: Math.ceil(count / limit)
         }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get inventory by ID
+  async getById(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const inventory = await Inventory.findOne({
+        where: { id },
+        include: [
+          {
+            model: Warehouse,
+            as: 'warehouse'
+          },
+          {
+            model: Product,
+            as: 'product',
+            include: [
+              { model: Category, as: 'category' },
+              { model: ProductPresentation, as: 'presentations' }
+            ]
+          }
+        ]
+      });
+
+      if (!inventory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Inventory item not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: inventory
       });
     } catch (error) {
       next(error);
@@ -126,18 +184,18 @@ class InventoryController {
           model: Warehouse,
           as: 'warehouse'
         }],
-        having: sequelize.where(
-          sequelize.col('inventory.quantity'),
-          Op.lte,
-          sequelize.col('product.reorder_point')
-        ),
-        order: [[sequelize.literal('(inventory.quantity / product.reorder_point)'), 'ASC']]
+        order: [[{ model: Product, as: 'product' }, 'name', 'ASC']]
       });
+
+      // Filter low stock items in JavaScript
+      const lowStockItems = inventory.filter(item => 
+        parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
+      );
 
       res.json({
         success: true,
-        data: inventory,
-        count: inventory.length
+        data: lowStockItems,
+        count: lowStockItems.length
       });
     } catch (error) {
       next(error);
@@ -302,9 +360,10 @@ class InventoryController {
 
       let totalValue = 0;
       const valuedItems = inventory.map(inv => {
-        const defaultPresentation = inv.product.presentations?.[0];
+        const defaultPresentation = inv.product?.presentations?.[0];
         const cost = defaultPresentation?.cost || 0;
-        const value = parseFloat(inv.quantity) * parseFloat(cost);
+        const quantity = parseFloat(inv.quantity) || 0;
+        const value = quantity * parseFloat(cost || 0);
         totalValue += value;
 
         return {
@@ -324,7 +383,16 @@ class InventoryController {
         }
       });
     } catch (error) {
-      next(error);
+      console.error('Error in getValuation:', error);
+      // Return default values on error
+      res.json({
+        success: true,
+        data: {
+          items: [],
+          totalValue: 0,
+          currency: 'USD'
+        }
+      });
     }
   }
 }

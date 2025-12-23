@@ -25,6 +25,12 @@ router.get('/alerts/expiring', inventoryController.getExpiringProducts);
 // Get inventory valuation
 router.get('/valuation', inventoryController.getValuation);
 
+// Get inventory by ID (must be last)
+router.get('/:id', 
+  authorize('inventory.view'),
+  inventoryController.getById
+);
+
 // Adjust inventory
 router.post('/adjust',
   authorize('inventory.adjust'),

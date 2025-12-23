@@ -18,6 +18,9 @@ const Customer = require('./Customer');
 const PriceList = require('./PriceList');
 const Quote = require('./Quote');
 const QuoteDetail = require('./QuoteDetail');
+const Sale = require('./Sale');
+const SaleDetail = require('./SaleDetail');
+const SalePayment = require('./SalePayment');
 
 // Define associations
 
@@ -132,6 +135,49 @@ Product.hasMany(QuoteDetail, { foreignKey: 'productId', as: 'quoteDetails' });
 QuoteDetail.belongsTo(ProductPresentation, { foreignKey: 'productPresentationId', as: 'presentation' });
 ProductPresentation.hasMany(QuoteDetail, { foreignKey: 'productPresentationId', as: 'quoteDetails' });
 
+// Sale - Customer (Many to One)
+Sale.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Customer.hasMany(Sale, { foreignKey: 'customer_id', as: 'sales' });
+
+// Sale - Warehouse (Many to One)
+Sale.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(Sale, { foreignKey: 'warehouse_id', as: 'sales' });
+
+// Sale - User (Seller/Cashier)
+Sale.belongsTo(User, { foreignKey: 'user_id', as: 'seller' });
+User.hasMany(Sale, { foreignKey: 'user_id', as: 'sales' });
+
+// Sale - User (Created/Updated by)
+Sale.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+Sale.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+
+// Sale - Quote (Many to One)
+Sale.belongsTo(Quote, { foreignKey: 'quote_id', as: 'quote' });
+Quote.hasOne(Sale, { foreignKey: 'quote_id', as: 'sale' });
+
+// SaleDetail - Sale (Many to One)
+SaleDetail.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
+Sale.hasMany(SaleDetail, { foreignKey: 'sale_id', as: 'details' });
+
+// SaleDetail - Product (Many to One)
+SaleDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(SaleDetail, { foreignKey: 'product_id', as: 'saleDetails' });
+
+// SaleDetail - ProductPresentation (Many to One)
+SaleDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(SaleDetail, { foreignKey: 'presentation_id', as: 'saleDetails' });
+
+// SaleDetail - Batch (Many to One)
+SaleDetail.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
+Batch.hasMany(SaleDetail, { foreignKey: 'batch_id', as: 'saleDetails' });
+
+// SalePayment - Sale (Many to One)
+SalePayment.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
+Sale.hasMany(SalePayment, { foreignKey: 'sale_id', as: 'payments' });
+
+// SalePayment - User (Created by)
+SalePayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -151,5 +197,8 @@ module.exports = {
   Customer,
   PriceList,
   Quote,
-  QuoteDetail
+  QuoteDetail,
+  Sale,
+  SaleDetail,
+  SalePayment
 };

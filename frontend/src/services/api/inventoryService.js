@@ -6,6 +6,18 @@ export const inventoryService = {
     return response.data;
   },
 
+  getAll: async (params = {}) => {
+    // Default to warehouse 1 if not specified
+    const warehouseId = params.warehouse_id || 1;
+    const response = await api.get(`/inventory/warehouse/${warehouseId}`, { params });
+    return response.data;
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/inventory/${id}`);
+    return response.data;
+  },
+
   getByProduct: async (productId) => {
     const response = await api.get(`/inventory/product/${productId}`);
     return response.data;

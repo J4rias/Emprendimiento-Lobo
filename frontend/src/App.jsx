@@ -6,10 +6,17 @@ import Sidebar from './components/common/Sidebar';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import InventoryPage from './pages/InventoryPage';
+import InventoryDetailPage from './pages/InventoryDetailPage';
+import InventoryAdjustPage from './pages/InventoryAdjustPage';
+import ProductsPage from './pages/ProductsPage';
 import QuotesPage from './pages/QuotesPage';
 import CustomersPage from './pages/CustomersPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import POSPage from './pages/POSPage';
+import SalesPage from './pages/SalesPage';
+import StockReplenishmentPage from './pages/StockReplenishmentPage';
+import CategoriesPage from './pages/CategoriesPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -76,11 +83,77 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/inventario/:id"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <InventoryDetailPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/inventario/:id/adjust"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <InventoryAdjustPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/productos"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <ProductsPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/cotizaciones"
         element={
           <PrivateRoute>
             <AppLayout>
               <QuotesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/pos"
+        element={
+          <PrivateRoute>
+            <POSPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/ventas"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SalesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/reponer-stock"
+        element={
+          <PrivateRoute>
+            <StockReplenishmentPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/categorias"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <CategoriesPage />
             </AppLayout>
           </PrivateRoute>
         }

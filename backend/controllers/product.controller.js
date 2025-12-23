@@ -98,6 +98,7 @@ class ProductController {
         name,
         description,
         category_id,
+        barcode,
         brand,
         manufacturer,
         unit_of_measure,
@@ -108,6 +109,21 @@ class ProductController {
         max_stock,
         reorder_point
       } = req.body;
+
+      // Optional: validate barcode uniqueness BEFORE creating product
+      const normalizedBarcode = barcode && String(barcode).trim() ? String(barcode).trim() : null;
+      if (normalizedBarcode) {
+        const existingBarcode = await Barcode.findOne({
+          where: { barcode: normalizedBarcode, is_active: true }
+        });
+
+        if (existingBarcode) {
+          return res.status(400).json({
+            success: false,
+            message: 'El código de barras ya está asignado a otro producto'
+          });
+        }
+      }
 
       // Get category to generate SKU
       const category = await Category.findByPk(category_id);
@@ -145,10 +161,23 @@ class ProductController {
         created_by: req.userId
       });
 
+      // Optional: create barcode record for scanner-based workflows
+      if (normalizedBarcode) {
+        await Barcode.create({
+          product_id: product.id,
+          presentation_id: null,
+          barcode: normalizedBarcode,
+          type: 'EAN13',
+          is_primary: true,
+          is_active: true
+        });
+      }
+
       // Reload with associations
       await product.reload({
         include: [
-          { model: Category, as: 'category' }
+          { model: Category, as: 'category' },
+          { model: Barcode, as: 'barcodes' }
         ]
       });
 
@@ -168,6 +197,8 @@ class ProductController {
       const { id } = req.params;
       const updateData = { ...req.body };
       delete updateData.sku; // SKU cannot be updated
+      const barcode = updateData.barcode;
+      delete updateData.barcode;
       delete updateData.created_by;
 
       const product = await Product.findByPk(id);
@@ -193,6 +224,62 @@ class ProductController {
           { model: Barcode, as: 'barcodes' }
         ]
       });
+
+      // Optional: upsert barcode record
+      if (barcode !== undefined) {
+        const normalizedBarcode = String(barcode || '').trim();
+
+        if (!normalizedBarcode) {
+          // If barcode is cleared, deactivate existing primary barcodes
+          await Barcode.update(
+            { is_active: false, is_primary: false },
+            { where: { product_id: product.id } }
+          );
+        } else {
+          const existingBarcode = await Barcode.findOne({
+            where: { barcode: normalizedBarcode, is_active: true }
+          });
+
+          if (existingBarcode && existingBarcode.product_id !== product.id) {
+            return res.status(400).json({
+              success: false,
+              message: 'El código de barras ya está asignado a otro producto'
+            });
+          }
+
+          // Deactivate other barcodes for this product
+          await Barcode.update(
+            { is_primary: false },
+            { where: { product_id: product.id } }
+          );
+
+          // Upsert barcode for this product
+          const productBarcode = await Barcode.findOne({
+            where: { product_id: product.id, barcode: normalizedBarcode }
+          });
+
+          if (productBarcode) {
+            await productBarcode.update({ is_active: true, is_primary: true });
+          } else {
+            await Barcode.create({
+              product_id: product.id,
+              presentation_id: null,
+              barcode: normalizedBarcode,
+              type: 'EAN13',
+              is_primary: true,
+              is_active: true
+            });
+          }
+
+          await product.reload({
+            include: [
+              { model: Category, as: 'category' },
+              { model: ProductPresentation, as: 'presentations' },
+              { model: Barcode, as: 'barcodes' }
+            ]
+          });
+        }
+      }
 
       res.json({
         success: true,
@@ -259,16 +346,33 @@ class ProductController {
         }]
       });
 
-      if (!barcodeRecord) {
+      if (barcodeRecord?.product) {
+        return res.json({
+          success: true,
+          data: barcodeRecord.product
+        });
+      }
+
+      // Fallback: allow searching by SKU (useful when barcode is stored as sku)
+      const productBySku = await Product.findOne({
+        where: { sku: barcode, is_active: true },
+        include: [
+          { model: Category, as: 'category' },
+          { model: ProductPresentation, as: 'presentations' },
+          { model: Barcode, as: 'barcodes' }
+        ]
+      });
+
+      if (!productBySku) {
         return res.status(404).json({
           success: false,
           message: 'Product not found'
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
-        data: barcodeRecord.product
+        data: productBySku
       });
     } catch (error) {
       next(error);

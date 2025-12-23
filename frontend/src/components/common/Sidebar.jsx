@@ -13,6 +13,9 @@ import {
   X,
   FileSpreadsheet,
   UserCheck,
+  CreditCard,
+  Scan,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -33,6 +36,18 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'inventory.view',
     },
     {
+      name: 'Reponer Stock',
+      icon: Scan,
+      path: '/reponer-stock',
+      permission: 'inventory.adjust',
+    },
+    {
+      name: 'Categorías',
+      icon: Tag,
+      path: '/categorias',
+      permission: 'products.view',
+    },
+    {
       name: 'Productos',
       icon: Warehouse,
       path: '/productos',
@@ -48,7 +63,13 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Cotizaciones',
       icon: FileSpreadsheet,
       path: '/cotizaciones',
-      permission: 'sales.quotes.view',
+      permission: 'quotes.view',
+    },
+    {
+      name: 'Punto de Venta',
+      icon: CreditCard,
+      path: '/pos',
+      permission: 'sales.create',
     },
     {
       name: 'Ventas',

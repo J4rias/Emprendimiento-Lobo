@@ -249,3 +249,93 @@ CREATE TABLE IF NOT EXISTS transfer_details (
   INDEX idx_transfer_id (transfer_id),
   INDEX idx_product_id (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- MÓDULO DE VENTAS
+-- ========================================
+
+-- Sales
+CREATE TABLE IF NOT EXISTS sales (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  sale_number VARCHAR(50) NOT NULL UNIQUE,
+  customer_id INT NULL,
+  warehouse_id INT NOT NULL,
+  user_id INT NOT NULL,
+  sale_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sale_type ENUM('cash', 'credit') NOT NULL DEFAULT 'cash',
+  payment_method ENUM('cash', 'card', 'transfer', 'mixed') NULL,
+  subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  total DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  paid_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  change_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  status ENUM('pending', 'completed', 'cancelled', 'returned') NOT NULL DEFAULT 'pending',
+  notes TEXT,
+  quote_id INT NULL,
+  created_by INT NOT NULL,
+  updated_by INT NULL,
+  deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (quote_id) REFERENCES quotes(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id),
+  INDEX idx_sale_number (sale_number),
+  INDEX idx_customer_id (customer_id),
+  INDEX idx_warehouse_id (warehouse_id),
+  INDEX idx_sale_date (sale_date),
+  INDEX idx_status (status),
+  INDEX idx_sale_type (sale_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sale Details
+CREATE TABLE IF NOT EXISTS sale_details (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  sale_id INT NOT NULL,
+  product_id INT NOT NULL,
+  presentation_id INT NOT NULL,
+  batch_id INT NULL,
+  quantity DECIMAL(10,2) NOT NULL,
+  unit_price DECIMAL(15,2) NOT NULL,
+  discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  tax_percent DECIMAL(5,2) NOT NULL DEFAULT 16.00,
+  tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  subtotal DECIMAL(15,2) NOT NULL,
+  total DECIMAL(15,2) NOT NULL,
+  cost_price DECIMAL(15,2) NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (presentation_id) REFERENCES product_presentations(id),
+  FOREIGN KEY (batch_id) REFERENCES batches(id),
+  INDEX idx_sale_id (sale_id),
+  INDEX idx_product_id (product_id),
+  INDEX idx_presentation_id (presentation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sale Payments
+CREATE TABLE IF NOT EXISTS sale_payments (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  sale_id INT NOT NULL,
+  payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  payment_method ENUM('cash', 'card', 'transfer', 'check', 'other') NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  reference VARCHAR(100) NULL,
+  bank_id INT NULL,
+  notes TEXT,
+  created_by INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  INDEX idx_sale_id (sale_id),
+  INDEX idx_payment_date (payment_date),
+  INDEX idx_payment_method (payment_method)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

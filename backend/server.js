@@ -13,7 +13,7 @@ const startServer = async () => {
     // Sync database (in development only - use migrations in production)
     if (process.env.NODE_ENV === 'development') {
       console.log('🔄 Syncing database...');
-      await sequelize.sync({ alter: false }); // Set to true to auto-update schema
+      await sequelize.sync(); // Removed alter: true to prevent duplicate indexes
       console.log('✅ Database synced successfully');
     }
 

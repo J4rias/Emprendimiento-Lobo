@@ -13,11 +13,11 @@ router.use(auth);
 // Get all products
 router.get('/', productController.getAll);
 
-// Get product by ID
-router.get('/:id', productController.getById);
-
 // Search by barcode
 router.get('/barcode/:barcode', productController.searchByBarcode);
+
+// Get product by ID
+router.get('/:id', productController.getById);
 
 // Create product
 router.post('/',

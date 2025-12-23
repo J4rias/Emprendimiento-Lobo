@@ -15,13 +15,15 @@ const inventoryRoutes = require('./routes/inventory.routes');
 const quoteRoutes = require('./routes/quote.routes');
 const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
+const saleRoutes = require('./routes/sale.routes');
+const categoryRoutes = require('./routes/category.routes');
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
 
-// CORS - Permitir múltiples orígenes
+// CORS - Permitir solo localhost
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -43,12 +45,26 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - más permisivo para desarrollo
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Aumentado a 1000 requests
+  message: {
+    error: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
-app.use('/api/', limiter);
+
+// Skip rate limiting during development
+if (process.env.NODE_ENV !== 'production') {
+  console.log('⚠️ Rate limiting deshabilitado en modo desarrollo');
+  // Opcional: aplicar solo a endpoints no críticos
+  // app.use('/api/products', limiter);
+} else {
+  // En producción, aplicar rate limiting a todos
+  app.use('/api/', limiter);
+}
 
 // Body parser
 app.use(express.json());
@@ -79,8 +95,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/sales', saleRoutes);
 app.use('/api', roleRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // 404 handler
 app.use((req, res) => {
