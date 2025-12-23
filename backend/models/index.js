@@ -21,6 +21,9 @@ const QuoteDetail = require('./QuoteDetail');
 const Sale = require('./Sale');
 const SaleDetail = require('./SaleDetail');
 const SalePayment = require('./SalePayment');
+const Supplier = require('./Supplier');
+const SupplierContact = require('./SupplierContact');
+const Brand = require('./Brand');
 
 // Define associations
 
@@ -178,6 +181,10 @@ Sale.hasMany(SalePayment, { foreignKey: 'sale_id', as: 'payments' });
 // SalePayment - User (Created by)
 SalePayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
+// Supplier - SupplierContact (One to Many)
+Supplier.hasMany(SupplierContact, { foreignKey: 'supplier_id', as: 'contacts' });
+SupplierContact.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -200,5 +207,8 @@ module.exports = {
   QuoteDetail,
   Sale,
   SaleDetail,
-  SalePayment
+  SalePayment,
+  Supplier,
+  SupplierContact,
+  Brand
 };

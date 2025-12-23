@@ -44,6 +44,18 @@ const initializeDatabase = async () => {
       { name: 'products.update', description: 'Actualizar productos', module: 'products', action: 'update' },
       { name: 'products.delete', description: 'Eliminar productos', module: 'products', action: 'delete' },
 
+      // Suppliers
+      { name: 'suppliers.view', description: 'Ver proveedores', module: 'suppliers', action: 'view' },
+      { name: 'suppliers.create', description: 'Crear proveedores', module: 'suppliers', action: 'create' },
+      { name: 'suppliers.update', description: 'Actualizar proveedores', module: 'suppliers', action: 'update' },
+      { name: 'suppliers.delete', description: 'Eliminar proveedores', module: 'suppliers', action: 'delete' },
+
+      // Brands
+      { name: 'brands.view', description: 'Ver marcas', module: 'brands', action: 'view' },
+      { name: 'brands.create', description: 'Crear marcas', module: 'brands', action: 'create' },
+      { name: 'brands.update', description: 'Actualizar marcas', module: 'brands', action: 'update' },
+      { name: 'brands.delete', description: 'Eliminar marcas', module: 'brands', action: 'delete' },
+
       // Inventory
       { name: 'inventory.view', description: 'Ver inventario', module: 'inventory', action: 'view' },
       { name: 'inventory.adjust', description: 'Ajustar inventario', module: 'inventory', action: 'adjust' },

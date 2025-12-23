@@ -17,6 +17,8 @@ import POSPage from './pages/POSPage';
 import SalesPage from './pages/SalesPage';
 import StockReplenishmentPage from './pages/StockReplenishmentPage';
 import CategoriesPage from './pages/CategoriesPage';
+import SuppliersPage from './pages/SuppliersPage';
+import BrandsPage from './pages/BrandsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -154,6 +156,26 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <CategoriesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/proveedores"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SuppliersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/marcas"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <BrandsPage />
             </AppLayout>
           </PrivateRoute>
         }

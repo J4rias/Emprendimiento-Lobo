@@ -17,6 +17,9 @@ const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const saleRoutes = require('./routes/sale.routes');
 const categoryRoutes = require('./routes/category.routes');
+const supplierRoutes = require('./routes/supplier.routes');
+const brandRoutes = require('./routes/brand.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 
@@ -55,6 +58,9 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Servir archivos estáticos
+app.use('/uploads', express.static('public/uploads'));
 
 // Skip rate limiting during development
 if (process.env.NODE_ENV !== 'production') {
@@ -99,6 +105,9 @@ app.use('/api/sales', saleRoutes);
 app.use('/api', roleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404 handler
 app.use((req, res) => {
