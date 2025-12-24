@@ -10,6 +10,33 @@ export const BarcodeScannerComponent = ({ onDetected, onError }) => {
   const onErrorRef = useRef(onError);
 
   useEffect(() => {
+    // Save original console methods
+    const originalWarn = console.warn;
+    const originalLog = console.log;
+
+    // Suppress ZXing library warnings
+    console.warn = (...args) => {
+      const message = args[0]?.toString() || '';
+      if (
+        message.includes('It was not possible to play the video') ||
+        message.includes('Trying to play video that is already playing')
+      ) {
+        return; // Suppress these specific warnings
+      }
+      originalWarn.apply(console, args);
+    };
+
+    console.log = (...args) => {
+      const message = args[0]?.toString() || '';
+      if (
+        message.includes('It was not possible to play the video') ||
+        message.includes('Trying to play video that is already playing')
+      ) {
+        return; // Suppress these specific logs
+      }
+      originalLog.apply(console, args);
+    };
+
     const handleUnhandledRejection = (event) => {
       const reason = event?.reason;
       if (reason?.name === 'AbortError') {
@@ -19,7 +46,11 @@ export const BarcodeScannerComponent = ({ onDetected, onError }) => {
     };
 
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     return () => {
+      // Restore original console methods
+      console.warn = originalWarn;
+      console.log = originalLog;
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
@@ -34,6 +65,8 @@ export const BarcodeScannerComponent = ({ onDetected, onError }) => {
 
   useEffect(() => {
     let cancelled = false;
+    let activeStream = null;
+    let animationFrameId = null;
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
 
@@ -47,38 +80,61 @@ export const BarcodeScannerComponent = ({ onDetected, onError }) => {
           }
         };
 
-        if (!videoRef.current) return;
+        if (!videoRef.current || cancelled) return;
 
         setIsScanning(true);
 
-        await codeReader.decodeFromConstraints(constraints, videoRef.current, (result, error) => {
+        // Get video stream
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        activeStream = stream;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+
+        // Manual scan loop with throttling
+        let lastScanTime = 0;
+        const SCAN_INTERVAL = 300; // Scan every 300ms instead of continuously
+
+        const scan = async () => {
           if (cancelled) return;
 
-          if (result) {
-            const code = result.getText();
-            const now = Date.now();
-            const last = lastScanRef.current;
+          const now = Date.now();
+          if (now - lastScanTime >= SCAN_INTERVAL) {
+            lastScanTime = now;
 
-            // Prevent duplicate scans within 2 seconds
-            if (last.code !== code || now - last.ts > 2000) {
-              lastScanRef.current = { code, ts: now };
-              onDetectedRef.current?.(code);
+            try {
+              const result = await codeReader.decodeOnceFromStream(stream, videoRef.current);
+
+              if (result && !cancelled) {
+                const code = result.getText();
+                const last = lastScanRef.current;
+
+                // Prevent duplicate scans within 2 seconds
+                if (last.code !== code || now - last.ts > 2000) {
+                  lastScanRef.current = { code, ts: now };
+                  onDetectedRef.current?.(code);
+                }
+              }
+            } catch (err) {
+              // Ignore common scanning errors (NotFoundException, etc.)
             }
           }
 
-          // Ignore common errors during scanning
-          if (error && error.name !== 'NotFoundException') {
-            // AbortError can happen if video stream restarts; ignore it.
-            if (error.name !== 'AbortError') {
-              console.warn('Barcode scan error:', error);
-            }
+          if (!cancelled) {
+            animationFrameId = requestAnimationFrame(scan);
           }
-        });
+        };
+
+        scan();
+
       } catch (err) {
         if (cancelled) return;
         if (err?.name === 'AbortError') return;
 
-        console.error('Camera access error:', err);
         let errorMessage = 'No se pudo acceder a la cámara';
 
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -100,18 +156,35 @@ export const BarcodeScannerComponent = ({ onDetected, onError }) => {
     return () => {
       cancelled = true;
       setIsScanning(false);
+
+      // Cancel animation frame
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      // Stop all tracks first
+      if (activeStream && typeof activeStream.getTracks === 'function') {
+        activeStream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
+
+      // Then reset the code reader
       try {
         codeReader.reset();
       } catch {
         // ignore
       }
+
+      // Finally clean up the video element
       if (videoRef.current) {
         try {
           const stream = videoRef.current.srcObject;
           if (stream && typeof stream.getTracks === 'function') {
-            stream.getTracks().forEach((t) => t.stop());
+            stream.getTracks().forEach((track) => track.stop());
           }
           videoRef.current.srcObject = null;
+          videoRef.current.pause();
         } catch {
           // ignore
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -11,6 +11,8 @@ import {
   X,
   AlertCircle,
   Camera,
+  Keyboard,
+  Upload,
   Image as ImageIcon,
   HelpCircle,
   Eye,
@@ -19,8 +21,7 @@ import {
   Tag,
   DollarSign,
   Box,
-  BarChart,
-  Settings
+  BarChart
 } from 'lucide-react';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
 import ImageUpload from '../components/common/ImageUpload';
@@ -31,9 +32,6 @@ const API_BASE_URL = API_URL.replace(/\/api$/, '');
 const ProductsPage = () => {
   const { token, hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -42,7 +40,6 @@ const ProductsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -53,7 +50,6 @@ const ProductsPage = () => {
   const [viewingProduct, setViewingProduct] = useState(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [scannerError, setScannerError] = useState(null);
-  const [barcodeError, setBarcodeError] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -78,39 +74,13 @@ const ProductsPage = () => {
     purchase_currency: 'USD'
   });
 
-  // Debounce search to avoid losing focus
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Track focus before debounced search triggers
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus after loading completes
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
-
   useEffect(() => {
     fetchProducts();
     fetchCategories();
     fetchBrands();
     fetchPackagingTypes();
     fetchPresentationTypes();
-  }, [currentPage, debouncedSearch, categoryFilter]);
+  }, [currentPage, search, categoryFilter]);
 
   // Check if action=new parameter is present
   useEffect(() => {
@@ -200,7 +170,7 @@ const ProductsPage = () => {
       const params = new URLSearchParams({
         page: currentPage,
         limit: 20,
-        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(search && { search }),
         ...(categoryFilter && { category_id: categoryFilter }),
       });
 
@@ -226,29 +196,8 @@ const ProductsPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setBarcodeError(null);
 
     try {
-      // Validate barcode if provided
-      if (formData.barcode) {
-        const checkResponse = await fetch(`${API_URL}/products/barcode/${encodeURIComponent(formData.barcode)}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (checkResponse.ok) {
-          const checkData = await checkResponse.json();
-
-          // If barcode exists and it's not the current product being edited
-          if (checkData.data && checkData.data.id !== editingProduct?.id) {
-            setBarcodeError(`El código de barras ya existe en el producto: ${checkData.data.name}`);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       const url = editingProduct
         ? `${API_URL}/products/${editingProduct.id}`
         : `${API_URL}/products`;
@@ -385,67 +334,24 @@ const ProductsPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
-    // Clear barcode error when user modifies the barcode field
-    if (name === 'barcode' && barcodeError) {
-      setBarcodeError(null);
-    }
-
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
   };
 
-  const handleBarcodeDetected = async (barcode) => {
+  const handleBarcodeDetected = (barcode) => {
     if (barcode) {
-      try {
-        // Check if barcode already exists using the barcode endpoint
-        const response = await fetch(`${API_URL}/products/barcode/${encodeURIComponent(barcode)}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          // If barcode exists (data is not null) and it's not the current product being edited
-          if (data.data && data.data.id !== editingProduct?.id) {
-            setBarcodeError(`El código de barras ya existe en el producto: ${data.data.name}`);
-            setShowBarcodeScanner(false);
-            // Vibrate error pattern
-            if (navigator.vibrate) {
-              navigator.vibrate([100, 50, 100]);
-            }
-            return;
-          }
-          // If data.data is null, barcode doesn't exist - continue to set it
-        } else {
-          // Other errors, log but continue
-          console.warn('Unexpected response checking barcode:', response.status);
-        }
-
-        // Save scanned code as barcode (SKU is auto-generated by backend)
-        setFormData(prev => ({
-          ...prev,
-          barcode: barcode
-        }));
-        setShowBarcodeScanner(false);
-        setScannerError(null);
-        setBarcodeError(null);
-        // Vibrate on success
-        if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
-      } catch (err) {
-        // Network or other errors - still allow setting the barcode
-        setFormData(prev => ({
-          ...prev,
-          barcode: barcode
-        }));
-        setShowBarcodeScanner(false);
-        setScannerError(null);
+      // Save scanned code as barcode (SKU is auto-generated by backend)
+      setFormData(prev => ({
+        ...prev,
+        barcode: barcode
+      }));
+      setShowBarcodeScanner(false);
+      setScannerError(null);
+      // Vibrate on success
+      if (navigator.vibrate) {
+        navigator.vibrate(100);
       }
     }
   };
@@ -518,15 +424,15 @@ const ProductsPage = () => {
               Buscar
             </label>
             <input
-              ref={searchInputRef}
               type="text"
-              placeholder="Nombre, SKU o código de barras..."
+              placeholder="Nombre, SKU o marca..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="input"
+              disabled={viewMode}
+                    className="input"
             />
           </div>
 
@@ -649,7 +555,7 @@ const ProductsPage = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {hasPermission('products.update') && product.is_active && (
+                          {hasPermission('products.update') && (
                             <button
                               onClick={() => handleEdit(product)}
                               className="p-1 text-blue-600 hover:text-blue-800"
@@ -705,122 +611,73 @@ const ProductsPage = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" onClick={handleCloseModal}>
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h2 className="text-xl font-bold text-gray-900">
+                {viewMode ? 'Ver Producto' : (editingProduct ? 'Editar Producto' : 'Nuevo Producto')}
+              </h2>
+              <button
+                onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
             </div>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                    <Package className="h-6 w-6" />
-                    {viewMode ? 'Ver Producto' : (editingProduct ? 'Editar Producto' : 'Nuevo Producto')}
-                  </h3>
-                  <button
-                    onClick={handleCloseModal}
-                    className="text-white hover:text-gray-200 transition-colors"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-              </div>
-
-            <form onSubmit={handleSubmit} className="bg-white px-6 py-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Image */}
-                <div className="lg:col-span-1 space-y-4">
-                  {/* Product Image */}
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <ImageIcon className="h-5 w-5 text-blue-600" />
-                      Imagen del Producto
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Barcode Scanner */}
+              {showBarcodeScanner && (
+                <div className="mb-4 bg-gray-50 rounded-lg p-4 border-2 border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <Camera className="w-5 h-5 text-blue-600" />
+                      Escanear Código de Barras
                     </h3>
-                    <ImageUpload
-                      value={imagePreview}
-                      onChange={setImagePreview}
-                      type="products"
-                      placeholder="Click para subir imagen"
-                      previewSize="w-full h-48"
-                      disabled={viewMode}
-                    />
-                  </div>
-
-                  {/* Barcode Scanner Button - Only on large screens */}
-                  {!viewMode && (
                     <button
                       type="button"
-                      onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
-                      className="hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      title="Escanear código de barras"
+                      onClick={() => {
+                        setShowBarcodeScanner(false);
+                        setScannerError(null);
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
                     >
-                      <Camera className="w-5 h-5" />
-                      Escanear código de barras
+                      <X className="w-5 h-5" />
                     </button>
-                  )}
+                  </div>
+                  
+                  <div className="bg-black rounded-lg overflow-hidden" style={{ minHeight: '250px' }}>
+                    {scannerError ? (
+                      <div className="flex items-center justify-center h-64 p-6 text-center">
+                        <div>
+                          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                          <p className="text-white mb-2">Error al acceder a la cámara</p>
+                          <p className="text-gray-400 text-sm mb-4">{scannerError}</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowBarcodeScanner(false)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <BarcodeScannerComponent
+                        onDetected={handleBarcodeDetected}
+                        onError={(err) => setScannerError(err)}
+                      />
+                    )}
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mt-3 text-center">
+                    Apunta la cámara al código de barras del producto
+                  </p>
                 </div>
-
-                {/* Right Column - Form Fields */}
-                <div className="lg:col-span-2 space-y-4">
-                  {/* Barcode Scanner */}
-                  {showBarcodeScanner && (
-                    <div className="bg-gray-50 rounded-lg p-4 border-2 border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                          <Camera className="w-5 h-5 text-blue-600" />
-                          Escanear Código de Barras
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowBarcodeScanner(false);
-                            setScannerError(null);
-                          }}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="bg-black rounded-lg overflow-hidden h-72">
-                        {scannerError ? (
-                          <div className="flex items-center justify-center h-full p-6 text-center">
-                            <div>
-                              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                              <p className="text-white mb-2">Error al acceder a la cámara</p>
-                              <p className="text-gray-400 text-sm mb-4">{scannerError}</p>
-                              <button
-                                type="button"
-                                onClick={() => setShowBarcodeScanner(false)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                              >
-                                Cerrar
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <BarcodeScannerComponent
-                            onDetected={handleBarcodeDetected}
-                            onError={(err) => setScannerError(err)}
-                          />
-                        )}
-                      </div>
-
-                      <p className="text-sm text-gray-600 mt-3 text-center">
-                        Apunta la cámara al código de barras del producto
-                      </p>
-                    </div>
-                  )}
+              )}
 
               {/* Basic Info */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-blue-600" />
-                  Información Básica
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nombre del Producto *
@@ -831,6 +688,7 @@ const ProductsPage = () => {
                     value={formData.name}
                     onChange={handleChange}
                     required
+                    disabled={viewMode}
                     disabled={viewMode}
                     className="input"
                     placeholder="Ej: Aceite de Soya 1L"
@@ -847,6 +705,7 @@ const ProductsPage = () => {
                     onChange={handleChange}
                     rows="3"
                     disabled={viewMode}
+                    disabled={viewMode}
                     className="input"
                     placeholder="Descripción detallada del producto..."
                   />
@@ -861,6 +720,7 @@ const ProductsPage = () => {
                     value={formData.category_id}
                     onChange={handleChange}
                     required
+                    disabled={viewMode}
                     disabled={viewMode}
                     className="input"
                   >
@@ -884,14 +744,14 @@ const ProductsPage = () => {
                       value={formData.barcode || ''}
                       onChange={handleChange}
                       disabled={viewMode}
-                      className={`input flex-1 ${barcodeError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                      className="input flex-1"
                       placeholder="Ej: 7730969301421"
                     />
                     {!viewMode && (
                       <button
                         type="button"
                         onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
-                        className="lg:hidden px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                         title="Escanear código de barras"
                       >
                         <Camera className="w-4 h-4" />
@@ -899,22 +759,6 @@ const ProductsPage = () => {
                       </button>
                     )}
                   </div>
-                  {barcodeError && (
-                    <div className="mt-2 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm text-red-800 font-medium">Código de barras duplicado</p>
-                        <p className="text-sm text-red-700 mt-1">{barcodeError}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setBarcodeError(null)}
-                        className="text-red-400 hover:text-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -936,15 +780,79 @@ const ProductsPage = () => {
                     ))}
                   </select>
                 </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Imagen del Producto
+                  </label>
+                  <ImageUpload
+                    value={imagePreview}
+                    onChange={setImagePreview}
+                    type="products"
+                    placeholder="Click para subir imagen del producto"
+                    previewSize="w-32 h-32"
+                    disabled={viewMode}
+                  />
+                </div>
               </div>
+
+              {/* Stock Settings */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Configuración de Stock</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stock Mínimo
+                    </label>
+                    <input
+                      type="number"
+                      name="min_stock"
+                      value={formData.min_stock}
+                      onChange={handleChange}
+                      min="0"
+                      step="1"
+                      disabled={viewMode}
+                    className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stock Máximo
+                    </label>
+                    <input
+                      type="number"
+                      name="max_stock"
+                      value={formData.max_stock}
+                      onChange={handleChange}
+                      min="0"
+                      step="1"
+                      disabled={viewMode}
+                    className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Punto de Reorden
+                    </label>
+                    <input
+                      type="number"
+                      name="reorder_point"
+                      value={formData.reorder_point}
+                      onChange={handleChange}
+                      min="0"
+                      step="1"
+                      disabled={viewMode}
+                    className="input"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Presentation Section */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Box className="h-5 w-5 text-blue-600" />
-                  Presentación del Producto
-                </h3>
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Presentación del Producto</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -955,7 +863,7 @@ const ProductsPage = () => {
                       value={formData.packaging_type_id}
                       onChange={handleChange}
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                     >
                       <option value="">Seleccione un tipo de empaque</option>
                       {packagingTypes.map((type) => (
@@ -975,7 +883,7 @@ const ProductsPage = () => {
                       value={formData.presentation_type_id}
                       onChange={handleChange}
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                     >
                       <option value="">Seleccione un tipo de presentación</option>
                       {presentationTypes.map((type) => (
@@ -998,7 +906,7 @@ const ProductsPage = () => {
                       min="1"
                       step="1"
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                       placeholder="Ej: 12"
                     />
                   </div>
@@ -1016,7 +924,7 @@ const ProductsPage = () => {
                         min="0"
                         step="0.01"
                         disabled={viewMode}
-                        className="input"
+                    className="input"
                         placeholder="Ej: 2"
                       />
                       <select
@@ -1024,7 +932,7 @@ const ProductsPage = () => {
                         value={formData.unit_size_measure}
                         onChange={handleChange}
                         disabled={viewMode}
-                        className="input"
+                    className="input"
                       >
                         <option value="UND">UND</option>
                         <option value="LT">LT</option>
@@ -1058,7 +966,7 @@ const ProductsPage = () => {
                       min="0"
                       step="0.01"
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                       placeholder="Ej: 25.50"
                     />
                   </div>
@@ -1087,7 +995,7 @@ const ProductsPage = () => {
                       min="0"
                       step="0.01"
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                       placeholder="Ej: 20.00"
                     />
                   </div>
@@ -1101,7 +1009,7 @@ const ProductsPage = () => {
                       value={formData.purchase_currency}
                       onChange={handleChange}
                       disabled={viewMode}
-                      className="input"
+                    className="input"
                     >
                       <option value="USD">USD - Dólar</option>
                       <option value="COP">COP - Peso Colombiano</option>
@@ -1111,69 +1019,9 @@ const ProductsPage = () => {
                 </div>
               </div>
 
-              {/* Stock Settings */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart className="h-5 w-5 text-blue-600" />
-                  Configuración de Stock
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stock Mínimo
-                    </label>
-                    <input
-                      type="number"
-                      name="min_stock"
-                      value={formData.min_stock}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stock Máximo
-                    </label>
-                    <input
-                      type="number"
-                      name="max_stock"
-                      value={formData.max_stock}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Punto de Reorden
-                    </label>
-                    <input
-                      type="number"
-                      name="reorder_point"
-                      value={formData.reorder_point}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Additional Settings */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-blue-600" />
-                  Configuración Adicional
-                </h3>
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Configuración Adicional</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="flex items-center">
@@ -1214,40 +1062,27 @@ const ProductsPage = () => {
                   </div>
                 </div>
               </div>
-                </div>
-              </div>
 
               {/* Actions */}
-              <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 -mx-6 -mb-6 mt-6 flex justify-end gap-3 rounded-b-lg">
+              <div className="border-t border-gray-200 pt-4 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn-secondary"
                 >
                   {viewMode ? 'Cerrar' : 'Cancelar'}
                 </button>
                 {!viewMode && (
                   <button
                     type="submit"
-                    disabled={loading || barcodeError}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    disabled={loading}
+                    className="btn-primary disabled:opacity-50"
                   >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        {editingProduct ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                        {editingProduct ? 'Actualizar' : 'Crear Producto'}
-                      </>
-                    )}
+                    {loading ? 'Guardando...' : editingProduct ? 'Actualizar' : 'Crear Producto'}
                   </button>
                 )}
               </div>
             </form>
-            </div>
           </div>
         </div>
       )}
@@ -1311,7 +1146,7 @@ const ProductsPage = () => {
                     {/* Dates */}
                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                        <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           Creado
                         </label>
@@ -1332,7 +1167,7 @@ const ProductsPage = () => {
                         </p>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                        <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           Actualizado
                         </label>
@@ -1479,10 +1314,7 @@ const ProductsPage = () => {
 
                     {/* Additional Configuration */}
                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Configuración Adicional
-                      </h4>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Configuración Adicional</h4>
                       <div className="space-y-2">
                         <label className="flex items-center text-sm text-gray-700">
                           <input
@@ -1515,7 +1347,7 @@ const ProductsPage = () => {
                   >
                     Cerrar
                   </button>
-                  {hasPermission('products.update') && viewingProduct.is_active && (
+                  {hasPermission('products.update') && (
                     <button
                       onClick={() => {
                         setShowViewModal(false);

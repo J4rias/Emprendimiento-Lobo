@@ -19,6 +19,8 @@ import StockReplenishmentPage from './pages/StockReplenishmentPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SuppliersPage from './pages/SuppliersPage';
 import BrandsPage from './pages/BrandsPage';
+import ExchangeRatesPage from './pages/ExchangeRatesPage';
+import ReportsPage from './pages/ReportsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -206,6 +208,26 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <SettingsPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/tasas-cambio"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <ExchangeRatesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/reportes"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <ReportsPage />
             </AppLayout>
           </PrivateRoute>
         }

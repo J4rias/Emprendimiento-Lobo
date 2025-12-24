@@ -28,19 +28,13 @@ const Product = sequelize.define('Product', {
       key: 'id'
     }
   },
-  brand: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  manufacturer: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  unit_of_measure: {
-    type: DataTypes.STRING(20),
-    allowNull: false,
-    defaultValue: 'UND',
-    comment: 'UND, KG, LT, MT, etc.'
+  brand_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'brands',
+      key: 'id'
+    }
   },
   is_perishable: {
     type: DataTypes.BOOLEAN,
@@ -51,15 +45,15 @@ const Product = sequelize.define('Product', {
     defaultValue: false
   },
   min_stock: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.INTEGER,
     defaultValue: 0
   },
   max_stock: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.INTEGER,
     defaultValue: 0
   },
   reorder_point: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.INTEGER,
     defaultValue: 0
   },
   image_url: {

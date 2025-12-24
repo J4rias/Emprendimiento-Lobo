@@ -1,14 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { inventoryService } from '../services/api/inventoryService';
-import { ArrowLeft, Package, Calendar, DollarSign, AlertTriangle, Warehouse, Edit } from 'lucide-react';
+import { ArrowLeft, Package, Calendar, DollarSign, AlertTriangle, Warehouse, Edit, ArrowRightLeft } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const InventoryDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [convertedValue, setConvertedValue] = useState(null);
+
+  const currencies = [
+    { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
+    { code: 'COP', name: 'Peso Colombiano', symbol: '$' },
+    { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
+  ];
 
   useEffect(() => {
     fetchInventoryDetail();
@@ -24,6 +36,37 @@ const InventoryDetailPage = () => {
       setLoading(false);
     }
   };
+
+  // Convert unit cost when currency changes
+  useEffect(() => {
+    const convertValue = async () => {
+      if (!inventory?.product?.presentations?.[0]?.cost || selectedCurrency === 'USD') {
+        setConvertedValue(null);
+        return;
+      }
+
+      try {
+        const unitCost = parseFloat(inventory.product.presentations[0].cost);
+        const response = await fetch(
+          `${API_URL}/exchange-rates/convert?amount=${unitCost}&from_currency=USD&to_currency=${selectedCurrency}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setConvertedValue(data.data);
+        }
+      } catch (error) {
+        console.error('Error converting currency:', error);
+      }
+    };
+
+    convertValue();
+  }, [selectedCurrency, inventory, token]);
 
   if (loading) {
     return (
@@ -117,10 +160,40 @@ const InventoryDetailPage = () => {
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Valor Unitario</p>
-            <p className="text-2xl font-bold text-green-600">
-              ${inventory.product.presentations?.[0]?.cost || '0.00'}
-            </p>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <p className="text-sm text-gray-600">Valor Unitario</p>
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+                className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                title="Seleccionar moneda"
+              >
+                {currencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedCurrency === 'USD' ? (
+              <p className="text-2xl font-bold text-green-600">
+                ${inventory.product.presentations?.[0]?.cost || '0.00'}
+              </p>
+            ) : (
+              <div>
+                <p className="text-2xl font-bold text-green-600">
+                  {currencies.find(c => c.code === selectedCurrency)?.symbol} {convertedValue?.converted_amount?.toFixed(2) || '...'}
+                </p>
+                {convertedValue && (
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    <ArrowRightLeft className="w-3 h-3 text-gray-400" />
+                    <p className="text-xs text-gray-500">
+                      ${inventory.product.presentations?.[0]?.cost || '0.00'} × {convertedValue.rate?.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
             <AlertTriangle className="w-8 h-8 text-yellow-600 mx-auto mb-2" />

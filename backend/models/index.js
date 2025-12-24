@@ -24,6 +24,9 @@ const SalePayment = require('./SalePayment');
 const Supplier = require('./Supplier');
 const SupplierContact = require('./SupplierContact');
 const Brand = require('./Brand');
+const ExchangeRate = require('./ExchangeRate');
+const PackagingType = require('./PackagingType');
+const PresentationType = require('./PresentationType');
 
 // Define associations
 
@@ -53,6 +56,10 @@ Category.hasMany(Category, { foreignKey: 'parent_id', as: 'children' });
 Product.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
 Category.hasMany(Product, { foreignKey: 'category_id', as: 'products' });
 
+// Product - Brand (Many to One)
+Product.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brand' });
+Brand.hasMany(Product, { foreignKey: 'brand_id', as: 'products' });
+
 // Product - User (Created/Updated by)
 Product.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 Product.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
@@ -60,6 +67,14 @@ Product.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
 // Product - ProductPresentation (One to Many)
 Product.hasMany(ProductPresentation, { foreignKey: 'product_id', as: 'presentations' });
 ProductPresentation.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+
+// ProductPresentation - PackagingType (Many to One)
+ProductPresentation.belongsTo(PackagingType, { foreignKey: 'packaging_type_id', as: 'packagingType' });
+PackagingType.hasMany(ProductPresentation, { foreignKey: 'packaging_type_id', as: 'presentations' });
+
+// ProductPresentation - PresentationType (Many to One)
+ProductPresentation.belongsTo(PresentationType, { foreignKey: 'presentation_type_id', as: 'presentationType' });
+PresentationType.hasMany(ProductPresentation, { foreignKey: 'presentation_type_id', as: 'presentations' });
 
 // Product - Barcode (One to Many)
 Product.hasMany(Barcode, { foreignKey: 'product_id', as: 'barcodes' });
@@ -185,6 +200,10 @@ SalePayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 Supplier.hasMany(SupplierContact, { foreignKey: 'supplier_id', as: 'contacts' });
 SupplierContact.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
 
+// ExchangeRate - User (Created/Updated by)
+ExchangeRate.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+ExchangeRate.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -210,5 +229,8 @@ module.exports = {
   SalePayment,
   Supplier,
   SupplierContact,
-  Brand
+  Brand,
+  ExchangeRate,
+  PackagingType,
+  PresentationType
 };

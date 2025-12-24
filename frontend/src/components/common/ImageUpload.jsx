@@ -21,6 +21,9 @@ const ImageUpload = ({
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Get base URL for images (API URL without /api suffix)
+  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
+
   const handleFileSelect = async (files) => {
     if (!files || files.length === 0) return;
 
@@ -134,24 +137,32 @@ const ImageUpload = ({
     onChange(newUrls);
   };
 
-  const renderPreview = (url, index = null) => (
-    <div key={index || 'preview'} className="relative group">
-      <img
-        src={url}
-        alt="Preview"
-        className={`${previewSize} object-cover rounded-lg border-2 border-gray-200`}
-      />
-      {!disabled && (
-        <button
-          type="button"
-          onClick={() => index !== null ? removeImageAtIndex(index) : removeImage()}
-          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
-  );
+  const renderPreview = (url, index = null) => {
+    // Ensure URL has the base server URL
+    let fullUrl = url;
+    if (url && !url.startsWith('http') && !url.startsWith('data:')) {
+      fullUrl = `${baseUrl}${url}`;
+    }
+
+    return (
+      <div key={index || 'preview'} className="relative group">
+        <img
+          src={fullUrl}
+          alt="Preview"
+          className={`${previewSize} object-cover rounded-lg border-2 border-gray-200 max-w-full max-h-full`}
+        />
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => index !== null ? removeImageAtIndex(index) : removeImage()}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={`space-y-2 ${className}`}>

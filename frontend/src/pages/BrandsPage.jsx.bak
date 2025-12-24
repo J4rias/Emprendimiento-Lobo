@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api/axios';
-import { Plus, Edit2, Trash2, Search, Building2, Globe, MapPin, Eye, X, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Building2, Globe, MapPin, Eye, X } from 'lucide-react';
 import ImageUpload from '../components/common/ImageUpload';
 
 const BrandsPage = () => {
@@ -82,28 +82,16 @@ const BrandsPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Prepare data, remove empty website field to avoid validation error
-      const dataToSend = { ...formData };
-      if (!dataToSend.website || dataToSend.website.trim() === '') {
-        delete dataToSend.website;
-      }
-      if (!dataToSend.logo_url || dataToSend.logo_url.trim() === '') {
-        delete dataToSend.logo_url;
-      }
-
       if (editingBrand) {
-        await api.put(`/brands/${editingBrand.id}`, dataToSend);
+        await api.put(`/brands/${editingBrand.id}`, formData);
       } else {
-        await api.post('/brands', dataToSend);
+        await api.post('/brands', formData);
       }
       fetchBrands();
       handleCloseModal();
     } catch (err) {
       setError('Error al guardar la marca');
       console.error('Error saving brand:', err);
-      if (err.response) {
-        console.error('Error response:', err.response.data);
-      }
     }
   };
 
@@ -169,13 +157,9 @@ const BrandsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Marcas</h1>
-          <p className="text-gray-600">Gestión de marcas de productos</p>
-        </div>
+    <div className="px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Marcas</h1>
         <button
           onClick={() => setShowModal(true)}
           className="btn btn-primary flex items-center gap-2"
@@ -185,30 +169,16 @@ const BrandsPage = () => {
         </button>
       </div>
 
-      {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{error}</p>
-          </div>
-          <button
-            onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
+          {error}
         </div>
       )}
 
       {/* Search */}
-      <div className="card">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Search className="h-4 w-4 inline mr-1" />
-            Buscar
-          </label>
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
           <input
             ref={searchInputRef}
             type="text"
@@ -218,16 +188,16 @@ const BrandsPage = () => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="input"
+            className="input pl-10"
           />
         </div>
       </div>
 
       {/* Brands List */}
-      <div className="card overflow-hidden">
+      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Marca
@@ -255,7 +225,7 @@ const BrandsPage = () => {
                         <img
                           src={brand.logo_url}
                           alt={brand.name}
-                          className="max-h-10 w-10 mr-3 object-cover"
+                          className="h-10 w-10 rounded-full mr-3 object-cover"
                         />
                       ) : (
                         <Building2 className="h-10 w-10 text-gray-400 mr-3" />
@@ -428,7 +398,7 @@ const BrandsPage = () => {
                         onChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
                         type="brands"
                         placeholder="Subir logo de la marca"
-                        previewSize="h-24"
+                        previewSize="w-24 h-24"
                       />
                     </div>
 

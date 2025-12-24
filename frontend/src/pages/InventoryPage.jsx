@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
-import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download, RefreshCw, Eye, Edit, Plus, Minus, HelpCircle, Info } from 'lucide-react';
+import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download, RefreshCw, Eye, Edit, Plus, Minus, HelpCircle, Info, ArrowRightLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const InventoryPage = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [selectedWarehouse, setSelectedWarehouse] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -16,6 +20,14 @@ const InventoryPage = () => {
   });
   const [selectedItems, setSelectedItems] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [convertedValue, setConvertedValue] = useState(null);
+
+  const currencies = [
+    { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
+    { code: 'COP', name: 'Peso Colombiano', symbol: '$' },
+    { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
+  ];
 
   const { data: inventoryData, isLoading, refetch } = useQuery({
     queryKey: ['inventory', selectedWarehouse, searchTerm, filters],
@@ -42,6 +54,36 @@ const InventoryPage = () => {
     queryKey: ['valuation'],
     queryFn: () => inventoryService.getValuation({ warehouse_id: selectedWarehouse }),
   });
+
+  // Convert inventory value when currency changes
+  useEffect(() => {
+    const convertValue = async () => {
+      if (!valuationData?.data?.totalValue || selectedCurrency === 'USD') {
+        setConvertedValue(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_URL}/exchange-rates/convert?amount=${valuationData.data.totalValue}&from_currency=USD&to_currency=${selectedCurrency}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setConvertedValue(data.data);
+        }
+      } catch (error) {
+        console.error('Error converting currency:', error);
+      }
+    };
+
+    convertValue();
+  }, [selectedCurrency, valuationData, token]);
 
   const handleSelectItem = (itemId) => {
     setSelectedItems(prev => 
@@ -119,13 +161,14 @@ const InventoryPage = () => {
                 <p><strong>📦 Stock Actual:</strong> Cantidad física disponible de cada producto en el depósito seleccionado.</p>
                 <p><strong>⚠️ Stock Bajo:</strong> Productos que están en o por debajo del punto de reorden configurado.</p>
                 <p><strong>🔴 Agotado:</strong> Productos sin stock disponible que necesitan reabastecimiento urgente.</p>
-                <p><strong>💰 Valor Total:</strong> Suma del costo de todos los productos en inventario.</p>
+                <p><strong>💰 Valor Total:</strong> Suma del costo de todos los productos en inventario. Puedes cambiar la moneda para ver el valor en USD, COP o VES.</p>
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <p className="font-medium mb-1">Acciones disponibles:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Click en el ojo (👁️) para ver detalles del producto</li>
                     <li>Click en el lápiz (✏️) para ajustar el stock (agregar o remover)</li>
                     <li>Selecciona múltiples productos para transferencias masivas</li>
+                    <li>Usa el selector de moneda para ver valores en diferentes divisas</li>
                   </ul>
                 </div>
               </div>
@@ -195,12 +238,42 @@ const InventoryPage = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Valor Total</p>
-              <p className="text-2xl font-bold text-green-600">
-                ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'}
-              </p>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                <select
+                  value={selectedCurrency}
+                  onChange={(e) => setSelectedCurrency(e.target.value)}
+                  className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  title="Seleccionar moneda"
+                >
+                  {currencies.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedCurrency === 'USD' ? (
+                <p className="text-2xl font-bold text-green-600">
+                  ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'}
+                </p>
+              ) : (
+                <div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {currencies.find(c => c.code === selectedCurrency)?.symbol} {convertedValue?.converted_amount?.toFixed(2) || '...'}
+                  </p>
+                  {convertedValue && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <ArrowRightLeft className="w-3 h-3 text-gray-400" />
+                      <p className="text-xs text-gray-500">
+                        ${valuationData?.data?.totalValue?.toFixed(2)} USD × {convertedValue.rate?.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="bg-green-100 p-3 rounded-lg">
               <DollarSign className="w-6 h-6 text-green-600" />

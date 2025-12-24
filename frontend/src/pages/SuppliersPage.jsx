@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api/axios';
-import { Plus, Edit2, Trash2, Search, Building, User, Mail, Phone, MapPin, Eye, Calendar, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Building, User, Mail, Phone, Eye, Calendar, Clock, AlertCircle, X, Tag, BookText, Contact } from 'lucide-react';
 import SupplierContactManager from '../components/suppliers/SupplierContactManager';
 
 const SuppliersPage = () => {
+  const { hasPermission } = useAuth();
+  const searchInputRef = useRef(null);
+  const wasSearchFocused = useRef(false);
+  const cursorPosition = useRef(0);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,6 +17,7 @@ const SuppliersPage = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -24,9 +30,35 @@ const SuppliersPage = () => {
     contacts: []
   });
 
+  // Debounce search to avoid losing focus
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Track focus before debounced search triggers
+  useEffect(() => {
+    if (document.activeElement === searchInputRef.current) {
+      wasSearchFocused.current = true;
+      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
+    }
+  }, [debouncedSearch]);
+
+  // Restore focus after loading completes
+  useEffect(() => {
+    if (!loading && wasSearchFocused.current && searchInputRef.current) {
+      searchInputRef.current.focus();
+      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
+      wasSearchFocused.current = false;
+    }
+  }, [loading]);
+
   useEffect(() => {
     fetchSuppliers();
-  }, [currentPage, searchTerm]);
+  }, [currentPage, debouncedSearch]);
 
   const fetchSuppliers = async () => {
     try {
@@ -35,7 +67,7 @@ const SuppliersPage = () => {
         params: {
           page: currentPage,
           limit: 20,
-          search: searchTerm
+          search: debouncedSearch
         }
       });
       setSuppliers(response.data.data);
@@ -52,7 +84,6 @@ const SuppliersPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      console.log('Submitting supplier data:', formData);
       if (editingSupplier) {
         await api.put(`/suppliers/${editingSupplier.id}`, formData);
       } else {
@@ -130,29 +161,50 @@ const SuppliersPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Proveedores</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Nuevo Proveedor
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
+          <p className="text-gray-600">Gestión de proveedores</p>
+        </div>
+        {hasPermission('suppliers.create') && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <Plus className="h-5 w-5" />
+            Nuevo Proveedor
+          </button>
+        )}
       </div>
 
+      {/* Error Alert */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
-          {error}
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-600 hover:text-red-800"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       )}
 
       {/* Search */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+      <div className="card">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Search className="h-4 w-4 inline mr-1" />
+            Buscar
+          </label>
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Buscar proveedores..."
             value={searchTerm}
@@ -160,16 +212,16 @@ const SuppliersPage = () => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="input pl-10"
+            className="input"
           />
         </div>
       </div>
 
       {/* Suppliers List */}
-      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="table">
+            <thead>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Proveedor
@@ -180,9 +232,11 @@ const SuppliersPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
+                {(hasPermission('suppliers.update') || hasPermission('suppliers.delete')) && (
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -235,39 +289,42 @@ const SuppliersPage = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      supplier.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${supplier.is_active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}>
                       {supplier.is_active ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleView(supplier)}
-                      className="text-gray-600 hover:text-gray-900 mr-3"
-                      title="Ver detalles"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleEdit(supplier)}
-                      className="text-primary-600 hover:text-primary-900 mr-3"
-                      title="Editar"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    {supplier.is_active && (
+                  {(hasPermission('suppliers.update') || hasPermission('suppliers.delete')) && (
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
-                        onClick={() => handleDelete(supplier.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar"
+                        onClick={() => handleView(supplier)}
+                        className="text-gray-600 hover:text-gray-900 mr-3"
+                        title="Ver detalles"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Eye className="h-4 w-4" />
                       </button>
-                    )}
-                  </td>
+                      {hasPermission('suppliers.update') && supplier.is_active && (
+                        <button
+                          onClick={() => handleEdit(supplier)}
+                          className="text-primary-600 hover:text-primary-900 mr-3"
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
+                      {hasPermission('suppliers.delete') && supplier.is_active && (
+                        <button
+                          onClick={() => handleDelete(supplier.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -334,14 +391,25 @@ const SuppliersPage = () => {
             </div>
 
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <form onSubmit={handleSubmit}>
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="mb-4">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-                    </h3>
-                  </div>
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <Building className="h-6 w-6" />
+                    {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
 
+              <form onSubmit={handleSubmit}>
+                <div className="bg-white px-6 py-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2 space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
@@ -409,34 +477,22 @@ const SuppliersPage = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="is_active"
-                          checked={formData.is_active}
-                          onChange={handleChange}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Proveedor Activo</span>
-                      </label>
-                    </div>
                   </div>
                 </div>
 
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="submit"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  >
-                    {editingSupplier ? 'Actualizar' : 'Guardar'}
-                  </button>
+                <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    {editingSupplier ? 'Actualizar' : 'Guardar'}
                   </button>
                 </div>
               </form>
@@ -453,123 +509,53 @@ const SuppliersPage = () => {
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="mb-4">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <Building className="h-6 w-6" />
                     Detalles del Proveedor
                   </h3>
+                  <button
+                    onClick={() => setShowViewModal(false)}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
                 </div>
+              </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500">Nombre</label>
-                    <p className="mt-1 text-sm text-gray-900">{viewingSupplier.name}</p>
-                  </div>
-
-                  {viewingSupplier.tax_id && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">RIF / Tax ID</label>
-                      <p className="mt-1 text-sm text-gray-900">{viewingSupplier.tax_id}</p>
-                    </div>
-                  )}
-
-                  {viewingSupplier.payment_terms && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Condiciones de Pago</label>
-                      <p className="mt-1 text-sm text-gray-900">{viewingSupplier.payment_terms}</p>
-                    </div>
-                  )}
-
-                  {/* Contactos */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-3">Contactos</label>
-                    {viewingSupplier.contacts && viewingSupplier.contacts.length > 0 ? (
-                      <div className="space-y-3">
-                        {viewingSupplier.contacts.map((contact) => (
-                          <div key={contact.id} className="border border-gray-200 rounded-lg p-3">
-                            {contact.is_primary && (
-                              <div className="flex items-center mb-2">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                  Contacto Principal
-                                </span>
-                              </div>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <div className="flex items-center">
-                                  <User className="h-4 w-4 text-gray-400 mr-2" />
-                                  <p className="font-medium text-gray-900">{contact.name}</p>
-                                </div>
-                                {contact.position && (
-                                  <div className="flex items-center ml-6">
-                                    <span className="text-gray-500">{contact.position}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-gray-600 space-y-1">
-                                {contact.email && (
-                                  <div className="flex items-center">
-                                    <Mail className="h-3 w-3 mr-2" />
-                                    {contact.email}
-                                  </div>
-                                )}
-                                {contact.phone && (
-                                  <div className="flex items-center">
-                                    <Phone className="h-3 w-3 mr-2" />
-                                    {contact.phone}
-                                  </div>
-                                )}
-                                {contact.mobile && (
-                                  <div className="flex items-center">
-                                    <Phone className="h-3 w-3 mr-2" />
-                                    Móvil: {contact.mobile}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">Sin contactos registrados</p>
-                    )}
-                  </div>
-
-                  {viewingSupplier.notes && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Notas</label>
-                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{viewingSupplier.notes}</p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Estado</label>
-                      <p className="mt-1">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          viewingSupplier.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+              <div className="bg-white px-6 py-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Image and Basic Info */}
+                  <div className="lg:col-span-1 space-y-4">
+                    {/* Status Supplier */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Estado</label>
+                      <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${viewingSupplier.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
                         }`}>
-                          {viewingSupplier.is_active ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </p>
+                        {viewingSupplier.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+
+                    {/* Dates */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-500">
-                          <Calendar className="h-4 w-4 inline mr-1" />
+                        <label className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
                           Creado
                         </label>
-                        <p className="mt-1 text-sm text-gray-900">
+                        <p className="text-sm text-gray-900">
                           {(() => {
                             const date = viewingSupplier.createdAt || viewingSupplier.created_at;
                             if (!date) return '-';
                             try {
                               return new Date(date).toLocaleDateString('es-ES', {
                                 day: '2-digit',
-                                month: '2-digit',
+                                month: 'short',
                                 year: 'numeric'
                               });
                             } catch (e) {
@@ -579,18 +565,18 @@ const SuppliersPage = () => {
                         </p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-500">
-                          <Clock className="h-4 w-4 inline mr-1" />
-                          Última Actualización
+                        <label className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Actualizado
                         </label>
-                        <p className="mt-1 text-sm text-gray-900">
+                        <p className="text-sm text-gray-900">
                           {(() => {
                             const date = viewingSupplier.updatedAt || viewingSupplier.updated_at;
                             if (!date) return '-';
                             try {
                               return new Date(date).toLocaleDateString('es-ES', {
                                 day: '2-digit',
-                                month: '2-digit',
+                                month: 'short',
                                 year: 'numeric'
                               });
                             } catch (e) {
@@ -601,23 +587,140 @@ const SuppliersPage = () => {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={() => setShowViewModal(false)}
-                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:w-auto sm:text-sm"
-                >
-                  Cerrar
-                </button>
+                  {/* Right Column - Details */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Información Básica
+                      </h4>
+                      <div className="grid gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500">Nombre</label>
+                          <p className="mt-1 text-sm text-gray-900">{viewingSupplier.name}</p>
+                        </div>
+
+                        {viewingSupplier.tax_id && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">RIF / Tax ID</label>
+                            <p className="mt-1 text-sm text-gray-900">{viewingSupplier.tax_id}</p>
+                          </div>
+                        )}
+
+                        {viewingSupplier.payment_terms && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Condiciones de Pago</label>
+                            <p className="mt-1 text-sm text-gray-900">{viewingSupplier.payment_terms}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contactos */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <Contact className="h-4 w-4" />
+                        Contactos
+                      </h4>
+                      {viewingSupplier.contacts && viewingSupplier.contacts.length > 0 ? (
+                        <div className="space-y-3">
+                          {viewingSupplier.contacts.map((contact) => (
+                            <div key={contact.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                              {contact.is_primary && (
+                                <div className="flex items-center mb-2">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    Contacto Principal
+                                  </span>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <div className="flex items-center">
+                                    <User className="h-4 w-4 text-gray-400 mr-2" />
+                                    <p className="font-medium text-gray-900">{contact.name}</p>
+                                  </div>
+                                  {contact.position && (
+                                    <div className="flex items-center ml-6">
+                                      <span className="text-gray-500">{contact.position}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-gray-600 space-y-1">
+                                  {contact.email && (
+                                    <div className="flex items-center">
+                                      <Mail className="h-3 w-3 mr-2" />
+                                      {contact.email}
+                                    </div>
+                                  )}
+                                  {contact.phone && (
+                                    <div className="flex items-center">
+                                      <Phone className="h-3 w-3 mr-2" />
+                                      {contact.phone}
+                                    </div>
+                                  )}
+                                  {contact.mobile && (
+                                    <div className="flex items-center">
+                                      <Phone className="h-3 w-3 mr-2" />
+                                      Móvil: {contact.mobile}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">Sin contactos registrados</p>
+                      )}
+                    </div>
+
+                    {/* Notas */}
+                    {viewingSupplier.notes && (
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                          <BookText className="h-4 w-4" />
+                          Información Adicional
+                        </h4>
+                        <div className="grid gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Notas</label>
+                            <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{viewingSupplier.notes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer Actions */}
+                    <div className="mt-6 flex justify-end gap-3">
+                      <button
+                        onClick={() => setShowViewModal(false)}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Cerrar
+                      </button>
+                      {hasPermission('suppliers.update') && viewingSupplier.is_active && (
+                        <button
+                          onClick={() => {
+                            setShowViewModal(false);
+                            handleEdit(viewingSupplier);
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

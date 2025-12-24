@@ -17,26 +17,11 @@ class ProductController {
 
       const offset = (page - 1) * limit;
       const where = {};
-      const include = [
-        { model: Category, as: 'category' },
-        { model: Brand, as: 'brand' },
-        {
-          model: ProductPresentation,
-          as: 'presentations',
-          include: [
-            { model: PackagingType, as: 'packagingType' },
-            { model: PresentationType, as: 'presentationType' }
-          ]
-        },
-        { model: Barcode, as: 'barcodes' }
-      ];
 
       if (search) {
-        // Search in product name, SKU, or barcode
         where[Op.or] = [
           { name: { [Op.like]: `%${search}%` } },
-          { sku: { [Op.like]: `%${search}%` } },
-          { '$barcodes.barcode$': { [Op.like]: `%${search}%` } }
+          { sku: { [Op.like]: `%${search}%` } }
         ];
       }
 
@@ -46,9 +31,19 @@ class ProductController {
 
       const { rows: products, count } = await Product.findAndCountAll({
         where,
-        include,
-        distinct: true,
-        subQuery: false,
+        include: [
+          { model: Category, as: 'category' },
+          { model: Brand, as: 'brand' },
+          {
+            model: ProductPresentation,
+            as: 'presentations',
+            include: [
+              { model: PackagingType, as: 'packagingType' },
+              { model: PresentationType, as: 'presentationType' }
+            ]
+          },
+          { model: Barcode, as: 'barcodes' }
+        ],
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [['created_at', 'DESC']]
@@ -120,27 +115,18 @@ class ProductController {
         category_id,
         barcode,
         brand_id,
+        unit_of_measure,
         is_perishable,
         has_batch_control,
         min_stock,
         max_stock,
-        reorder_point,
-        image_url,
-        // Presentation fields
-        packaging_type_id,
-        presentation_type_id,
-        units_per_package,
-        unit_size,
-        unit_size_measure,
-        package_price,
-        package_cost,
-        purchase_currency
+        reorder_point
       } = req.body;
 
-      // Get image URL from processed files if uploaded, or use provided image_url
-      const finalImageUrl = req.processedFiles && req.processedFiles.length > 0
+      // Get image URL from processed files if uploaded
+      const image_url = req.processedFiles && req.processedFiles.length > 0
         ? req.processedFiles[0].url
-        : (image_url || null);
+        : null;
 
       // Optional: validate barcode uniqueness BEFORE creating product
       const normalizedBarcode = barcode && String(barcode).trim() ? String(barcode).trim() : null;
@@ -182,38 +168,15 @@ class ProductController {
         description,
         category_id,
         brand_id,
+        unit_of_measure,
         is_perishable,
         has_batch_control,
         min_stock,
         max_stock,
         reorder_point,
-        image_url: finalImageUrl,
+        image_url,
         created_by: req.userId
       });
-
-      // Create default presentation if presentation data provided
-      if (packaging_type_id || presentation_type_id || units_per_package) {
-        const presentationName = `${name} - Presentación estándar`;
-        const unitsPerPkg = parseInt(units_per_package) || 1;
-        
-        await ProductPresentation.create({
-          product_id: product.id,
-          packaging_type_id: packaging_type_id || null,
-          presentation_type_id: presentation_type_id || null,
-          name: presentationName,
-          units_per_package: unitsPerPkg,
-          unit_size: unit_size || null,
-          unit_size_measure: unit_size_measure || null,
-          units_per_presentation: unitsPerPkg, // For compatibility
-          package_price: package_price || 0,
-          package_cost: package_cost || 0,
-          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : 0,
-          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0,
-          purchase_currency: purchase_currency || 'USD',
-          is_default: true,
-          is_active: true
-        });
-      }
 
       // Optional: create barcode record for scanner-based workflows
       if (normalizedBarcode) {
@@ -232,14 +195,6 @@ class ProductController {
         include: [
           { model: Category, as: 'category' },
           { model: Brand, as: 'brand' },
-          {
-            model: ProductPresentation,
-            as: 'presentations',
-            include: [
-              { model: PackagingType, as: 'packagingType' },
-              { model: PresentationType, as: 'presentationType' }
-            ]
-          },
           { model: Barcode, as: 'barcodes' }
         ]
       });
@@ -264,29 +219,7 @@ class ProductController {
       delete updateData.barcode;
       delete updateData.created_by;
 
-      // Extract presentation fields
-      const {
-        packaging_type_id,
-        presentation_type_id,
-        units_per_package,
-        unit_size,
-        unit_size_measure,
-        package_price,
-        package_cost,
-        purchase_currency
-      } = updateData;
-      
-      // Remove presentation fields from product update
-      delete updateData.packaging_type_id;
-      delete updateData.presentation_type_id;
-      delete updateData.units_per_package;
-      delete updateData.unit_size;
-      delete updateData.unit_size_measure;
-      delete updateData.package_price;
-      delete updateData.package_cost;
-      delete updateData.purchase_currency;
-
-      // Get image URL from processed files if uploaded, or use provided image_url
+      // Get image URL from processed files if uploaded
       if (req.processedFiles && req.processedFiles.length > 0) {
         updateData.image_url = req.processedFiles[0].url;
       }
@@ -306,53 +239,12 @@ class ProductController {
         updated_by: req.userId
       });
 
-      // Update or create default presentation if presentation data provided
-      if (packaging_type_id !== undefined || presentation_type_id !== undefined || units_per_package !== undefined) {
-        const defaultPresentation = await ProductPresentation.findOne({
-          where: { product_id: product.id, is_default: true }
-        });
-
-        const unitsPerPkg = parseInt(units_per_package) || 1;
-        const presentationData = {
-          packaging_type_id: packaging_type_id || null,
-          presentation_type_id: presentation_type_id || null,
-          units_per_package: unitsPerPkg,
-          unit_size: unit_size || null,
-          unit_size_measure: unit_size_measure || null,
-          units_per_presentation: unitsPerPkg,
-          package_price: package_price || 0,
-          package_cost: package_cost || 0,
-          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : 0,
-          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0,
-          purchase_currency: purchase_currency || 'USD'
-        };
-
-        if (defaultPresentation) {
-          await defaultPresentation.update(presentationData);
-        } else {
-          await ProductPresentation.create({
-            product_id: product.id,
-            name: `${product.name} - Presentación estándar`,
-            ...presentationData,
-            is_default: true,
-            is_active: true
-          });
-        }
-      }
-
       // Reload with associations
       await product.reload({
         include: [
           { model: Category, as: 'category' },
           { model: Brand, as: 'brand' },
-          {
-            model: ProductPresentation,
-            as: 'presentations',
-            include: [
-              { model: PackagingType, as: 'packagingType' },
-              { model: PresentationType, as: 'presentationType' }
-            ]
-          },
+          { model: ProductPresentation, as: 'presentations' },
           { model: Barcode, as: 'barcodes' }
         ]
       });
@@ -406,15 +298,7 @@ class ProductController {
           await product.reload({
             include: [
               { model: Category, as: 'category' },
-              { model: Brand, as: 'brand' },
-              {
-                model: ProductPresentation,
-                as: 'presentations',
-                include: [
-                  { model: PackagingType, as: 'packagingType' },
-                  { model: PresentationType, as: 'presentationType' }
-                ]
-              },
+              { model: ProductPresentation, as: 'presentations' },
               { model: Barcode, as: 'barcodes' }
             ]
           });
@@ -504,10 +388,9 @@ class ProductController {
       });
 
       if (!productBySku) {
-        return res.status(200).json({
-          success: true,
-          data: null,
-          message: 'Barcode not found'
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
         });
       }
 

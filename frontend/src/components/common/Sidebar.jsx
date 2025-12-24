@@ -32,7 +32,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   // Rutas de los subitems de cada acordeón
   const productsRoutes = ['/productos', '/categorias', '/proveedores', '/marcas'];
-  const configRoutes = ['/usuarios', '/roles', '/configuracion'];
+  const configRoutes = ['/usuarios', '/roles', '/configuracion', '/tasas-cambio'];
 
   // Efecto para controlar el estado de los acordeones basado en la ruta actual
   useEffect(() => {
@@ -161,6 +161,11 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
           name: 'Configuración General',
           path: '/configuracion',
+          permission: 'settings.manage',
+        },
+        {
+          name: 'Tasas de Cambio',
+          path: '/tasas-cambio',
           permission: 'settings.manage',
         },
       ],

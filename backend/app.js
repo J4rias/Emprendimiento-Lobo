@@ -20,11 +20,16 @@ const categoryRoutes = require('./routes/category.routes');
 const supplierRoutes = require('./routes/supplier.routes');
 const brandRoutes = require('./routes/brand.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const exchangeRateRoutes = require('./routes/exchangeRate.routes');
+const packagingTypeRoutes = require('./routes/packagingType.routes');
+const presentationTypeRoutes = require('./routes/presentationType.routes');
 
 const app = express();
-
-// Security middleware
-app.use(helmet());
+// Security middleware con configuración para permitir imágenes
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+}));
 
 // CORS - Permitir solo localhost
 const allowedOrigins = [
@@ -45,7 +50,8 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['Content-Type', 'Content-Length']
 }));
 
 // Rate limiting - más permisivo para desarrollo
@@ -108,6 +114,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/exchange-rates', exchangeRateRoutes);
+app.use('/api/packaging-types', packagingTypeRoutes);
+app.use('/api/presentation-types', presentationTypeRoutes);
 
 // 404 handler
 app.use((req, res) => {

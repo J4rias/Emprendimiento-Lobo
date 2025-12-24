@@ -359,27 +359,17 @@ class InventoryController {
       });
 
       let totalValue = 0;
-      const totalsByCurrency = {
-        USD: 0,
-        COP: 0,
-        VES: 0
-      };
-
       const valuedItems = inventory.map(inv => {
         const defaultPresentation = inv.product?.presentations?.[0];
         const cost = defaultPresentation?.cost || 0;
-        const currency = defaultPresentation?.purchase_currency || 'USD';
         const quantity = parseFloat(inv.quantity) || 0;
         const value = quantity * parseFloat(cost || 0);
-        
         totalValue += value;
-        totalsByCurrency[currency] += value;
 
         return {
           product: inv.product,
           quantity: inv.quantity,
           cost,
-          currency,
           value
         };
       });
@@ -389,7 +379,6 @@ class InventoryController {
         data: {
           items: valuedItems,
           totalValue,
-          totalsByCurrency,
           currency: 'USD'
         }
       });
@@ -401,7 +390,6 @@ class InventoryController {
         data: {
           items: [],
           totalValue: 0,
-          totalsByCurrency: { USD: 0, COP: 0, VES: 0 },
           currency: 'USD'
         }
       });
