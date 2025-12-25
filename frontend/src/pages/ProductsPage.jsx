@@ -623,15 +623,16 @@ const ProductsPage = () => {
                     </td>
                     <td>
                       {product.category ? (
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: product.category.color || '#6B7280' }}
-                          />
-                          <span>{product.category.name}</span>
-                        </div>
+                        <span
+                          className="px-2 py-1 text-xs rounded-full text-white font-medium inline-flex items-center gap-1.5"
+                          style={{ backgroundColor: product.category.color || '#6B7280' }}
+                        >
+                          {product.category.name}
+                        </span>
                       ) : (
-                        'N/A'
+                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                          N/A
+                        </span>
                       )}
                     </td>
                     <td>{product.brand?.name || '-'}</td>
