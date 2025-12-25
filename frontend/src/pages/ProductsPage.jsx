@@ -621,7 +621,19 @@ const ProductsPage = () => {
                         )}
                       </div>
                     </td>
-                    <td>{product.category?.name || 'N/A'}</td>
+                    <td>
+                      {product.category ? (
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: product.category.color || '#6B7280' }}
+                          />
+                          <span>{product.category.name}</span>
+                        </div>
+                      ) : (
+                        'N/A'
+                      )}
+                    </td>
                     <td>{product.brand?.name || '-'}</td>
                     <td>
                       <span className="text-sm text-gray-600">
@@ -1386,7 +1398,17 @@ const ProductsPage = () => {
                         )}
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
-                          <p className="text-sm text-gray-900">{viewingProduct.category?.name || '-'}</p>
+                          {viewingProduct.category ? (
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: viewingProduct.category.color || '#6B7280' }}
+                              />
+                              <p className="text-sm text-gray-900">{viewingProduct.category.name}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-900">-</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Marca</label>

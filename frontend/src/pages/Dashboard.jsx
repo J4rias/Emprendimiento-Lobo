@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, TrendingUp, Calendar } from 'lucide-react';
+import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, TrendingUp, Calendar, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/api/productService';
 import { inventoryService } from '../services/api/inventoryService';
 import saleService from '../services/api/saleService';
+import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
@@ -20,6 +21,7 @@ const Dashboard = () => {
     pendingSales: 0,
     monthRevenue: 0
   });
+  const [categoriesStats, setCategoriesStats] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -36,6 +38,10 @@ const Dashboard = () => {
 
       // Cargar valoración del inventario
       const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
+
+      // Cargar categorías con conteo de productos
+      const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
+      setCategoriesStats(categoriesData.data || []);
 
       setStats({
         totalProducts: productsData.pagination?.total || 0,
@@ -151,6 +157,52 @@ const Dashboard = () => {
           </div>
         ))}
       </div>
+
+      {/* Categories Overview */}
+      {categoriesStats.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Tag className="w-5 h-5" />
+              Productos por Categoría
+            </h2>
+            <button
+              onClick={() => navigate('/categorias')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Ver todas
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            {categoriesStats
+              .filter(cat => cat.productCount > 0)
+              .sort((a, b) => (b.productCount || 0) - (a.productCount || 0))
+              .slice(0, 6)
+              .map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => navigate(`/productos?category=${category.id}`)}
+                  className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors group"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:shadow-md transition-shadow"
+                    style={{ backgroundColor: category.color || '#6B7280' }}
+                  >
+                    {category.productCount || 0}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-gray-900 truncate w-full">
+                      {category.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      producto{category.productCount !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

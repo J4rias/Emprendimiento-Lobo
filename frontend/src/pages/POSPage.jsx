@@ -214,8 +214,15 @@ const POSPage = () => {
                 <div
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md hover:border-blue-500 transition-all"
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md hover:border-blue-500 transition-all relative"
                 >
+                  {product.category && (
+                    <div
+                      className="absolute top-2 right-2 w-3 h-3 rounded-full shadow-sm"
+                      style={{ backgroundColor: product.category.color || '#6B7280' }}
+                      title={product.category.name}
+                    />
+                  )}
                   <div className="aspect-square bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
                     <ShoppingCart className="w-12 h-12 text-gray-400" />
                   </div>
