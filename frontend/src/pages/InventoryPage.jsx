@@ -20,8 +20,6 @@ const InventoryPage = () => {
   });
   const [selectedItems, setSelectedItems] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('USD');
-  const [convertedValue, setConvertedValue] = useState(null);
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -51,39 +49,9 @@ const InventoryPage = () => {
   });
 
   const { data: valuationData } = useQuery({
-    queryKey: ['valuation'],
-    queryFn: () => inventoryService.getValuation({ warehouse_id: selectedWarehouse }),
+    queryKey: ['valuation', selectedWarehouse],
+    queryFn: () => inventoryService.getValuation({ warehouse_id: selectedWarehouse === 'all' ? undefined : selectedWarehouse }),
   });
-
-  // Convert inventory value when currency changes
-  useEffect(() => {
-    const convertValue = async () => {
-      if (!valuationData?.data?.totalValue || selectedCurrency === 'USD') {
-        setConvertedValue(null);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `${API_URL}/exchange-rates/convert?amount=${valuationData.data.totalValue}&from_currency=USD&to_currency=${selectedCurrency}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setConvertedValue(data.data);
-        }
-      } catch (error) {
-        console.error('Error converting currency:', error);
-      }
-    };
-
-    convertValue();
-  }, [selectedCurrency, valuationData, token]);
 
   const handleSelectItem = (itemId) => {
     setSelectedItems(prev => 
@@ -114,7 +82,7 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -241,37 +209,22 @@ const InventoryPage = () => {
           <div className="flex items-center justify-between mb-2">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <select
-                  value={selectedCurrency}
-                  onChange={(e) => setSelectedCurrency(e.target.value)}
-                  className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  title="Seleccionar moneda"
-                >
-                  {currencies.map((currency) => (
-                    <option key={currency.code} value={currency.code}>
-                      {currency.code}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-sm font-medium text-gray-600">Valor Total (USD)</p>
               </div>
-              {selectedCurrency === 'USD' ? (
-                <p className="text-2xl font-bold text-green-600">
-                  ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'}
-                </p>
-              ) : (
-                <div>
-                  <p className="text-2xl font-bold text-green-600">
-                    {currencies.find(c => c.code === selectedCurrency)?.symbol} {convertedValue?.converted_amount?.toFixed(2) || '...'}
-                  </p>
-                  {convertedValue && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <ArrowRightLeft className="w-3 h-3 text-gray-400" />
-                      <p className="text-xs text-gray-500">
-                        ${valuationData?.data?.totalValue?.toFixed(2)} USD × {convertedValue.rate?.toFixed(2)}
-                      </p>
-                    </div>
-                  )}
+              <p className="text-2xl font-bold text-green-600">
+                ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'}
+              </p>
+              {valuationData?.data?.totalsByCurrency && (
+                <div className="mt-2 space-y-1">
+                  {Object.entries(valuationData.data.totalsByCurrency)
+                    .filter(([_, value]) => value > 0)
+                    .map(([currency, value]) => (
+                      <div key={currency} className="flex items-center gap-1">
+                        <p className="text-xs text-gray-500">
+                          {currencies.find(c => c.code === currency)?.symbol} {value.toFixed(2)} {currency}
+                        </p>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
@@ -459,9 +412,18 @@ const InventoryPage = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 rounded-full">
-                            {item.product.category?.name}
-                          </span>
+                          {item.product.category ? (
+                            <span
+                              className="px-2 py-1 text-xs rounded-full text-white font-medium inline-flex items-center gap-1.5"
+                              style={{ backgroundColor: item.product.category.color || '#6B7280' }}
+                            >
+                              {item.product.category.name}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                              N/A
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">

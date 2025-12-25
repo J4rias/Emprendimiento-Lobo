@@ -358,7 +358,6 @@ class InventoryController {
         }]
       });
 
-      let totalValue = 0;
       const totalsByCurrency = {
         USD: 0,
         COP: 0,
@@ -371,9 +370,11 @@ class InventoryController {
         const currency = defaultPresentation?.purchase_currency || 'USD';
         const quantity = parseFloat(inv.quantity) || 0;
         const value = quantity * parseFloat(cost || 0);
-        
-        totalValue += value;
-        totalsByCurrency[currency] += value;
+
+        // Sum by currency
+        if (totalsByCurrency.hasOwnProperty(currency)) {
+          totalsByCurrency[currency] += value;
+        }
 
         return {
           product: inv.product,
@@ -383,6 +384,9 @@ class InventoryController {
           value
         };
       });
+
+      // Total value is only USD for now (can be extended to convert all to USD)
+      const totalValue = totalsByCurrency.USD;
 
       res.json({
         success: true,
