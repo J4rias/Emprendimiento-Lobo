@@ -30,16 +30,19 @@ const Dashboard = () => {
     try {
       // Cargar datos básicos
       const productsData = await productService.getAll({ limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
-      
+
       // Cargar datos de stock bajo
       const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
-      
+
+      // Cargar valoración del inventario
+      const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
+
       setStats({
         totalProducts: productsData.pagination?.total || 0,
         todaySales: 0,
         todayRevenue: 0,
         lowStock: lowStockData.data?.length || 0,
-        inventoryValue: 0,
+        inventoryValue: valuationData.data?.totalValue || 0,
         pendingSales: 0,
         monthRevenue: 0
       });

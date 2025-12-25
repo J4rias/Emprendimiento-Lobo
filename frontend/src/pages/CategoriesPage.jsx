@@ -23,6 +23,7 @@ const CategoriesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
+    code: '',
     name: '',
     description: '',
     color: '#6B7280'
@@ -55,6 +56,7 @@ const CategoriesPage = () => {
   const handleOpenModal = (category = null) => {
     setEditingCategory(category);
     setFormData({
+      code: category?.code || '',
       name: category?.name || '',
       description: category?.description || '',
       color: category?.color || '#6B7280'
@@ -67,6 +69,7 @@ const CategoriesPage = () => {
     setShowModal(false);
     setEditingCategory(null);
     setFormData({
+      code: '',
       name: '',
       description: '',
       color: '#6B7280'
@@ -78,7 +81,7 @@ const CategoriesPage = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'code' ? value.toUpperCase() : value
     }));
   };
 
@@ -201,14 +204,21 @@ const CategoriesPage = () => {
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
           >
             <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div
-                  className="w-4 h-4 rounded-full"
+                  className="w-4 h-4 rounded-full flex-shrink-0"
                   style={{ backgroundColor: category.color }}
                 />
-                <h3 className="font-semibold text-gray-900 truncate">
-                  {category.name}
-                </h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                      {category.code}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 truncate">
+                    {category.name}
+                  </h3>
+                </div>
               </div>
               {hasPermission('products.create') && (
                 <div className="flex items-center gap-1">
@@ -301,6 +311,26 @@ const CategoriesPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código *
+                </label>
+                <input
+                  type="text"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  required
+                  maxLength="10"
+                  className="input uppercase"
+                  placeholder="Ej: BEB, LAC, SNK"
+                  style={{ textTransform: 'uppercase' }}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Código único de la categoría (máx. 10 caracteres)
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nombre de la Categoría *

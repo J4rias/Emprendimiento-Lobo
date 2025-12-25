@@ -157,27 +157,20 @@ class ProductController {
         }
       }
 
-      // Get category to generate SKU
-      const category = await Category.findByPk(category_id);
-      if (!category) {
-        return res.status(400).json({
-          success: false,
-          message: 'Category not found'
-        });
+      // Get brand for SKU generation
+      let brandName = null;
+      if (brand_id) {
+        const brand = await Brand.findByPk(brand_id);
+        brandName = brand?.name || null;
       }
 
-      // Get next sequence for SKU
-      const lastProduct = await Product.findOne({
-        where: { category_id },
-        order: [['id', 'DESC']]
-      });
-
-      const sequence = lastProduct ? lastProduct.id + 1 : skuConfig.startFrom;
-      const sku = skuConfig.generate(category.code, sequence);
+      // Generate SKU - will be updated after presentations are created
+      // For now, create a temporary SKU
+      const tempSku = `TEMP-${Date.now()}`;
 
       // Create product
       const product = await Product.create({
-        sku,
+        sku: tempSku,
         name,
         description,
         category_id,
@@ -243,6 +236,19 @@ class ProductController {
           { model: Barcode, as: 'barcodes' }
         ]
       });
+
+      // Generate final SKU based on product data and presentations
+      const finalSku = skuConfig.generate({
+        brandName,
+        productName: name,
+        presentations: product.presentations,
+        brand_id: brand_id,
+        existingSku: null
+      });
+
+      // Update product with final SKU
+      await product.update({ sku: finalSku });
+      product.sku = finalSku;
 
       res.status(201).json({
         success: true,

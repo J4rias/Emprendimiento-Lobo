@@ -20,6 +20,11 @@ const Category = sequelize.define('Category', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  color: {
+    type: DataTypes.STRING(7),
+    allowNull: true,
+    defaultValue: '#6B7280'
+  },
   parent_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
