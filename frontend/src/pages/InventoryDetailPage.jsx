@@ -30,6 +30,12 @@ const InventoryDetailPage = () => {
     try {
       const response = await inventoryService.getById(id);
       setInventory(response.data);
+
+      // Set selected currency to the product's original currency
+      const presentation = response.data?.product?.presentations?.[0];
+      if (presentation?.purchase_currency) {
+        setSelectedCurrency(presentation.purchase_currency);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar detalles del inventario');
     } finally {
@@ -40,15 +46,24 @@ const InventoryDetailPage = () => {
   // Convert unit cost when currency changes
   useEffect(() => {
     const convertValue = async () => {
-      if (!inventory?.product?.presentations?.[0]?.cost || selectedCurrency === 'USD') {
+      const presentation = inventory?.product?.presentations?.[0];
+      if (!presentation?.cost) {
+        setConvertedValue(null);
+        return;
+      }
+
+      const originalCurrency = presentation.purchase_currency || 'USD';
+
+      // If selected currency is the same as original, no conversion needed
+      if (selectedCurrency === originalCurrency) {
         setConvertedValue(null);
         return;
       }
 
       try {
-        const unitCost = parseFloat(inventory.product.presentations[0].cost);
+        const unitCost = parseFloat(presentation.cost);
         const response = await fetch(
-          `${API_URL}/exchange-rates/convert?amount=${unitCost}&from_currency=USD&to_currency=${selectedCurrency}`,
+          `${API_URL}/exchange-rates/convert?amount=${unitCost}&from_currency=${originalCurrency}&to_currency=${selectedCurrency}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -62,6 +77,7 @@ const InventoryDetailPage = () => {
         }
       } catch (error) {
         console.error('Error converting currency:', error);
+        setConvertedValue(null);
       }
     };
 
@@ -175,25 +191,44 @@ const InventoryDetailPage = () => {
                 ))}
               </select>
             </div>
-            {selectedCurrency === 'USD' ? (
-              <p className="text-2xl font-bold text-green-600">
-                ${inventory.product.presentations?.[0]?.cost || '0.00'}
-              </p>
-            ) : (
-              <div>
-                <p className="text-2xl font-bold text-green-600">
-                  {currencies.find(c => c.code === selectedCurrency)?.symbol} {convertedValue?.converted_amount?.toFixed(2) || '...'}
-                </p>
-                {convertedValue && (
-                  <div className="flex items-center justify-center gap-1 mt-1">
-                    <ArrowRightLeft className="w-3 h-3 text-gray-400" />
-                    <p className="text-xs text-gray-500">
-                      ${inventory.product.presentations?.[0]?.cost || '0.00'} × {convertedValue.rate?.toFixed(2)}
+            {(() => {
+              const presentation = inventory.product.presentations?.[0];
+              const originalCurrency = presentation?.purchase_currency || 'USD';
+              const cost = presentation?.cost || '0.00';
+              const originalCurrencyInfo = currencies.find(c => c.code === originalCurrency);
+
+              if (!convertedValue) {
+                // Show in original currency
+                return (
+                  <div>
+                    <p className="text-2xl font-bold text-green-600">
+                      {originalCurrencyInfo?.symbol}{parseFloat(cost).toFixed(2)} {originalCurrency}
                     </p>
+                    {selectedCurrency !== originalCurrency && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Convirtiendo...
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                );
+              } else {
+                // Show converted value
+                const selectedCurrencyInfo = currencies.find(c => c.code === selectedCurrency);
+                return (
+                  <div>
+                    <p className="text-2xl font-bold text-green-600">
+                      {selectedCurrencyInfo?.symbol}{convertedValue.converted_amount?.toFixed(2)} {selectedCurrency}
+                    </p>
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <ArrowRightLeft className="w-3 h-3 text-gray-400" />
+                      <p className="text-xs text-gray-500">
+                        {originalCurrencyInfo?.symbol}{parseFloat(cost).toFixed(2)} {originalCurrency} × {convertedValue.rate?.toFixed(4)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
             <AlertTriangle className="w-8 h-8 text-yellow-600 mx-auto mb-2" />

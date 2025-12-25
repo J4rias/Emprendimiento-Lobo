@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
-import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download, RefreshCw, Eye, Edit, Plus, Minus, HelpCircle, Info, ArrowRightLeft } from 'lucide-react';
+import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download, RefreshCw, Eye, Edit, Plus, Minus, HelpCircle, Info, ArrowRightLeft, X, Warehouse } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,6 +20,7 @@ const InventoryPage = () => {
   });
   const [selectedItems, setSelectedItems] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [showCurrencyBreakdown, setShowCurrencyBreakdown] = useState(false);
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -129,14 +130,13 @@ const InventoryPage = () => {
                 <p><strong>📦 Stock Actual:</strong> Cantidad física disponible de cada producto en el depósito seleccionado.</p>
                 <p><strong>⚠️ Stock Bajo:</strong> Productos que están en o por debajo del punto de reorden configurado.</p>
                 <p><strong>🔴 Agotado:</strong> Productos sin stock disponible que necesitan reabastecimiento urgente.</p>
-                <p><strong>💰 Valor Total:</strong> Suma del costo de todos los productos en inventario. Puedes cambiar la moneda para ver el valor en USD, COP o VES.</p>
+                <p><strong>💰 Valor Total:</strong> Suma del costo de todos los productos en inventario. Se muestra separado por moneda (USD, COP, VES).</p>
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <p className="font-medium mb-1">Acciones disponibles:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Click en el ojo (👁️) para ver detalles del producto</li>
                     <li>Click en el lápiz (✏️) para ajustar el stock (agregar o remover)</li>
                     <li>Selecciona múltiples productos para transferencias masivas</li>
-                    <li>Usa el selector de moneda para ver valores en diferentes divisas</li>
                   </ul>
                 </div>
               </div>
@@ -153,7 +153,7 @@ const InventoryPage = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div 
+        <div
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setFilters({ ...filters, lowStock: !filters.lowStock })}
           title="Click para filtrar productos con stock bajo"
@@ -166,13 +166,13 @@ const InventoryPage = () => {
               </p>
               <p className="text-xs text-gray-500 mt-1">Click para filtrar</p>
             </div>
-            <div className="bg-red-100 p-3 rounded-lg">
+            <div className="bg-red-100 p-3 rounded-lg flex-shrink-0">
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
           </div>
         </div>
 
-        <div 
+        <div
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setFilters({ ...filters, expiring: !filters.expiring })}
           title="Click para filtrar productos próximos a vencer"
@@ -185,7 +185,7 @@ const InventoryPage = () => {
               </p>
               <p className="text-xs text-gray-500 mt-1">Próximos 30 días</p>
             </div>
-            <div className="bg-yellow-100 p-3 rounded-lg">
+            <div className="bg-yellow-100 p-3 rounded-lg flex-shrink-0">
               <Calendar className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
@@ -198,37 +198,34 @@ const InventoryPage = () => {
               <p className="text-2xl font-bold text-blue-600">
                 {inventoryData?.pagination?.total || 0}
               </p>
+              <p className="text-xs text-gray-500 mt-1">En inventario</p>
             </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
+            <div className="bg-blue-100 p-3 rounded-lg flex-shrink-0">
               <Package className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm font-medium text-gray-600">Valor Total (USD)</p>
-              </div>
+              <p className="text-sm font-medium text-gray-600">Valor Total</p>
               <p className="text-2xl font-bold text-green-600">
-                ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'}
+                ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'} USD
               </p>
-              {valuationData?.data?.totalsByCurrency && (
-                <div className="mt-2 space-y-1">
-                  {Object.entries(valuationData.data.totalsByCurrency)
-                    .filter(([_, value]) => value > 0)
-                    .map(([currency, value]) => (
-                      <div key={currency} className="flex items-center gap-1">
-                        <p className="text-xs text-gray-500">
-                          {currencies.find(c => c.code === currency)?.symbol} {value.toFixed(2)} {currency}
-                        </p>
-                      </div>
-                    ))}
-                </div>
+
+              {/* Botón para ver desglose */}
+              {valuationData?.data?.totalsByCurrency && Object.entries(valuationData.data.totalsByCurrency).filter(([_, value]) => value > 0).length > 1 && (
+                <button
+                  onClick={() => setShowCurrencyBreakdown(true)}
+                  className="mt-1 text-xs text-green-700 hover:text-green-800 font-medium flex items-center gap-1"
+                >
+                  <Info className="w-3 h-3" />
+                  Ver desglose por moneda
+                </button>
               )}
             </div>
-            <div className="bg-green-100 p-3 rounded-lg">
+            <div className="bg-green-100 p-3 rounded-lg flex-shrink-0">
               <DollarSign className="w-6 h-6 text-green-600" />
             </div>
           </div>
@@ -236,49 +233,79 @@ const InventoryPage = () => {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4">
+      <div className="card">
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Buscador */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="input pl-10"
                 placeholder="Buscar por nombre o SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <select
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={selectedWarehouse}
-              onChange={(e) => setSelectedWarehouse(e.target.value)}
-            >
-              <option value="all">Todos los Depósitos</option>
-              <option value={1}>Depósito Principal</option>
-              <option value={2}>Sucursal 1</option>
-              <option value={3}>Sucursal 2</option>
-            </select>
-            
+
+          {/* Depósito */}
+          <div className="w-full md:w-48">
+            <div className="relative">
+              <Warehouse className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <select
+                className="input pl-10 appearance-none"
+                value={selectedWarehouse}
+                onChange={(e) => setSelectedWarehouse(e.target.value)}
+              >
+                <option value="all">Todos los Depósitos</option>
+                <option value={1}>Depósito Principal</option>
+                <option value={2}>Sucursal 1</option>
+                <option value={3}>Sucursal 2</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                (filters.lowStock || filters.expiring || filters.outOfStock)
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title="Filtros rápidos"
             >
               <Filter className="w-4 h-4" />
-              Filtros
               {(filters.lowStock || filters.expiring || filters.outOfStock) && (
-                <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                <span className="bg-white text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">
                   {Object.keys(filters).filter(k => filters[k]).length}
                 </span>
               )}
             </button>
 
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedWarehouse('all');
+                setFilters({
+                  lowStock: false,
+                  expiring: false,
+                  outOfStock: false
+                });
+              }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
+              title="Limpiar filtros"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+
+            <button
+              className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
+              title="Descargar reporte"
+            >
               <Download className="w-4 h-4" />
-              Exportar
             </button>
           </div>
         </div>
@@ -496,6 +523,106 @@ const InventoryPage = () => {
           </>
         )}
       </div>
+
+      {/* Modal de Desglose por Moneda */}
+      {showCurrencyBreakdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Desglose por Moneda</h2>
+                <button
+                  onClick={() => setShowCurrencyBreakdown(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">Total Convertido</p>
+                <p className="text-3xl font-bold text-green-600">
+                  ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'} USD
+                </p>
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Valores por Moneda:</p>
+                <div className="space-y-3">
+                  {valuationData?.data?.totalsByCurrency && Object.entries(valuationData.data.totalsByCurrency)
+                    .filter(([_, value]) => value > 0)
+                    .map(([currency, value]) => {
+                      const currencyInfo = currencies.find(c => c.code === currency);
+                      const conversion = valuationData.data.conversions?.find(c => c.currency === currency);
+
+                      return (
+                        <div key={currency} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-gray-900">{currencyInfo?.name}</span>
+                            <span className="text-sm text-gray-500">{currency}</span>
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">
+                            {currencyInfo?.symbol}{value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          {conversion && (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <ArrowRightLeft className="w-3 h-3" />
+                                <span>
+                                  Tasa: 1 {currency} = ${conversion.rate.toFixed(6)} USD
+                                </span>
+                              </div>
+                              <p className="text-sm text-green-600 font-medium mt-1">
+                                = ${conversion.convertedAmount.toFixed(2)} USD
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Advertencias */}
+              {valuationData?.data?.warnings && valuationData.data.warnings.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-yellow-800 mb-1">Advertencias:</p>
+                        {valuationData.data.warnings.map((warning, idx) => (
+                          <p key={idx} className="text-xs text-yellow-700 mb-1">
+                            {warning.message}
+                          </p>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setShowCurrencyBreakdown(false);
+                            navigate('/configuracion/tasas-cambio');
+                          }}
+                          className="mt-2 text-xs text-yellow-800 hover:text-yellow-900 font-medium underline"
+                        >
+                          Configurar tasas de cambio
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowCurrencyBreakdown(false)}
+                className="mt-6 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

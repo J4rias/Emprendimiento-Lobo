@@ -1,4 +1,4 @@
-const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation } = require('../models');
+const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -385,15 +385,45 @@ class InventoryController {
         };
       });
 
-      // Total value is only USD for now (can be extended to convert all to USD)
-      const totalValue = totalsByCurrency.USD;
+      // Convert all currencies to USD
+      let totalValueUSD = totalsByCurrency.USD;
+      const conversions = [];
+      const warnings = [];
+
+      // Process each non-USD currency
+      for (const [currency, amount] of Object.entries(totalsByCurrency)) {
+        if (currency === 'USD' || amount === 0) continue;
+
+        try {
+          // Convert amount to USD
+          const converted = await ExchangeRate.convert(amount, currency, 'USD');
+          const rate = await ExchangeRate.getRate(currency, 'USD');
+
+          totalValueUSD += converted;
+          conversions.push({
+            currency,
+            originalAmount: amount,
+            rate: rate || 0,
+            convertedAmount: converted
+          });
+        } catch (error) {
+          console.warn(`No exchange rate found for ${currency} to USD:`, error.message);
+          warnings.push({
+            currency,
+            amount,
+            message: `No se encontró tasa de cambio de ${currency} a USD. Este monto no está incluido en el total.`
+          });
+        }
+      }
 
       res.json({
         success: true,
         data: {
           items: valuedItems,
-          totalValue,
-          totalsByCurrency,
+          totalValue: totalValueUSD,  // Total converted to USD
+          totalsByCurrency,  // Original breakdown by currency
+          conversions,  // Conversion details
+          warnings,  // Warnings for missing rates
           currency: 'USD'
         }
       });
