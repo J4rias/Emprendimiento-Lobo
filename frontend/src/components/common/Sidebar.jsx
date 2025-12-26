@@ -19,6 +19,7 @@ import {
   DollarSign,
   BarChart3,
   CreditCard,
+  ArrowRightLeft,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -65,6 +66,13 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: Scan,
       path: '/reponer-stock',
       permission: 'inventory.adjust',
+    },
+    {
+      name: 'Transferencias',
+      icon: ArrowRightLeft,
+      path: '/transferencias',
+      permission: 'inventory.transfer',
+
     },
     {
       name: 'Productos',

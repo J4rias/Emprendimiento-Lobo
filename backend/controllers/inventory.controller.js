@@ -1,4 +1,4 @@
-const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate } = require('../models');
+const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate, InventoryMovement, User } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -210,18 +210,59 @@ class InventoryController {
       const {
         product_id,
         warehouse_id,
-        quantity,
+        presentation_id,
+        package_quantity,
+        loose_units = 0,
         type, // 'add' or 'remove'
         reason,
-        batch_id
+        batch_id,
+        document_number
       } = req.body;
 
+      const user_id = req.user.id;
+
       // Validate
+      if (!product_id || !warehouse_id || !type) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan campos requeridos'
+        });
+      }
+
       if (!['add', 'remove'].includes(type)) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
           message: 'Invalid adjustment type. Must be "add" or "remove"'
+        });
+      }
+
+      // Buscar presentación si se especificó
+      let presentation = null;
+      let units_per_package = 1;
+
+      if (presentation_id) {
+        presentation = await ProductPresentation.findByPk(presentation_id, { transaction });
+        if (!presentation) {
+          await transaction.rollback();
+          return res.status(404).json({
+            success: false,
+            message: 'Presentación no encontrada'
+          });
+        }
+        units_per_package = presentation.units_per_package;
+      }
+
+      // Calcular cantidad total en unidades base
+      const packageUnits = (package_quantity || 0) * units_per_package;
+      const totalUnits = packageUnits + parseFloat(loose_units || 0);
+
+      if (totalUnits <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'La cantidad debe ser mayor a 0'
         });
       }
 
@@ -238,14 +279,14 @@ class InventoryController {
       });
 
       // Calculate new quantity
-      const adjustment = type === 'add' ? parseFloat(quantity) : -parseFloat(quantity);
+      const adjustment = type === 'add' ? totalUnits : -totalUnits;
       const newQuantity = parseFloat(inventory.quantity) + adjustment;
 
       if (newQuantity < 0) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message: 'Insufficient inventory'
+          message: 'No hay suficiente stock para realizar esta operación'
         });
       }
 
@@ -265,23 +306,41 @@ class InventoryController {
         }
       }
 
-      // Here you would also create an inventory movement record
-      // for audit trail (to be implemented in movements table)
+      // Registrar movimiento en historial
+      const movement = await InventoryMovement.create({
+        product_id,
+        warehouse_id,
+        presentation_id: presentation_id || null,
+        movement_type: type === 'add' ? 'ajuste_positivo' : 'ajuste_negativo',
+        package_quantity: package_quantity || null,
+        loose_units: loose_units || 0,
+        quantity: totalUnits,
+        unit_cost: presentation?.cost || null,
+        package_cost: presentation?.package_cost || null,
+        currency: presentation?.purchase_currency || 'USD',
+        reason,
+        document_number,
+        batch_id,
+        user_id
+      }, { transaction });
 
       await transaction.commit();
 
       // Reload inventory with associations
       await inventory.reload({
         include: [
-          { model: Product, as: 'product' },
+          { model: Product, as: 'product', include: [{ model: ProductPresentation, as: 'presentations' }] },
           { model: Warehouse, as: 'warehouse' }
         ]
       });
 
       res.json({
         success: true,
-        message: 'Inventory adjusted successfully',
-        data: inventory
+        message: 'Inventario ajustado correctamente',
+        data: {
+          inventory,
+          movement
+        }
       });
     } catch (error) {
       await transaction.rollback();
@@ -439,6 +498,79 @@ class InventoryController {
           currency: 'USD'
         }
       });
+    }
+  }
+
+  // Obtener historial de movimientos
+  async getMovements(req, res, next) {
+    try {
+      const {
+        product_id,
+        warehouse_id,
+        movement_type,
+        start_date,
+        end_date,
+        page = 1,
+        limit = 50
+      } = req.query;
+
+      const where = {};
+
+      if (product_id) where.product_id = product_id;
+      if (warehouse_id) where.warehouse_id = warehouse_id;
+      if (movement_type) where.movement_type = movement_type;
+
+      if (start_date || end_date) {
+        where.created_at = {};
+        if (start_date) where.created_at[Op.gte] = start_date;
+        if (end_date) where.created_at[Op.lte] = end_date;
+      }
+
+      const offset = (page - 1) * limit;
+
+      const { count, rows: movements } = await InventoryMovement.findAndCountAll({
+        where,
+        include: [
+          { model: Product, as: 'product', attributes: ['id', 'name', 'sku'] },
+          { model: Warehouse, as: 'warehouse', attributes: ['id', 'name'] },
+          { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] },
+          { model: User, as: 'user', attributes: ['id', 'name'] }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit),
+        offset
+      });
+
+      res.json({
+        success: true,
+        data: movements,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          pages: Math.ceil(count / limit)
+        }
+      });
+
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get all warehouses
+  async getWarehouses(req, res, next) {
+    try {
+      const warehouses = await Warehouse.findAll({
+        order: [['name', 'ASC']],
+        attributes: ['id', 'code', 'name', 'description', 'address', 'city', 'is_active']
+      });
+
+      res.json({
+        success: true,
+        data: warehouses
+      });
+
+    } catch (error) {
+      next(error);
     }
   }
 }

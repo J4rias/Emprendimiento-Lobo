@@ -2,8 +2,11 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // Remove unit_of_measure column from products table
-    await queryInterface.removeColumn('products', 'unit_of_measure');
+    // Remove unit_of_measure column from products table if it exists
+    const tableDescription = await queryInterface.describeTable('products');
+    if (tableDescription.unit_of_measure) {
+      await queryInterface.removeColumn('products', 'unit_of_measure');
+    }
   },
 
   async down(queryInterface, Sequelize) {

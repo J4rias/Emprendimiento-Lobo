@@ -27,6 +27,7 @@ const Brand = require('./Brand');
 const ExchangeRate = require('./ExchangeRate');
 const PackagingType = require('./PackagingType');
 const PresentationType = require('./PresentationType');
+const InventoryMovement = require('./InventoryMovement');
 
 // Define associations
 
@@ -125,6 +126,10 @@ Product.hasMany(TransferDetail, { foreignKey: 'product_id', as: 'transferDetails
 TransferDetail.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
 Batch.hasMany(TransferDetail, { foreignKey: 'batch_id', as: 'transferDetails' });
 
+// TransferDetail - ProductPresentation (Many to One)
+TransferDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(TransferDetail, { foreignKey: 'presentation_id', as: 'transferDetails' });
+
 // Customer - PriceList (Many to One)
 Customer.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
 PriceList.hasMany(Customer, { foreignKey: 'priceListId', as: 'customers' });
@@ -204,6 +209,26 @@ SupplierContact.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' 
 ExchangeRate.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 ExchangeRate.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
 
+// InventoryMovement - Product (Many to One)
+InventoryMovement.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(InventoryMovement, { foreignKey: 'product_id', as: 'movements' });
+
+// InventoryMovement - Warehouse (Many to One)
+InventoryMovement.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(InventoryMovement, { foreignKey: 'warehouse_id', as: 'movements' });
+
+// InventoryMovement - ProductPresentation (Many to One)
+InventoryMovement.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(InventoryMovement, { foreignKey: 'presentation_id', as: 'movements' });
+
+// InventoryMovement - User (Many to One)
+InventoryMovement.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(InventoryMovement, { foreignKey: 'user_id', as: 'inventoryMovements' });
+
+// InventoryMovement - Batch (Many to One)
+InventoryMovement.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
+Batch.hasMany(InventoryMovement, { foreignKey: 'batch_id', as: 'movements' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -232,5 +257,6 @@ module.exports = {
   Brand,
   ExchangeRate,
   PackagingType,
-  PresentationType
+  PresentationType,
+  InventoryMovement
 };

@@ -2,15 +2,16 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // Eliminar campos no usados de la tabla suppliers
-    await queryInterface.removeColumn('suppliers', 'contact_person');
-    await queryInterface.removeColumn('suppliers', 'email');
-    await queryInterface.removeColumn('suppliers', 'phone');
-    await queryInterface.removeColumn('suppliers', 'mobile');
-    await queryInterface.removeColumn('suppliers', 'address');
-    await queryInterface.removeColumn('suppliers', 'city');
-    await queryInterface.removeColumn('suppliers', 'state');
-    await queryInterface.removeColumn('suppliers', 'country');
+    // Eliminar campos no usados de la tabla suppliers solo si existen
+    const tableDescription = await queryInterface.describeTable('suppliers');
+
+    const columnsToRemove = ['contact_person', 'email', 'phone', 'mobile', 'address', 'city', 'state', 'country'];
+
+    for (const column of columnsToRemove) {
+      if (tableDescription[column]) {
+        await queryInterface.removeColumn('suppliers', column);
+      }
+    }
   },
 
   down: async (queryInterface, Sequelize) => {

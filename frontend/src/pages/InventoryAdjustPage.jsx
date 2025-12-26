@@ -14,8 +14,13 @@ const InventoryAdjustPage = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   
+  const [presentations, setPresentations] = useState([]);
+  const [selectedPresentation, setSelectedPresentation] = useState(null);
+  const [packageQuantity, setPackageQuantity] = useState(0);
+  const [looseUnits, setLooseUnits] = useState(0);
+  const [documentNumber, setDocumentNumber] = useState('');
+
   const [formData, setFormData] = useState({
-    quantity: 0,
     type: 'add',
     reason: ''
   });
@@ -28,15 +33,26 @@ const InventoryAdjustPage = () => {
     try {
       const response = await inventoryService.getById(id);
       setInventory(response.data);
-      setFormData(prev => ({
-        ...prev,
-        quantity: 0
-      }));
+
+      // Load presentations
+      if (response.data?.product?.presentations) {
+        setPresentations(response.data.product.presentations);
+        // Select default presentation
+        const defaultPres = response.data.product.presentations.find(p => p.is_default);
+        if (defaultPres) setSelectedPresentation(defaultPres.id);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar detalles del inventario');
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateTotalUnits = () => {
+    const presentation = presentations.find(p => p.id === selectedPresentation);
+    const unitsPerPackage = presentation?.units_per_package || 1;
+    const packageUnits = packageQuantity * unitsPerPackage;
+    return packageUnits + parseFloat(looseUnits || 0);
   };
 
   const handleSubmit = async (e) => {
@@ -49,22 +65,27 @@ const InventoryAdjustPage = () => {
       const adjustmentData = {
         product_id: inventory.product.id,
         warehouse_id: inventory.warehouse_id,
-        quantity: formData.quantity,
+        presentation_id: selectedPresentation || null,
+        package_quantity: packageQuantity,
+        loose_units: looseUnits,
         type: formData.type,
-        reason: formData.reason || `Ajuste manual por ${user?.name || 'Usuario'}`
+        reason: formData.reason || `Ajuste manual por ${user?.name || 'Usuario'}`,
+        document_number: documentNumber
       };
 
       await inventoryService.adjustInventory(adjustmentData);
-      
+
       setSuccess('Stock ajustado exitosamente');
-      
+
       // Refresh inventory data
       await fetchInventoryDetail();
-      
+
       // Reset form
+      setPackageQuantity(0);
+      setLooseUnits(0);
+      setDocumentNumber('');
       setFormData(prev => ({
         ...prev,
-        quantity: 0,
         reason: ''
       }));
     } catch (err) {
@@ -74,15 +95,7 @@ const InventoryAdjustPage = () => {
     }
   };
 
-  const handleQuantityChange = (delta) => {
-    const newQuantity = formData.quantity + delta;
-    const maxValue = formData.type === 'remove' ? parseFloat(inventory.quantity) : Infinity;
-    const clampedQuantity = Math.max(0, Math.min(newQuantity, maxValue));
-    setFormData(prev => ({
-      ...prev,
-      quantity: clampedQuantity
-    }));
-  };
+  const totalUnits = calculateTotalUnits();
 
   if (loading) {
     return (
@@ -215,51 +228,100 @@ const InventoryAdjustPage = () => {
             </div>
           </div>
 
-          {/* Quantity */}
+          {/* Presentation Selector */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cantidad a {formData.type === 'add' ? 'Agregar' : 'Quitar'}
+              Tipo de Empaque
             </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleQuantityChange(-1)}
-                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <input
-                type="number"
-                min="0"
-                max={formData.type === 'remove' ? inventory.quantity : undefined}
-                value={formData.quantity}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  const maxValue = formData.type === 'remove' ? parseFloat(inventory.quantity) : Infinity;
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    quantity: Math.max(0, Math.min(value, maxValue))
-                  }));
-                }}
-                className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-center"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => handleQuantityChange(1)}
-                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={selectedPresentation || ''}
+              onChange={(e) => setSelectedPresentation(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Sin presentación (unidades sueltas)</option>
+              {presentations.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.units_per_package} unidades)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Package Quantity */}
+          {selectedPresentation && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cantidad de {presentations.find(p => p.id === selectedPresentation)?.name || 'Paquetes'}
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPackageQuantity(Math.max(0, packageQuantity - 1))}
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-center"
+                  value={packageQuantity}
+                  onChange={(e) => setPackageQuantity(parseInt(e.target.value) || 0)}
+                  min="0"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPackageQuantity(packageQuantity + 1)}
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-2">
+          )}
+
+          {/* Loose Units */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Unidades Sueltas {selectedPresentation ? '(adicionales)' : ''}
+            </label>
+            <input
+              type="number"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={looseUnits}
+              onChange={(e) => setLooseUnits(parseFloat(e.target.value) || 0)}
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          {/* Total Calculated */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-900 font-medium">Total en Unidades Base:</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {totalUnits.toFixed(2)} unidades
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
               Nuevo stock: <span className="font-medium">
-                {formData.type === 'add' 
-                  ? parseFloat(inventory.quantity) + parseFloat(formData.quantity) 
-                  : Math.max(0, parseFloat(inventory.quantity) - parseFloat(formData.quantity))
-                }
+                {formData.type === 'add'
+                  ? (parseFloat(inventory.quantity) + totalUnits).toFixed(2)
+                  : Math.max(0, parseFloat(inventory.quantity) - totalUnits).toFixed(2)
+                } unidades
               </span>
             </p>
+          </div>
+
+          {/* Document Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Número de Documento (Opcional)
+            </label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              placeholder="Ej: FAC-12345, REM-789"
+            />
           </div>
 
           {/* Reason */}
@@ -287,7 +349,7 @@ const InventoryAdjustPage = () => {
             </button>
             <button
               type="submit"
-              disabled={submitting || formData.quantity === 0}
+              disabled={submitting || totalUnits === 0}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Procesando...' : 'Confirmar Ajuste'}

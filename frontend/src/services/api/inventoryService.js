@@ -42,4 +42,9 @@ export const inventoryService = {
     const response = await api.post('/inventory/adjust', data);
     return response.data;
   },
+
+  getMovements: async (params = {}) => {
+    const response = await api.get('/inventory/movements', { params });
+    return response.data;
+  },
 };

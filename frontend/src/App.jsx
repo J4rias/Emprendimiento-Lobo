@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
@@ -8,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import InventoryPage from './pages/InventoryPage';
 import InventoryDetailPage from './pages/InventoryDetailPage';
 import InventoryAdjustPage from './pages/InventoryAdjustPage';
+import TransfersPage from './pages/TransfersPage';
+import InventoryMovementsPage from './pages/InventoryMovementsPage';
 import ProductsPage from './pages/ProductsPage';
 import QuotesPage from './pages/QuotesPage';
 import CustomersPage from './pages/CustomersPage';
@@ -102,6 +105,26 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <InventoryAdjustPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/transferencias"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <TransfersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/inventario/movimientos"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <InventoryMovementsPage />
             </AppLayout>
           </PrivateRoute>
         }
@@ -242,6 +265,30 @@ function App() {
   return (
     <AuthProvider>
       <AppRoutes />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
     </AuthProvider>
   );
 }

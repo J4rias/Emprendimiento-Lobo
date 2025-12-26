@@ -29,23 +29,31 @@ module.exports = {
       allowNull: false
     });
 
-    // 3. Add brand_id column
-    await queryInterface.addColumn('products', 'brand_id', {
-      type: Sequelize.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'brands',
-        key: 'id'
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL'
-    });
+    // 3. Add brand_id column if it doesn't exist
+    const productTableDescription = await queryInterface.describeTable('products');
 
-    // 4. Remove manufacturer column
-    await queryInterface.removeColumn('products', 'manufacturer');
+    if (!productTableDescription.brand_id) {
+      await queryInterface.addColumn('products', 'brand_id', {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'brands',
+          key: 'id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      });
+    }
 
-    // 5. Remove old brand text column (will use brand_id instead)
-    await queryInterface.removeColumn('products', 'brand');
+    // 4. Remove manufacturer column if it exists
+    if (productTableDescription.manufacturer) {
+      await queryInterface.removeColumn('products', 'manufacturer');
+    }
+
+    // 5. Remove old brand text column if it exists (will use brand_id instead)
+    if (productTableDescription.brand) {
+      await queryInterface.removeColumn('products', 'brand');
+    }
 
     // 6. Create packaging_types table (bandeja, caja, fardo)
     await queryInterface.createTable('packaging_types', {
@@ -182,26 +190,34 @@ module.exports = {
       });
     }
 
-    // Insert default packaging types
-    await queryInterface.bulkInsert('packaging_types', [
-      { name: 'Bandeja', description: 'Empaque en bandeja', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Caja', description: 'Empaque en caja', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Fardo', description: 'Empaque en fardo', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Paquete', description: 'Empaque en paquete', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Bulto', description: 'Empaque en bulto', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Unidad', description: 'Venta por unidad individual', is_active: true, created_at: new Date(), updated_at: new Date() }
-    ]);
+    // Insert default packaging types if they don't exist
+    try {
+      await queryInterface.bulkInsert('packaging_types', [
+        { name: 'Bandeja', description: 'Empaque en bandeja', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Caja', description: 'Empaque en caja', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Fardo', description: 'Empaque en fardo', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Paquete', description: 'Empaque en paquete', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Bulto', description: 'Empaque en bulto', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Unidad', description: 'Venta por unidad individual', is_active: true, created_at: new Date(), updated_at: new Date() }
+      ], { ignoreDuplicates: true });
+    } catch (error) {
+      console.log('Packaging types already exist or error inserting:', error.message);
+    }
 
-    // Insert default presentation types
-    await queryInterface.bulkInsert('presentation_types', [
-      { name: 'Botella', description: 'Envase en botella', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Bolsa', description: 'Envase en bolsa', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Lata', description: 'Envase en lata', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Caja', description: 'Envase en caja', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Envase Plástico', description: 'Envase de plástico', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Vidrio', description: 'Envase de vidrio', is_active: true, created_at: new Date(), updated_at: new Date() },
-      { name: 'Tetra Pak', description: 'Envase tetra pak', is_active: true, created_at: new Date(), updated_at: new Date() }
-    ]);
+    // Insert default presentation types if they don't exist
+    try {
+      await queryInterface.bulkInsert('presentation_types', [
+        { name: 'Botella', description: 'Envase en botella', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Bolsa', description: 'Envase en bolsa', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Lata', description: 'Envase en lata', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Caja', description: 'Envase en caja', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Envase Plástico', description: 'Envase de plástico', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Vidrio', description: 'Envase de vidrio', is_active: true, created_at: new Date(), updated_at: new Date() },
+        { name: 'Tetra Pak', description: 'Envase tetra pak', is_active: true, created_at: new Date(), updated_at: new Date() }
+      ], { ignoreDuplicates: true });
+    } catch (error) {
+      console.log('Presentation types already exist or error inserting:', error.message);
+    }
   },
 
   async down(queryInterface, Sequelize) {

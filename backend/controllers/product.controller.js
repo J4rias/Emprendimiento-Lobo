@@ -525,6 +525,231 @@ class ProductController {
       next(error);
     }
   }
+
+  // Presentation Management Methods
+
+  async getPresentations(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const product = await Product.findByPk(id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
+        });
+      }
+
+      const presentations = await ProductPresentation.findAll({
+        where: { product_id: id },
+        include: [
+          { model: PackagingType, as: 'packagingType' },
+          { model: PresentationType, as: 'presentationType' }
+        ],
+        order: [['is_default', 'DESC'], ['id', 'ASC']]
+      });
+
+      return res.json({
+        success: true,
+        data: presentations
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createPresentation(req, res, next) {
+    try {
+      const { id } = req.params;
+      const {
+        name,
+        packaging_type_id,
+        presentation_type_id,
+        units_per_package,
+        unit_size,
+        unit_size_measure,
+        package_price,
+        package_cost,
+        purchase_currency,
+        is_default,
+        is_active
+      } = req.body;
+
+      const product = await Product.findByPk(id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
+        });
+      }
+
+      // If this is set as default, unmark all other presentations as default
+      if (is_default) {
+        await ProductPresentation.update(
+          { is_default: false },
+          { where: { product_id: id } }
+        );
+      }
+
+      const presentation = await ProductPresentation.create({
+        product_id: id,
+        name,
+        packaging_type_id: packaging_type_id || null,
+        presentation_type_id: presentation_type_id || null,
+        units_per_package: units_per_package || 1,
+        unit_size: unit_size || null,
+        unit_size_measure: unit_size_measure || 'UND',
+        units_per_presentation: units_per_package || 1, // For compatibility
+        package_price: package_price || 0,
+        package_cost: package_cost || 0,
+        purchase_currency: purchase_currency || 'USD',
+        is_default: is_default || false,
+        is_active: is_active !== undefined ? is_active : true
+      });
+
+      // Reload with associations
+      const createdPresentation = await ProductPresentation.findByPk(presentation.id, {
+        include: [
+          { model: PackagingType, as: 'packagingType' },
+          { model: PresentationType, as: 'presentationType' }
+        ]
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: createdPresentation,
+        message: 'Presentation created successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePresentation(req, res, next) {
+    try {
+      const { presentationId } = req.params;
+      const updateData = req.body;
+
+      const presentation = await ProductPresentation.findByPk(presentationId);
+      if (!presentation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Presentation not found'
+        });
+      }
+
+      // Update units_per_presentation if units_per_package is updated
+      if (updateData.units_per_package !== undefined) {
+        updateData.units_per_presentation = updateData.units_per_package;
+      }
+
+      await presentation.update(updateData);
+
+      // Reload with associations
+      const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
+        include: [
+          { model: PackagingType, as: 'packagingType' },
+          { model: PresentationType, as: 'presentationType' }
+        ]
+      });
+
+      return res.json({
+        success: true,
+        data: updatedPresentation,
+        message: 'Presentation updated successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deletePresentation(req, res, next) {
+    try {
+      const { presentationId } = req.params;
+
+      const presentation = await ProductPresentation.findByPk(presentationId);
+      if (!presentation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Presentation not found'
+        });
+      }
+
+      // Check if this is the last presentation for the product
+      const presentationCount = await ProductPresentation.count({
+        where: { product_id: presentation.product_id }
+      });
+
+      if (presentationCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete the last presentation. A product must have at least one presentation.'
+        });
+      }
+
+      // If this is the default presentation, set another one as default
+      if (presentation.is_default) {
+        const anotherPresentation = await ProductPresentation.findOne({
+          where: {
+            product_id: presentation.product_id,
+            id: { [Op.ne]: presentationId }
+          }
+        });
+
+        if (anotherPresentation) {
+          await anotherPresentation.update({ is_default: true });
+        }
+      }
+
+      await presentation.destroy();
+
+      return res.json({
+        success: true,
+        message: 'Presentation deleted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setDefaultPresentation(req, res, next) {
+    try {
+      const { presentationId } = req.params;
+
+      const presentation = await ProductPresentation.findByPk(presentationId);
+      if (!presentation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Presentation not found'
+        });
+      }
+
+      // Unmark all presentations for this product as default
+      await ProductPresentation.update(
+        { is_default: false },
+        { where: { product_id: presentation.product_id } }
+      );
+
+      // Mark this one as default
+      await presentation.update({ is_default: true });
+
+      // Reload with associations
+      const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
+        include: [
+          { model: PackagingType, as: 'packagingType' },
+          { model: PresentationType, as: 'presentationType' }
+        ]
+      });
+
+      return res.json({
+        success: true,
+        data: updatedPresentation,
+        message: 'Default presentation updated successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new ProductController();

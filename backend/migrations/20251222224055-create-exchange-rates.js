@@ -77,14 +77,28 @@ module.exports = {
       }
     });
 
-    // Crear índices
-    await queryInterface.addIndex('exchange_rates', ['from_currency', 'to_currency', 'effective_date'], {
-      unique: true,
-      name: 'unique_exchange_rate_per_day'
-    });
+    // Crear índices solo si no existen
+    const indexes = await queryInterface.showIndex('exchange_rates');
+    const indexNames = indexes.map(idx => idx.name);
 
-    await queryInterface.addIndex('exchange_rates', ['effective_date']);
-    await queryInterface.addIndex('exchange_rates', ['is_active']);
+    if (!indexNames.includes('unique_exchange_rate_per_day')) {
+      await queryInterface.addIndex('exchange_rates', ['from_currency', 'to_currency', 'effective_date'], {
+        unique: true,
+        name: 'unique_exchange_rate_per_day'
+      });
+    }
+
+    if (!indexNames.includes('exchange_rates_effective_date')) {
+      await queryInterface.addIndex('exchange_rates', ['effective_date'], {
+        name: 'exchange_rates_effective_date'
+      });
+    }
+
+    if (!indexNames.includes('exchange_rates_is_active')) {
+      await queryInterface.addIndex('exchange_rates', ['is_active'], {
+        name: 'exchange_rates_is_active'
+      });
+    }
   },
 
   down: async (queryInterface, Sequelize) => {

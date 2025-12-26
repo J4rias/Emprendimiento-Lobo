@@ -23,6 +23,7 @@ const uploadRoutes = require('./routes/upload.routes');
 const exchangeRateRoutes = require('./routes/exchangeRate.routes');
 const packagingTypeRoutes = require('./routes/packagingType.routes');
 const presentationTypeRoutes = require('./routes/presentationType.routes');
+const transferRoutes = require('./routes/transfer.routes');
 
 const app = express();
 // Security middleware con configuración para permitir imágenes
@@ -116,6 +117,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/exchange-rates', exchangeRateRoutes);
 app.use('/api/packaging-types', packagingTypeRoutes);
+app.use('/api/transfers', transferRoutes);
 app.use('/api/presentation-types', presentationTypeRoutes);
 
 // 404 handler

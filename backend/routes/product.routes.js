@@ -58,4 +58,52 @@ router.delete('/:id',
   productController.delete
 );
 
+// Presentation management routes
+router.get('/:id/presentations',
+  productController.getPresentations
+);
+
+router.post('/:id/presentations',
+  authorize('products.update'),
+  [
+    body('name').notEmpty().withMessage('Presentation name is required'),
+    body('units_per_package').isInt({ min: 1 }).withMessage('Units per package must be at least 1'),
+    body('packaging_type_id').optional().isInt().withMessage('Packaging type ID must be an integer'),
+    body('presentation_type_id').optional().isInt().withMessage('Presentation type ID must be an integer'),
+    body('unit_size').optional().isDecimal().withMessage('Unit size must be a decimal'),
+    body('package_price').optional().isDecimal().withMessage('Package price must be a decimal'),
+    body('package_cost').optional().isDecimal().withMessage('Package cost must be a decimal'),
+    body('is_default').optional().isBoolean().withMessage('Is default must be a boolean'),
+    body('is_active').optional().isBoolean().withMessage('Is active must be a boolean'),
+    validate
+  ],
+  productController.createPresentation
+);
+
+router.put('/presentations/:presentationId',
+  authorize('products.update'),
+  [
+    body('name').optional().notEmpty().withMessage('Presentation name cannot be empty'),
+    body('units_per_package').optional().isInt({ min: 1 }).withMessage('Units per package must be at least 1'),
+    body('packaging_type_id').optional().isInt().withMessage('Packaging type ID must be an integer'),
+    body('presentation_type_id').optional().isInt().withMessage('Presentation type ID must be an integer'),
+    body('unit_size').optional().isDecimal().withMessage('Unit size must be a decimal'),
+    body('package_price').optional().isDecimal().withMessage('Package price must be a decimal'),
+    body('package_cost').optional().isDecimal().withMessage('Package cost must be a decimal'),
+    body('is_active').optional().isBoolean().withMessage('Is active must be a boolean'),
+    validate
+  ],
+  productController.updatePresentation
+);
+
+router.delete('/presentations/:presentationId',
+  authorize('products.delete'),
+  productController.deletePresentation
+);
+
+router.put('/presentations/:presentationId/set-default',
+  authorize('products.update'),
+  productController.setDefaultPresentation
+);
+
 module.exports = router;

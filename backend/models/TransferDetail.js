@@ -31,6 +31,26 @@ const TransferDetail = sequelize.define('TransferDetail', {
       key: 'id'
     }
   },
+  presentation_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'product_presentations',
+      key: 'id'
+    },
+    comment: 'Presentación usada en la transferencia'
+  },
+  package_quantity: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+    comment: 'Cantidad de paquetes transferidos'
+  },
+  loose_units: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: 'Unidades sueltas transferidas'
+  },
   quantity_requested: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
