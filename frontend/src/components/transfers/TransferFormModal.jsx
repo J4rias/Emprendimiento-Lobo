@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Package, Search, Check } from 'lucide-react';
 import { warehouseService } from '../../services/api/warehouseService';
 import { inventoryService } from '../../services/api/inventoryService';
 import toast from 'react-hot-toast';
 
-const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
+const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], sourceWarehouseId = null }) => {
   const [formData, setFormData] = useState({
     origin_warehouse_id: '',
     destination_warehouse_id: '',
@@ -16,12 +16,39 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
   const [availableProducts, setAvailableProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerms, setSearchTerms] = useState({}); // Un término de búsqueda por cada item
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !initializedRef.current) {
       console.log('Modal opened, fetching data...');
       fetchWarehouses();
-    } else {
+
+      // Inicializar con datos preseleccionados si existen
+      if (sourceWarehouseId) {
+        setFormData(prev => ({
+          ...prev,
+          origin_warehouse_id: sourceWarehouseId.toString()
+        }));
+      }
+
+      if (preselectedItems && preselectedItems.length > 0) {
+        const initialItems = preselectedItems.map((item, index) => ({
+          _tempId: Date.now() + index,
+          product_id: item.product_id,
+          presentation_id: item.presentation_id,
+          package_quantity: item.package_quantity || 0,
+          loose_units: item.loose_units || 0,
+          batch_id: null
+        }));
+
+        setFormData(prev => ({
+          ...prev,
+          items: initialItems
+        }));
+      }
+
+      initializedRef.current = true;
+    } else if (!isOpen) {
       // Reset form when modal is closed
       setFormData({
         origin_warehouse_id: '',
@@ -31,6 +58,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
       });
       setSearchTerms({});
       setAvailableProducts([]);
+      initializedRef.current = false;
     }
   }, [isOpen]);
 
@@ -152,11 +180,29 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
 
       if (product) {
         newItems[index].selectedProduct = product;
-        newItems[index].presentation_id = null;
+
+        // Auto-select default presentation if available
+        const defaultPresentation = product.presentations?.find(p => p.is_default) || product.presentations?.[0];
+        if (defaultPresentation) {
+          newItems[index].presentation_id = defaultPresentation.id.toString();
+        } else {
+          newItems[index].presentation_id = null;
+        }
       }
     }
 
     setFormData({ ...formData, items: newItems });
+  };
+
+  // Calculate total units for an item
+  const calculateTotalUnits = (item, product) => {
+    if (!product) return 0;
+
+    const presentation = product.presentations?.find(p => p.id === parseInt(item.presentation_id));
+    const unitsPerPkg = presentation?.units_per_package || 1;
+    const pkgUnits = (parseInt(item.package_quantity) || 0) * unitsPerPkg;
+    const looseUnits = parseInt(item.loose_units) || 0;
+    return pkgUnits + looseUnits;
   };
 
   const handleSubmit = async (e) => {
@@ -185,6 +231,14 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
         toast.error(`Debes seleccionar un producto en el ítem ${i + 1}`);
         return;
       }
+
+      // Validate product has presentations
+      const product = item.selectedProduct || availableProducts.find(p => p.id === parseInt(item.product_id));
+      if (!product?.presentations || product.presentations.length === 0) {
+        toast.error(`El producto en el ítem ${i + 1} no tiene presentaciones configuradas. Primero debes agregar una presentación al producto.`);
+        return;
+      }
+
       const total = parseFloat(item.package_quantity || 0) + parseFloat(item.loose_units || 0);
       if (total <= 0) {
         toast.error(`La cantidad debe ser mayor a cero en el ítem ${i + 1}`);
@@ -445,23 +499,50 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
                         </div>
 
                         {/* Presentation */}
-                        {product && product.presentations && product.presentations.length > 0 && (
-                          <div>
+                        {product && product.presentations && product.presentations.length > 0 ? (
+                          <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Presentación
+                              Presentación *
                             </label>
                             <select
                               value={item.presentation_id || ''}
                               onChange={(e) => updateItem(index, 'presentation_id', e.target.value || null)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                              <option value="">Sin presentación</option>
+                              <option value="">Seleccionar presentación</option>
                               {product.presentations.map(p => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} ({p.units_per_package} unidades)
+                                  {p.name} - {p.units_per_package} uds/paquete
+                                  {parseFloat(p.package_price || 0) > 0 ? ` - ${parseFloat(p.package_price).toFixed(2)}` : ''}
+                                  {p.is_default ? ' (Predeterminada)' : ''}
                                 </option>
                               ))}
                             </select>
+
+                            {/* Visual indicator for selected presentation */}
+                            {item.presentation_id && (() => {
+                              const selectedPresentation = product.presentations.find(p => p.id === parseInt(item.presentation_id));
+                              return selectedPresentation && (
+                                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-gray-700">
+                                  <div className="flex items-center gap-2">
+                                    <Package size={14} className="text-blue-600" />
+                                    <span className="font-medium">Cada paquete contiene: {selectedPresentation.units_per_package} unidades</span>
+                                  </div>
+                                  {selectedPresentation.package_cost > 0 && (
+                                    <div className="mt-1 ml-5">💰 Costo/paquete: ${parseFloat(selectedPresentation.package_cost).toFixed(2)}</div>
+                                  )}
+                                  {selectedPresentation.package_price > 0 && (
+                                    <div className="mt-1 ml-5">💵 Precio/paquete: ${parseFloat(selectedPresentation.package_price).toFixed(2)}</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : product && (
+                          <div className="md:col-span-2">
+                            <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-lg text-sm text-yellow-800">
+                              ⚠️ Este producto no tiene presentaciones configuradas. Debes agregar al menos una presentación antes de poder transferirlo.
+                            </div>
                           </div>
                         )}
 
@@ -469,6 +550,14 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Cantidad de Paquetes
+                            {item.presentation_id && (() => {
+                              const selectedPresentation = product?.presentations?.find(p => p.id === parseInt(item.presentation_id));
+                              return selectedPresentation && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({selectedPresentation.units_per_package} uds/paquete)
+                                </span>
+                              );
+                            })()}
                           </label>
                           <input
                             type="number"
@@ -494,6 +583,47 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit }) => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
+
+                        {/* Total Units Calculation Display */}
+                        {product && item.presentation_id && (parseInt(item.package_quantity) > 0 || parseInt(item.loose_units) > 0) && (
+                          <div className="md:col-span-2">
+                            <div className="p-3 bg-green-50 border border-green-300 rounded-lg">
+                              <div className="text-sm font-medium text-green-900">
+                                📦 Total a transferir:
+                              </div>
+                              <div className="text-xs text-green-700 mt-1">
+                                {(() => {
+                                  const selectedPresentation = product.presentations?.find(p => p.id === parseInt(item.presentation_id));
+                                  const unitsPerPkg = selectedPresentation?.units_per_package || 1;
+                                  const pkgQty = parseInt(item.package_quantity) || 0;
+                                  const looseUnits = parseInt(item.loose_units) || 0;
+                                  const pkgUnits = pkgQty * unitsPerPkg;
+                                  const totalUnits = pkgUnits + looseUnits;
+
+                                  return (
+                                    <>
+                                      {pkgQty > 0 && (
+                                        <span>({pkgQty} {pkgQty === 1 ? 'paquete' : 'paquetes'} × {unitsPerPkg} uds/paquete = {pkgUnits} uds)</span>
+                                      )}
+                                      {pkgQty > 0 && looseUnits > 0 && <span> + </span>}
+                                      {looseUnits > 0 && (
+                                        <span>({looseUnits} {looseUnits === 1 ? 'suelta' : 'sueltas'})</span>
+                                      )}
+                                      <span className="font-bold ml-1">= {totalUnits} unidades totales</span>
+
+                                      {/* Warning if exceeds available quantity */}
+                                      {totalUnits > product.available_quantity && (
+                                        <div className="mt-1 text-orange-700">
+                                          ⚠️ Excede la cantidad disponible ({product.available_quantity} uds)
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Item Notes */}
                         <div className="md:col-span-2">

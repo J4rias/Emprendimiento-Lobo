@@ -28,6 +28,13 @@ const ExchangeRate = require('./ExchangeRate');
 const PackagingType = require('./PackagingType');
 const PresentationType = require('./PresentationType');
 const InventoryMovement = require('./InventoryMovement');
+const PurchaseOrder = require('./PurchaseOrder');
+const PurchaseOrderDetail = require('./PurchaseOrderDetail');
+const SupplierPayment = require('./SupplierPayment');
+const CreditNote = require('./CreditNote');
+const CreditNoteDetail = require('./CreditNoteDetail');
+const Delivery = require('./Delivery');
+const DeliveryDetail = require('./DeliveryDetail');
 
 // Define associations
 
@@ -229,6 +236,113 @@ User.hasMany(InventoryMovement, { foreignKey: 'user_id', as: 'inventoryMovements
 InventoryMovement.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
 Batch.hasMany(InventoryMovement, { foreignKey: 'batch_id', as: 'movements' });
 
+// PurchaseOrder - Supplier (Many to One)
+PurchaseOrder.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
+Supplier.hasMany(PurchaseOrder, { foreignKey: 'supplier_id', as: 'purchaseOrders' });
+
+// PurchaseOrder - Warehouse (Many to One)
+PurchaseOrder.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(PurchaseOrder, { foreignKey: 'warehouse_id', as: 'purchaseOrders' });
+
+// PurchaseOrder - User (Created/Updated/Approved by)
+PurchaseOrder.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+PurchaseOrder.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+PurchaseOrder.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+
+// PurchaseOrder - PurchaseOrderDetail (One to Many)
+PurchaseOrder.hasMany(PurchaseOrderDetail, { foreignKey: 'purchase_order_id', as: 'details' });
+PurchaseOrderDetail.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id', as: 'purchaseOrder' });
+
+// PurchaseOrderDetail - Product (Many to One)
+PurchaseOrderDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(PurchaseOrderDetail, { foreignKey: 'product_id', as: 'purchaseOrderDetails' });
+
+// PurchaseOrderDetail - ProductPresentation (Many to One)
+PurchaseOrderDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(PurchaseOrderDetail, { foreignKey: 'presentation_id', as: 'purchaseOrderDetails' });
+
+// SupplierPayment - Supplier (Many to One)
+SupplierPayment.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
+Supplier.hasMany(SupplierPayment, { foreignKey: 'supplier_id', as: 'payments' });
+
+// SupplierPayment - PurchaseOrder (Many to One, optional)
+SupplierPayment.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id', as: 'purchaseOrder' });
+PurchaseOrder.hasMany(SupplierPayment, { foreignKey: 'purchase_order_id', as: 'payments' });
+
+// SupplierPayment - User (Created by)
+SupplierPayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+User.hasMany(SupplierPayment, { foreignKey: 'created_by', as: 'supplierPayments' });
+
+// CreditNote - Sale (Many to One)
+CreditNote.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
+Sale.hasMany(CreditNote, { foreignKey: 'sale_id', as: 'creditNotes' });
+
+// CreditNote - Customer (Many to One)
+CreditNote.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Customer.hasMany(CreditNote, { foreignKey: 'customer_id', as: 'creditNotes' });
+
+// CreditNote - Warehouse (Many to One)
+CreditNote.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(CreditNote, { foreignKey: 'warehouse_id', as: 'creditNotes' });
+
+// CreditNote - User (Created/Approved by)
+CreditNote.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+CreditNote.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+User.hasMany(CreditNote, { foreignKey: 'created_by', as: 'createdCreditNotes' });
+
+// CreditNote - CreditNoteDetail (One to Many)
+CreditNote.hasMany(CreditNoteDetail, { foreignKey: 'credit_note_id', as: 'details' });
+CreditNoteDetail.belongsTo(CreditNote, { foreignKey: 'credit_note_id', as: 'creditNote' });
+
+// CreditNoteDetail - SaleDetail (Many to One)
+CreditNoteDetail.belongsTo(SaleDetail, { foreignKey: 'sale_detail_id', as: 'saleDetail' });
+SaleDetail.hasMany(CreditNoteDetail, { foreignKey: 'sale_detail_id', as: 'creditNoteDetails' });
+
+// CreditNoteDetail - Product (Many to One)
+CreditNoteDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(CreditNoteDetail, { foreignKey: 'product_id', as: 'creditNoteDetails' });
+
+// CreditNoteDetail - ProductPresentation (Many to One)
+CreditNoteDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(CreditNoteDetail, { foreignKey: 'presentation_id', as: 'creditNoteDetails' });
+
+// CreditNoteDetail - Batch (Many to One)
+CreditNoteDetail.belongsTo(Batch, { foreignKey: 'batch_id', as: 'batch' });
+Batch.hasMany(CreditNoteDetail, { foreignKey: 'batch_id', as: 'creditNoteDetails' });
+
+// Delivery - Sale (Many to One)
+Delivery.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
+Sale.hasMany(Delivery, { foreignKey: 'sale_id', as: 'deliveries' });
+
+// Delivery - Customer (Many to One)
+Delivery.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Customer.hasMany(Delivery, { foreignKey: 'customer_id', as: 'deliveries' });
+
+// Delivery - Warehouse (Many to One)
+Delivery.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(Delivery, { foreignKey: 'warehouse_id', as: 'deliveries' });
+
+// Delivery - User (Delivered by and Created by)
+Delivery.belongsTo(User, { foreignKey: 'delivered_by', as: 'deliverer' });
+Delivery.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+User.hasMany(Delivery, { foreignKey: 'created_by', as: 'createdDeliveries' });
+
+// Delivery - DeliveryDetail (One to Many)
+Delivery.hasMany(DeliveryDetail, { foreignKey: 'delivery_id', as: 'details' });
+DeliveryDetail.belongsTo(Delivery, { foreignKey: 'delivery_id', as: 'delivery' });
+
+// DeliveryDetail - SaleDetail (Many to One)
+DeliveryDetail.belongsTo(SaleDetail, { foreignKey: 'sale_detail_id', as: 'saleDetail' });
+SaleDetail.hasMany(DeliveryDetail, { foreignKey: 'sale_detail_id', as: 'deliveryDetails' });
+
+// DeliveryDetail - Product (Many to One)
+DeliveryDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(DeliveryDetail, { foreignKey: 'product_id', as: 'deliveryDetails' });
+
+// DeliveryDetail - ProductPresentation (Many to One)
+DeliveryDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(DeliveryDetail, { foreignKey: 'presentation_id', as: 'deliveryDetails' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -258,5 +372,12 @@ module.exports = {
   ExchangeRate,
   PackagingType,
   PresentationType,
-  InventoryMovement
+  InventoryMovement,
+  PurchaseOrder,
+  PurchaseOrderDetail,
+  SupplierPayment,
+  CreditNote,
+  CreditNoteDetail,
+  Delivery,
+  DeliveryDetail
 };

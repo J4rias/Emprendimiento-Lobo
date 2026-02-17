@@ -20,10 +20,13 @@ import {
   DollarSign,
   Box,
   BarChart,
-  Settings
+  Settings,
+  Star
 } from 'lucide-react';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
 import ImageUpload from '../components/common/ImageUpload';
+import PresentationManager from '../components/products/PresentationManager';
+import { presentationService } from '../services/api/presentationService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -55,27 +58,21 @@ const ProductsPage = () => {
   const [scannerError, setScannerError] = useState(null);
   const [barcodeError, setBarcodeError] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [presentations, setPresentations] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category_id: '',
     barcode: '',
     brand_id: '',
+    unit_size: '',
+    unit_size_measure: 'UND',
     is_perishable: false,
     has_batch_control: false,
     min_stock: 0,
     max_stock: 0,
     reorder_point: 0,
-    is_active: true,
-    // Presentation fields
-    packaging_type_id: '',
-    presentation_type_id: '',
-    units_per_package: 1,
-    unit_size: '',
-    unit_size_measure: 'UND',
-    package_price: '',
-    package_cost: '',
-    purchase_currency: 'USD'
+    is_active: true
   });
 
   // Debounce search to avoid losing focus
@@ -229,6 +226,13 @@ const ProductsPage = () => {
     setBarcodeError(null);
 
     try {
+      // Validate presentations
+      if (presentations.length === 0) {
+        setError('Debes agregar al menos una presentación al producto');
+        setLoading(false);
+        return;
+      }
+
       // Validate barcode if provided
       if (formData.barcode) {
         const checkResponse = await fetch(`${API_URL}/products/barcode/${encodeURIComponent(formData.barcode)}`, {
@@ -284,12 +288,71 @@ const ProductsPage = () => {
         throw new Error(errorData.message || 'Error al guardar producto');
       }
 
+      const productData = await response.json();
+      const productId = editingProduct ? editingProduct.id : productData.data.id;
+
+      // Handle presentations
+      await savePresentations(productId);
+
       await fetchProducts();
       handleCloseModal();
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const savePresentations = async (productId) => {
+    try {
+      // Get existing presentations for the product
+      const existingPresentations = editingProduct?.presentations || [];
+      const existingIds = existingPresentations.map(p => p.id);
+      const currentIds = presentations.filter(p => p.id).map(p => p.id);
+
+      // Delete presentations that were removed
+      const toDelete = existingIds.filter(id => !currentIds.includes(id));
+      for (const id of toDelete) {
+        await presentationService.delete(id);
+      }
+
+      // Create or update presentations
+      for (const presentation of presentations) {
+        if (presentation.isNew || !presentation.id) {
+          // Create new presentation
+          await presentationService.create(productId, {
+            name: presentation.name,
+            packaging_type_id: presentation.packaging_type_id || null,
+            presentation_type_id: presentation.presentation_type_id || null,
+            units_per_package: presentation.units_per_package,
+            package_price: presentation.package_price || 0,
+            package_cost: presentation.package_cost || 0,
+            purchase_currency: presentation.purchase_currency || 'USD',
+            is_default: presentation.is_default || false,
+            is_active: presentation.is_active !== undefined ? presentation.is_active : true
+          });
+        } else {
+          // Update existing presentation
+          await presentationService.update(presentation.id, {
+            name: presentation.name,
+            packaging_type_id: presentation.packaging_type_id || null,
+            presentation_type_id: presentation.presentation_type_id || null,
+            units_per_package: presentation.units_per_package,
+            package_price: presentation.package_price || 0,
+            package_cost: presentation.package_cost || 0,
+            purchase_currency: presentation.purchase_currency || 'USD',
+            is_active: presentation.is_active !== undefined ? presentation.is_active : true
+          });
+
+          // Set as default if needed
+          if (presentation.is_default) {
+            await presentationService.setDefault(presentation.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error saving presentations:', error);
+      throw new Error('Error al guardar presentaciones: ' + error.message);
     }
   };
 
@@ -301,29 +364,23 @@ const ProductsPage = () => {
   const handleEdit = (product) => {
     setEditingProduct(product);
     setViewMode(false);
-    const defaultPresentation = product.presentations?.[0] || {};
     setFormData({
       name: product.name || '',
       description: product.description || '',
       category_id: product.category_id || '',
       barcode: product.barcodes?.[0]?.barcode || '',
       brand_id: product.brand_id || '',
+      unit_size: product.unit_size || '',
+      unit_size_measure: product.unit_size_measure || 'UND',
       is_perishable: product.is_perishable || false,
       has_batch_control: product.has_batch_control || false,
       min_stock: parseInt(product.min_stock) || 0,
       max_stock: parseInt(product.max_stock) || 0,
       reorder_point: parseInt(product.reorder_point) || 0,
-      is_active: product.is_active !== undefined ? product.is_active : true,
-      // Presentation fields
-      packaging_type_id: defaultPresentation.packaging_type_id || '',
-      presentation_type_id: defaultPresentation.presentation_type_id || '',
-      units_per_package: defaultPresentation.units_per_package || 1,
-      unit_size: defaultPresentation.unit_size || '',
-      unit_size_measure: defaultPresentation.unit_size_measure || 'UND',
-      package_price: defaultPresentation.package_price || '',
-      package_cost: defaultPresentation.package_cost || '',
-      purchase_currency: defaultPresentation.purchase_currency || 'USD'
+      is_active: product.is_active !== undefined ? product.is_active : true
     });
+    // Set presentations from product
+    setPresentations(product.presentations || []);
     // Set image preview if product has an image
     if (product.image_url) {
       setImagePreview(product.image_url);
@@ -363,22 +420,16 @@ const ProductsPage = () => {
       category_id: '',
       barcode: '',
       brand_id: '',
+      unit_size: '',
+      unit_size_measure: 'UND',
       is_perishable: false,
       has_batch_control: false,
       min_stock: 0,
       max_stock: 0,
       reorder_point: 0,
-      is_active: true,
-      // Presentation fields
-      packaging_type_id: '',
-      presentation_type_id: '',
-      units_per_package: 1,
-      unit_size: '',
-      unit_size_measure: 'UND',
-      package_price: '',
-      package_cost: '',
-      purchase_currency: 'USD'
+      is_active: true
     });
+    setPresentations([]);
     setImagePreview(null);
     setError(null);
   };
@@ -949,6 +1000,43 @@ const ProductsPage = () => {
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tamaño de Unidad Individual *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      name="unit_size"
+                      step="0.1"
+                      value={formData.unit_size || ''}
+                      onChange={handleChange}
+                      disabled={viewMode}
+                      className="input flex-1"
+                      placeholder="Ej: 500"
+                      required
+                    />
+                    <select
+                      name="unit_size_measure"
+                      value={formData.unit_size_measure}
+                      onChange={handleChange}
+                      disabled={viewMode}
+                      className="input w-24"
+                      required
+                    >
+                      <option value="UND">UND</option>
+                      <option value="LT">LT</option>
+                      <option value="ML">ML</option>
+                      <option value="KG">KG</option>
+                      <option value="GR">GR</option>
+                      <option value="OZ">OZ</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Tamaño de cada unidad individual (ej: 500 ML para una botella de 500ml). Este dato se usa en todas las presentaciones del producto.
+                  </p>
+                </div>
               </div>
               </div>
 
@@ -956,172 +1044,17 @@ const ProductsPage = () => {
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Box className="h-5 w-5 text-blue-600" />
-                  Presentación del Producto
+                  Presentaciones del Producto
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tipo de Empaque
-                    </label>
-                    <select
-                      name="packaging_type_id"
-                      value={formData.packaging_type_id}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className="input"
-                    >
-                      <option value="">Seleccione un tipo de empaque</option>
-                      {packagingTypes.map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tipo de Presentación (Unidad)
-                    </label>
-                    <select
-                      name="presentation_type_id"
-                      value={formData.presentation_type_id}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className="input"
-                    >
-                      <option value="">Seleccione un tipo de presentación</option>
-                      {presentationTypes.map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unidades por Empaque
-                    </label>
-                    <input
-                      type="number"
-                      name="units_per_package"
-                      value={formData.units_per_package}
-                      onChange={handleChange}
-                      min="1"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                      placeholder="Ej: 12"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tamaño de Unidad
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        name="unit_size"
-                        value={formData.unit_size}
-                        onChange={handleChange}
-                        min="0"
-                        step="0.01"
-                        disabled={viewMode}
-                        className="input"
-                        placeholder="Ej: 2"
-                      />
-                      <select
-                        name="unit_size_measure"
-                        value={formData.unit_size_measure}
-                        onChange={handleChange}
-                        disabled={viewMode}
-                        className="input"
-                      >
-                        <option value="UND">UND</option>
-                        <option value="LT">LT</option>
-                        <option value="ML">ML</option>
-                        <option value="KG">KG</option>
-                        <option value="GR">GR</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <span className="flex items-center gap-2">
-                        Precio por Paquete
-                        <div className="relative group">
-                          <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-56 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
-                            <div className="font-semibold mb-1">Precio de Venta</div>
-                            <div>Precio que TÚ cobras a tus clientes por el paquete completo.</div>
-                            <div className="mt-1 text-green-300">Ejemplo: Vendes bandeja a $8.00</div>
-                            <div className="absolute top-full left-4 w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
-                          </div>
-                        </div>
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      name="package_price"
-                      value={formData.package_price}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      disabled={viewMode}
-                      className="input"
-                      placeholder="Ej: 25.50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <span className="flex items-center gap-2">
-                        Costo por Paquete
-                        <div className="relative group">
-                          <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-56 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
-                            <div className="font-semibold mb-1">Precio de Compra</div>
-                            <div>Precio que TÚ pagas al proveedor por el paquete completo.</div>
-                            <div className="mt-1 text-yellow-300">Ejemplo: Compras bandeja a $6.00</div>
-                            <div className="mt-1 text-blue-300">Ganancia: $8.00 - $6.00 = $2.00</div>
-                            <div className="absolute top-full right-4 w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
-                          </div>
-                        </div>
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      name="package_cost"
-                      value={formData.package_cost}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      disabled={viewMode}
-                      className="input"
-                      placeholder="Ej: 20.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Moneda de Compra
-                    </label>
-                    <select
-                      name="purchase_currency"
-                      value={formData.purchase_currency}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className="input"
-                    >
-                      <option value="USD">USD - Dólar</option>
-                      <option value="COP">COP - Peso Colombiano</option>
-                      <option value="VES">VES - Bolívar</option>
-                    </select>
-                  </div>
-                </div>
+                <PresentationManager
+                  presentations={presentations}
+                  onChange={setPresentations}
+                  readonly={viewMode}
+                  packagingTypes={packagingTypes}
+                  presentationTypes={presentationTypes}
+                  productUnitSize={formData.unit_size}
+                  productUnitMeasure={formData.unit_size_measure}
+                />
               </div>
 
               {/* Stock Settings */}
@@ -1415,6 +1348,12 @@ const ProductsPage = () => {
                           <label className="block text-xs font-medium text-gray-500 mb-1">Marca</label>
                           <p className="text-sm text-gray-900">{viewingProduct.brand?.name || '-'}</p>
                         </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Tamaño de Unidad</label>
+                          <p className="text-sm text-gray-900">
+                            {viewingProduct.unit_size ? `${parseFloat(viewingProduct.unit_size) % 1 === 0 ? parseFloat(viewingProduct.unit_size).toString() : parseFloat(viewingProduct.unit_size).toFixed(1)} ${viewingProduct.unit_size_measure || 'UND'}` : '-'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -1423,10 +1362,22 @@ const ProductsPage = () => {
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                           <Box className="h-4 w-4" />
-                          Presentación
+                          Presentaciones ({viewingProduct.presentations.length})
                         </h4>
                         {viewingProduct.presentations.map((presentation, index) => (
-                          <div key={presentation.id || index} className="space-y-3">
+                          <div key={presentation.id || index} className={`space-y-3 ${index > 0 ? 'mt-4 pt-4 border-t border-gray-300' : ''}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm font-semibold text-gray-900">{presentation.name || 'Sin nombre'}</span>
+                              </div>
+                              {presentation.is_default && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  <Star className="h-3 w-3 mr-1 fill-current" />
+                                  Predeterminada
+                                </span>
+                              )}
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de Empaque</label>
@@ -1441,10 +1392,8 @@ const ProductsPage = () => {
                                 <p className="text-sm text-gray-900">{presentation.units_per_package}</p>
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Tamaño de Unidad</label>
-                                <p className="text-sm text-gray-900">
-                                  {presentation.unit_size ? `${presentation.unit_size} ${presentation.unit_size_measure || ''}` : '-'}
-                                </p>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Moneda de Compra</label>
+                                <p className="text-sm text-gray-900">{presentation.purchase_currency || 'USD'}</p>
                               </div>
                             </div>
 

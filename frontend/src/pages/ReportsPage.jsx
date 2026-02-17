@@ -1,366 +1,598 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
+import { saleService } from '../services/api/saleService';
+import { inventoryService } from '../services/api/inventoryService';
+import { purchaseOrderService } from '../services/api/purchaseOrderService';
+import { productService } from '../services/api/productService';
 import {
-  BarChart3,
-  DollarSign,
-  Calendar,
+  FileText,
   Download,
-  RefreshCw,
-  Package,
+  Calendar,
+  Filter,
   TrendingUp,
-  ArrowRightLeft
+  Package,
+  ShoppingCart,
+  DollarSign
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
 const ReportsPage = () => {
-  const { token } = useAuth();
+  const [reportType, setReportType] = useState('sales');
+  const [dateRange, setDateRange] = useState({
+    start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    end_date: new Date().toISOString().split('T')[0]
+  });
+  const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [valuationData, setValuationData] = useState(null);
-  const [selectedCurrency, setSelectedCurrency] = useState('USD');
-  const [convertedValues, setConvertedValues] = useState({});
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [stats, setStats] = useState(null);
 
-  const currencies = [
-    { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
-    { code: 'COP', name: 'Peso Colombiano', symbol: '$' },
-    { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
+  const reportTypes = [
+    { value: 'sales', label: 'Reporte de Ventas', icon: DollarSign },
+    { value: 'inventory', label: 'Inventario Valorizado', icon: Package },
+    { value: 'purchases', label: 'Reporte de Compras', icon: ShoppingCart },
+    { value: 'top_products', label: 'Productos Más Vendidos', icon: TrendingUp },
+    { value: 'low_stock', label: 'Productos con Bajo Stock', icon: Package }
   ];
 
-  useEffect(() => {
-    fetchValuationReport();
-  }, [selectedDate]);
-
-  useEffect(() => {
-    if (valuationData && selectedCurrency !== 'USD') {
-      convertAllCurrencies();
-    }
-  }, [selectedCurrency, valuationData]);
-
-  const fetchValuationReport = async () => {
-    setLoading(true);
+  const generateReport = async () => {
     try {
-      const response = await fetch(`${API_URL}/inventory/valuation?date=${selectedDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      setLoading(true);
+      setReportData(null);
+      setStats(null);
 
-      if (response.ok) {
-        const data = await response.json();
-        setValuationData(data.data);
+      switch (reportType) {
+        case 'sales':
+          await generateSalesReport();
+          break;
+        case 'inventory':
+          await generateInventoryReport();
+          break;
+        case 'purchases':
+          await generatePurchasesReport();
+          break;
+        case 'top_products':
+          await generateTopProductsReport();
+          break;
+        case 'low_stock':
+          await generateLowStockReport();
+          break;
+        default:
+          break;
       }
     } catch (error) {
-      console.error('Error fetching valuation:', error);
+      console.error('Error generating report:', error);
+      alert('Error al generar el reporte');
     } finally {
       setLoading(false);
     }
   };
 
-  const convertAllCurrencies = async () => {
-    if (!valuationData?.totalValue) return;
+  const generateSalesReport = async () => {
+    const [salesStats, salesList] = await Promise.all([
+      saleService.getSalesStats(dateRange),
+      saleService.getSales({ ...dateRange, limit: 1000 })
+    ]);
 
-    const converted = {};
-
-    for (const currency of currencies) {
-      if (currency.code === 'USD') {
-        converted[currency.code] = {
-          amount: valuationData.totalValue,
-          rate: 1
-        };
-        continue;
-      }
-
-      try {
-        const response = await fetch(
-          `${API_URL}/exchange-rates/convert?amount=${valuationData.totalValue}&from_currency=USD&to_currency=${currency.code}&date=${selectedDate}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          converted[currency.code] = {
-            amount: data.data.converted_amount,
-            rate: data.data.rate
-          };
-        }
-      } catch (error) {
-        console.error(`Error converting to ${currency.code}:`, error);
-      }
-    }
-
-    setConvertedValues(converted);
-  };
-
-  const exportReport = () => {
-    // Create CSV content
-    const csvRows = [
-      ['Reporte de Valoración de Inventario'],
-      ['Fecha', selectedDate],
-      [''],
-      ['Moneda', 'Valor Total', 'Tasa de Cambio (desde USD)'],
-    ];
-
-    currencies.forEach(currency => {
-      const value = currency.code === 'USD'
-        ? valuationData?.totalValue || 0
-        : convertedValues[currency.code]?.amount || 0;
-      const rate = currency.code === 'USD'
-        ? 1
-        : convertedValues[currency.code]?.rate || 0;
-
-      csvRows.push([
-        `${currency.code} - ${currency.name}`,
-        value.toFixed(2),
-        rate.toFixed(6)
-      ]);
+    setStats({
+      total_sales: salesStats.data?.total_sales || 0,
+      total_amount: salesStats.data?.total_amount || 0,
+      average_ticket: salesStats.data?.average_ticket || 0,
+      sales_by_type: salesStats.data?.sales_by_type || []
     });
 
-    const csvContent = csvRows.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    setReportData(salesList.data || []);
+  };
 
-    link.setAttribute('href', url);
-    link.setAttribute('download', `valuation_report_${selectedDate}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+  const generateInventoryReport = async () => {
+    const inventoryData = await inventoryService.getAll({ limit: 1000 });
+
+    let totalValue = 0;
+    const processedData = (inventoryData.data || []).map(item => {
+      const value = (item.quantity || 0) * (item.product?.cost || 0);
+      totalValue += value;
+      return {
+        ...item,
+        value
+      };
+    });
+
+    setStats({
+      total_items: processedData.length,
+      total_value: totalValue,
+      total_quantity: processedData.reduce((sum, item) => sum + (item.quantity || 0), 0)
+    });
+
+    setReportData(processedData);
+  };
+
+  const generatePurchasesReport = async () => {
+    const purchaseOrders = await purchaseOrderService.getAll({
+      ...dateRange,
+      limit: 1000
+    });
+
+    const totalAmount = (purchaseOrders.data || []).reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
+
+    setStats({
+      total_orders: purchaseOrders.data?.length || 0,
+      total_amount: totalAmount,
+      average_order: purchaseOrders.data?.length > 0 ? totalAmount / purchaseOrders.data.length : 0
+    });
+
+    setReportData(purchaseOrders.data || []);
+  };
+
+  const generateTopProductsReport = async () => {
+    const salesData = await saleService.getAll({
+      ...dateRange,
+      limit: 1000
+    });
+
+    // Aggregate product sales
+    const productMap = {};
+    (salesData.data || []).forEach(sale => {
+      (sale.details || []).forEach(detail => {
+        const productId = detail.product_id;
+        if (!productMap[productId]) {
+          productMap[productId] = {
+            product: detail.product,
+            total_quantity: 0,
+            total_amount: 0,
+            sales_count: 0
+          };
+        }
+        productMap[productId].total_quantity += (detail.package_quantity || 0) * (detail.product?.presentation?.units_per_package || 1) + (detail.loose_units || 0);
+        productMap[productId].total_amount += parseFloat(detail.line_total || 0);
+        productMap[productId].sales_count += 1;
+      });
+    });
+
+    const topProducts = Object.values(productMap)
+      .sort((a, b) => b.total_amount - a.total_amount)
+      .slice(0, 50);
+
+    setStats({
+      total_products: topProducts.length,
+      total_revenue: topProducts.reduce((sum, p) => sum + p.total_amount, 0),
+      total_units_sold: topProducts.reduce((sum, p) => sum + p.total_quantity, 0)
+    });
+
+    setReportData(topProducts);
+  };
+
+  const generateLowStockReport = async () => {
+    const lowStockData = await inventoryService.getLowStock({ limit: 1000 });
+
+    setStats({
+      critical_items: lowStockData.data?.length || 0
+    });
+
+    setReportData(lowStockData.data || []);
+  };
+
+  const exportToCSV = () => {
+    if (!reportData || reportData.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    let csvContent = '';
+    let filename = '';
+
+    switch (reportType) {
+      case 'sales':
+        csvContent = generateSalesCSV();
+        filename = `reporte_ventas_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        break;
+      case 'inventory':
+        csvContent = generateInventoryCSV();
+        filename = `inventario_valorizado_${new Date().toISOString().split('T')[0]}.csv`;
+        break;
+      case 'purchases':
+        csvContent = generatePurchasesCSV();
+        filename = `reporte_compras_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        break;
+      case 'top_products':
+        csvContent = generateTopProductsCSV();
+        filename = `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        break;
+      case 'low_stock':
+        csvContent = generateLowStockCSV();
+        filename = `productos_bajo_stock_${new Date().toISOString().split('T')[0]}.csv`;
+        break;
+      default:
+        return;
+    }
+
+    // Create and download
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
     link.click();
-    document.body.removeChild(link);
+  };
+
+  const generateSalesCSV = () => {
+    let csv = 'Número,Fecha,Cliente,Tipo,Estado,Subtotal,Descuento,Impuesto,Total\n';
+    reportData.forEach(sale => {
+      csv += `"${sale.sale_number}","${new Date(sale.sale_date).toLocaleDateString()}","${sale.customer?.name || 'Cliente General'}","${sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}","${sale.status}",${sale.subtotal},${sale.discount_amount},${sale.tax_amount},${sale.total}\n`;
+    });
+    return csv;
+  };
+
+  const generateInventoryCSV = () => {
+    let csv = 'SKU,Producto,Almacén,Cantidad,Costo Unitario,Valor Total\n';
+    reportData.forEach(item => {
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${item.quantity},${item.product?.cost || 0},${item.value || 0}\n`;
+    });
+    return csv;
+  };
+
+  const generatePurchasesCSV = () => {
+    let csv = 'Número,Fecha,Proveedor,Estado,Moneda,Total\n';
+    reportData.forEach(po => {
+      csv += `"${po.order_number}","${new Date(po.order_date).toLocaleDateString()}","${po.supplier?.name || ''}","${po.status}","${po.currency}",${po.total}\n`;
+    });
+    return csv;
+  };
+
+  const generateTopProductsCSV = () => {
+    let csv = 'SKU,Producto,Cantidad Vendida,Monto Total,Número de Ventas\n';
+    reportData.forEach(item => {
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.total_amount},${item.sales_count}\n`;
+    });
+    return csv;
+  };
+
+  const generateLowStockCSV = () => {
+    let csv = 'SKU,Producto,Almacén,Stock Actual,Stock Mínimo,Estado\n';
+    reportData.forEach(item => {
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${item.quantity},${item.product?.minimum_stock || 0},"Crítico"\n`;
+    });
+    return csv;
+  };
+
+  const renderStatsCards = () => {
+    if (!stats) return null;
+
+    switch (reportType) {
+      case 'sales':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Ventas</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_sales}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Monto Total</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Ticket Promedio</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.average_ticket || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        );
+      case 'inventory':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Items</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_items}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Cantidad Total</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_quantity}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Valor Total</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_value || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        );
+      case 'purchases':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Órdenes</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_orders}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Monto Total</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Promedio por Orden</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.average_order || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        );
+      case 'top_products':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Productos</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_products}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Unidades Vendidas</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_units_sold}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Ingresos Totales</div>
+              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_revenue || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        );
+      case 'low_stock':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Items Críticos</div>
+              <div className="text-2xl font-bold text-red-600">{stats.critical_items}</div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderReportTable = () => {
+    if (!reportData || reportData.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          No hay datos para mostrar
+        </div>
+      );
+    }
+
+    switch (reportType) {
+      case 'sales':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((sale, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.sale_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(sale.sale_date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sale.customer?.name || 'Cliente General'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                    S/ {parseFloat(sale.total || 0).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'inventory':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Almacén</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Total</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((item, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    S/ {parseFloat(item.product?.cost || 0).toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                    S/ {parseFloat(item.value || 0).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'purchases':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proveedor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((po, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{po.order_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(po.order_date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.supplier?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.status}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                    {po.currency} {parseFloat(po.total || 0).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'top_products':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cant. Vendida</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">N° Ventas</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((item, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                    S/ {parseFloat(item.total_amount || 0).toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{item.sales_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'low_stock':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Almacén</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Stock Actual</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Stock Mínimo</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((item, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">{item.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{item.product?.minimum_stock || 0}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                      Crítico
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes de Valoración</h1>
-          <p className="text-gray-600">Análisis multimoneda del inventario</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchValuationReport}
-            disabled={loading}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-          <button
-            onClick={exportReport}
-            disabled={!valuationData}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Exportar CSV
-          </button>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
+        <p className="text-gray-600 mt-1">Genera y exporta reportes del sistema</p>
       </div>
 
-      {/* Date Selector */}
-      <div className="card">
-        <div className="flex items-center gap-4">
-          <Calendar className="h-5 w-5 text-gray-400" />
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de valoración
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Report Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Filter className="w-4 h-4 inline mr-1" />
+              Tipo de Reporte
             </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="input max-w-xs"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Multi-Currency Valuation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {currencies.map((currency) => {
-          const value = currency.code === 'USD'
-            ? valuationData?.totalValue || 0
-            : convertedValues[currency.code]?.amount || 0;
-          const rate = currency.code === 'USD'
-            ? 1
-            : convertedValues[currency.code]?.rate || 0;
-
-          return (
-            <div
-              key={currency.code}
-              className={`card ${selectedCurrency === currency.code ? 'ring-2 ring-blue-500' : ''}`}
-              onClick={() => setSelectedCurrency(currency.code)}
-              style={{ cursor: 'pointer' }}
+            <select
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{currency.code}</p>
-                  <p className="text-xs text-gray-500">{currency.name}</p>
-                </div>
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
+              {reportTypes.map(type => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Range (only for date-dependent reports) */}
+          {['sales', 'purchases', 'top_products'].includes(reportType) && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Fecha Inicio
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.start_date}
+                  onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              <p className="text-2xl font-bold text-gray-900 mb-2">
-                {currency.symbol} {value.toFixed(2)}
-              </p>
-
-              {currency.code !== 'USD' && rate > 0 && (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <ArrowRightLeft className="h-3 w-3" />
-                  <span>1 USD = {rate.toFixed(2)} {currency.code}</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Detailed Report Table */}
-
-      {/* Purchase Currency Totals Section */}
-      {valuationData?.totalsByCurrency && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Totales por Moneda de Compra
-            </h2>
-            <p className="text-sm text-gray-500">
-              Valores en la moneda original de cada producto
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {currencies.map((currency) => {
-              const total = valuationData.totalsByCurrency[currency.code] || 0;
-              
-              return (
-                <div
-                  key={`purchase-${currency.code}`}
-                  className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="text-xs font-medium text-blue-600 uppercase">{currency.code}</p>
-                      <p className="text-xs text-blue-500">{currency.name}</p>
-                    </div>
-                    <div className="bg-blue-200 p-2 rounded-lg">
-                      <TrendingUp className="h-4 w-4 text-blue-700" />
-                    </div>
-                  </div>
-
-                  <p className="text-2xl font-bold text-blue-900">
-                    {currency.symbol} {total.toFixed(2)}
-                  </p>
-                  
-                  <p className="text-xs text-blue-600 mt-1">
-                    Total en {currency.code}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>Nota:</strong> Estos valores representan el costo total del inventario en cada moneda original de compra. 
-              Para ver valores convertidos a una moneda específica, use las tarjetas superiores.
-            </p>
-          </div>
-        </div>
-      )}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Desglose por Moneda
-          </h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Fecha Fin
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.end_date}
+                  onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Moneda</th>
-                <th>Valor Base (USD)</th>
-                <th>Tasa de Cambio</th>
-                <th>Valor Convertido</th>
-                <th>Diferencia vs USD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currencies.map((currency) => {
-                const baseValue = valuationData?.totalValue || 0;
-                const convertedAmount = currency.code === 'USD'
-                  ? baseValue
-                  : convertedValues[currency.code]?.amount || 0;
-                const rate = currency.code === 'USD'
-                  ? 1
-                  : convertedValues[currency.code]?.rate || 0;
-                const difference = convertedAmount - baseValue;
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={generateReport}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4" />
+            {loading ? 'Generando...' : 'Generar Reporte'}
+          </button>
 
-                return (
-                  <tr key={currency.code}>
-                    <td>
-                      <div>
-                        <div className="font-medium">{currency.code}</div>
-                        <div className="text-sm text-gray-500">{currency.name}</div>
-                      </div>
-                    </td>
-                    <td className="font-mono">${baseValue.toFixed(2)}</td>
-                    <td className="font-mono">
-                      {rate.toFixed(6)}
-                    </td>
-                    <td className="font-mono font-semibold">
-                      {currency.symbol} {convertedAmount.toFixed(2)}
-                    </td>
-                    <td>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        difference > 0
-                          ? 'bg-green-100 text-green-800'
-                          : difference < 0
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {difference > 0 ? '+' : ''}{difference.toFixed(2)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {reportData && reportData.length > 0 && (
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              <Download className="w-4 h-4" />
+              Exportar CSV
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Info Card */}
-      <div className="card bg-blue-50 border-blue-200">
-        <div className="flex items-start gap-3">
-          <TrendingUp className="h-6 w-6 text-blue-600 mt-1" />
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-2">Sobre este reporte</h3>
-            <ul className="text-sm text-gray-700 space-y-1">
-              <li>• Los valores se calculan usando las tasas de cambio configuradas para la fecha seleccionada</li>
-              <li>• El valor base siempre se calcula en USD y se convierte a otras monedas</li>
-              <li>• Si no hay tasa para la fecha exacta, se usa la tasa más reciente disponible</li>
-              <li>• Puedes exportar el reporte a CSV para análisis adicional</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      {/* Stats Cards */}
+      {renderStatsCards()}
 
-      {/* Loading State */}
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 flex items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-gray-700">Generando reporte...</p>
+      {/* Report Table */}
+      {reportData && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            {renderReportTable()}
           </div>
         </div>
       )}

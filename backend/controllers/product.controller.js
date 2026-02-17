@@ -175,6 +175,8 @@ class ProductController {
         description,
         category_id,
         brand_id,
+        unit_size: unit_size || null,
+        unit_size_measure: unit_size_measure || 'UND',
         is_perishable,
         has_batch_control,
         min_stock,
@@ -188,15 +190,13 @@ class ProductController {
       if (packaging_type_id || presentation_type_id || units_per_package) {
         const presentationName = `${name} - Presentación estándar`;
         const unitsPerPkg = parseInt(units_per_package) || 1;
-        
+
         await ProductPresentation.create({
           product_id: product.id,
           packaging_type_id: packaging_type_id || null,
           presentation_type_id: presentation_type_id || null,
           name: presentationName,
           units_per_package: unitsPerPkg,
-          unit_size: unit_size || null,
-          unit_size_measure: unit_size_measure || null,
           units_per_presentation: unitsPerPkg, // For compatibility
           package_price: package_price || 0,
           package_cost: package_cost || 0,
@@ -237,11 +237,12 @@ class ProductController {
         ]
       });
 
-      // Generate final SKU based on product data and presentations
+      // Generate final SKU based on product data
       const finalSku = skuConfig.generate({
         brandName,
         productName: name,
-        presentations: product.presentations,
+        unit_size: unit_size || null,
+        unit_size_measure: unit_size_measure || 'UND',
         brand_id: brand_id,
         existingSku: null
       });
@@ -270,24 +271,20 @@ class ProductController {
       delete updateData.barcode;
       delete updateData.created_by;
 
-      // Extract presentation fields
+      // Extract presentation fields (unit_size and unit_size_measure are now product fields)
       const {
         packaging_type_id,
         presentation_type_id,
         units_per_package,
-        unit_size,
-        unit_size_measure,
         package_price,
         package_cost,
         purchase_currency
       } = updateData;
-      
-      // Remove presentation fields from product update
+
+      // Remove presentation fields from product update (but keep unit_size and unit_size_measure)
       delete updateData.packaging_type_id;
       delete updateData.presentation_type_id;
       delete updateData.units_per_package;
-      delete updateData.unit_size;
-      delete updateData.unit_size_measure;
       delete updateData.package_price;
       delete updateData.package_cost;
       delete updateData.purchase_currency;
@@ -323,8 +320,6 @@ class ProductController {
           packaging_type_id: packaging_type_id || null,
           presentation_type_id: presentation_type_id || null,
           units_per_package: unitsPerPkg,
-          unit_size: unit_size || null,
-          unit_size_measure: unit_size_measure || null,
           units_per_presentation: unitsPerPkg,
           package_price: package_price || 0,
           package_cost: package_cost || 0,

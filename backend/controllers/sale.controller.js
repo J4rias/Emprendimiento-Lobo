@@ -121,6 +121,40 @@ exports.createSale = async (req, res) => {
     const total = subtotal - discount_amount + tax_amount;
     const change_amount = sale_type === 'cash' ? Math.max(0, paid_amount - total) : 0;
 
+    // CRITICAL: Validate credit if sale_type is credit
+    if (sale_type === 'credit' && customer_id) {
+      const customer = await Customer.findByPk(customer_id, { transaction });
+
+      if (!customer) {
+        await transaction.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'Cliente no encontrado'
+        });
+      }
+
+      // Calculate current credit used
+      const currentCreditUsed = parseFloat(customer.credit_used || 0);
+      const creditLimit = parseFloat(customer.credit_limit || 0);
+      const availableCredit = creditLimit - currentCreditUsed;
+
+      // Validate that customer has enough credit
+      if (total > availableCredit) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `El cliente no tiene crédito suficiente. Disponible: S/ ${availableCredit.toFixed(2)}, Requerido: S/ ${total.toFixed(2)}`,
+          available_credit: availableCredit,
+          required_amount: total
+        });
+      }
+
+      // Update customer credit_used
+      await customer.update({
+        credit_used: currentCreditUsed + total
+      }, { transaction });
+    }
+
     const sale = await Sale.create({
       sale_number,
       customer_id: customer_id || null,
@@ -260,10 +294,10 @@ exports.getSales = async (req, res) => {
     const { count, rows } = await Sale.findAndCountAll({
       where,
       include: [
-        { 
-          model: Customer, 
+        {
+          model: Customer,
           as: 'customer',
-          attributes: ['id', 'name', 'document_number']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'document_number']
         },
         { 
           model: Warehouse, 
@@ -273,7 +307,7 @@ exports.getSales = async (req, res) => {
         { 
           model: User, 
           as: 'seller',
-          attributes: ['id', 'name', 'email']
+          attributes: ['id', 'username', 'first_name', 'last_name']
         }
       ],
       limit: parseInt(limit),
@@ -338,7 +372,7 @@ exports.getSaleById = async (req, res) => {
         { 
           model: User, 
           as: 'seller',
-          attributes: ['id', 'name', 'email']
+          attributes: ['id', 'username', 'first_name', 'last_name']
         },
         {
           model: SalePayment,
@@ -347,7 +381,7 @@ exports.getSaleById = async (req, res) => {
             {
               model: User,
               as: 'creator',
-              attributes: ['id', 'name']
+              attributes: ['id', 'username', 'first_name', 'last_name']
             }
           ]
         }
@@ -608,8 +642,8 @@ exports.getSalesStats = async (req, res) => {
       where,
       attributes: [
         'sale_type',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('total')), 'total']
+        [sequelize.fn('COUNT', sequelize.col('Sale.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('Sale.total')), 'total']
       ],
       group: ['sale_type']
     });
@@ -618,8 +652,8 @@ exports.getSalesStats = async (req, res) => {
       where,
       attributes: [
         'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('total')), 'total']
+        [sequelize.fn('COUNT', sequelize.col('Sale.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('Sale.total')), 'total']
       ],
       group: ['status']
     });
@@ -627,8 +661,8 @@ exports.getSalesStats = async (req, res) => {
     const topProducts = await SaleDetail.findAll({
       attributes: [
         'product_id',
-        [sequelize.fn('SUM', sequelize.col('quantity')), 'total_quantity'],
-        [sequelize.fn('SUM', sequelize.col('total')), 'total_amount']
+        [sequelize.fn('SUM', sequelize.col('SaleDetail.quantity')), 'total_quantity'],
+        [sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'total_amount']
       ],
       include: [
         {
@@ -643,9 +677,10 @@ exports.getSalesStats = async (req, res) => {
           attributes: ['id', 'name', 'sku']
         }
       ],
-      group: ['product_id'],
-      order: [[sequelize.fn('SUM', sequelize.col('quantity')), 'DESC']],
-      limit: 10
+      group: ['SaleDetail.product_id', 'product.id', 'product.name', 'product.sku'],
+      order: [[sequelize.fn('SUM', sequelize.col('SaleDetail.quantity')), 'DESC']],
+      limit: 10,
+      raw: false
     });
 
     res.json({

@@ -21,6 +21,9 @@ import {
   CreditCard,
   ArrowRightLeft,
   X,
+  Truck,
+  FileX,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -129,8 +132,26 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       name: 'Compras',
       icon: ShoppingBag,
-      path: '/compras',
+      path: '/purchase-orders',
       permission: 'purchases.view',
+    },
+    {
+      name: 'Entregas',
+      icon: Truck,
+      path: '/deliveries',
+      permission: 'deliveries.view',
+    },
+    {
+      name: 'Notas de Crédito',
+      icon: FileX,
+      path: '/credit-notes',
+      permission: 'credit_notes.view',
+    },
+    {
+      name: 'Pagos a Proveedores',
+      icon: Receipt,
+      path: '/supplier-payments',
+      permission: 'supplier_payments.view',
     },
     {
       name: 'Facturación',

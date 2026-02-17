@@ -65,7 +65,7 @@ const InventoryAdjustPage = () => {
       const adjustmentData = {
         product_id: inventory.product.id,
         warehouse_id: inventory.warehouse_id,
-        presentation_id: selectedPresentation || null,
+        ...(selectedPresentation && { presentation_id: selectedPresentation }),
         package_quantity: packageQuantity,
         loose_units: looseUnits,
         type: formData.type,
@@ -231,50 +231,91 @@ const InventoryAdjustPage = () => {
           {/* Presentation Selector */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo de Empaque
+              Presentación del Producto *
             </label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={selectedPresentation || ''}
               onChange={(e) => setSelectedPresentation(e.target.value ? parseInt(e.target.value) : null)}
+              required
             >
-              <option value="">Sin presentación (unidades sueltas)</option>
+              <option value="">Seleccionar presentación</option>
               {presentations.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.units_per_package} unidades)
+                  {p.name} - {p.units_per_package} uds/paquete
+                  {parseFloat(p.package_price || 0) > 0 ? ` - $${parseFloat(p.package_price).toFixed(2)}` : ''}
+                  {p.is_default ? ' (Predeterminada)' : ''}
                 </option>
               ))}
             </select>
+
+            {/* Visual indicator for selected presentation */}
+            {selectedPresentation && (() => {
+              const selectedPres = presentations.find(p => p.id === selectedPresentation);
+              return selectedPres && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span className="font-medium">Detalles de la Presentación</span>
+                  </div>
+                  <div className="ml-6 space-y-1 text-xs">
+                    <p>📦 Cada paquete contiene: <span className="font-semibold">{selectedPres.units_per_package} unidades</span></p>
+                    {parseFloat(selectedPres.package_cost || 0) > 0 && (
+                      <p>💰 Costo/paquete: <span className="font-semibold">${parseFloat(selectedPres.package_cost).toFixed(2)} {selectedPres.purchase_currency || 'USD'}</span></p>
+                    )}
+                    {parseFloat(selectedPres.package_price || 0) > 0 && (
+                      <p>💵 Precio/paquete: <span className="font-semibold">${parseFloat(selectedPres.package_price).toFixed(2)}</span></p>
+                    )}
+                    {parseFloat(selectedPres.cost || 0) > 0 && (
+                      <p>💲 Costo/unidad: <span className="font-semibold">${parseFloat(selectedPres.cost).toFixed(2)}</span></p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Package Quantity */}
           {selectedPresentation && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cantidad de {presentations.find(p => p.id === selectedPresentation)?.name || 'Paquetes'}
+                Cantidad de Paquetes
+                {(() => {
+                  const selectedPres = presentations.find(p => p.id === selectedPresentation);
+                  return selectedPres && (
+                    <span className="text-xs text-gray-500 ml-1">
+                      ({selectedPres.units_per_package} uds/paquete)
+                    </span>
+                  );
+                })()}
               </label>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setPackageQuantity(Math.max(0, packageQuantity - 1))}
-                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  disabled={packageQuantity === 0}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
                 <input
                   type="number"
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-center"
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={packageQuantity}
-                  onChange={(e) => setPackageQuantity(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setPackageQuantity(Math.max(0, parseInt(e.target.value) || 0))}
                   min="0"
+                  step="1"
                 />
                 <button
                   type="button"
                   onClick={() => setPackageQuantity(packageQuantity + 1)}
-                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
+                <span className="text-sm text-gray-600">
+                  {packageQuantity} {packageQuantity === 1 ? 'paquete' : 'paquetes'}
+                </span>
               </div>
             </div>
           )}
@@ -286,29 +327,70 @@ const InventoryAdjustPage = () => {
             </label>
             <input
               type="number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={looseUnits}
-              onChange={(e) => setLooseUnits(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setLooseUnits(Math.max(0, parseFloat(e.target.value) || 0))}
               min="0"
-              step="0.01"
+              step="1"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Ingresa la cantidad de unidades individuales
+            </p>
           </div>
 
           {/* Total Calculated */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900 font-medium">Total en Unidades Base:</p>
-            <p className="text-2xl font-bold text-blue-600">
-              {totalUnits.toFixed(2)} unidades
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Nuevo stock: <span className="font-medium">
-                {formData.type === 'add'
-                  ? (parseFloat(inventory.quantity) + totalUnits).toFixed(2)
-                  : Math.max(0, parseFloat(inventory.quantity) - totalUnits).toFixed(2)
-                } unidades
-              </span>
-            </p>
-          </div>
+          {(packageQuantity > 0 || looseUnits > 0) && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Package className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-blue-900 font-semibold mb-2">Resumen del Ajuste:</p>
+
+                  {/* Calculation breakdown */}
+                  <div className="space-y-1 text-xs text-gray-700 mb-3">
+                    {selectedPresentation && packageQuantity > 0 && (() => {
+                      const selectedPres = presentations.find(p => p.id === selectedPresentation);
+                      const pkgUnits = packageQuantity * (selectedPres?.units_per_package || 1);
+                      return (
+                        <p>
+                          📦 {packageQuantity} {packageQuantity === 1 ? 'paquete' : 'paquetes'} × {selectedPres?.units_per_package} uds = <span className="font-semibold">{pkgUnits} unidades</span>
+                        </p>
+                      );
+                    })()}
+                    {looseUnits > 0 && (
+                      <p>➕ {looseUnits} {looseUnits === 1 ? 'unidad suelta' : 'unidades sueltas'}</p>
+                    )}
+                  </div>
+
+                  {/* Total */}
+                  <div className="border-t border-blue-300 pt-2">
+                    <p className="text-sm text-blue-900 font-medium">
+                      Total a {formData.type === 'add' ? 'agregar' : 'quitar'}:
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {Math.floor(totalUnits)} unidades
+                    </p>
+                  </div>
+
+                  {/* New stock preview */}
+                  <div className="mt-3 p-2 bg-white rounded border border-blue-200">
+                    <p className="text-xs text-gray-600">
+                      Stock actual: <span className="font-semibold">{Math.floor(inventory.quantity)} uds</span>
+                    </p>
+                    <p className="text-sm text-gray-900 font-semibold">
+                      Nuevo stock: <span className={formData.type === 'add' ? 'text-green-600' : 'text-orange-600'}>
+                        {formData.type === 'add'
+                          ? Math.floor(parseFloat(inventory.quantity) + totalUnits)
+                          : Math.max(0, Math.floor(parseFloat(inventory.quantity) - totalUnits))
+                        } uds
+                      </span>
+                      {formData.type === 'add' ? ' ↗' : ' ↘'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Document Number */}
           <div>
@@ -339,22 +421,47 @@ const InventoryAdjustPage = () => {
           </div>
 
           {/* Submit */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-4 border-t">
             <button
               type="button"
               onClick={() => navigate(`/inventario/${id}`)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={submitting}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={submitting || totalUnits === 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={submitting || totalUnits === 0 || !selectedPresentation}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              {submitting ? 'Procesando...' : 'Confirmar Ajuste'}
+              {submitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Confirmar Ajuste {formData.type === 'add' ? '(Agregar)' : '(Quitar)'}
+                </>
+              )}
             </button>
           </div>
+
+          {/* Validation warnings */}
+          {!selectedPresentation && (
+            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p>Debes seleccionar una presentación para continuar</p>
+            </div>
+          )}
+          {totalUnits === 0 && selectedPresentation && (
+            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p>Debes ingresar al menos un paquete o una unidad suelta</p>
+            </div>
+          )}
         </form>
       </div>
     </div>

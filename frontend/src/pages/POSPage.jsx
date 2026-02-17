@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Trash2, Plus, Minus, Search, User, CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, Search, User, CreditCard, Banknote, Smartphone, X, UserPlus } from 'lucide-react';
 import { productService } from '../services/api/productService';
-import saleService from '../services/api/saleService';
+import { saleService } from '../services/api/saleService';
 import { useAuth } from '../context/AuthContext';
+import CustomerSearch from '../components/CustomerSearch';
 
 const POSPage = () => {
   const { user } = useAuth();
@@ -15,19 +16,27 @@ const POSPage = () => {
   const [paidAmount, setPaidAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   useEffect(() => {
     loadProducts();
   }, [searchTerm]);
 
+  // Apply customer discount when customer is selected or cart changes
+  useEffect(() => {
+    if (customer && customer.discount_percentage > 0) {
+      applyCustomerDiscount();
+    }
+  }, [customer]);
+
   const loadProducts = async () => {
     try {
-      const data = await productService.getProducts({ 
+      const data = await productService.getAll({
         search: searchTerm,
         limit: 20,
         is_active: true
       });
-      setProducts(data.products || []);
+      setProducts(data.products || data.data || []);
     } catch (error) {
       console.error('Error loading products:', error);
     }
@@ -47,7 +56,7 @@ const POSPage = () => {
     if (existingItem) {
       updateQuantity(existingItem.product_id, existingItem.presentation_id, existingItem.quantity + 1);
     } else {
-      setCart([...cart, {
+      const newItem = {
         product_id: product.id,
         presentation_id: presentation.id,
         product_name: product.name,
@@ -55,8 +64,9 @@ const POSPage = () => {
         quantity: 1,
         unit_price: presentation.sale_price || 0,
         tax_percent: 16,
-        discount_percent: 0
-      }]);
+        discount_percent: customer?.discount_percentage || 0
+      };
+      setCart([...cart, newItem]);
     }
   };
 
@@ -66,7 +76,7 @@ const POSPage = () => {
       return;
     }
 
-    setCart(cart.map(item => 
+    setCart(cart.map(item =>
       item.product_id === productId && item.presentation_id === presentationId
         ? { ...item, quantity: newQuantity }
         : item
@@ -80,11 +90,50 @@ const POSPage = () => {
   };
 
   const updateDiscount = (productId, presentationId, discount) => {
-    setCart(cart.map(item => 
+    setCart(cart.map(item =>
       item.product_id === productId && item.presentation_id === presentationId
         ? { ...item, discount_percent: parseFloat(discount) || 0 }
         : item
     ));
+  };
+
+  const applyCustomerDiscount = () => {
+    if (customer && customer.discount_percentage > 0) {
+      setCart(cart.map(item => ({
+        ...item,
+        discount_percent: customer.discount_percentage
+      })));
+    }
+  };
+
+  const handleCustomerSelect = (selectedCustomer) => {
+    setCustomer(selectedCustomer);
+
+    // If customer has a discount, apply it to all cart items
+    if (selectedCustomer.discount_percentage > 0) {
+      setCart(cart.map(item => ({
+        ...item,
+        discount_percent: selectedCustomer.discount_percentage
+      })));
+    }
+  };
+
+  const handleRemoveCustomer = () => {
+    setCustomer(null);
+    // Remove customer discount from cart items
+    setCart(cart.map(item => ({
+      ...item,
+      discount_percent: 0
+    })));
+  };
+
+  const handleSaleTypeChange = (type) => {
+    setSaleType(type);
+
+    // If changing to credit, require customer selection
+    if (type === 'credit' && !customer) {
+      setShowCustomerSearch(true);
+    }
   };
 
   const calculateTotals = () => {
@@ -116,6 +165,13 @@ const POSPage = () => {
   const handleCompleteSale = async () => {
     if (cart.length === 0) {
       alert('El carrito está vacío');
+      return;
+    }
+
+    // Require customer for credit sales
+    if (saleType === 'credit' && !customer) {
+      alert('Debe seleccionar un cliente para ventas a crédito');
+      setShowCustomerSearch(true);
       return;
     }
 
@@ -154,14 +210,21 @@ const POSPage = () => {
       };
 
       const response = await saleService.createSale(saleData);
-      
-      alert(`Venta completada exitosamente!\nNúmero: ${response.sale.sale_number}\nTotal: $${totals.total}\nCambio: $${(paid - totalAmount).toFixed(2)}`);
-      
+
+      const changeAmount = saleType === 'cash' ? (paid - totalAmount).toFixed(2) : '0.00';
+      alert(
+        `Venta completada exitosamente!\n` +
+        `Número: ${response.sale.sale_number}\n` +
+        `Total: S/ ${totals.total}` +
+        (saleType === 'cash' ? `\nCambio: S/ ${changeAmount}` : '')
+      );
+
       // Limpiar carrito
       setCart([]);
       setPaidAmount('');
       setCustomer(null);
       setShowPaymentModal(false);
+      setSaleType('cash');
 
     } catch (error) {
       console.error('Error completing sale:', error);
@@ -171,8 +234,16 @@ const POSPage = () => {
     }
   };
 
+  const getCustomerDisplayName = () => {
+    if (!customer) return '';
+    if (customer.type === 'natural') {
+      return `${customer.first_name} ${customer.last_name}`;
+    }
+    return customer.business_name || customer.trade_name;
+  };
+
   const totals = calculateTotals();
-  const change = saleType === 'cash' && paidAmount 
+  const change = saleType === 'cash' && paidAmount
     ? (parseFloat(paidAmount) - parseFloat(totals.total)).toFixed(2)
     : '0.00';
 
@@ -231,7 +302,7 @@ const POSPage = () => {
                   </h3>
                   <p className="text-xs text-gray-500 mb-2">{product.sku}</p>
                   <p className="text-lg font-bold text-blue-600">
-                    ${product.presentations?.[0]?.sale_price?.toFixed(2) || '0.00'}
+                    S/ {product.presentations?.[0]?.sale_price?.toFixed(2) || '0.00'}
                   </p>
                 </div>
               ))}
@@ -247,6 +318,68 @@ const POSPage = () => {
               <ShoppingCart className="w-5 h-5" />
               Carrito ({cart.length})
             </h2>
+          </div>
+
+          {/* Customer Section */}
+          <div className="p-4 border-b border-gray-200">
+            {customer ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900">
+                        {getCustomerDisplayName()}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        {customer.document_type}: {customer.document_number}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRemoveCustomer}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {customer.credit_limit > 0 && (
+                  <div className="mt-2 pt-2 border-t border-blue-200">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-blue-700">Límite:</span>
+                        <p className="font-semibold text-blue-900">
+                          S/ {customer.credit_limit.toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Días:</span>
+                        <p className="font-semibold text-blue-900">
+                          {customer.credit_days} días
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {customer.discount_percentage > 0 && (
+                  <div className="mt-2 pt-2 border-t border-blue-200 text-center">
+                    <span className="text-xs text-green-600 font-semibold">
+                      Descuento Aplicado: {customer.discount_percentage}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowCustomerSearch(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="text-sm font-medium">Seleccionar Cliente</span>
+              </button>
+            )}
           </div>
 
           {/* Cart Items */}
@@ -289,7 +422,7 @@ const POSPage = () => {
                       </button>
                     </div>
                     <span className="font-bold text-blue-600">
-                      ${(item.quantity * item.unit_price).toFixed(2)}
+                      S/ {(item.quantity * item.unit_price).toFixed(2)}
                     </span>
                   </div>
 
@@ -302,7 +435,11 @@ const POSPage = () => {
                       value={item.discount_percent}
                       onChange={(e) => updateDiscount(item.product_id, item.presentation_id, e.target.value)}
                       className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"
+                      disabled={customer && customer.discount_percentage > 0}
                     />
+                    {customer && customer.discount_percentage > 0 && (
+                      <span className="text-xs text-green-600">(Cliente)</span>
+                    )}
                   </div>
                 </div>
               ))
@@ -313,19 +450,19 @@ const POSPage = () => {
           <div className="border-t border-gray-200 p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal:</span>
-              <span className="font-medium">${totals.subtotal}</span>
+              <span className="font-medium">S/ {totals.subtotal}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Descuento:</span>
-              <span className="font-medium text-red-600">-${totals.discount}</span>
+              <span className="font-medium text-red-600">-S/ {totals.discount}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">IVA:</span>
-              <span className="font-medium">${totals.tax}</span>
+              <span className="font-medium">S/ {totals.tax}</span>
             </div>
             <div className="flex justify-between text-xl font-bold border-t pt-2">
               <span>Total:</span>
-              <span className="text-blue-600">${totals.total}</span>
+              <span className="text-blue-600">S/ {totals.total}</span>
             </div>
           </div>
 
@@ -337,7 +474,7 @@ const POSPage = () => {
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setSaleType('cash')}
+                  onClick={() => handleSaleTypeChange('cash')}
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     saleType === 'cash'
                       ? 'bg-blue-600 text-white'
@@ -347,7 +484,7 @@ const POSPage = () => {
                   Contado
                 </button>
                 <button
-                  onClick={() => setSaleType('credit')}
+                  onClick={() => handleSaleTypeChange('credit')}
                   className={`py-2 px-4 rounded-lg font-medium transition-colors ${
                     saleType === 'credit'
                       ? 'bg-blue-600 text-white'
@@ -421,7 +558,7 @@ const POSPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-green-800">Cambio:</span>
                       <span className="text-xl font-bold text-green-600">
-                        ${change >= 0 ? change : '0.00'}
+                        S/ {change >= 0 ? change : '0.00'}
                       </span>
                     </div>
                   </div>
@@ -429,9 +566,17 @@ const POSPage = () => {
               </>
             )}
 
+            {saleType === 'credit' && customer && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-xs text-yellow-800">
+                  Venta a crédito. El cliente tiene {customer.credit_days} días para pagar.
+                </p>
+              </div>
+            )}
+
             <button
               onClick={handleCompleteSale}
-              disabled={cart.length === 0 || loading}
+              disabled={cart.length === 0 || loading || (saleType === 'credit' && !customer)}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Procesando...' : 'Completar Venta'}
@@ -439,6 +584,15 @@ const POSPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Customer Search Modal */}
+      <CustomerSearch
+        isOpen={showCustomerSearch}
+        onClose={() => setShowCustomerSearch(false)}
+        onSelect={handleCustomerSelect}
+        validateCredit={saleType === 'credit'}
+        saleAmount={parseFloat(totals.total)}
+      />
     </div>
   );
 };

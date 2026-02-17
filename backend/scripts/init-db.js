@@ -1,6 +1,8 @@
 const { sequelize } = require('../config/database');
 const bcrypt = require('bcrypt');
-const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList } = require('../models');
+const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList, Brand } = require('../models');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const initializeDatabase = async () => {
@@ -79,6 +81,33 @@ const initializeDatabase = async () => {
       { name: 'purchases.create', description: 'Crear órdenes de compra', module: 'purchases', action: 'create' },
       { name: 'purchases.approve', description: 'Aprobar órdenes de compra', module: 'purchases', action: 'approve' },
       { name: 'purchases.receive', description: 'Recibir compras', module: 'purchases', action: 'receive' },
+      { name: 'purchases.update', description: 'Actualizar órdenes de compra', module: 'purchases', action: 'update' },
+      { name: 'purchases.delete', description: 'Eliminar órdenes de compra', module: 'purchases', action: 'delete' },
+
+      // Customers
+      { name: 'customers.view', description: 'Ver clientes', module: 'customers', action: 'view' },
+      { name: 'customers.create', description: 'Crear clientes', module: 'customers', action: 'create' },
+      { name: 'customers.update', description: 'Actualizar clientes', module: 'customers', action: 'update' },
+      { name: 'customers.delete', description: 'Eliminar clientes', module: 'customers', action: 'delete' },
+
+      // Credit Notes
+      { name: 'credit_notes.view', description: 'Ver notas de crédito', module: 'credit_notes', action: 'view' },
+      { name: 'credit_notes.create', description: 'Crear notas de crédito', module: 'credit_notes', action: 'create' },
+      { name: 'credit_notes.update', description: 'Actualizar notas de crédito', module: 'credit_notes', action: 'update' },
+      { name: 'credit_notes.approve', description: 'Aprobar notas de crédito', module: 'credit_notes', action: 'approve' },
+      { name: 'credit_notes.delete', description: 'Eliminar notas de crédito', module: 'credit_notes', action: 'delete' },
+
+      // Deliveries
+      { name: 'deliveries.view', description: 'Ver entregas', module: 'deliveries', action: 'view' },
+      { name: 'deliveries.create', description: 'Crear entregas', module: 'deliveries', action: 'create' },
+      { name: 'deliveries.update', description: 'Actualizar entregas', module: 'deliveries', action: 'update' },
+      { name: 'deliveries.delete', description: 'Cancelar entregas', module: 'deliveries', action: 'delete' },
+
+      // Supplier Payments
+      { name: 'supplier_payments.view', description: 'Ver pagos a proveedores', module: 'supplier_payments', action: 'view' },
+      { name: 'supplier_payments.create', description: 'Registrar pagos a proveedores', module: 'supplier_payments', action: 'create' },
+      { name: 'supplier_payments.update', description: 'Actualizar pagos a proveedores', module: 'supplier_payments', action: 'update' },
+      { name: 'supplier_payments.delete', description: 'Eliminar pagos a proveedores', module: 'supplier_payments', action: 'delete' },
 
       // Reports
       { name: 'reports.view', description: 'Ver reportes', module: 'reports', action: 'view' },
@@ -109,7 +138,8 @@ const initializeDatabase = async () => {
     // Assign permissions to Despachador
     const despachadorPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'inventory.adjust', 'inventory.transfer',
-       'inventory.receive', 'purchases.view', 'purchases.receive', 'reports.view'].includes(p.name)
+       'inventory.receive', 'purchases.view', 'purchases.receive', 'reports.view',
+       'deliveries.view', 'deliveries.create', 'deliveries.update'].includes(p.name)
     );
     for (const permission of despachadorPerms) {
       await RolePermission.create({
@@ -121,7 +151,9 @@ const initializeDatabase = async () => {
     // Assign permissions to Cajero
     const cajeroPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'sales.quotes.view', 'sales.quotes.create',
-       'sales.view', 'sales.create', 'sales.return', 'reports.view'].includes(p.name)
+       'sales.view', 'sales.create', 'sales.return', 'reports.view',
+       'customers.view', 'customers.create', 'customers.update',
+       'credit_notes.view', 'credit_notes.create'].includes(p.name)
     );
     for (const permission of cajeroPerms) {
       await RolePermission.create({
@@ -133,7 +165,9 @@ const initializeDatabase = async () => {
     // Assign permissions to Contador
     const contadorPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'sales.view', 'purchases.view',
-       'reports.view', 'reports.export', 'reports.financial'].includes(p.name)
+       'reports.view', 'reports.export', 'reports.financial',
+       'customers.view', 'credit_notes.view', 'credit_notes.approve',
+       'supplier_payments.view', 'supplier_payments.create', 'supplier_payments.update'].includes(p.name)
     );
     for (const permission of contadorPerms) {
       await RolePermission.create({
@@ -145,7 +179,7 @@ const initializeDatabase = async () => {
 
     // Create Admin User
     console.log('👤 Creating admin user...');
-    await User.create({
+    const adminUser = await User.create({
       username: 'admin',
       email: 'admin@viveres.com',
       password: 'Admin123!',  // El hook beforeCreate se encargará del hash
@@ -297,6 +331,41 @@ const initializeDatabase = async () => {
     ];
     await Customer.bulkCreate(customers);
     console.log(`✅ ${customers.length} customers created\n`);
+
+    // Restore brands from backup if exists
+    const BACKUP_FILE = path.join(__dirname, 'brands-backup.json');
+    if (fs.existsSync(BACKUP_FILE)) {
+      console.log('♻️  Restaurando marcas desde respaldo...');
+      try {
+        const brandsBackup = JSON.parse(fs.readFileSync(BACKUP_FILE, 'utf8'));
+
+        for (const brandData of brandsBackup) {
+          // Verificar si la imagen existe
+          if (brandData.image_url) {
+            const imagePath = path.join(__dirname, '..', 'public', brandData.image_url);
+            if (!fs.existsSync(imagePath)) {
+              console.log(`⚠️  Imagen no encontrada: ${brandData.image_url}`);
+              brandData.image_url = null;
+            }
+          }
+
+          await Brand.create({
+            code: brandData.code,
+            name: brandData.name,
+            description: brandData.description,
+            image_url: brandData.image_url,
+            status: brandData.status || 'active',
+            created_by: adminUser.id
+          });
+        }
+
+        console.log(`✅ ${brandsBackup.length} marcas restauradas\n`);
+      } catch (error) {
+        console.error('⚠️  Error al restaurar marcas:', error.message);
+      }
+    } else {
+      console.log('ℹ️  No se encontró respaldo de marcas\n');
+    }
 
     console.log('');
     console.log('='.repeat(60));

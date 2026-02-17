@@ -24,6 +24,13 @@ import SuppliersPage from './pages/SuppliersPage';
 import BrandsPage from './pages/BrandsPage';
 import ExchangeRatesPage from './pages/ExchangeRatesPage';
 import ReportsPage from './pages/ReportsPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import PurchaseOrderCreatePage from './pages/PurchaseOrderCreatePage';
+import PurchaseOrderReceivePage from './pages/PurchaseOrderReceivePage';
+import CreditNotesPage from './pages/CreditNotesPage';
+import CreditNoteCreatePage from './pages/CreditNoteCreatePage';
+import DeliveriesPage from './pages/DeliveriesPage';
+import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -241,6 +248,76 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <ExchangeRatesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/purchase-orders"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PurchaseOrdersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/purchase-orders/create"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PurchaseOrderCreatePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/purchase-orders/receive/:id"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PurchaseOrderReceivePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/credit-notes"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <CreditNotesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/credit-notes/create"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <CreditNoteCreatePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/deliveries"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <DeliveriesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/supplier-payments"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SupplierPaymentsPage />
             </AppLayout>
           </PrivateRoute>
         }

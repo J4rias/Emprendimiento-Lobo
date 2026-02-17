@@ -149,11 +149,16 @@ const InventoryDetailPage = () => {
           </div>
           <div>
             <p className="text-sm text-gray-600">Marca</p>
-            <p className="font-medium">{inventory.product.brand || 'N/A'}</p>
+            <p className="font-medium">{inventory.product.brand?.name || 'N/A'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Unidad de Medida</p>
-            <p className="font-medium">{inventory.product.unit_of_measure}</p>
+            <p className="text-sm text-gray-600">Tamaño de Unidad</p>
+            <p className="font-medium">
+              {inventory.product.unit_size
+                ? `${parseFloat(inventory.product.unit_size)} ${inventory.product.unit_size_measure || 'UND'}`
+                : inventory.product.unit_size_measure || 'UND'
+              }
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Depósito</p>
@@ -164,6 +169,76 @@ const InventoryDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Presentations Info */}
+      {inventory.product.presentations && inventory.product.presentations.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Presentaciones del Producto
+          </h2>
+          <div className="space-y-3">
+            {inventory.product.presentations.map((presentation) => (
+              <div
+                key={presentation.id}
+                className={`p-4 rounded-lg border-2 ${
+                  presentation.is_default
+                    ? 'bg-blue-50 border-blue-300'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-900">{presentation.name}</h3>
+                      {presentation.is_default && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-600 text-white rounded-full">
+                          Predeterminada
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Código de barras: {presentation.barcode || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-600">Unidades por paquete</p>
+                    <p className="font-semibold text-gray-900">{presentation.units_per_package} uds</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Costo por paquete</p>
+                    <p className="font-semibold text-gray-900">
+                      ${parseFloat(presentation.package_cost || 0).toFixed(2)} {presentation.purchase_currency || 'USD'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Precio por paquete</p>
+                    <p className="font-semibold text-green-600">
+                      ${parseFloat(presentation.package_price || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Costo por unidad</p>
+                    <p className="font-semibold text-gray-900">
+                      ${parseFloat(presentation.cost || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {presentation.description && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-600">Descripción</p>
+                    <p className="text-sm text-gray-700">{presentation.description}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stock Info */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

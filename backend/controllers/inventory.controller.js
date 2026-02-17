@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 class InventoryController {
-  // Get inventory by warehouse
+    // Get inventory by warehouse
   async getByWarehouse(req, res, next) {
     try {
       const { warehouse_id } = req.params;
@@ -34,23 +34,54 @@ class InventoryController {
 
       const { rows: inventory, count } = await Inventory.findAndCountAll({
         where,
-        include: [{
-          model: Product,
-          as: 'product',
-          where: productWhere,
-          include: [
-            { model: Category, as: 'category' }
-          ]
-        }],
+        include: [
+          {
+            model: Product,
+            as: 'product',
+            where: productWhere,
+            include: [
+              { model: Category, as: 'category' }
+            ]
+          },
+          {
+            model: Warehouse,
+            as: 'warehouse'
+          }
+        ],
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [[{ model: Product, as: 'product' }, 'name', 'ASC']]
       });
 
+      // Load presentations separately for each product
+      const productIds = [...new Set(inventory.map(item => item.product_id))];
+      const presentations = await ProductPresentation.findAll({
+        where: { product_id: productIds },
+        attributes: ['id', 'product_id', 'name', 'units_per_package', 'package_price', 'package_cost', 'purchase_currency', 'is_default', 'is_active']
+      });
+
+      // Group presentations by product_id
+      const presentationsByProduct = {};
+      presentations.forEach(pres => {
+        if (!presentationsByProduct[pres.product_id]) {
+          presentationsByProduct[pres.product_id] = [];
+        }
+        presentationsByProduct[pres.product_id].push(pres);
+      });
+
+      // Convert to plain JSON and attach presentations
+      const inventoryWithPresentations = inventory.map(item => {
+        const plainItem = item.toJSON();
+        if (plainItem.product) {
+          plainItem.product.presentations = presentationsByProduct[item.product_id] || [];
+        }
+        return plainItem;
+      });
+
       // Filter items in JavaScript if needed
-      let filteredInventory = inventory;
+      let filteredInventory = inventoryWithPresentations;
       if (low_stock === 'true') {
-        filteredInventory = inventory.filter(item => 
+        filteredInventory = inventoryWithPresentations.filter(item => 
           parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
         );
       }
@@ -59,7 +90,7 @@ class InventoryController {
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
         
-        filteredInventory = inventory.filter(item => {
+        filteredInventory = inventoryWithPresentations.filter(item => {
           // Check if any batch is expiring within 30 days
           return item.product && item.product.batches && item.product.batches.some(batch => {
             if (!batch.expiration_date) return false;
@@ -70,7 +101,7 @@ class InventoryController {
       }
       
       if (out_of_stock === 'true') {
-        filteredInventory = inventory.filter(item => 
+        filteredInventory = inventoryWithPresentations.filter(item => 
           parseFloat(item.quantity) <= 0
         );
       }
@@ -106,9 +137,9 @@ class InventoryController {
             model: Product,
             as: 'product',
             include: [
-              { model: Category, as: 'category' },
-              { model: ProductPresentation, as: 'presentations' }
-            ]
+            { model: Category, as: 'category' },
+            { model: ProductPresentation, as: 'presentations' }
+          ]
           }
         ]
       });
@@ -144,7 +175,10 @@ class InventoryController {
           {
             model: Product,
             as: 'product',
-            include: [{ model: Category, as: 'category' }]
+            include: [
+            { model: Category, as: 'category' },
+            { model: ProductPresentation, as: 'presentations' }
+          ]
           }
         ],
         order: [['quantity', 'DESC']]
@@ -410,9 +444,7 @@ class InventoryController {
           as: 'product',
           include: [{
             model: ProductPresentation,
-            as: 'presentations',
-            where: { is_default: true },
-            required: false
+            as: 'presentations'
           }]
         }]
       });
@@ -424,11 +456,14 @@ class InventoryController {
       };
 
       const valuedItems = inventory.map(inv => {
-        const defaultPresentation = inv.product?.presentations?.[0];
-        const cost = defaultPresentation?.cost || 0;
+        // Get default presentation or first available
+        const defaultPresentation = inv.product?.presentations?.find(p => p.is_default) || inv.product?.presentations?.[0];
+        
+        // Use unit cost, not package cost
+        const cost = parseFloat(defaultPresentation?.cost || 0);
         const currency = defaultPresentation?.purchase_currency || 'USD';
         const quantity = parseFloat(inv.quantity) || 0;
-        const value = quantity * parseFloat(cost || 0);
+        const value = quantity * cost;
 
         // Sum by currency
         if (totalsByCurrency.hasOwnProperty(currency)) {
@@ -534,7 +569,7 @@ class InventoryController {
           { model: Product, as: 'product', attributes: ['id', 'name', 'sku'] },
           { model: Warehouse, as: 'warehouse', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] },
-          { model: User, as: 'user', attributes: ['id', 'name'] }
+          { model: User, as: 'user', attributes: ['id', 'username', 'first_name', 'last_name'] }
         ],
         order: [['created_at', 'DESC']],
         limit: parseInt(limit),

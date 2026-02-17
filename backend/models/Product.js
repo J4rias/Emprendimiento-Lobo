@@ -60,6 +60,17 @@ const Product = sequelize.define('Product', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+  unit_size: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    comment: 'Tamaño de la unidad individual (ej: 500 para 500ml)'
+  },
+  unit_size_measure: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    defaultValue: 'UND',
+    comment: 'Medida del tamaño (UND, LT, ML, KG, GR, OZ, etc.)'
+  },
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true

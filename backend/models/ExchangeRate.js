@@ -86,6 +86,7 @@ ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date(
 
   const effectiveDate = date instanceof Date ? date.toISOString().split('T')[0] : date;
 
+  // 1. Buscar tasa directa para la fecha específica
   const rate = await ExchangeRate.findOne({
     where: {
       from_currency: fromCurrency,
@@ -100,7 +101,7 @@ ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date(
     return parseFloat(rate.rate);
   }
 
-  // Si no hay tasa directa, intentar conversión inversa
+  // 2. Buscar tasa inversa para la fecha específica
   const inverseRate = await ExchangeRate.findOne({
     where: {
       from_currency: toCurrency,
@@ -115,7 +116,7 @@ ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date(
     return 1 / parseFloat(inverseRate.rate);
   }
 
-  // Si no hay tasa para el día específico, buscar la más reciente
+  // 3. Buscar tasa directa más reciente
   const latestRate = await ExchangeRate.findOne({
     where: {
       from_currency: fromCurrency,
@@ -127,6 +128,96 @@ ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date(
 
   if (latestRate) {
     return parseFloat(latestRate.rate);
+  }
+
+  // 4. Buscar tasa inversa más reciente
+  const latestInverseRate = await ExchangeRate.findOne({
+    where: {
+      from_currency: toCurrency,
+      to_currency: fromCurrency,
+      is_active: true
+    },
+    order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+  });
+
+  if (latestInverseRate) {
+    return 1 / parseFloat(latestInverseRate.rate);
+  }
+
+  // 5. NUEVO: Conversión triangular usando USD como moneda puente
+  // Si no encontramos tasa directa ni inversa, intentar conversión triangular
+  // Ejemplo: VES → COP = (VES → USD) × (USD → COP)
+  const bridgeCurrency = 'USD';
+
+  if (fromCurrency !== bridgeCurrency && toCurrency !== bridgeCurrency) {
+    try {
+      // Buscar tasas más recientes para conversión triangular
+      const fromToBridge = await ExchangeRate.findOne({
+        where: {
+          from_currency: fromCurrency,
+          to_currency: bridgeCurrency,
+          is_active: true
+        },
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+      });
+
+      const bridgeToTo = await ExchangeRate.findOne({
+        where: {
+          from_currency: bridgeCurrency,
+          to_currency: toCurrency,
+          is_active: true
+        },
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+      });
+
+      // Si encontramos ambas tasas, hacer conversión triangular
+      if (fromToBridge && bridgeToTo) {
+        const triangularRate = parseFloat(fromToBridge.rate) * parseFloat(bridgeToTo.rate);
+        return triangularRate;
+      }
+
+      // Intentar con tasas inversas para la triangulación
+      const bridgeToFrom = await ExchangeRate.findOne({
+        where: {
+          from_currency: bridgeCurrency,
+          to_currency: fromCurrency,
+          is_active: true
+        },
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+      });
+
+      if (bridgeToFrom && bridgeToTo) {
+        const triangularRate = (1 / parseFloat(bridgeToFrom.rate)) * parseFloat(bridgeToTo.rate);
+        return triangularRate;
+      }
+
+      const fromToBridge2 = await ExchangeRate.findOne({
+        where: {
+          from_currency: fromCurrency,
+          to_currency: bridgeCurrency,
+          is_active: true
+        },
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+      });
+
+      const toToBridge = await ExchangeRate.findOne({
+        where: {
+          from_currency: toCurrency,
+          to_currency: bridgeCurrency,
+          is_active: true
+        },
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+      });
+
+      if (fromToBridge2 && toToBridge) {
+        const triangularRate = parseFloat(fromToBridge2.rate) / parseFloat(toToBridge.rate);
+        return triangularRate;
+      }
+
+    } catch (triangularError) {
+      // Si falla la conversión triangular, continuar con el error original
+      console.error('Triangular conversion failed:', triangularError.message);
+    }
   }
 
   throw new Error(`No exchange rate found for ${fromCurrency} to ${toCurrency}`);

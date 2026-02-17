@@ -3,7 +3,7 @@ import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, Tren
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/api/productService';
 import { inventoryService } from '../services/api/inventoryService';
-import saleService from '../services/api/saleService';
+import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
 

@@ -13,8 +13,11 @@ const StockReplenishmentPage = () => {
   
   const [barcode, setBarcode] = useState('');
   const [product, setProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
   const [warehouseId, setWarehouseId] = useState(1);
+  const [presentations, setPresentations] = useState([]);
+  const [selectedPresentation, setSelectedPresentation] = useState(null);
+  const [packageQuantity, setPackageQuantity] = useState(0);
+  const [looseUnits, setLooseUnits] = useState(0);
   const [warehouses, setWarehouses] = useState([
     { id: 1, name: 'Depósito Principal' },
     { id: 2, name: 'Sucursal 1' },
@@ -47,16 +50,29 @@ const StockReplenishmentPage = () => {
 
   const searchProduct = async (code) => {
     if (!code || code.trim() === '') return;
-    
+
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
       const response = await productService.searchByBarcode(code);
-      
+
       if (response.success && response.data) {
         setProduct(response.data);
+
+        // Load presentations
+        if (response.data.presentations && response.data.presentations.length > 0) {
+          setPresentations(response.data.presentations);
+          // Select default presentation
+          const defaultPres = response.data.presentations.find(p => p.is_default);
+          if (defaultPres) {
+            setSelectedPresentation(defaultPres.id);
+          } else {
+            setSelectedPresentation(response.data.presentations[0].id);
+          }
+        }
+
         setScanMode(false);
         setBarcode('');
       } else {
@@ -88,13 +104,22 @@ const StockReplenishmentPage = () => {
     }
   };
 
-  const handleQuantityChange = (delta) => {
-    const newQuantity = Math.max(1, quantity + delta);
-    setQuantity(newQuantity);
+  const calculateTotalUnits = () => {
+    const presentation = presentations.find(p => p.id === selectedPresentation);
+    const unitsPerPackage = presentation?.units_per_package || 1;
+    const packageUnits = packageQuantity * unitsPerPackage;
+    return packageUnits + parseFloat(looseUnits || 0);
   };
 
   const handleReplenish = async () => {
     if (!product) return;
+
+    const totalUnits = calculateTotalUnits();
+
+    if (totalUnits === 0) {
+      setError('Debes ingresar al menos un paquete o una unidad suelta');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -103,7 +128,9 @@ const StockReplenishmentPage = () => {
       await inventoryService.adjustInventory({
         product_id: product.id,
         warehouse_id: warehouseId,
-        quantity: quantity,
+        ...(selectedPresentation && { presentation_id: selectedPresentation }),
+        package_quantity: packageQuantity,
+        loose_units: looseUnits,
         type: 'add',
         reason: `Reposición de stock - Escáner móvil por ${user?.name || 'Usuario'}`
       });
@@ -113,18 +140,21 @@ const StockReplenishmentPage = () => {
         id: Date.now(),
         product: product.name,
         sku: product.sku,
-        quantity: quantity,
+        quantity: totalUnits,
         warehouse: warehouses.find(w => w.id === warehouseId)?.name,
         timestamp: new Date().toLocaleTimeString()
       };
       setHistory([historyItem, ...history.slice(0, 9)]); // Keep last 10
 
-      setSuccess(`✓ ${quantity} unidades agregadas correctamente`);
-      
+      setSuccess(`✓ ${Math.floor(totalUnits)} unidades agregadas correctamente`);
+
       // Reset for next scan
       setTimeout(() => {
         setProduct(null);
-        setQuantity(1);
+        setPresentations([]);
+        setSelectedPresentation(null);
+        setPackageQuantity(0);
+        setLooseUnits(0);
         setScanMode(true);
         setSuccess(null);
       }, 1500);
@@ -139,7 +169,10 @@ const StockReplenishmentPage = () => {
   const handleCancel = () => {
     setProduct(null);
     setBarcode('');
-    setQuantity(1);
+    setPresentations([]);
+    setSelectedPresentation(null);
+    setPackageQuantity(0);
+    setLooseUnits(0);
     setScanMode(true);
     setError(null);
     setSuccess(null);
@@ -308,61 +341,175 @@ const StockReplenishmentPage = () => {
                 <div className="flex-1">
                   <h3 className="text-xl font-bold mb-1">{product.name}</h3>
                   <p className="text-green-100">SKU: {product.sku}</p>
-                  {product.presentations?.[0] && (
-                    <p className="text-green-100 text-sm mt-1">
-                      {product.presentations[0].name}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
 
             {/* Quantity Selector */}
-            <div className="p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Cantidad a Agregar
-              </label>
-              
-              <div className="flex items-center gap-4 mb-6">
-                <button
-                  onClick={() => handleQuantityChange(-1)}
-                  className="w-16 h-16 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 flex items-center justify-center"
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="w-8 h-8" />
-                </button>
-                
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="flex-1 text-center text-4xl font-bold py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="1"
-                />
-                
-                <button
-                  onClick={() => handleQuantityChange(1)}
-                  className="w-16 h-16 bg-green-100 text-green-600 rounded-xl hover:bg-green-200 flex items-center justify-center"
-                >
-                  <Plus className="w-8 h-8" />
-                </button>
+            <div className="p-6 space-y-4">
+              {/* Presentation Selector */}
+              {presentations.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Presentación del Producto *
+                  </label>
+                  <select
+                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    value={selectedPresentation || ''}
+                    onChange={(e) => setSelectedPresentation(e.target.value ? parseInt(e.target.value) : null)}
+                    required
+                  >
+                    <option value="">Seleccionar presentación</option>
+                    {presentations.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} - {p.units_per_package} uds/paquete
+                        {parseFloat(p.package_price || 0) > 0 ? ` - $${parseFloat(p.package_price).toFixed(2)}` : ''}
+                        {p.is_default ? ' ⭐' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Package Quantity */}
+              {selectedPresentation && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cantidad de Paquetes
+                    {(() => {
+                      const selectedPres = presentations.find(p => p.id === selectedPresentation);
+                      return selectedPres && (
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({selectedPres.units_per_package} uds/paquete)
+                        </span>
+                      );
+                    })()}
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPackageQuantity(Math.max(0, packageQuantity - 1))}
+                      className="w-14 h-14 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 flex items-center justify-center disabled:opacity-50"
+                      disabled={packageQuantity === 0}
+                    >
+                      <Minus className="w-6 h-6" />
+                    </button>
+                    <input
+                      type="number"
+                      className="flex-1 text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500"
+                      value={packageQuantity}
+                      onChange={(e) => setPackageQuantity(Math.max(0, parseInt(e.target.value) || 0))}
+                      min="0"
+                      step="1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPackageQuantity(packageQuantity + 1)}
+                      className="w-14 h-14 bg-green-100 text-green-600 rounded-xl hover:bg-green-200 flex items-center justify-center"
+                    >
+                      <Plus className="w-6 h-6" />
+                    </button>
+                  </div>
+                  <p className="text-center text-sm text-gray-600 mt-2 font-medium">
+                    {packageQuantity} {packageQuantity === 1 ? 'paquete' : 'paquetes'}
+                  </p>
+                </div>
+              )}
+
+              {/* Loose Units */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Unidades Sueltas {selectedPresentation ? '(adicionales)' : ''}
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setLooseUnits(Math.max(0, looseUnits - 1))}
+                    className="w-14 h-14 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 flex items-center justify-center disabled:opacity-50"
+                    disabled={looseUnits === 0}
+                  >
+                    <Minus className="w-6 h-6" />
+                  </button>
+                  <input
+                    type="number"
+                    className="flex-1 text-center text-2xl font-semibold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500"
+                    value={looseUnits}
+                    onChange={(e) => setLooseUnits(Math.max(0, parseFloat(e.target.value) || 0))}
+                    min="0"
+                    step="1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLooseUnits(looseUnits + 1)}
+                    className="w-14 h-14 bg-green-100 text-green-600 rounded-xl hover:bg-green-200 flex items-center justify-center"
+                  >
+                    <Plus className="w-6 h-6" />
+                  </button>
+                </div>
+                <p className="text-center text-xs text-gray-500 mt-2">
+                  Ingresa la cantidad de unidades individuales
+                </p>
               </div>
 
-              {/* Quick Quantity Buttons */}
-              <div className="grid grid-cols-4 gap-2 mb-6">
-                {[5, 10, 25, 50].map(qty => (
-                  <button
-                    key={qty}
-                    onClick={() => setQuantity(qty)}
-                    className="py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"
-                  >
-                    +{qty}
-                  </button>
-                ))}
-              </div>
+              {/* Total Calculated */}
+              {(packageQuantity > 0 || looseUnits > 0) && (() => {
+                const totalUnits = calculateTotalUnits();
+                return (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <Package className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm text-green-900 font-bold mb-2">Resumen del Ajuste:</p>
+
+                        {/* Calculation breakdown */}
+                        <div className="space-y-1 text-sm text-gray-700 mb-3">
+                          {selectedPresentation && packageQuantity > 0 && (() => {
+                            const selectedPres = presentations.find(p => p.id === selectedPresentation);
+                            const pkgUnits = packageQuantity * (selectedPres?.units_per_package || 1);
+                            return (
+                              <p className="font-medium">
+                                📦 {packageQuantity} {packageQuantity === 1 ? 'paquete' : 'paquetes'} × {selectedPres?.units_per_package} uds = <span className="font-bold text-green-700">{pkgUnits} unidades</span>
+                              </p>
+                            );
+                          })()}
+                          {looseUnits > 0 && (
+                            <p className="font-medium">➕ {looseUnits} {looseUnits === 1 ? 'unidad suelta' : 'unidades sueltas'}</p>
+                          )}
+                        </div>
+
+                        {/* Total */}
+                        <div className="border-t-2 border-green-300 pt-2">
+                          <p className="text-sm text-green-900 font-bold">Total a agregar:</p>
+                          <p className="text-3xl font-black text-green-600">
+                            {Math.floor(totalUnits)} uds
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Quick Quantity Buttons for Packages */}
+              {selectedPresentation && (
+                <div>
+                  <p className="text-xs text-gray-600 mb-2 font-medium">Acceso Rápido (Paquetes):</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 5, 10, 20].map(qty => (
+                      <button
+                        key={qty}
+                        onClick={() => setPackageQuantity(qty)}
+                        className="py-3 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 text-lg"
+                      >
+                        {qty}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pt-4">
                 <button
                   onClick={handleCancel}
                   className="py-4 bg-gray-200 text-gray-700 rounded-xl font-semibold text-lg hover:bg-gray-300 flex items-center justify-center gap-2"
@@ -372,13 +519,21 @@ const StockReplenishmentPage = () => {
                 </button>
                 <button
                   onClick={handleReplenish}
-                  disabled={loading}
-                  className="py-4 bg-green-600 text-white rounded-xl font-semibold text-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                  disabled={loading || !selectedPresentation || (packageQuantity === 0 && looseUnits === 0)}
+                  className="py-4 bg-green-600 text-white rounded-xl font-semibold text-lg hover:bg-green-700 disabled:bg-gray-400 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Check className="w-5 h-5" />
                   {loading ? 'Guardando...' : 'Confirmar'}
                 </button>
               </div>
+
+              {/* Validation warnings */}
+              {!selectedPresentation && presentations.length > 0 && (
+                <div className="text-sm text-amber-700 bg-amber-50 border-2 border-amber-300 rounded-xl p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <p className="font-medium">Debes seleccionar una presentación para continuar</p>
+                </div>
+              )}
             </div>
           </div>
         )}

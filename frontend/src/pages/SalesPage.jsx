@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle } from 'lucide-react';
-import saleService from '../services/api/saleService';
+import { saleService } from '../services/api/saleService';
 
 const SalesPage = () => {
   const [sales, setSales] = useState([]);

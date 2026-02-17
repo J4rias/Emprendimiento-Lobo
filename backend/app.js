@@ -24,6 +24,11 @@ const exchangeRateRoutes = require('./routes/exchangeRate.routes');
 const packagingTypeRoutes = require('./routes/packagingType.routes');
 const presentationTypeRoutes = require('./routes/presentationType.routes');
 const transferRoutes = require('./routes/transfer.routes');
+const customerRoutes = require('./routes/customer.routes');
+const purchaseOrderRoutes = require('./routes/purchaseOrder.routes');
+const supplierPaymentRoutes = require('./routes/supplierPayment.routes');
+const creditNoteRoutes = require('./routes/creditNote.routes');
+const deliveryRoutes = require('./routes/delivery.routes');
 
 const app = express();
 // Security middleware con configuración para permitir imágenes
@@ -119,6 +124,11 @@ app.use('/api/exchange-rates', exchangeRateRoutes);
 app.use('/api/packaging-types', packagingTypeRoutes);
 app.use('/api/transfers', transferRoutes);
 app.use('/api/presentation-types', presentationTypeRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/supplier-payments', supplierPaymentRoutes);
+app.use('/api/credit-notes', creditNoteRoutes);
+app.use('/api/deliveries', deliveryRoutes);
 
 // 404 handler
 app.use((req, res) => {

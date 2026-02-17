@@ -12,17 +12,17 @@ export const presentationService = {
   },
 
   update: async (presentationId, data) => {
-    const response = await api.put(`/presentations/${presentationId}`, data);
+    const response = await api.put(`/products/presentations/${presentationId}`, data);
     return response.data;
   },
 
   delete: async (presentationId) => {
-    const response = await api.delete(`/presentations/${presentationId}`);
+    const response = await api.delete(`/products/presentations/${presentationId}`);
     return response.data;
   },
 
   setDefault: async (presentationId) => {
-    const response = await api.put(`/presentations/${presentationId}/set-default`);
+    const response = await api.put(`/products/presentations/${presentationId}/set-default`);
     return response.data;
   },
 };

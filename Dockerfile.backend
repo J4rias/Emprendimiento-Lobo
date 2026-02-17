@@ -1,0 +1,27 @@
+# Stage 1: Install production dependencies
+FROM node:20-alpine AS deps
+
+# Native deps for Sharp (libvips)
+RUN apk add --no-cache vips-dev python3 make g++
+
+WORKDIR /app
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
+# Stage 2: Runtime
+FROM node:20-alpine AS runtime
+
+# Sharp runtime dependency
+RUN apk add --no-cache vips
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY backend/ ./
+
+# Create upload directories (overridden by volume mount in production)
+RUN mkdir -p public/uploads/brands public/uploads/products public/uploads/temp
+
+EXPOSE 5000
+
+CMD ["sh", "-c", "npx sequelize-cli db:migrate --env production && node server.js"]

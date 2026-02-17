@@ -1,6 +1,6 @@
 import api from './axios';
 
-const saleService = {
+export const saleService = {
   createSale: async (saleData) => {
     const response = await api.post('/sales', saleData);
     return response.data;
@@ -37,4 +37,3 @@ const saleService = {
   }
 };
 
-export default saleService;

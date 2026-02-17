@@ -10,8 +10,7 @@ const getAll = async (req, res, next) => {
     const where = {
       [Op.or]: [
         { name: { [Op.like]: `%${search}%` } },
-        { description: { [Op.like]: `%${search}%` } },
-        { country: { [Op.like]: `%${search}%` } }
+        { description: { [Op.like]: `%${search}%` } }
       ]
     };
 

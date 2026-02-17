@@ -4,6 +4,7 @@ import { inventoryService } from '../services/api/inventoryService';
 import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download, RefreshCw, Eye, Edit, Plus, Minus, HelpCircle, Info, ArrowRightLeft, X, Warehouse } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import TransferFormModal from '../components/transfers/TransferFormModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -21,6 +22,7 @@ const InventoryPage = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
   const [showCurrencyBreakdown, setShowCurrencyBreakdown] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -28,7 +30,7 @@ const InventoryPage = () => {
     { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
   ];
 
-  const { data: inventoryData, isLoading, refetch } = useQuery({
+  const { data: inventoryData, isLoading } = useQuery({
     queryKey: ['inventory', selectedWarehouse, searchTerm, filters],
     queryFn: () =>
       inventoryService.getByWarehouse(selectedWarehouse, {
@@ -37,21 +39,33 @@ const InventoryPage = () => {
         expiring: filters.expiring,
         out_of_stock: filters.outOfStock,
       }),
+    refetchOnWindowFocus: true,
+    staleTime: 30000, // Consider data stale after 30 seconds
+    refetchInterval: 60000, // Auto-refetch every 60 seconds
   });
 
   const { data: lowStockData } = useQuery({
     queryKey: ['lowStock'],
     queryFn: () => inventoryService.getLowStock(),
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: expiringData } = useQuery({
     queryKey: ['expiring'],
     queryFn: () => inventoryService.getExpiringProducts({ days: 30 }),
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: valuationData } = useQuery({
     queryKey: ['valuation', selectedWarehouse],
     queryFn: () => inventoryService.getValuation({ warehouse_id: selectedWarehouse === 'all' ? undefined : selectedWarehouse }),
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const handleSelectItem = (itemId) => {
@@ -73,13 +87,86 @@ const InventoryPage = () => {
   const getStockStatus = (quantity, reorderPoint) => {
     const qty = parseFloat(quantity);
     const point = parseFloat(reorderPoint);
-    
+
     if (qty === 0) {
       return { text: 'Agotado', className: 'px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full' };
     } else if (qty <= point) {
       return { text: 'Stock Bajo', className: 'px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full' };
     }
     return { text: 'Normal', className: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full' };
+  };
+
+  const handleDownloadReport = () => {
+    if (!inventoryData?.data || inventoryData.data.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    // Preparar los datos para CSV
+    const headers = ['Producto', 'SKU', 'Categoría', 'Stock Actual', 'Unidad', 'Depósito', 'Estado'];
+    const rows = inventoryData.data.map(item => {
+      const status = getStockStatus(item.quantity, item.product.reorder_point);
+      return [
+        item.product.name,
+        item.product.sku,
+        item.product.category?.name || 'N/A',
+        Math.floor(parseFloat(item.quantity)),
+        item.product.unit_size_measure || 'UND',
+        item.warehouse?.name || 'N/A',
+        status.text
+      ];
+    });
+
+    // Crear contenido CSV
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // Escapar comas y comillas en los valores
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(','))
+    ].join('\n');
+
+    // Crear blob y descargar
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const warehouseName = selectedWarehouse === 'all' ? 'todos' : `deposito-${selectedWarehouse}`;
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventario-${warehouseName}-${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleOpenTransferModal = () => {
+    if (selectedItems.length === 0) {
+      alert('Selecciona al menos un producto para transferir');
+      return;
+    }
+
+    // Verificar que todos los items seleccionados sean del mismo depósito
+    const items = inventoryData.data.filter(item => selectedItems.includes(item.id));
+    const warehouses = [...new Set(items.map(item => item.warehouse_id))];
+
+    if (warehouses.length > 1) {
+      alert('Solo puedes transferir productos del mismo depósito en una sola transferencia');
+      return;
+    }
+
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSuccess = () => {
+    setShowTransferModal(false);
+    setSelectedItems([]);
   };
 
   return (
@@ -102,13 +189,7 @@ const InventoryPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Actualizar
-          </button>
+
           <button
             onClick={() => navigate('/productos?action=new')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
@@ -127,16 +208,19 @@ const InventoryPage = () => {
             <div className="flex-1">
               <h3 className="font-semibold text-blue-900 mb-2">¿Cómo funciona el inventario?</h3>
               <div className="text-sm text-blue-800 space-y-2">
-                <p><strong>📦 Stock Actual:</strong> Cantidad física disponible de cada producto en el depósito seleccionado.</p>
+                <p><strong>📦 Stock Actual:</strong> Cantidad física disponible de cada producto (se muestra como número entero).</p>
+                <p><strong>🏢 Depósito:</strong> Almacén donde se encuentra el producto.</p>
                 <p><strong>⚠️ Stock Bajo:</strong> Productos que están en o por debajo del punto de reorden configurado.</p>
                 <p><strong>🔴 Agotado:</strong> Productos sin stock disponible que necesitan reabastecimiento urgente.</p>
                 <p><strong>💰 Valor Total:</strong> Suma del costo de todos los productos en inventario. Se muestra separado por moneda (USD, COP, VES).</p>
+                <p><strong>🔄 Actualización Automática:</strong> Los datos se actualizan automáticamente cada minuto y al volver a la pestaña.</p>
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <p className="font-medium mb-1">Acciones disponibles:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Click en el ojo (👁️) para ver detalles del producto</li>
                     <li>Click en el lápiz (✏️) para ajustar el stock (agregar o remover)</li>
                     <li>Selecciona múltiples productos para transferencias masivas</li>
+                    <li>Descarga reportes de inventario en formato CSV</li>
                   </ul>
                 </div>
               </div>
@@ -302,6 +386,7 @@ const InventoryPage = () => {
             </button>
 
             <button
+              onClick={handleDownloadReport}
               className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center"
               title="Descargar reporte"
             >
@@ -366,7 +451,10 @@ const InventoryPage = () => {
                     <button className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded text-sm hover:bg-blue-50">
                       Ajustar Stock
                     </button>
-                    <button className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded text-sm hover:bg-blue-50">
+                    <button
+                      onClick={handleOpenTransferModal}
+                      className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded text-sm hover:bg-blue-50"
+                    >
                       Transferir
                     </button>
                   </div>
@@ -400,7 +488,7 @@ const InventoryPage = () => {
                       Stock Actual
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Stock Mínimo
+                      Depósito
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
@@ -455,7 +543,7 @@ const InventoryPage = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-gray-900">
-                              {parseFloat(item.quantity).toFixed(2)}
+                              {Math.floor(parseFloat(item.quantity))}
                             </span>
                             <span className="text-xs text-gray-500">
                               {item.product.unit_of_measure}
@@ -464,7 +552,7 @@ const InventoryPage = () => {
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-600">
-                            {item.product.reorder_point || '0'} {item.product.unit_of_measure}
+                            {item.warehouse?.name || 'N/A'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -622,6 +710,25 @@ const InventoryPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Transferencia */}
+      {showTransferModal && inventoryData?.data && (
+        <TransferFormModal
+          isOpen={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          onSuccess={handleTransferSuccess}
+          preselectedItems={inventoryData.data
+            .filter(item => selectedItems.includes(item.id))
+            .map(item => ({
+              product_id: item.product_id,
+              product: item.product,
+              presentation_id: item.product.presentations?.[0]?.id || null,
+              package_quantity: 0,
+              loose_units: 0
+            }))}
+          sourceWarehouseId={inventoryData.data.find(item => selectedItems.includes(item.id))?.warehouse_id}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 /**
  * SKU Configuration
- * Format: {BRAND_3_LETRAS}-{NOMBRE_CORTO}-{PRESENTACION}-{CONTENIDO}-{UOM}-{HASH4}
+ * Format: {BRAND_3_LETRAS}-{NOMBRE_CORTO}-{CONTENIDO}-{UOM}-{HASH4}
  * Example: POR-ACEITE-SOYA-850-ML-7F3A
  */
 
@@ -13,7 +13,7 @@ const NOISE_WORDS = [
 ];
 
 module.exports = {
-  format: '{BRAND_3_LETRAS}-{NOMBRE_CORTO}-{PRESENTACION}-{CONTENIDO}-{UOM}-{HASH4}',
+  format: '{BRAND_3_LETRAS}-{NOMBRE_CORTO}-{CONTENIDO}-{UOM}-{HASH4}',
 
   /**
    * Normaliza texto: mayúsculas, sin tildes, sin ñ
@@ -87,21 +87,11 @@ module.exports = {
   },
 
   /**
-   * Extrae información de presentación
+   * Extrae información del producto (unit_size y unit_size_measure)
    */
-  getPresentationInfo: function(presentations) {
-    if (!presentations || presentations.length === 0) {
-      return { presentation: 'UND', content: '1', uom: 'UND' };
-    }
-
-    // Usar la primera presentación o la que esté marcada como default
-    const primary = presentations.find(p => p.is_default) || presentations[0];
-
-    const presentationType = primary.presentationType?.name || primary.presentation_type || 'UNIDAD';
-    let content = primary.unit_size || primary.content || '1';
-
-    // El UOM viene de unit_size_measure (ML, LT, KG, GR, etc.)
-    const uom = primary.unit_size_measure || primary.uom || 'UND';
+  getProductInfo: function(unit_size, unit_size_measure) {
+    let content = unit_size || '1';
+    const uom = unit_size_measure || 'UND';
 
     // Limpiar y formatear el contenido
     content = String(content).replace(/[^0-9.]/g, '');
@@ -112,14 +102,7 @@ module.exports = {
       content = num % 1 === 0 ? String(Math.floor(num)) : String(num);
     }
 
-    // Abreviar tipo de presentación (BOTELLA → BOT, CAJA → CAJ)
-    let shortPresentation = this.normalize(presentationType);
-    if (shortPresentation.length > 3) {
-      shortPresentation = shortPresentation.substring(0, 3);
-    }
-
     return {
-      presentation: shortPresentation,
       content: content,
       uom: this.normalize(uom)
     };
@@ -151,13 +134,14 @@ module.exports = {
 
   /**
    * Genera SKU completo
-   * @param {Object} options - { brandName, productName, presentations, brand_id, existingSku }
+   * @param {Object} options - { brandName, productName, unit_size, unit_size_measure, brand_id, existingSku }
    */
   generate: function(options) {
     const {
       brandName,
       productName,
-      presentations = [],
+      unit_size,
+      unit_size_measure,
       brand_id = null,
       existingSku = null
     } = options;
@@ -165,14 +149,13 @@ module.exports = {
     // Extraer componentes
     const brandCode = this.getBrandCode(brandName);
     const shortName = this.getShortName(productName);
-    const { presentation, content, uom } = this.getPresentationInfo(presentations);
+    const { content, uom } = this.getProductInfo(unit_size, unit_size_measure);
     const hash = this.generateHash(brand_id, productName, content, uom, existingSku);
 
     // Construir SKU
     const skuParts = [
       brandCode,
       shortName,
-      presentation,
       content,
       uom,
       hash

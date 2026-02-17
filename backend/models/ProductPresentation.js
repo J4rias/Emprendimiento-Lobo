@@ -44,16 +44,6 @@ const ProductPresentation = sequelize.define('ProductPresentation', {
     defaultValue: 1,
     comment: 'Cantidad de unidades por empaque (ej: 6 botellas por bandeja)'
   },
-  unit_size: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    comment: 'Tamaño de la unidad individual (ej: 2 para 2 litros)'
-  },
-  unit_size_measure: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    comment: 'Medida del tamaño (LT, ML, KG, GR, etc.)'
-  },
   units_per_presentation: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,

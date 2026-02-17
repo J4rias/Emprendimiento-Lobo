@@ -1,19 +1,49 @@
 import { useState, useEffect } from 'react';
 import { Plus, Package, Star, Trash2, DollarSign } from 'lucide-react';
 
-const PresentationManager = ({ presentations = [], onChange, readonly = false, packagingTypes = [], presentationTypes = [] }) => {
+const PresentationManager = ({ presentations = [], onChange, readonly = false, packagingTypes = [], presentationTypes = [], productUnitSize = '', productUnitMeasure = 'UND' }) => {
   const [localPresentations, setLocalPresentations] = useState([]);
 
-  const unitMeasures = ['UND', 'LT', 'ML', 'KG', 'GR', 'OZ'];
   const currencies = [
     { code: 'USD', symbol: '$' },
     { code: 'COP', symbol: '$' },
     { code: 'VES', symbol: 'Bs' }
   ];
 
+  // Generate automatic presentation name
+  const generatePresentationName = (unitsPerPackage, packagingTypeId) => {
+    if (!productUnitSize || !unitsPerPackage) return '';
+
+    const packagingType = packagingTypes.find(t => t.id === parseInt(packagingTypeId));
+    const packagingAbbr = packagingType ? packagingType.name.substring(0, 3).toUpperCase() : 'EMP';
+
+    // Format unit size: show one decimal only if it's not a whole number
+    const unitSize = parseFloat(productUnitSize);
+    const formattedUnitSize = unitSize % 1 === 0 ? unitSize.toString() : unitSize.toFixed(1);
+
+    return `${formattedUnitSize} ${productUnitMeasure} ${packagingAbbr} x${unitsPerPackage}`;
+  };
+
   useEffect(() => {
     setLocalPresentations(presentations);
   }, [presentations]);
+
+  // Regenerate presentation names when productUnitSize or productUnitMeasure changes
+  useEffect(() => {
+    if (!productUnitSize || localPresentations.length === 0) return;
+
+    const updatedPresentations = localPresentations.map(presentation => {
+      const newName = generatePresentationName(
+        presentation.units_per_package,
+        presentation.packaging_type_id
+      );
+      return newName ? { ...presentation, name: newName } : presentation;
+    });
+
+    setLocalPresentations(updatedPresentations);
+    onChange(updatedPresentations);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productUnitSize, productUnitMeasure]);
 
   const addPresentation = () => {
     const newPresentation = {
@@ -22,8 +52,6 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
       packaging_type_id: null,
       presentation_type_id: null,
       units_per_package: 1,
-      unit_size: '',
-      unit_size_measure: 'UND',
       package_price: 0,
       package_cost: 0,
       purchase_currency: 'USD',
@@ -52,12 +80,24 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
     // Convertir valores numéricos
     if (field === 'units_per_package') {
       updatedPresentations[index][field] = parseInt(value) || 1;
-    } else if (field === 'unit_size' || field === 'package_price' || field === 'package_cost') {
+    } else if (field === 'package_price' || field === 'package_cost') {
       updatedPresentations[index][field] = parseFloat(value) || 0;
     } else if (field === 'packaging_type_id' || field === 'presentation_type_id') {
       updatedPresentations[index][field] = value ? parseInt(value) : null;
     } else {
       updatedPresentations[index][field] = value;
+    }
+
+    // Auto-generate name when units_per_package or packaging_type_id changes
+    if (field === 'units_per_package' || field === 'packaging_type_id') {
+      const presentation = updatedPresentations[index];
+      const newName = generatePresentationName(
+        presentation.units_per_package,
+        presentation.packaging_type_id
+      );
+      if (newName) {
+        updatedPresentations[index].name = newName;
+      }
     }
 
     setLocalPresentations(updatedPresentations);
@@ -116,13 +156,8 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                 <div className="flex items-center">
                   <DollarSign className="h-3 w-3 mr-1" />
                   Precio: {currencies.find(c => c.code === getDefaultPresentation().purchase_currency)?.symbol || '$'}
-                  {getDefaultPresentation().package_price.toFixed(2)}
+                  {(parseFloat(getDefaultPresentation().package_price) || 0).toFixed(2)}
                 </div>
-              )}
-              {getDefaultPresentation().unit_size && (
-                <p className="text-xs">
-                  Tamaño: {getDefaultPresentation().unit_size} {getDefaultPresentation().unit_size_measure}
-                </p>
               )}
             </div>
           </div>
@@ -159,21 +194,11 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                 className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center">
+                  <div className="flex items-center flex-1">
                     <Package className="h-4 w-4 text-gray-400 mr-2" />
-                    {readonly ? (
-                      <span className="text-sm font-medium text-gray-900">
-                        {presentation.name || 'Sin nombre'}
-                      </span>
-                    ) : (
-                      <input
-                        type="text"
-                        value={presentation.name}
-                        onChange={(e) => updatePresentation(index, 'name', e.target.value)}
-                        placeholder="Nombre de la presentación (ej: Caja de 12 unidades)"
-                        className="text-sm font-medium text-gray-900 border-b border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:outline-none bg-transparent flex-1"
-                      />
-                    )}
+                    <span className="text-sm font-medium text-gray-900">
+                      {presentation.name || 'Sin nombre'}
+                    </span>
                     {presentation.is_default && (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                         <Star className="h-3 w-3 mr-1 fill-current" />
@@ -260,36 +285,6 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
                         required
                       />
-                    )}
-                  </div>
-
-                  {/* Tamaño de Unidad */}
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Tamaño Unidad</label>
-                    {readonly ? (
-                      <p className="text-gray-700">
-                        {presentation.unit_size ? `${presentation.unit_size} ${presentation.unit_size_measure}` : 'N/A'}
-                      </p>
-                    ) : (
-                      <div className="flex gap-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={presentation.unit_size || ''}
-                          onChange={(e) => updatePresentation(index, 'unit_size', e.target.value)}
-                          placeholder="2"
-                          className="w-20 text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
-                        />
-                        <select
-                          value={presentation.unit_size_measure}
-                          onChange={(e) => updatePresentation(index, 'unit_size_measure', e.target.value)}
-                          className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
-                        >
-                          {unitMeasures.map((measure) => (
-                            <option key={measure} value={measure}>{measure}</option>
-                          ))}
-                        </select>
-                      </div>
                     )}
                   </div>
 
