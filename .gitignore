@@ -49,4 +49,4 @@ coverage/
 *.db
 
 # MCP
-mcp.json
+.mcp.json
