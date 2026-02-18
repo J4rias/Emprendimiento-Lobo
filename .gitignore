@@ -47,3 +47,6 @@ coverage/
 # Database
 *.sql.backup
 *.db
+
+# MCP
+.mcp.json
