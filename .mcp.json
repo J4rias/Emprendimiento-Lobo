@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "hostinger-api": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "hostinger-api-mcp"],
+      "env": {
+        "API_TOKEN": "wSCtqNtkc6Oopmhu0MlZOTho9YHV3lww1jPeNguA9e1f4455"
+      }
+    },
+    "convex-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "convex@latest", "mcp", "start"]
+    }
+  }
+}
