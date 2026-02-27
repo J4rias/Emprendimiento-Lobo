@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 
 # Environment variables
@@ -50,3 +49,6 @@ coverage/
 
 # MCP
 .mcp.json
+
+# Markdown
+*.md
