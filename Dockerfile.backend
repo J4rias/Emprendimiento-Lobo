@@ -1,28 +1,25 @@
 # Stage 1: Install production dependencies
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 
-# Install build dependencies for sharp and node-gyp
-RUN apk add --no-cache \
-    vips-dev \
-    cairo-dev \
-    pixman-dev \
+# Install build dependencies for sharp and system tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     python3 \
-    make \
-    g++ \
-    gcc \
-    linux-headers \
-    libc6-compat && \
-    npm install -g node-gyp
+    libvips-dev \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
 # Stage 2: Runtime
-FROM node:20-alpine AS runtime
+FROM node:20-slim AS runtime
 
-# Sharp runtime dependency
-RUN apk add --no-cache vips
+# Install libvips runtime dependency
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libvips42 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
