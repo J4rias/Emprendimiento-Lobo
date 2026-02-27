@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     networks:
       - empresa2_internal
+      - proxy_net
     volumes:
       - empresa2_uploads:/app/public/uploads
     healthcheck:
