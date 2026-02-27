@@ -31,4 +31,4 @@ RUN mkdir -p public/uploads/brands public/uploads/products public/uploads/temp
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "npx sequelize-cli db:migrate --env production && node server.js"]
+CMD ["node", "server.js"]
