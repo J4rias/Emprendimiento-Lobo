@@ -22,7 +22,7 @@ const ImageUpload = ({
   const fileInputRef = useRef(null);
 
   // Get base URL for images (API URL without /api suffix)
-  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
+  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'window.location.origin';
 
   const handleFileSelect = async (files) => {
     if (!files || files.length === 0) return;
