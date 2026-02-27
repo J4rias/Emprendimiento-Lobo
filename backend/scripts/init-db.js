@@ -1,6 +1,6 @@
 const { sequelize } = require('../config/database');
 const bcrypt = require('bcrypt');
-const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList, Brand } = require('../models');
+const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList, Brand, CompanySettings } = require('../models');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -73,6 +73,7 @@ const initializeDatabase = async () => {
       // Sales
       { name: 'sales.view', description: 'Ver ventas', module: 'sales', action: 'view' },
       { name: 'sales.create', description: 'Crear ventas', module: 'sales', action: 'create' },
+      { name: 'sales.update', description: 'Actualizar ventas', module: 'sales', action: 'update' },
       { name: 'sales.cancel', description: 'Cancelar ventas', module: 'sales', action: 'cancel' },
       { name: 'sales.return', description: 'Procesar devoluciones', module: 'sales', action: 'return' },
 
@@ -139,7 +140,7 @@ const initializeDatabase = async () => {
     const despachadorPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'inventory.adjust', 'inventory.transfer',
        'inventory.receive', 'purchases.view', 'purchases.receive', 'reports.view',
-       'deliveries.view', 'deliveries.create', 'deliveries.update'].includes(p.name)
+       'deliveries.view', 'deliveries.create', 'deliveries.update', 'deliveries.delete'].includes(p.name)
     );
     for (const permission of despachadorPerms) {
       await RolePermission.create({
@@ -151,9 +152,10 @@ const initializeDatabase = async () => {
     // Assign permissions to Cajero
     const cajeroPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'sales.quotes.view', 'sales.quotes.create',
-       'sales.view', 'sales.create', 'sales.return', 'reports.view',
+       'sales.view', 'sales.create', 'sales.cancel', 'sales.return', 'reports.view',
        'customers.view', 'customers.create', 'customers.update',
-       'credit_notes.view', 'credit_notes.create'].includes(p.name)
+       'credit_notes.view', 'credit_notes.create',
+       'deliveries.view'].includes(p.name)
     );
     for (const permission of cajeroPerms) {
       await RolePermission.create({
@@ -166,8 +168,10 @@ const initializeDatabase = async () => {
     const contadorPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'sales.view', 'purchases.view',
        'reports.view', 'reports.export', 'reports.financial',
-       'customers.view', 'credit_notes.view', 'credit_notes.approve',
-       'supplier_payments.view', 'supplier_payments.create', 'supplier_payments.update'].includes(p.name)
+       'customers.view', 'customers.update',
+       'credit_notes.view', 'credit_notes.create', 'credit_notes.approve', 'credit_notes.delete',
+       'deliveries.view',
+       'supplier_payments.view', 'supplier_payments.create', 'supplier_payments.update', 'supplier_payments.delete'].includes(p.name)
     );
     for (const permission of contadorPerms) {
       await RolePermission.create({
@@ -245,7 +249,7 @@ const initializeDatabase = async () => {
         code: 'LP-0001',
         name: 'Precio Público',
         description: 'Lista de precios para clientes minoristas',
-        currency: 'PEN',
+        currency: 'USD',
         basePercentage: 30,
         isDefault: true,
         status: 'active'
@@ -254,7 +258,7 @@ const initializeDatabase = async () => {
         code: 'LP-0002',
         name: 'Precio Mayorista',
         description: 'Lista de precios para clientes mayoristas',
-        currency: 'PEN',
+        currency: 'USD',
         basePercentage: 20,
         isDefault: false,
         status: 'active'
@@ -263,7 +267,7 @@ const initializeDatabase = async () => {
         code: 'LP-0003',
         name: 'Precio Distribuidor',
         description: 'Lista de precios para distribuidores',
-        currency: 'PEN',
+        currency: 'USD',
         basePercentage: 15,
         isDefault: false,
         status: 'active'
@@ -366,6 +370,14 @@ const initializeDatabase = async () => {
     } else {
       console.log('ℹ️  No se encontró respaldo de marcas\n');
     }
+
+    // Configuración de empresa
+    console.log('🏢 Creando configuración de empresa...');
+    await CompanySettings.findOrCreate({
+      where: { id: 1 },
+      defaults: { name: 'Mi Empresa' },
+    });
+    console.log('✅ Configuración de empresa creada\n');
 
     console.log('');
     console.log('='.repeat(60));

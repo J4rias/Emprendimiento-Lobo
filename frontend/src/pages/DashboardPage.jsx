@@ -95,7 +95,7 @@ const DashboardPage = () => {
                 {stats.sales?.total_sales || 0}
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                S/ {parseFloat(stats.sales?.total_amount || 0).toFixed(2)}
+                USD {parseFloat(stats.sales?.total_amount || 0).toFixed(2)}
               </p>
             </div>
             <div className="bg-blue-50 rounded-full p-3">

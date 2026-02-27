@@ -86,7 +86,7 @@ exports.createSale = async (req, res) => {
         });
       }
 
-      const unit_price = item.unit_price || presentation.sale_price;
+      const unit_price = item.unit_price || presentation.base_price;
       const item_subtotal = unit_price * item.quantity;
       const item_discount = item.discount_percent ? (item_subtotal * item.discount_percent / 100) : 0;
       const taxable_amount = item_subtotal - item_discount;
@@ -143,7 +143,7 @@ exports.createSale = async (req, res) => {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message: `El cliente no tiene crédito suficiente. Disponible: S/ ${availableCredit.toFixed(2)}, Requerido: S/ ${total.toFixed(2)}`,
+          message: `El cliente no tiene crédito suficiente. Disponible: ${availableCredit.toFixed(2)}, Requerido: ${total.toFixed(2)}`,
           available_credit: availableCredit,
           required_amount: total
         });

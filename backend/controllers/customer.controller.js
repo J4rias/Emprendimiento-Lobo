@@ -406,22 +406,21 @@ class CustomerController {
         });
       }
 
-      // Calculate current balance (sales pending payment)
-      const currentBalance = await this.calculateCustomerBalance(id);
-
-      const availableCredit = customer.creditLimit - currentBalance;
+      const creditLimit = parseFloat(customer.creditLimit || 0);
+      const creditUsed = parseFloat(customer.creditUsed || 0);
+      const availableCredit = Math.max(0, creditLimit - creditUsed);
       const requestedAmount = parseFloat(amount);
-      const hasCredit = customer.hasAvailableCredit(requestedAmount, currentBalance);
+      const hasCredit = customer.hasAvailableCredit(requestedAmount);
 
       res.json({
         success: true,
         data: {
           customerId: id,
           customerName: customer.getFullName(),
-          creditLimit: parseFloat(customer.creditLimit),
-          currentBalance: parseFloat(currentBalance),
-          availableCredit: parseFloat(availableCredit),
-          requestedAmount: requestedAmount,
+          creditLimit,
+          currentBalance: creditUsed,
+          availableCredit,
+          requestedAmount,
           hasAvailableCredit: hasCredit,
           creditStatus: hasCredit ? 'approved' : 'rejected'
         }
@@ -450,20 +449,20 @@ class CustomerController {
         });
       }
 
-      // Calculate current balance
-      const currentBalance = await this.calculateCustomerBalance(id);
-      const availableCredit = customer.creditLimit - currentBalance;
-      const creditUsagePercent = customer.creditLimit > 0
-        ? (currentBalance / customer.creditLimit) * 100
-        : 0;
+      const creditLimit = parseFloat(customer.creditLimit || 0);
+      const creditUsed = parseFloat(customer.creditUsed || 0);
+      const availableCredit = Math.max(0, creditLimit - creditUsed);
+      const creditUsagePercent = creditLimit > 0 ? (creditUsed / creditLimit) * 100 : 0;
 
-      // Get pending sales
+      // Get pending credit sales with payment detail
       const pendingSales = await Sale.findAll({
         where: {
           customer_id: id,
+          sale_type: 'credit',
           payment_status: { [Op.in]: ['pending', 'partial'] }
         },
         attributes: ['id', 'sale_number', 'sale_date', 'total', 'payment_status'],
+        include: [{ model: SalePayment, as: 'payments', attributes: ['amount', 'payment_date'] }],
         order: [['sale_date', 'DESC']],
         limit: 10
       });
@@ -475,19 +474,27 @@ class CustomerController {
             id: customer.id,
             code: customer.code,
             name: customer.getFullName(),
-            creditLimit: parseFloat(customer.creditLimit),
+            creditLimit,
             creditDays: customer.creditDays
           },
           credit: {
-            limit: parseFloat(customer.creditLimit),
-            used: parseFloat(currentBalance),
-            available: parseFloat(availableCredit),
+            limit: creditLimit,
+            used: creditUsed,
+            available: availableCredit,
             usagePercent: parseFloat(creditUsagePercent.toFixed(2))
           },
-          pendingSales: pendingSales.map(s => ({
-            ...s.toJSON(),
-            total: parseFloat(s.total)
-          }))
+          pendingSales: pendingSales.map(s => {
+            const paid = (s.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
+            return {
+              id: s.id,
+              sale_number: s.sale_number,
+              sale_date: s.sale_date,
+              total: parseFloat(s.total),
+              paid,
+              balance: parseFloat(s.total) - paid,
+              payment_status: s.payment_status
+            };
+          })
         }
       });
     } catch (error) {
@@ -576,32 +583,77 @@ class CustomerController {
     }
   }
 
-  // Helper: Calculate customer balance
-  async calculateCustomerBalance(customerId) {
-    const sales = await Sale.findAll({
-      where: {
-        customer_id: customerId,
-        payment_status: { [Op.in]: ['pending', 'partial'] }
-      },
-      attributes: ['id', 'total']
-    });
+  // Get customers with overdue credit balances
+  async getOverdueCustomers(req, res, next) {
+    try {
+      const today = new Date();
 
-    const salesWithPayments = await Promise.all(
-      sales.map(async (sale) => {
-        const payments = await SalePayment.findAll({
-          where: { sale_id: sale.id },
-          attributes: ['amount']
-        });
+      // Find credit sales that are past due (sale_date + creditDays < today)
+      const overdueSales = await Sale.findAll({
+        where: {
+          sale_type: 'credit',
+          payment_status: { [Op.in]: ['pending', 'partial'] }
+        },
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'customer_id', 'payment_status'],
+        include: [
+          {
+            model: Customer,
+            as: 'customer',
+            attributes: ['id', 'code', 'first_name', 'last_name', 'business_name', 'type', 'phone', 'mobile', 'credit_days', 'credit_limit', 'credit_used'],
+            where: { isDeleted: false }
+          },
+          {
+            model: SalePayment,
+            as: 'payments',
+            attributes: ['amount'],
+            required: false
+          }
+        ]
+      });
 
-        const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-        const pending = parseFloat(sale.total) - totalPaid;
+      // Filter and calculate overdue
+      const overdueList = overdueSales
+        .map(sale => {
+          const customer = sale.customer;
+          const creditDays = customer?.credit_days || 0;
+          const dueDate = new Date(sale.sale_date);
+          dueDate.setDate(dueDate.getDate() + creditDays);
 
-        return pending;
-      })
-    );
+          const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+          const paid = (sale.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
+          const balance = parseFloat(sale.total) - paid;
 
-    return salesWithPayments.reduce((sum, pending) => sum + pending, 0);
+          return { sale, customer, dueDate, daysOverdue, balance };
+        })
+        .filter(item => item.daysOverdue > 0 && item.balance > 0)
+        .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+      res.json({
+        success: true,
+        data: overdueList.map(item => ({
+          customer: {
+            id: item.customer.id,
+            code: item.customer.code,
+            name: item.customer.getFullName ? item.customer.getFullName() : (item.customer.businessName || `${item.customer.firstName} ${item.customer.lastName}`),
+            phone: item.customer.phone || item.customer.mobile
+          },
+          sale: {
+            id: item.sale.id,
+            sale_number: item.sale.sale_number,
+            sale_date: item.sale.sale_date,
+            total: parseFloat(item.sale.total),
+            balance: item.balance,
+            due_date: item.dueDate,
+            days_overdue: item.daysOverdue
+          },
+          aging_bucket: item.daysOverdue <= 30 ? '0-30' : item.daysOverdue <= 60 ? '31-60' : item.daysOverdue <= 90 ? '61-90' : '+90'
+        }))
+      });
+    } catch (error) {
+      next(error);
+    }
   }
+
 }
 
 module.exports = new CustomerController();

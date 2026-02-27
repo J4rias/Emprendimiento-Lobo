@@ -3,6 +3,7 @@ const {
   Supplier,
   PurchaseOrder,
   User,
+  ExchangeRate,
   sequelize
 } = require('../models');
 const { Op } = require('sequelize');
@@ -206,6 +207,7 @@ exports.createPayment = async (req, res) => {
       amount,
       currency,
       reference,
+      invoice_number,
       bank_id,
       notes
     } = req.body;
@@ -257,6 +259,58 @@ exports.createPayment = async (req, res) => {
           message: 'La orden de compra no pertenece al proveedor seleccionado'
         });
       }
+
+      // Validate that payment does not exceed the remaining PO balance
+      // All amounts are normalized to the PO's currency for a fair comparison
+      const poCurrency = purchaseOrder.currency || 'USD';
+      const paymentDate = payment_date ? new Date(payment_date) : new Date();
+
+      const previousPayments = await SupplierPayment.findAll({
+        where: {
+          purchase_order_id,
+          status: { [Op.ne]: 'cancelled' }
+        },
+        attributes: ['amount', 'currency']
+      });
+
+      // Convert each previous payment to PO currency
+      let totalPaidInPOCurrency = 0;
+      for (const pmt of previousPayments) {
+        try {
+          const converted = pmt.currency === poCurrency
+            ? parseFloat(pmt.amount)
+            : await ExchangeRate.convert(parseFloat(pmt.amount), pmt.currency, poCurrency, paymentDate);
+          totalPaidInPOCurrency += converted;
+        } catch (e) {
+          // Fallback: no exchange rate available, use as-is
+          totalPaidInPOCurrency += parseFloat(pmt.amount);
+        }
+      }
+
+      // Convert new payment amount to PO currency
+      let amountInPOCurrency;
+      try {
+        amountInPOCurrency = currency === poCurrency
+          ? parseFloat(amount)
+          : await ExchangeRate.convert(parseFloat(amount), currency, poCurrency, paymentDate);
+      } catch (e) {
+        amountInPOCurrency = parseFloat(amount);
+      }
+
+      const poTotal = parseFloat(purchaseOrder.total || 0);
+      const saldoPendiente = poTotal - totalPaidInPOCurrency;
+
+      if (amountInPOCurrency > saldoPendiente + 0.01) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `El monto excede el saldo pendiente de la orden de compra. Saldo pendiente: ${saldoPendiente.toFixed(2)} ${poCurrency}`,
+          saldo_pendiente: saldoPendiente,
+          saldo_pendiente_currency: poCurrency,
+          total_pagado: totalPaidInPOCurrency,
+          total_oc: poTotal
+        });
+      }
     }
 
     // Generate payment number
@@ -272,6 +326,8 @@ exports.createPayment = async (req, res) => {
       amount: parseFloat(amount),
       currency,
       reference: reference || null,
+      invoice_number: invoice_number || null,
+      status: 'recorded',
       bank_id: bank_id || null,
       notes: notes || null,
       created_by: req.user.id
@@ -579,5 +635,198 @@ exports.getPaymentStats = async (req, res) => {
       message: 'Error al obtener estadísticas de pagos',
       error: error.message
     });
+  }
+};
+
+/**
+ * Get payments grouped by a specific Purchase Order with balance info
+ * GET /api/supplier-payments/by-po/:poId
+ */
+exports.getPaymentsByPO = async (req, res) => {
+  try {
+    const { poId } = req.params;
+
+    const purchaseOrder = await PurchaseOrder.findByPk(poId, {
+      include: [{ model: Supplier, as: 'supplier', attributes: ['id', 'name'] }]
+    });
+
+    if (!purchaseOrder) {
+      return res.status(404).json({ success: false, message: 'Orden de compra no encontrada' });
+    }
+
+    const payments = await SupplierPayment.findAll({
+      where: { purchase_order_id: poId },
+      include: [{ model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] }],
+      order: [['payment_date', 'DESC']]
+    });
+
+    // Normalize all payments to the PO's currency for a consistent balance
+    const poCurrency = purchaseOrder.currency || 'USD';
+    const today = new Date();
+    let totalPagadoEnMonedaOC = 0;
+
+    for (const p of payments.filter(p => p.status !== 'cancelled')) {
+      try {
+        const converted = p.currency === poCurrency
+          ? parseFloat(p.amount)
+          : await ExchangeRate.convert(parseFloat(p.amount), p.currency, poCurrency, today);
+        totalPagadoEnMonedaOC += converted;
+      } catch (e) {
+        totalPagadoEnMonedaOC += parseFloat(p.amount);
+      }
+    }
+
+    const saldoPendiente = parseFloat(purchaseOrder.total || 0) - totalPagadoEnMonedaOC;
+
+    res.json({
+      success: true,
+      data: {
+        purchase_order: {
+          id: purchaseOrder.id,
+          order_number: purchaseOrder.order_number,
+          total: purchaseOrder.total,
+          currency: poCurrency,
+          status: purchaseOrder.status,
+          supplier: purchaseOrder.supplier
+        },
+        payments,
+        summary: {
+          total_pagado: totalPagadoEnMonedaOC,
+          total_pagado_currency: poCurrency,
+          saldo_pendiente: Math.max(0, saldoPendiente),
+          saldo_pendiente_currency: poCurrency,
+          esta_pagada_completa: saldoPendiente <= 0.01
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching payments by PO:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener pagos de la orden de compra', error: error.message });
+  }
+};
+
+/**
+ * Get total payable balance for a supplier (received POs minus confirmed payments)
+ * GET /api/suppliers/:id/payable-balance  (registered in supplier routes)
+ * Also accessible as GET /api/supplier-payments/payable-balance/:supplierId
+ */
+exports.getPayableBalance = async (req, res) => {
+  try {
+    const supplierId = req.params.supplierId || req.params.id;
+
+    const supplier = await Supplier.findByPk(supplierId);
+    if (!supplier) {
+      return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+    }
+
+    // Get received POs grouped by currency
+    const receivedPOs = await PurchaseOrder.findAll({
+      where: {
+        supplier_id: supplierId,
+        status: { [Op.in]: ['received', 'partially_received'] }
+      },
+      attributes: ['id', 'order_number', 'total', 'currency', 'status']
+    });
+
+    // Get all non-cancelled payments for this supplier
+    const payments = await SupplierPayment.findAll({
+      where: {
+        supplier_id: supplierId,
+        status: { [Op.ne]: 'cancelled' }
+      },
+      attributes: ['amount', 'currency']
+    });
+
+    // Normalize all OC totals and payments to USD for a combined balance
+    const today = new Date();
+    let totalOCsUSD = 0;
+    const ocByCurrency = {};
+
+    for (const po of receivedPOs) {
+      const cur = po.currency || 'USD';
+      ocByCurrency[cur] = (ocByCurrency[cur] || 0) + parseFloat(po.total || 0);
+    }
+
+    for (const [cur, total] of Object.entries(ocByCurrency)) {
+      try {
+        totalOCsUSD += cur === 'USD' ? total : await ExchangeRate.convert(total, cur, 'USD', today);
+      } catch (e) {
+        totalOCsUSD += total;
+      }
+    }
+
+    let totalPagadoUSD = 0;
+    const pagadoByCurrency = {};
+
+    for (const pmt of payments) {
+      const cur = pmt.currency || 'USD';
+      pagadoByCurrency[cur] = (pagadoByCurrency[cur] || 0) + parseFloat(pmt.amount || 0);
+    }
+
+    for (const [cur, total] of Object.entries(pagadoByCurrency)) {
+      try {
+        totalPagadoUSD += cur === 'USD' ? total : await ExchangeRate.convert(total, cur, 'USD', today);
+      } catch (e) {
+        totalPagadoUSD += total;
+      }
+    }
+
+    const saldoPendienteUSD = Math.max(0, totalOCsUSD - totalPagadoUSD);
+
+    res.json({
+      success: true,
+      data: {
+        supplier: { id: supplier.id, name: supplier.name },
+        total_ocs_recibidas_usd: totalOCsUSD,
+        total_pagado_usd: totalPagadoUSD,
+        saldo_pendiente_usd: saldoPendienteUSD,
+        desglose_ocs_por_moneda: ocByCurrency,
+        desglose_pagos_por_moneda: pagadoByCurrency,
+        purchase_orders: receivedPOs
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching payable balance:', error);
+    res.status(500).json({ success: false, message: 'Error al calcular saldo pendiente del proveedor', error: error.message });
+  }
+};
+
+/**
+ * Cancel a supplier payment (change status to cancelled)
+ * PUT /api/supplier-payments/:id/cancel
+ */
+exports.cancelPayment = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payment = await SupplierPayment.findByPk(id, { transaction });
+    if (!payment) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: 'Pago no encontrado' });
+    }
+
+    if (payment.status === 'cancelled') {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: 'El pago ya está anulado' });
+    }
+
+    await payment.update({
+      status: 'cancelled',
+      notes: reason ? `${payment.notes || ''}\n[ANULADO]: ${reason}`.trim() : payment.notes
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Pago anulado exitosamente',
+      data: payment
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error cancelling payment:', error);
+    res.status(500).json({ success: false, message: 'Error al anular el pago', error: error.message });
   }
 };

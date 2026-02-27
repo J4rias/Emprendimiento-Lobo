@@ -215,8 +215,8 @@ const POSPage = () => {
       alert(
         `Venta completada exitosamente!\n` +
         `Número: ${response.sale.sale_number}\n` +
-        `Total: S/ ${totals.total}` +
-        (saleType === 'cash' ? `\nCambio: S/ ${changeAmount}` : '')
+        `Total: $ ${totals.total}` +
+        (saleType === 'cash' ? `\nCambio: $ ${changeAmount}` : '')
       );
 
       // Limpiar carrito
@@ -302,7 +302,7 @@ const POSPage = () => {
                   </h3>
                   <p className="text-xs text-gray-500 mb-2">{product.sku}</p>
                   <p className="text-lg font-bold text-blue-600">
-                    S/ {product.presentations?.[0]?.sale_price?.toFixed(2) || '0.00'}
+                    $ {product.presentations?.[0]?.sale_price?.toFixed(2) || '0.00'}
                   </p>
                 </div>
               ))}
@@ -350,7 +350,7 @@ const POSPage = () => {
                       <div>
                         <span className="text-blue-700">Límite:</span>
                         <p className="font-semibold text-blue-900">
-                          S/ {customer.credit_limit.toFixed(2)}
+                          $ {customer.credit_limit.toFixed(2)}
                         </p>
                       </div>
                       <div>
@@ -422,7 +422,7 @@ const POSPage = () => {
                       </button>
                     </div>
                     <span className="font-bold text-blue-600">
-                      S/ {(item.quantity * item.unit_price).toFixed(2)}
+                      $ {(item.quantity * item.unit_price).toFixed(2)}
                     </span>
                   </div>
 
@@ -450,19 +450,19 @@ const POSPage = () => {
           <div className="border-t border-gray-200 p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal:</span>
-              <span className="font-medium">S/ {totals.subtotal}</span>
+              <span className="font-medium">$ {totals.subtotal}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Descuento:</span>
-              <span className="font-medium text-red-600">-S/ {totals.discount}</span>
+              <span className="font-medium text-red-600">-$ {totals.discount}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">IVA:</span>
-              <span className="font-medium">S/ {totals.tax}</span>
+              <span className="font-medium">$ {totals.tax}</span>
             </div>
             <div className="flex justify-between text-xl font-bold border-t pt-2">
               <span>Total:</span>
-              <span className="text-blue-600">S/ {totals.total}</span>
+              <span className="text-blue-600">$ {totals.total}</span>
             </div>
           </div>
 
@@ -558,7 +558,7 @@ const POSPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-green-800">Cambio:</span>
                       <span className="text-xl font-bold text-green-600">
-                        S/ {change >= 0 ? change : '0.00'}
+                        $ {change >= 0 ? change : '0.00'}
                       </span>
                     </div>
                   </div>

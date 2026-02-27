@@ -584,7 +584,7 @@ const CustomersPage = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Límite de Crédito (S/)
+                    Límite de Crédito ($)
                   </label>
                   <input
                     type="number"
@@ -729,7 +729,7 @@ const CustomersPage = () => {
               <div>
                 <label className="text-sm font-medium text-gray-700">Límite de Crédito</label>
                 <p className="mt-1 text-gray-900">
-                  S/ {parseFloat(viewingCustomer.creditLimit || 0).toFixed(2)}
+                  $ {parseFloat(viewingCustomer.creditLimit || 0).toFixed(2)}
                 </p>
               </div>
               <div>

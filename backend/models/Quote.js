@@ -46,9 +46,9 @@ const Quote = sequelize.define('Quote', {
     comment: 'Estado de la cotización'
   },
   currency: {
-    type: DataTypes.ENUM('USD', 'COP', 'VES', 'PEN'),
+    type: DataTypes.ENUM('USD', 'COP', 'VES'),
     allowNull: false,
-    defaultValue: 'PEN',
+    defaultValue: 'USD',
     comment: 'Moneda de la cotización'
   },
   exchangeRate: {
@@ -79,7 +79,7 @@ const Quote = sequelize.define('Quote', {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: false,
     defaultValue: 18,
-    comment: 'Porcentaje de impuesto (IGV en Perú = 18%)'
+    comment: 'Porcentaje de impuesto (IVA)'
   },
   taxAmount: {
     type: DataTypes.DECIMAL(12, 2),

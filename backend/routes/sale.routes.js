@@ -34,9 +34,9 @@ router.put('/:id',
   saleController.updateSale
 );
 
-router.post('/:id/cancel', 
-  auth, 
-  authorize('sales.delete'), 
+router.post('/:id/cancel',
+  auth,
+  authorize('sales.cancel'),
   saleController.cancelSale
 );
 

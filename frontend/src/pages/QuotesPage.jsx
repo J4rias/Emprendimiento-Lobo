@@ -109,7 +109,7 @@ const QuotesPage = () => {
     },
     {
       header: 'Total',
-      accessor: (row) => `S/ ${parseFloat(row.total || 0).toFixed(2)}`,
+      accessor: (row) => `$ ${parseFloat(row.total || 0).toFixed(2)}`,
       className: 'text-right font-semibold',
     },
     {
@@ -287,7 +287,7 @@ const QuotesPage = () => {
             <div className="border-t pt-4">
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total</span>
-                <span>S/ {parseFloat(selectedQuote.total || 0).toFixed(2)}</span>
+                <span>$ {parseFloat(selectedQuote.total || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>

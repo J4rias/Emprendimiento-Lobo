@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CompanyProvider } from './context/CompanyContext';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import LoginPage from './pages/LoginPage';
@@ -341,7 +342,9 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
+      <CompanyProvider>
       <AppRoutes />
+      </CompanyProvider>
       <Toaster
         position="top-right"
         toastOptions={{

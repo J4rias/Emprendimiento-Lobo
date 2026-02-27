@@ -20,6 +20,14 @@ router.get(
   customerController.getActiveCustomers
 );
 
+// Get customers with overdue credit balances (cuentas por cobrar vencidas)
+router.get(
+  '/overdue',
+  authenticate,
+  authorize('customers.view'),
+  customerController.getOverdueCustomers
+);
+
 // Get customer by ID
 router.get(
   '/:id',

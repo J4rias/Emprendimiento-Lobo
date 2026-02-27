@@ -1,5 +1,8 @@
 version: '3.9'
 
+# Infraestructura compartida: NPM (proxy) + MySQL (base de datos)
+# Este compose se levanta primero: docker compose up -d
+
 services:
   npm:
     image: jc21/nginx-proxy-manager:latest
@@ -8,16 +11,36 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "81:81"
+      - "81:81"    # UI de administración de NPM
     volumes:
       - npm_data:/data
       - npm_letsencrypt:/etc/letsencrypt
     networks:
       - proxy_net
 
+  mysql:
+    image: mysql:8.0
+    container_name: lobo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: CAMBIAR_ROOT_PASSWORD
+      MYSQL_USER: lobo_user
+      MYSQL_PASSWORD: CAMBIAR_PASSWORD
+      # Las bases empresa1_db y empresa2_db se crean al ejecutar init-db.js en cada backend
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - proxy_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 volumes:
   npm_data:
   npm_letsencrypt:
+  mysql_data:
 
 networks:
   proxy_net:

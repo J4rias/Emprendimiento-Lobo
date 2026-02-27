@@ -1,0 +1,45 @@
+version: '3.9'
+
+# Stack de Empresa 2
+# Uso: docker compose -f docker-compose.empresa2.yml -p empresa2 up -d
+
+networks:
+  empresa2_internal:
+    # Red privada entre backend y frontend de empresa2
+  proxy_net:
+    external: true
+    # Red compartida con NPM para que el proxy pueda alcanzar el frontend
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: empresa2-backend
+    env_file: .env.empresa2
+    restart: unless-stopped
+    networks:
+      - empresa2_internal
+    volumes:
+      - empresa2_uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    container_name: empresa2-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - empresa2_internal
+      - proxy_net
+    # Sin ports expuestos: NPM accede al frontend por la red proxy_net
+
+volumes:
+  empresa2_uploads:

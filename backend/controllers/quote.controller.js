@@ -224,7 +224,7 @@ exports.createQuote = async (req, res, next) => {
       customerId,
       priceListId,
       userId: req.user.id,
-      currency: currency || 'PEN',
+      currency: currency || 'USD',
       subtotal,
       notes,
       internalNotes,

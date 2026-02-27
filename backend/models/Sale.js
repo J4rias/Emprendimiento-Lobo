@@ -94,7 +94,7 @@ const Sale = sequelize.define('Sale', {
     comment: 'Vuelto entregado'
   },
   status: {
-    type: DataTypes.ENUM('pending', 'completed', 'cancelled', 'returned'),
+    type: DataTypes.ENUM('pending', 'completed', 'cancelled', 'returned', 'delivered'),
     allowNull: false,
     defaultValue: 'pending',
     comment: 'Estado de la venta'

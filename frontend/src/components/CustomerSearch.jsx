@@ -67,8 +67,8 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
         if (!validation.has_available_credit) {
           setError(
             `El cliente no tiene crédito suficiente. ` +
-            `Disponible: S/ ${validation.available_credit?.toFixed(2) || '0.00'}, ` +
-            `Requerido: S/ ${saleAmount.toFixed(2)}`
+            `Disponible: $ ${validation.available_credit?.toFixed(2) || '0.00'}, ` +
+            `Requerido: $ ${saleAmount.toFixed(2)}`
           );
         }
       } catch (err) {
@@ -170,7 +170,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                   <div>
                     <span className="text-blue-700">Límite de Crédito:</span>
                     <p className="font-semibold text-blue-900">
-                      S/ {selectedCustomer.credit_limit?.toFixed(2) || '0.00'}
+                      $ {selectedCustomer.credit_limit?.toFixed(2) || '0.00'}
                     </p>
                   </div>
                   <div>
@@ -196,7 +196,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                       <div>
                         <span className="text-blue-700">Crédito Usado:</span>
                         <p className="font-semibold text-blue-900">
-                          S/ {creditValidation.current_balance?.toFixed(2) || '0.00'}
+                          $ {creditValidation.current_balance?.toFixed(2) || '0.00'}
                         </p>
                       </div>
                       <div>
@@ -204,7 +204,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                         <p className={`font-semibold ${
                           creditValidation.has_available_credit ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          S/ {creditValidation.available_credit?.toFixed(2) || '0.00'}
+                          $ {creditValidation.available_credit?.toFixed(2) || '0.00'}
                         </p>
                       </div>
                     </div>
@@ -257,7 +257,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-green-600 flex items-center gap-1">
                             <CreditCard className="w-3 h-3" />
-                            Crédito: S/ {customer.credit_limit.toFixed(2)}
+                            Crédito: $ {customer.credit_limit.toFixed(2)}
                           </span>
                           {customer.discount_percentage > 0 && (
                             <span className="text-xs text-blue-600">

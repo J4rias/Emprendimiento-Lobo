@@ -23,9 +23,9 @@ const PriceList = sequelize.define('PriceList', {
     allowNull: true
   },
   currency: {
-    type: DataTypes.ENUM('USD', 'COP', 'VES', 'PEN'),
+    type: DataTypes.ENUM('USD', 'COP', 'VES'),
     allowNull: false,
-    defaultValue: 'PEN',
+    defaultValue: 'USD',
     comment: 'Moneda de la lista de precios'
   },
   basePercentage: {

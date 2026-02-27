@@ -564,6 +564,14 @@ exports.confirmDelivery = async (req, res) => {
       signature_image_url: signature_image_url || null
     }, { transaction });
 
+    // Auto-update Sale status to 'delivered' when delivery is confirmed
+    if (delivery.sale_id) {
+      await Sale.update(
+        { status: 'delivered' },
+        { where: { id: delivery.sale_id }, transaction }
+      );
+    }
+
     await transaction.commit();
 
     res.json({

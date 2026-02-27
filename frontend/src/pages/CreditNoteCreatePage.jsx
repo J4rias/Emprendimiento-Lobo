@@ -307,7 +307,7 @@ const CreditNoteCreatePage = () => {
               <div>
                 <div className="text-sm text-blue-700">Total Venta</div>
                 <div className="font-medium text-blue-900">
-                  S/ {parseFloat(sale.total).toFixed(2)}
+                  $ {parseFloat(sale.total).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -521,15 +521,15 @@ const CreditNoteCreatePage = () => {
                   <div className="space-y-1">
                     <div className="text-sm text-right">
                       <span className="text-gray-600">Subtotal: </span>
-                      <span className="font-medium">S/ {totals.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">$ {totals.subtotal.toFixed(2)}</span>
                     </div>
                     <div className="text-sm text-right">
                       <span className="text-gray-600">Impuestos: </span>
-                      <span className="font-medium">S/ {totals.tax_amount.toFixed(2)}</span>
+                      <span className="font-medium">$ {totals.tax_amount.toFixed(2)}</span>
                     </div>
                     <div className="text-lg font-bold text-right">
                       <span className="text-gray-900">Total: </span>
-                      <span className="text-blue-600">S/ {totals.total.toFixed(2)}</span>
+                      <span className="text-blue-600">$ {totals.total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

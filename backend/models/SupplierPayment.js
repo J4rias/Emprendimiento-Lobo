@@ -67,6 +67,17 @@ const SupplierPayment = sequelize.define('SupplierPayment', {
     allowNull: true,
     comment: 'Banco utilizado para el pago (opcional) - sin FK por ahora'
   },
+  invoice_number: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Número de factura del proveedor asociada al pago'
+  },
+  status: {
+    type: DataTypes.ENUM('recorded', 'confirmed', 'cancelled'),
+    allowNull: false,
+    defaultValue: 'recorded',
+    comment: 'Estado del pago: recorded=registrado, confirmed=confirmado, cancelled=anulado'
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

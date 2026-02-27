@@ -77,7 +77,7 @@ export const printHTML = (content, title = 'Imprimir') => {
  * @param {string} currency - Currency symbol
  * @returns {string} Formatted currency
  */
-export const formatCurrency = (amount, currency = 'S/') => {
+export const formatCurrency = (amount, currency = '$') => {
   return `${currency} ${parseFloat(amount).toFixed(2)}`;
 };
 

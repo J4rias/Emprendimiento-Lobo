@@ -13,10 +13,8 @@ import {
   Shield,
   UserCog,
   UserCheck,
-  FileText,
   FileSpreadsheet,
   ShoppingBag,
-  DollarSign,
   BarChart3,
   CreditCard,
   ArrowRightLeft,
@@ -26,10 +24,12 @@ import {
   Receipt,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useState, useEffect } from 'react';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { hasPermission } = useAuth();
+  const { companyName } = useCompany();
   const location = useLocation();
   const [productsOpen, setProductsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
@@ -109,13 +109,13 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Clientes',
       icon: UserCheck,
       path: '/clientes',
-      permission: 'sales.view',
+      permission: 'customers.view',
     },
     {
       name: 'Cotizaciones',
       icon: FileSpreadsheet,
       path: '/cotizaciones',
-      permission: 'quotes.view',
+      permission: 'sales.quotes.view',
     },
     {
       name: 'Punto de Venta',
@@ -154,18 +154,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'supplier_payments.view',
     },
     {
-      name: 'Facturación',
-      icon: FileText,
-      path: '/facturacion',
-      permission: 'invoices.view',
-    },
-    {
-      name: 'Cuentas',
-      icon: DollarSign,
-      path: '/cuentas',
-      permission: 'accounts.view',
-    },
-    {
       name: 'Reportes',
       icon: BarChart3,
       path: '/reportes',
@@ -174,7 +162,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       name: 'Configuración',
       icon: Shield,
-      permission: 'users.view', // Mostrar si tiene permiso de usuarios o configuración
+      permission: 'users.view',
       isAccordion: true,
       items: [
         {
@@ -185,7 +173,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         {
           name: 'Roles',
           path: '/roles',
-          permission: 'users.manage',
+          permission: 'roles.manage',
         },
         {
           name: 'Configuración General',
@@ -308,6 +296,11 @@ const Sidebar = ({ isOpen, onClose }) => {
             >
               <X className="h-6 w-6" />
             </button>
+          </div>
+
+          {/* Company name */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-semibold text-primary-700 truncate">{companyName}</p>
           </div>
 
           {/* Navigation */}

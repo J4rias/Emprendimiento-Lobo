@@ -29,6 +29,42 @@ router.get(
 );
 
 /**
+ * @route   GET /api/supplier-payments/payable-balance/:supplierId
+ * @desc    Get total payable balance for a supplier (received POs minus payments)
+ * @access  Private (requires payments.view permission)
+ */
+router.get(
+  '/payable-balance/:supplierId',
+  authenticate,
+  authorize('supplier_payments.view'),
+  supplierPaymentController.getPayableBalance
+);
+
+/**
+ * @route   GET /api/supplier-payments/by-po/:poId
+ * @desc    Get payments and balance summary for a specific purchase order
+ * @access  Private (requires payments.view permission)
+ */
+router.get(
+  '/by-po/:poId',
+  authenticate,
+  authorize('supplier_payments.view'),
+  supplierPaymentController.getPaymentsByPO
+);
+
+/**
+ * @route   PUT /api/supplier-payments/:id/cancel
+ * @desc    Cancel (anular) a supplier payment
+ * @access  Private (requires payments.delete permission)
+ */
+router.put(
+  '/:id/cancel',
+  authenticate,
+  authorize('supplier_payments.delete'),
+  supplierPaymentController.cancelPayment
+);
+
+/**
  * @route   GET /api/supplier-payments
  * @desc    Get all supplier payments with filters
  * @access  Private (requires payments.view permission)

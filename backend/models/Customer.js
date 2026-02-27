@@ -93,6 +93,12 @@ const Customer = sequelize.define('Customer', {
     defaultValue: 0,
     comment: 'Límite de crédito en moneda local'
   },
+  creditUsed: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Crédito actualmente usado por el cliente'
+  },
   creditDays: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -162,8 +168,8 @@ Customer.prototype.getFullName = function() {
 };
 
 // Método para verificar disponibilidad de crédito
-Customer.prototype.hasAvailableCredit = function(amount, currentBalance = 0) {
-  const availableCredit = this.creditLimit - currentBalance;
+Customer.prototype.hasAvailableCredit = function(amount) {
+  const availableCredit = parseFloat(this.creditLimit) - parseFloat(this.creditUsed || 0);
   return availableCredit >= amount;
 };
 

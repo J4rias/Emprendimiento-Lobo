@@ -218,7 +218,7 @@ const CreditNotesPage = () => {
       accessor: 'total',
       render: (creditNote) => (
         <div className="text-right font-medium text-gray-900">
-          S/ {parseFloat(creditNote.total).toFixed(2)}
+          $ {parseFloat(creditNote.total).toFixed(2)}
         </div>
       )
     },
@@ -313,7 +313,7 @@ const CreditNotesPage = () => {
               <div>
                 <p className="text-sm text-orange-700">Total Reembolsado</p>
                 <p className="text-2xl font-bold text-orange-900">
-                  S/ {parseFloat(stats.total_refunded || 0).toFixed(2)}
+                  $ {parseFloat(stats.total_refunded || 0).toFixed(2)}
                 </p>
               </div>
               <TrendingDown className="w-10 h-10 text-orange-600 opacity-50" />
@@ -487,10 +487,10 @@ const CreditNotesPage = () => {
                           {detail.package_quantity_returned}p + {detail.loose_units_returned}u
                         </td>
                         <td className="px-4 py-2 text-right text-sm">
-                          S/ {parseFloat(detail.unit_price).toFixed(2)}
+                          $ {parseFloat(detail.unit_price).toFixed(2)}
                         </td>
                         <td className="px-4 py-2 text-right text-sm font-medium">
-                          S/ {parseFloat(detail.line_total).toFixed(2)}
+                          $ {parseFloat(detail.line_total).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -505,15 +505,15 @@ const CreditNotesPage = () => {
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Subtotal:</span>
-                    <span className="text-sm font-medium">S/ {parseFloat(viewingCreditNote.subtotal).toFixed(2)}</span>
+                    <span className="text-sm font-medium">$ {parseFloat(viewingCreditNote.subtotal).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Impuestos:</span>
-                    <span className="text-sm font-medium">S/ {parseFloat(viewingCreditNote.tax_amount).toFixed(2)}</span>
+                    <span className="text-sm font-medium">$ {parseFloat(viewingCreditNote.tax_amount).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-semibold">Total:</span>
-                    <span className="font-semibold text-lg">S/ {parseFloat(viewingCreditNote.total).toFixed(2)}</span>
+                    <span className="font-semibold text-lg">$ {parseFloat(viewingCreditNote.total).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -530,7 +530,7 @@ const CreditNotesPage = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Monto Reembolsado</p>
-                    <p className="font-medium">S/ {parseFloat(viewingCreditNote.refund_amount).toFixed(2)}</p>
+                    <p className="font-medium">$ {parseFloat(viewingCreditNote.refund_amount).toFixed(2)}</p>
                   </div>
                   {viewingCreditNote.refund_reference && (
                     <div className="col-span-2">

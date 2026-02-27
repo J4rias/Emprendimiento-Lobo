@@ -263,11 +263,11 @@ const ReportsPage = () => {
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Monto Total</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Ticket Promedio</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.average_ticket || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.average_ticket || 0).toFixed(2)}</div>
             </div>
           </div>
         );
@@ -284,7 +284,7 @@ const ReportsPage = () => {
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Valor Total</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_value || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_value || 0).toFixed(2)}</div>
             </div>
           </div>
         );
@@ -297,11 +297,11 @@ const ReportsPage = () => {
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Monto Total</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_amount || 0).toFixed(2)}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Promedio por Orden</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.average_order || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.average_order || 0).toFixed(2)}</div>
             </div>
           </div>
         );
@@ -318,7 +318,7 @@ const ReportsPage = () => {
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-600">Ingresos Totales</div>
-              <div className="text-2xl font-bold text-gray-900">S/ {parseFloat(stats.total_revenue || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_revenue || 0).toFixed(2)}</div>
             </div>
           </div>
         );
@@ -370,7 +370,7 @@ const ReportsPage = () => {
                     {sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    S/ {parseFloat(sale.total || 0).toFixed(2)}
+                    $ {parseFloat(sale.total || 0).toFixed(2)}
                   </td>
                 </tr>
               ))}
@@ -398,10 +398,10 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                    S/ {parseFloat(item.product?.cost || 0).toFixed(2)}
+                    $ {parseFloat(item.product?.cost || 0).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    S/ {parseFloat(item.value || 0).toFixed(2)}
+                    $ {parseFloat(item.value || 0).toFixed(2)}
                   </td>
                 </tr>
               ))}
@@ -456,7 +456,7 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    S/ {parseFloat(item.total_amount || 0).toFixed(2)}
+                    $ {parseFloat(item.total_amount || 0).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{item.sales_count}</td>
                 </tr>

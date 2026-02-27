@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Shield, CheckSquare, Square } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2 } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
+import toast from 'react-hot-toast';
 
 const SettingsPage = () => {
   const { token, hasPermission } = useAuth();
+  const { companySettings, reloadCompany } = useCompany();
   const [activeTab, setActiveTab] = useState('roles');
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
@@ -19,7 +22,13 @@ const SettingsPage = () => {
     permissions: [],
   });
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  // Company form state
+  const [companyForm, setCompanyForm] = useState({
+    name: '', address: '', phone: '', email: '', tax_id: '', website: '',
+  });
+  const [companyLoading, setCompanyLoading] = useState(false);
+
+  const API_URL = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
     fetchRoles();
@@ -60,6 +69,47 @@ const SettingsPage = () => {
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
+    }
+  };
+
+  // Sync company form when context data loads
+  useEffect(() => {
+    if (companySettings) {
+      setCompanyForm({
+        name: companySettings.name || '',
+        address: companySettings.address || '',
+        phone: companySettings.phone || '',
+        email: companySettings.email || '',
+        tax_id: companySettings.tax_id || '',
+        website: companySettings.website || '',
+      });
+    }
+  }, [companySettings]);
+
+  const handleCompanySubmit = async (e) => {
+    e.preventDefault();
+    setCompanyLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/company`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(companyForm),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Datos de empresa actualizados');
+        reloadCompany();
+      } else {
+        toast.error(data.message || 'Error al guardar');
+      }
+    } catch (error) {
+      console.error('Error saving company:', error);
+      toast.error('Error al guardar los datos de empresa');
+    } finally {
+      setCompanyLoading(false);
     }
   };
 
@@ -238,6 +288,19 @@ const SettingsPage = () => {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
+          {hasPermission('settings.manage') && (
+            <button
+              onClick={() => setActiveTab('empresa')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'empresa'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Building2 className="inline-block h-5 w-5 mr-2" />
+              Empresa
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('roles')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -278,6 +341,79 @@ const SettingsPage = () => {
               emptyMessage="No se encontraron roles"
             />
           </div>
+        </div>
+      )}
+
+      {/* Empresa Tab */}
+      {activeTab === 'empresa' && hasPermission('settings.manage') && (
+        <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Datos de la Empresa</h2>
+          <form onSubmit={handleCompanySubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la empresa *</label>
+              <input
+                type="text"
+                value={companyForm.name}
+                onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+              <input
+                type="text"
+                value={companyForm.address}
+                onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
+                className="input w-full"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={companyForm.phone}
+                  onChange={(e) => setCompanyForm({ ...companyForm, phone: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                <input
+                  type="email"
+                  value={companyForm.email}
+                  onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RIF / NIT / Tax ID</label>
+                <input
+                  type="text"
+                  value={companyForm.tax_id}
+                  onChange={(e) => setCompanyForm({ ...companyForm, tax_id: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sitio web</label>
+                <input
+                  type="text"
+                  value={companyForm.website}
+                  onChange={(e) => setCompanyForm({ ...companyForm, website: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+            <div className="pt-2">
+              <button type="submit" className="btn-primary" disabled={companyLoading}>
+                {companyLoading ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
