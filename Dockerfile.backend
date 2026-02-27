@@ -1,8 +1,18 @@
 # Stage 1: Install production dependencies
 FROM node:20-alpine AS deps
 
-# Native deps for Sharp (libvips)
-RUN apk add --no-cache vips-dev python3 make g++
+# Install build dependencies for sharp and node-gyp
+RUN apk add --no-cache \
+    vips-dev \
+    cairo-dev \
+    pixman-dev \
+    python3 \
+    make \
+    g++ \
+    gcc \
+    linux-headers \
+    libc6-compat && \
+    npm install -g node-gyp
 
 WORKDIR /app
 COPY backend/package*.json ./
