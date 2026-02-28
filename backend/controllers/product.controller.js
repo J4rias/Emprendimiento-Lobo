@@ -1,4 +1,8 @@
-const { Product, Category, ProductPresentation, Barcode, Inventory, Warehouse, Brand, PackagingType, PresentationType } = require('../models');
+const {
+  Product, Category, ProductPresentation, Barcode,
+  Inventory, Warehouse, Brand, PackagingType,
+  PresentationType, PriceListDetail
+} = require('../models');
 const { sequelize } = require('../config/database');
 const { Op } = require('sequelize');
 const skuConfig = require('../config/sku');
@@ -13,24 +17,69 @@ class ProductController {
         search,
         category_id,
         is_active,
-        is_perishable
+        is_perishable,
+        price_list_id
       } = req.query;
 
       const offset = (page - 1) * limit;
       const where = {};
+
+      const presentationInclude = {
+        model: ProductPresentation,
+        as: 'presentations',
+        include: [
+          { model: PackagingType, as: 'packagingType' },
+          { model: PresentationType, as: 'presentationType' }
+        ]
+      };
+
       const include = [
         { model: Category, as: 'category' },
         { model: Brand, as: 'brand' },
+        presentationInclude,
+        { model: Barcode, as: 'barcodes' },
         {
-          model: ProductPresentation,
-          as: 'presentations',
-          include: [
-            { model: PackagingType, as: 'packagingType' },
-            { model: PresentationType, as: 'presentationType' }
-          ]
-        },
-        { model: Barcode, as: 'barcodes' }
+          model: Inventory,
+          as: 'inventories',
+          include: [{ model: Warehouse, as: 'warehouse' }]
+        }
       ];
+
+      if (price_list_id) {
+        // Only show products in the price list AND with price > 0
+        include.push({
+          model: PriceListDetail,
+          as: 'priceListDetails',
+          where: {
+            price_list_id,
+            package_price: { [Op.gt]: 0 }
+          },
+          required: true,
+          attributes: []
+        });
+
+        // Also filter the presentations include to only show those in the price list with price > 0
+        presentationInclude.include.push({
+          model: PriceListDetail,
+          as: 'priceListDetails',
+          where: {
+            price_list_id,
+            package_price: { [Op.gt]: 0 }
+          },
+          required: true,
+          attributes: []
+        });
+
+        // In POS (when price_list_id is present), also filter by stock > 0
+        // Find the index of the inventory include and make it required with a where clause
+        const inventoryInclude = include.find(inc => inc.as === 'inventories');
+        if (inventoryInclude) {
+          inventoryInclude.required = true;
+          inventoryInclude.where = {
+            quantity: { [Op.gt]: 0 }
+          };
+        }
+      }
 
       if (search) {
         // Search in product name, SKU, or barcode

@@ -32,6 +32,7 @@ import CreditNotesPage from './pages/CreditNotesPage';
 import CreditNoteCreatePage from './pages/CreditNoteCreatePage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
+import PriceListsPage from './pages/PriceListsPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -319,6 +320,16 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <DeliveriesPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/listas-precios"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PriceListsPage />
             </AppLayout>
           </PrivateRoute>
         }

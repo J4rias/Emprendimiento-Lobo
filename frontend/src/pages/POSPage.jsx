@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, Search, User, CreditCard, Banknote, Smartphone, X, UserPlus } from 'lucide-react';
 import { productService } from '../services/api/productService';
 import { saleService } from '../services/api/saleService';
+import { priceListService } from '../services/api/priceListService';
 import { useAuth } from '../context/AuthContext';
 import CustomerSearch from '../components/CustomerSearch';
 
 const POSPage = () => {
   const { user } = useAuth();
+  const searchInputRef = useRef(null);
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,10 +19,26 @@ const POSPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [priceLists, setPriceLists] = useState([]);
+  const [selectedPriceList, setSelectedPriceList] = useState(null);
+  const [priceListDetails, setPriceListDetails] = useState({});
+
+  useEffect(() => {
+    // Only focus search if NOT currently typing in another input (like discount)
+    const active = document.activeElement;
+    if (searchInputRef.current &&
+      (!active || active.tagName !== 'INPUT' || active === searchInputRef.current)) {
+      searchInputRef.current.focus();
+    }
+  }, [cart, searchTerm]);
 
   useEffect(() => {
     loadProducts();
-  }, [searchTerm]);
+  }, [searchTerm, selectedPriceList]);
+
+  useEffect(() => {
+    loadPriceLists();
+  }, []);
 
   // Apply customer discount when customer is selected or cart changes
   useEffect(() => {
@@ -34,11 +52,67 @@ const POSPage = () => {
       const data = await productService.getAll({
         search: searchTerm,
         limit: 20,
-        is_active: true
+        is_active: true,
+        price_list_id: selectedPriceList || undefined
       });
-      setProducts(data.products || data.data || []);
+      const results = data.products || data.data || [];
+      setProducts(results);
+
+      // Auto-add on exact barcode match
+      const trimmedSearch = searchTerm.trim();
+      if (trimmedSearch && results.length === 1) {
+        const product = results[0];
+        const isBarcodeMatch = (product.barcodes || []).some(b => b.barcode === trimmedSearch);
+        if (isBarcodeMatch) {
+          addToCart(product);
+          setSearchTerm(''); // Clear search after auto-add
+        }
+      }
     } catch (error) {
       console.error('Error loading products:', error);
+    }
+  };
+
+  const loadPriceLists = async () => {
+    try {
+      const res = await priceListService.getActive();
+      const lists = res.data || [];
+      setPriceLists(lists);
+
+      // Try to recover from localStorage
+      const savedListId = localStorage.getItem('lastPriceListId');
+      const savedListExists = lists.some(l => l.id === parseInt(savedListId));
+
+      const defaultList = lists.find(l => l.isDefault) || lists[0];
+
+      if (savedListId && savedListExists) {
+        selectPriceList(parseInt(savedListId));
+      } else if (defaultList) {
+        selectPriceList(defaultList.id);
+      }
+    } catch (error) {
+      console.error('Error loading price lists:', error);
+    }
+  };
+
+  const selectPriceList = async (listId) => {
+    if (!listId) {
+      setSelectedPriceList(null);
+      setPriceListDetails({});
+      localStorage.removeItem('lastPriceListId');
+      return;
+    }
+    try {
+      setSelectedPriceList(listId);
+      localStorage.setItem('lastPriceListId', listId.toString());
+      const res = await priceListService.getById(listId);
+      const detailsMap = {};
+      (res.data?.details || []).forEach(d => {
+        detailsMap[`${d.product_id}-${d.presentation_id}`] = d;
+      });
+      setPriceListDetails(detailsMap);
+    } catch (error) {
+      console.error('Error loading price list details:', error);
     }
   };
 
@@ -49,20 +123,42 @@ const POSPage = () => {
       return;
     }
 
+    // Calculate available stock in packages
+    const totalUnits = (product.inventories || []).reduce((sum, inv) => sum + parseFloat(inv.quantity), 0);
+    const unitsPerPkg = parseFloat(presentation.units_per_package) || 1;
+    const availablePackages = Math.floor(totalUnits / unitsPerPkg);
+
     const existingItem = cart.find(
       item => item.product_id === product.id && item.presentation_id === presentation.id
     );
 
     if (existingItem) {
-      updateQuantity(existingItem.product_id, existingItem.presentation_id, existingItem.quantity + 1);
+      if (existingItem.quantity + 1 > availablePackages) {
+        alert(`Stock insuficiente. Solo hay ${availablePackages} disponibles.`);
+        return;
+      }
+      updateQuantity(existingItem.product_id, existingItem.presentation_id, existingItem.quantity + 1, availablePackages);
     } else {
+      if (availablePackages <= 0) {
+        alert('Producto sin stock disponible');
+        return;
+      }
       const newItem = {
         product_id: product.id,
         presentation_id: presentation.id,
         product_name: product.name,
         presentation_name: presentation.name,
         quantity: 1,
-        unit_price: presentation.sale_price || 0,
+        stock_available: availablePackages,
+        unit_price: (() => {
+          // Try price list price first
+          const key = `${product.id}-${presentation.id}`;
+          const listDetail = priceListDetails[key];
+          if (listDetail && parseFloat(listDetail.package_price) > 0) {
+            return parseFloat(listDetail.package_price);
+          }
+          return presentation.sale_price || 0;
+        })(),
         tax_percent: 16,
         discount_percent: customer?.discount_percentage || 0
       };
@@ -70,9 +166,17 @@ const POSPage = () => {
     }
   };
 
-  const updateQuantity = (productId, presentationId, newQuantity) => {
+  const updateQuantity = (productId, presentationId, newQuantity, maxStock = null) => {
     if (newQuantity <= 0) {
       removeFromCart(productId, presentationId);
+      return;
+    }
+
+    const item = cart.find(i => i.product_id === productId && i.presentation_id === presentationId);
+    const available = maxStock !== null ? maxStock : (item?.stock_available || 999999);
+
+    if (newQuantity > available) {
+      alert(`Stock insuficiente. Solo hay ${available} disponibles.`);
       return;
     }
 
@@ -254,6 +358,21 @@ const POSPage = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800">Punto de Venta</h1>
           <div className="flex items-center gap-4">
+            {/* Price List Selector */}
+            {priceLists.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 whitespace-nowrap">Lista:</span>
+                <select
+                  value={selectedPriceList || ''}
+                  onChange={e => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {priceLists.map(pl => (
+                    <option key={pl.id} value={pl.id}>{pl.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="text-sm text-gray-600">
               <span className="font-medium">Usuario:</span> {user?.name}
             </div>
@@ -269,6 +388,7 @@ const POSPage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Buscar productos por nombre, SKU o código de barras..."
                 value={searchTerm}
@@ -281,31 +401,55 @@ const POSPage = () => {
           {/* Products Grid */}
           <div className="flex-1 overflow-y-auto">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  onClick={() => addToCart(product)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md hover:border-blue-500 transition-all relative"
-                >
-                  {product.category && (
-                    <div
-                      className="absolute top-2 right-2 w-3 h-3 rounded-full shadow-sm"
-                      style={{ backgroundColor: product.category.color || '#6B7280' }}
-                      title={product.category.name}
-                    />
-                  )}
-                  <div className="aspect-square bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
-                    <ShoppingCart className="w-12 h-12 text-gray-400" />
-                  </div>
-                  <h3 className="font-medium text-gray-800 text-sm mb-1 line-clamp-2">
-                    {product.name}
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-2">{product.sku}</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    $ {product.presentations?.[0]?.sale_price?.toFixed(2) || '0.00'}
-                  </p>
+              {products.length === 0 ? (
+                <div className="col-span-full py-20 text-center">
+                  <ShoppingCart className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                  <p className="text-gray-500">No se encontraron productos en esta lista de precios.</p>
                 </div>
-              ))}
+              ) : (
+                products.map((product) => (
+                  <div
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md hover:border-blue-500 transition-all relative"
+                  >
+                    {product.category && (
+                      <div
+                        className="absolute top-2 right-2 w-3 h-3 rounded-full shadow-sm"
+                        style={{ backgroundColor: product.category.color || '#6B7280' }}
+                        title={product.category.name}
+                      />
+                    )}
+                    <div className="aspect-square bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
+                      <ShoppingCart className="w-12 h-12 text-gray-400" />
+                    </div>
+                    <h3 className="font-medium text-gray-800 text-sm mb-1 line-clamp-2">
+                      {product.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-1">{product.sku}</p>
+                    <p className="text-[10px] font-medium text-gray-400 mb-2">
+                      Stock: {(() => {
+                        const totalUnits = (product.inventories || []).reduce((sum, inv) => sum + parseFloat(inv.quantity), 0);
+                        const pres = product.presentations?.[0];
+                        const unitsPerPkg = parseFloat(pres?.units_per_package) || 1;
+                        return Math.floor(totalUnits / unitsPerPkg);
+                      })()} disp.
+                    </p>
+                    <p className="text-lg font-bold text-blue-600">
+                      {(() => {
+                        const pres = product.presentations?.[0];
+                        if (!pres) return '$ 0.00';
+                        const key = `${product.id}-${pres.id}`;
+                        const listDetail = priceListDetails[key];
+                        const price = (listDetail && parseFloat(listDetail.package_price) > 0)
+                          ? parseFloat(listDetail.package_price)
+                          : (pres.sale_price || 0);
+                        return `$ ${price.toFixed(2)}`;
+                      })()}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -475,21 +619,19 @@ const POSPage = () => {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleSaleTypeChange('cash')}
-                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${
-                    saleType === 'cash'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${saleType === 'cash'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   Contado
                 </button>
                 <button
                   onClick={() => handleSaleTypeChange('credit')}
-                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${
-                    saleType === 'credit'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`py-2 px-4 rounded-lg font-medium transition-colors ${saleType === 'credit'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   Crédito
                 </button>
@@ -505,33 +647,30 @@ const POSPage = () => {
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setPaymentMethod('cash')}
-                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
-                        paymentMethod === 'cash'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${paymentMethod === 'cash'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                     >
                       <Banknote className="w-4 h-4 mx-auto mb-1" />
                       Efectivo
                     </button>
                     <button
                       onClick={() => setPaymentMethod('card')}
-                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
-                        paymentMethod === 'card'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${paymentMethod === 'card'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                     >
                       <CreditCard className="w-4 h-4 mx-auto mb-1" />
                       Tarjeta
                     </button>
                     <button
                       onClick={() => setPaymentMethod('transfer')}
-                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
-                        paymentMethod === 'transfer'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                      className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${paymentMethod === 'transfer'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                     >
                       <Smartphone className="w-4 h-4 mx-auto mb-1" />
                       Transfer

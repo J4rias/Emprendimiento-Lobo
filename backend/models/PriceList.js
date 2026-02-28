@@ -45,6 +45,12 @@ const PriceList = sequelize.define('PriceList', {
     allowNull: false,
     defaultValue: 'active'
   },
+  validity_days: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 5,
+    comment: 'Vigencia en días a partir de validFrom'
+  },
   validFrom: {
     type: DataTypes.DATE,
     allowNull: true,
@@ -59,6 +65,12 @@ const PriceList = sequelize.define('PriceList', {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false
+  },
+  updated_by: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'users', key: 'id' },
+    comment: 'Usuario que actualizó la lista por última vez'
   }
 }, {
   tableName: 'price_lists',
@@ -99,12 +111,18 @@ const PriceList = sequelize.define('PriceList', {
           }
         );
       }
+      // Auto-calculate validUntil from validFrom + validity_days
+      if (priceList.validFrom && priceList.validity_days) {
+        const from = new Date(priceList.validFrom);
+        from.setDate(from.getDate() + priceList.validity_days);
+        priceList.validUntil = from;
+      }
     }
   }
 });
 
 // Método para verificar si está vigente
-PriceList.prototype.isValid = function() {
+PriceList.prototype.isValid = function () {
   const now = new Date();
 
   if (this.validFrom && now < this.validFrom) {
@@ -119,7 +137,7 @@ PriceList.prototype.isValid = function() {
 };
 
 // Personalizar JSON
-PriceList.prototype.toJSON = function() {
+PriceList.prototype.toJSON = function () {
   const values = { ...this.get() };
   delete values.isDeleted;
   return values;

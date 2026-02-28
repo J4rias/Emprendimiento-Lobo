@@ -16,6 +16,7 @@ const Transfer = require('./Transfer');
 const TransferDetail = require('./TransferDetail');
 const Customer = require('./Customer');
 const PriceList = require('./PriceList');
+const PriceListDetail = require('./PriceListDetail');
 const Quote = require('./Quote');
 const QuoteDetail = require('./QuoteDetail');
 const Sale = require('./Sale');
@@ -141,6 +142,21 @@ ProductPresentation.hasMany(TransferDetail, { foreignKey: 'presentation_id', as:
 // Customer - PriceList (Many to One)
 Customer.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
 PriceList.hasMany(Customer, { foreignKey: 'priceListId', as: 'customers' });
+
+// PriceList - User (Updated by)
+PriceList.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+
+// PriceList - PriceListDetail (One to Many)
+PriceList.hasMany(PriceListDetail, { foreignKey: 'price_list_id', as: 'details' });
+PriceListDetail.belongsTo(PriceList, { foreignKey: 'price_list_id', as: 'priceList' });
+
+// PriceListDetail - Product (Many to One)
+PriceListDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(PriceListDetail, { foreignKey: 'product_id', as: 'priceListDetails' });
+
+// PriceListDetail - ProductPresentation (Many to One)
+PriceListDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(PriceListDetail, { foreignKey: 'presentation_id', as: 'priceListDetails' });
 
 // Quote - Customer (Many to One)
 Quote.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
@@ -362,6 +378,7 @@ module.exports = {
   TransferDetail,
   Customer,
   PriceList,
+  PriceListDetail,
   Quote,
   QuoteDetail,
   Sale,

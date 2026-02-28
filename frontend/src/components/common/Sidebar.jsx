@@ -110,6 +110,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'customers.view',
     },
     {
+      name: 'Listas de Precios',
+      icon: Receipt,
+      path: '/listas-precios',
+      permission: 'price_lists.view',
+    },
+    {
       name: 'Cotizaciones',
       icon: FileSpreadsheet,
       path: '/cotizaciones',

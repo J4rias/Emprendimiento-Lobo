@@ -1,0 +1,532 @@
+const {
+    PriceList,
+    PriceListDetail,
+    Product,
+    ProductPresentation,
+    Inventory,
+    Permission,
+    User,
+    ExchangeRate
+} = require('../models');
+const { Op } = require('sequelize');
+const { sequelize } = require('../config/database');
+
+class PriceListController {
+    constructor() {
+        this.getAll = this.getAll.bind(this);
+        this.getById = this.getById.bind(this);
+        this.create = this.create.bind(this);
+        this.update = this.update.bind(this);
+        this.duplicate = this.duplicate.bind(this);
+        this.getActive = this.getActive.bind(this);
+        this.getProductsWithStock = this.getProductsWithStock.bind(this);
+        this.exportCSV = this.exportCSV.bind(this);
+        this.delete = this.delete.bind(this);
+    }
+
+    // GET /api/price-lists/products-with-stock
+    async getProductsWithStock(req, res, next) {
+        try {
+            const products = await this._getProductsWithStock();
+            res.json({ success: true, data: products });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /api/price-lists
+    async getAll(req, res, next) {
+        try {
+            const { search, status, page = 1, limit = 20 } = req.query;
+            const where = { isDeleted: false };
+            const andConditions = [];
+
+            // Search filter
+            if (search && search.trim() !== '') {
+                andConditions.push({
+                    [Op.or]: [
+                        { name: { [Op.like]: `%${search}%` } },
+                        { code: { [Op.like]: `%${search}%` } }
+                    ]
+                });
+            }
+
+            // Status filter
+            if (status === 'active') {
+                where.status = 'active';
+                andConditions.push({
+                    [Op.or]: [
+                        { validUntil: null },
+                        { validUntil: { [Op.gte]: new Date() } }
+                    ]
+                });
+            } else if (status === 'inactive') {
+                where.status = 'inactive';
+            } else if (status === 'expired') {
+                where.status = 'active';
+                andConditions.push({
+                    validUntil: {
+                        [Op.and]: [
+                            { [Op.ne]: null },
+                            { [Op.lt]: new Date() }
+                        ]
+                    }
+                });
+            }
+
+            if (andConditions.length > 0) {
+                where[Op.and] = andConditions;
+            }
+
+            const offset = (parseInt(page) - 1) * parseInt(limit);
+            const { count, rows } = await PriceList.findAndCountAll({
+                where,
+                include: [
+                    { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] }
+                ],
+                order: [['updated_at', 'DESC']],
+                limit: parseInt(limit),
+                offset
+            });
+
+            res.json({
+                success: true,
+                data: rows,
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    totalPages: Math.ceil(count / parseInt(limit)),
+                    limit: parseInt(limit)
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /api/price-lists/active - Only active and valid (for POS)
+    async getActive(req, res, next) {
+        try {
+            const now = new Date();
+            const lists = await PriceList.findAll({
+                where: {
+                    isDeleted: false,
+                    status: 'active',
+                    [Op.or]: [
+                        { validUntil: null },
+                        { validUntil: { [Op.gte]: now } }
+                    ]
+                },
+                attributes: ['id', 'code', 'name', 'currency', 'isDefault', 'validFrom', 'validUntil', 'validity_days'],
+                order: [['isDefault', 'DESC'], ['name', 'ASC']]
+            });
+
+            res.json({ success: true, data: lists });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /api/price-lists/:id
+    async getById(req, res, next) {
+        try {
+            const { id } = req.params;
+
+            const priceList = await PriceList.findOne({
+                where: { id, isDeleted: false },
+                include: [
+                    { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] },
+                    {
+                        model: PriceListDetail,
+                        as: 'details',
+                        include: [
+                            {
+                                model: Product,
+                                as: 'product',
+                                attributes: ['id', 'sku', 'name', 'image_url']
+                            },
+                            {
+                                model: ProductPresentation,
+                                as: 'presentation',
+                                attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency']
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            if (!priceList) {
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            res.json({ success: true, data: priceList });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // POST /api/price-lists
+    async create(req, res, next) {
+        const transaction = await sequelize.transaction();
+        try {
+            const {
+                name, description, basePercentage,
+                isDefault, validity_days, details
+            } = req.body;
+
+            if (!name || !name.trim()) {
+                await transaction.rollback();
+                return res.status(400).json({ success: false, message: 'El nombre es obligatorio' });
+            }
+
+            // Create the price list header - Always USD
+            const validFrom = new Date();
+            const priceList = await PriceList.create({
+                name: name.trim(),
+                description: description || null,
+                currency: 'USD',
+                basePercentage: basePercentage || 0,
+                isDefault: isDefault || false,
+                validity_days: validity_days || 5,
+                validFrom,
+                status: 'active',
+                updated_by: req.user?.id || req.userId
+            }, { transaction });
+
+            // If details provided, create them
+            if (details && details.length > 0) {
+                const detailRecords = details.map(d => ({
+                    price_list_id: priceList.id,
+                    product_id: d.product_id,
+                    presentation_id: d.presentation_id,
+                    package_cost: d.package_cost || 0,
+                    unit_cost: d.unit_cost || 0,
+                    package_price: d.package_price || 0,
+                    unit_price: d.unit_price || 0,
+                    margin_percentage: d.margin_percentage || 0
+                }));
+                await PriceListDetail.bulkCreate(detailRecords, { transaction });
+            } else {
+                // Auto-generate from products with stock using basePercentage
+                const productsWithStock = await this._getProductsWithStock();
+                if (productsWithStock.length > 0) {
+                    const marginPct = parseFloat(basePercentage) || 0;
+                    const autoDetails = [];
+                    for (const item of productsWithStock) {
+                        const pkgCost = parseFloat(item.presentation.package_cost) || 0;
+                        const unitCost = parseFloat(item.presentation.cost) || 0;
+                        const pkgPrice = pkgCost > 0 ? pkgCost * (1 + marginPct / 100) : 0;
+                        const unitPrice = unitCost > 0 ? unitCost * (1 + marginPct / 100) : 0;
+                        const margin = pkgCost > 0 ? ((pkgPrice - pkgCost) / pkgCost * 100) : 0;
+
+                        autoDetails.push({
+                            price_list_id: priceList.id,
+                            product_id: item.product_id,
+                            presentation_id: item.presentation.id,
+                            package_cost: Math.round(pkgCost * 100) / 100,
+                            unit_cost: Math.round(unitCost * 100) / 100,
+                            package_price: Math.round(pkgPrice * 100) / 100,
+                            unit_price: Math.round(unitPrice * 100) / 100,
+                            margin_percentage: Math.round(margin * 10) / 10
+                        });
+                    }
+                    await PriceListDetail.bulkCreate(autoDetails, { transaction });
+                }
+            }
+
+            await transaction.commit();
+
+            // Re-fetch with details
+            const created = await PriceList.findByPk(priceList.id, {
+                include: [
+                    {
+                        model: PriceListDetail, as: 'details',
+                        include: [
+                            { model: Product, as: 'product', attributes: ['id', 'sku', 'name', 'image_url'] },
+                            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency'] }
+                        ]
+                    }
+                ]
+            });
+
+            res.status(201).json({ success: true, data: created });
+        } catch (error) {
+            await transaction.rollback();
+            next(error);
+        }
+    }
+
+    // PUT /api/price-lists/:id
+    async update(req, res, next) {
+        const transaction = await sequelize.transaction();
+        try {
+            const { id } = req.params;
+            const {
+                name, description, basePercentage,
+                isDefault, validity_days, status, details, renewValidity
+            } = req.body;
+
+            const priceList = await PriceList.findOne({
+                where: { id, isDeleted: false },
+                transaction
+            });
+
+            if (!priceList) {
+                await transaction.rollback();
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            // Update header
+            const updateData = { updated_by: req.user?.id || req.userId };
+            if (name !== undefined) updateData.name = name.trim();
+            if (description !== undefined) updateData.description = description;
+            // currency is hardcoded to USD, so it's not updated here
+            if (basePercentage !== undefined) updateData.basePercentage = basePercentage;
+            if (isDefault !== undefined) updateData.isDefault = isDefault;
+            if (validity_days !== undefined) updateData.validity_days = validity_days;
+            if (status !== undefined) updateData.status = status;
+
+            // Renew validity on update
+            if (renewValidity || status === 'active') {
+                updateData.validFrom = new Date();
+                updateData.validity_days = validity_days || priceList.validity_days;
+            }
+
+            await priceList.update(updateData, { transaction });
+
+            // Update details if provided
+            if (details && details.length > 0) {
+                // Delete existing details and recreate
+                await PriceListDetail.destroy({ where: { price_list_id: id }, transaction });
+                const detailRecords = details.map(d => ({
+                    price_list_id: parseInt(id),
+                    product_id: d.product_id,
+                    presentation_id: d.presentation_id,
+                    package_cost: d.package_cost || 0,
+                    unit_cost: d.unit_cost || 0,
+                    package_price: d.package_price || 0,
+                    unit_price: d.unit_price || 0,
+                    margin_percentage: d.margin_percentage || 0
+                }));
+                await PriceListDetail.bulkCreate(detailRecords, { transaction });
+            }
+
+            await transaction.commit();
+
+            // Re-fetch
+            const updated = await PriceList.findByPk(id, {
+                include: [
+                    { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] },
+                    {
+                        model: PriceListDetail, as: 'details',
+                        include: [
+                            { model: Product, as: 'product', attributes: ['id', 'sku', 'name', 'image_url'] },
+                            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency'] }
+                        ]
+                    }
+                ]
+            });
+
+            res.json({ success: true, data: updated });
+        } catch (error) {
+            await transaction.rollback();
+            next(error);
+        }
+    }
+
+    // POST /api/price-lists/:id/duplicate
+    async duplicate(req, res, next) {
+        const transaction = await sequelize.transaction();
+        try {
+            const { id } = req.params;
+            const { name } = req.body;
+
+            const original = await PriceList.findOne({
+                where: { id, isDeleted: false },
+                include: [{ model: PriceListDetail, as: 'details' }]
+            });
+
+            if (!original) {
+                await transaction.rollback();
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            const newList = await PriceList.create({
+                name: name || `${original.name} (Copia)`,
+                description: original.description,
+                currency: 'USD',
+                basePercentage: original.basePercentage,
+                isDefault: false,
+                validity_days: original.validity_days,
+                validFrom: new Date(),
+                status: 'active',
+                updated_by: req.user?.id || req.userId
+            }, { transaction });
+
+            // Copy details
+            if (original.details && original.details.length > 0) {
+                const copiedDetails = original.details.map(d => ({
+                    price_list_id: newList.id,
+                    product_id: d.product_id,
+                    presentation_id: d.presentation_id,
+                    package_cost: d.package_cost,
+                    unit_cost: d.unit_cost,
+                    package_price: d.package_price,
+                    unit_price: d.unit_price,
+                    margin_percentage: d.margin_percentage
+                }));
+                await PriceListDetail.bulkCreate(copiedDetails, { transaction });
+            }
+
+            await transaction.commit();
+
+            const created = await PriceList.findByPk(newList.id, {
+                include: [
+                    {
+                        model: PriceListDetail, as: 'details',
+                        include: [
+                            { model: Product, as: 'product', attributes: ['id', 'sku', 'name', 'image_url'] },
+                            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency'] }
+                        ]
+                    }
+                ]
+            });
+
+            res.status(201).json({ success: true, data: created });
+        } catch (error) {
+            await transaction.rollback();
+            next(error);
+        }
+    }
+
+    // DELETE /api/price-lists/:id (soft delete)
+    async delete(req, res, next) {
+        try {
+            const { id } = req.params;
+            const priceList = await PriceList.findOne({ where: { id, isDeleted: false } });
+
+            if (!priceList) {
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            await priceList.update({ isDeleted: true, status: 'inactive' });
+
+            res.json({ success: true, message: 'Lista de precios eliminada' });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /api/price-lists/:id/export/csv
+    async exportCSV(req, res, next) {
+        try {
+            const { id } = req.params;
+            const priceList = await PriceList.findOne({
+                where: { id, isDeleted: false },
+                include: [
+                    {
+                        model: PriceListDetail, as: 'details',
+                        include: [
+                            { model: Product, as: 'product', attributes: ['id', 'sku', 'name'] },
+                            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] }
+                        ]
+                    }
+                ]
+            });
+
+            if (!priceList) {
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            // Build CSV
+            const headers = ['SKU', 'Producto', 'Presentación', 'Uds/Paquete', 'Costo/Paquete', 'Costo Unitario', 'Precio/Paquete', 'Precio Unitario', 'Margen %'];
+            const rows = priceList.details.map(d => [
+                d.product?.sku || '',
+                `"${(d.product?.name || '').replace(/"/g, '""')}"`,
+                `"${(d.presentation?.name || '').replace(/"/g, '""')}"`,
+                d.presentation?.units_per_package || 1,
+                parseFloat(d.package_cost).toFixed(2),
+                parseFloat(d.unit_cost).toFixed(2),
+                parseFloat(d.package_price).toFixed(2),
+                parseFloat(d.unit_price).toFixed(2),
+                parseFloat(d.margin_percentage).toFixed(1)
+            ].join(','));
+
+            const csv = [headers.join(','), ...rows].join('\n');
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="lista-precios-${priceList.code}.csv"`);
+            res.send('\uFEFF' + csv); // BOM for Excel UTF-8
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // Helper: Get products with stock
+    async _getProductsWithStock() {
+        const inventories = await Inventory.findAll({
+            where: { quantity: { [Op.gt]: 0 } },
+            attributes: ['product_id'],
+            include: [
+                {
+                    model: Product,
+                    as: 'product',
+                    where: { is_active: true },
+                    attributes: ['id', 'sku', 'name']
+                }
+            ],
+            group: ['product_id']
+        });
+
+        // For each product with inventory, get its presentations
+        const results = [];
+        const seenPresentations = new Set();
+
+        for (const inv of inventories) {
+            const presentations = await ProductPresentation.findAll({
+                where: {
+                    product_id: inv.product_id,
+                    is_active: true
+                },
+                attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency']
+            });
+
+            for (const p of presentations) {
+                const key = `${inv.product_id}-${p.id}`;
+                if (!seenPresentations.has(key)) {
+                    seenPresentations.add(key);
+
+                    // Convert costs to USD if they are in COP or VES
+                    let usdPackageCost = p.package_cost;
+                    let usdUnitCost = p.cost;
+
+                    if (p.purchase_currency && p.purchase_currency !== 'USD') {
+                        try {
+                            usdPackageCost = await ExchangeRate.convert(p.package_cost, p.purchase_currency, 'USD');
+                            usdUnitCost = await ExchangeRate.convert(p.cost, p.purchase_currency, 'USD');
+                        } catch (error) {
+                            console.error(`Error converting costs for presentation ${p.id} from ${p.purchase_currency} to USD:`, error.message);
+                            // Optionally, you might want to handle this error more gracefully,
+                            // e.g., by setting costs to 0 or skipping the item.
+                            // For now, we'll just log and use the original cost.
+                        }
+                    }
+
+                    results.push({
+                        product_id: inv.product_id,
+                        product: inv.product,
+                        presentation: {
+                            ...p.get(), // Get plain data from Sequelize instance
+                            package_cost: usdPackageCost,
+                            cost: usdUnitCost
+                        }
+                    });
+                }
+            }
+        }
+
+        return results;
+    }
+}
+
+module.exports = new PriceListController();
