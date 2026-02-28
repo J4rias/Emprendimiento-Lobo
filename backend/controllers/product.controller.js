@@ -37,13 +37,13 @@ class ProductController {
         where[Op.or] = [
           { name: { [Op.like]: `%${search}%` } },
           { sku: { [Op.like]: `%${search}%` } },
-          { '$barcodes.barcode$': { [Op.like]: `%${search}%` } }
+          sequelize.where(sequelize.col('barcodes.barcode'), { [Op.like]: `%${search}%` })
         ];
       }
 
       if (category_id) where.category_id = category_id;
-      if (is_active !== undefined) where.is_active = is_active;
-      if (is_perishable !== undefined) where.is_perishable = is_perishable;
+      if (is_active !== undefined) where.is_active = is_active === 'true' || is_active === true;
+      if (is_perishable !== undefined) where.is_perishable = is_perishable === 'true' || is_perishable === true;
 
       const { rows: products, count } = await Product.findAndCountAll({
         where,

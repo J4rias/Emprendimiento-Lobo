@@ -50,7 +50,12 @@ const PurchaseOrderCreatePage = () => {
 
   useEffect(() => {
     if (productSearch.length >= 2) {
-      searchProducts();
+      const delayFn = setTimeout(() => {
+        searchProducts();
+      }, 300);
+      return () => clearTimeout(delayFn);
+    } else {
+      setProducts([]);
     }
   }, [productSearch]);
 
@@ -112,14 +117,52 @@ const PurchaseOrderCreatePage = () => {
 
   const searchProducts = async () => {
     try {
-      const response = await productService.getProducts({
+      const response = await productService.getAll({
         search: productSearch,
         is_active: true,
         limit: 20
       });
-      setProducts(response.products || []);
+      console.log('Resultados de búsqueda:', response);
+      setProducts(response.products || response.data || response || []);
     } catch (err) {
       console.error('Error searching products:', err);
+    }
+  };
+
+  const handleKeyDown = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      const delayMs = 100; // brief delay to allow products state to update if it just returned
+
+      setTimeout(async () => {
+        let currentProducts = products;
+
+        // If empty, let's fetch directly to be sure (scanner pressed Enter super fast before debounce fired)
+        if (currentProducts.length === 0 && productSearch.length >= 2) {
+          try {
+            const response = await productService.getAll({
+              search: productSearch,
+              is_active: true,
+              limit: 20
+            });
+            currentProducts = response.products || response.data || response || [];
+            setProducts(currentProducts);
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (currentProducts.length === 1) {
+          addProduct(currentProducts[0]);
+        } else if (currentProducts.length > 1) {
+          // Find exact match by barcode or SKU
+          const exact = currentProducts.find(p => p.sku === productSearch || (p.barcodes && p.barcodes.some(b => b.barcode === productSearch)));
+          if (exact) {
+            addProduct(exact);
+          }
+        }
+      }, delayMs);
     }
   };
 
@@ -138,17 +181,6 @@ const PurchaseOrderCreatePage = () => {
     }
 
     const presentation = product.presentations[0];
-
-    // Check if product already exists
-    const exists = formData.items.find(
-      item => item.product_id === product.id && item.presentation_id === presentation.id
-    );
-
-    if (exists) {
-      alert('Este producto ya está en la orden');
-      return;
-    }
-
     const newItem = {
       product_id: product.id,
       presentation_id: presentation.id,
@@ -163,10 +195,36 @@ const PurchaseOrderCreatePage = () => {
       tax_percent: 0
     };
 
-    setFormData(prev => ({
-      ...prev,
-      items: [...prev.items, newItem]
-    }));
+    setFormData(prev => {
+      // Functional check to prevent duplicates even with rapid clicks/scans
+      const exists = prev.items.find(
+        item => String(item.product_id) === String(product.id) &&
+          String(item.presentation_id) === String(presentation.id)
+      );
+
+      if (exists) {
+        // Can't alert inside here reliably without side effects, but we can just return prev
+        // to block the addition. The alert above was already useful for feedback but
+        // the functional check is the ultimate safeguard.
+        return prev;
+      }
+
+      return {
+        ...prev,
+        items: [...prev.items, newItem]
+      };
+    });
+
+    // We still keep the alert outside for immediate feedback, reading from current state
+    const alreadyThere = formData.items.find(
+      item => String(item.product_id) === String(product.id) &&
+        String(item.presentation_id) === String(presentation.id)
+    );
+
+    if (alreadyThere) {
+      alert(`El producto "${product.name}" ya se encuentra agregado en la orden.`);
+      return;
+    }
 
     setShowProductSearch(false);
     setProductSearch('');
@@ -291,7 +349,7 @@ const PurchaseOrderCreatePage = () => {
   const totals = calculateTotals();
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="mb-6">
         <button
@@ -447,19 +505,46 @@ const PurchaseOrderCreatePage = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <input
                         type="text"
-                        placeholder="Buscar por nombre o SKU..."
+                        placeholder="Buscar por nombre o SKU o código de barras..."
                         value={productSearch}
                         onChange={(e) => setProductSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                        onKeyDown={handleKeyDown}
+                        className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus
                       />
+                      {productSearch && (
+                        <button
+                          onClick={() => {
+                            setProductSearch('');
+                            setProducts([]);
+                          }}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 outline-none"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
 
                     <div className="max-h-96 overflow-y-auto">
                       {products.length === 0 ? (
-                        <p className="text-center text-gray-500 py-8">
-                          Busca productos por nombre o SKU
-                        </p>
+                        <div className="text-center py-12">
+                          <p className="text-gray-500 mb-4">
+                            {productSearch.length >= 2
+                              ? `No se encontraron productos para "${productSearch}"`
+                              : 'Busca productos por nombre o SKU'}
+                          </p>
+                          {productSearch && (
+                            <button
+                              onClick={() => {
+                                setProductSearch('');
+                                setProducts([]);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                              Limpiar búsqueda
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="space-y-2">
                           {products.map(product => (
@@ -500,9 +585,7 @@ const PurchaseOrderCreatePage = () => {
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Paquetes</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Unidades</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Costo Paq.</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Costo Unit.</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Desc %</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">IVA %</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Total</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -514,7 +597,7 @@ const PurchaseOrderCreatePage = () => {
                           <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
                           <div className="text-xs text-gray-500">{item.presentation_name}</div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -523,7 +606,7 @@ const PurchaseOrderCreatePage = () => {
                             className="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -532,7 +615,7 @@ const PurchaseOrderCreatePage = () => {
                             className="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -542,17 +625,7 @@ const PurchaseOrderCreatePage = () => {
                             className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.unit_cost}
-                            onChange={(e) => updateItem(index, 'unit_cost', e.target.value)}
-                            className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
@@ -563,17 +636,7 @@ const PurchaseOrderCreatePage = () => {
                             className="w-16 px-2 py-1 text-sm text-right border border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={item.tax_percent}
-                            onChange={(e) => updateItem(index, 'tax_percent', e.target.value)}
-                            className="w-16 px-2 py-1 text-sm text-right border border-gray-300 rounded"
-                          />
-                        </td>
+
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
                           ${calculateItemTotal(item).toFixed(2)}
                         </td>
@@ -618,10 +681,6 @@ const PurchaseOrderCreatePage = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Descuento:</span>
                 <span className="font-medium text-red-600">-{formData.currency} {totals.discount}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Impuestos:</span>
-                <span className="font-medium">{formData.currency} {totals.tax}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>

@@ -274,6 +274,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/purchase-orders/edit/:id"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PurchaseOrderCreatePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/purchase-orders/receive/:id"
         element={
           <PrivateRoute>

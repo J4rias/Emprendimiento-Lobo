@@ -7,8 +7,10 @@ import {
   AlertCircle,
   X,
   CheckCircle,
-  Calendar
+  Calendar,
+  ClipboardList
 } from 'lucide-react';
+import Modal from '../components/common/Modal';
 
 const PurchaseOrderReceivePage = () => {
   const navigate = useNavigate();
@@ -22,6 +24,8 @@ const PurchaseOrderReceivePage = () => {
   const [notes, setNotes] = useState('');
 
   const [receivedItems, setReceivedItems] = useState([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isFullyReceived, setIsFullyReceived] = useState(false);
 
   useEffect(() => {
     loadPurchaseOrder();
@@ -40,6 +44,7 @@ const PurchaseOrderReceivePage = () => {
       }
 
       setOrder(orderData);
+      setInvoiceNumber(orderData.last_invoice_number || '');
 
       // Initialize received items
       const items = orderData.details.map(detail => ({
@@ -73,35 +78,44 @@ const PurchaseOrderReceivePage = () => {
     setReceivedItems(prev => prev.map((item, i) => {
       if (i !== index) return item;
 
-      const updated = { ...item, [field]: value };
+      let val = parseInt(value) || 0;
+      if (val < 0) val = 0;
+
+      const updated = { ...item };
 
       // Validate that receiving quantity doesn't exceed pending
       if (field === 'receiving_packages') {
-        const qty = parseInt(value) || 0;
-        if (qty > item.pending_packages) {
-          updated.receiving_packages = item.pending_packages;
+        if (val > item.pending_packages) {
+          val = item.pending_packages;
         }
+        updated.receiving_packages = val;
       }
 
       if (field === 'receiving_units') {
-        const qty = parseInt(value) || 0;
-        if (qty > item.pending_units) {
-          updated.receiving_units = item.pending_units;
+        if (val > item.pending_units) {
+          val = item.pending_units;
         }
+        updated.receiving_units = val;
       }
 
       return updated;
     }));
   };
 
-  const handleReceive = async () => {
+  const handleReceive = () => {
     // Validate that at least one item is being received
     const hasItems = receivedItems.some(
       item => item.receiving_packages > 0 || item.receiving_units > 0
     );
 
     if (!hasItems) {
-      setError('Debe especificar al menos un producto a recibir');
+      setError('Debe especificar al menos un producto a recibir con cantidad mayor a cero');
+      return;
+    }
+
+    // Validate invoice number
+    if (!invoiceNumber.trim()) {
+      setError('El número de factura o documento de remisión es obligatorio para registrar el ingreso');
       return;
     }
 
@@ -117,9 +131,21 @@ const PurchaseOrderReceivePage = () => {
       }
     }
 
+    // Check if after this reception anything remains pending
+    const remainsPending = receivedItems.some(
+      item => (item.pending_packages - item.receiving_packages) > 0 ||
+        (item.pending_units - item.receiving_units) > 0
+    );
+
+    setIsFullyReceived(!remainsPending);
+    setShowConfirmModal(true);
+  };
+
+  const handleFinalSubmit = async () => {
     try {
       setSaving(true);
       setError(null);
+      setShowConfirmModal(false);
 
       const data = {
         received_items: receivedItems
@@ -137,8 +163,6 @@ const PurchaseOrderReceivePage = () => {
       };
 
       await purchaseOrderService.receive(id, data);
-
-      alert('Mercancía recibida exitosamente');
       navigate('/purchase-orders');
     } catch (err) {
       setError(err.response?.data?.message || 'Error al recibir la mercancía');
@@ -243,7 +267,7 @@ const PurchaseOrderReceivePage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Número de Factura/Remisión
+              Número de Factura/Remisión <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -284,7 +308,6 @@ const PurchaseOrderReceivePage = () => {
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 bg-blue-50">
                     Recibir Ahora
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Lote (Opcional)</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -301,12 +324,15 @@ const PurchaseOrderReceivePage = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="text-sm text-gray-600">
-                        {item.received_packages}p + {item.received_units}u
+                        {item.received_packages + item.receiving_packages}p + {item.received_units + item.receiving_units}u
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="text-sm font-medium text-orange-600">
-                        {item.pending_packages}p + {item.pending_units}u
+                      <div className={`text-sm font-medium ${(item.pending_packages - item.receiving_packages) === 0 && (item.pending_units - item.receiving_units) === 0
+                        ? 'text-gray-900'
+                        : 'text-orange-600'
+                        }`}>
+                        {item.pending_packages - item.receiving_packages}p + {item.pending_units - item.receiving_units}u
                       </div>
                     </td>
                     <td className="px-4 py-3 bg-blue-50">
@@ -318,12 +344,12 @@ const PurchaseOrderReceivePage = () => {
                             max={item.pending_packages}
                             value={item.receiving_packages}
                             onChange={(e) => updateReceivingItem(index, 'receiving_packages', e.target.value)}
-                            className="w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded"
+                            className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             disabled={item.pending_packages === 0}
                           />
-                          <span className="text-xs text-gray-600">p</span>
+                          <span className="text-sm font-medium text-gray-600">pqte</span>
                         </div>
-                        <span className="text-gray-400">+</span>
+                        <span className="text-gray-400 font-bold">+</span>
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
@@ -331,37 +357,10 @@ const PurchaseOrderReceivePage = () => {
                             max={item.pending_units}
                             value={item.receiving_units}
                             onChange={(e) => updateReceivingItem(index, 'receiving_units', e.target.value)}
-                            className="w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded"
+                            className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             disabled={item.pending_units === 0}
                           />
-                          <span className="text-xs text-gray-600">u</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          placeholder="Número de lote"
-                          value={item.batch_number}
-                          onChange={(e) => updateReceivingItem(index, 'batch_number', e.target.value)}
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                        />
-                        <div className="flex gap-1">
-                          <input
-                            type="date"
-                            placeholder="Fabricación"
-                            value={item.manufacture_date}
-                            onChange={(e) => updateReceivingItem(index, 'manufacture_date', e.target.value)}
-                            className="w-1/2 px-2 py-1 text-xs border border-gray-300 rounded"
-                          />
-                          <input
-                            type="date"
-                            placeholder="Expiración"
-                            value={item.expiry_date}
-                            onChange={(e) => updateReceivingItem(index, 'expiry_date', e.target.value)}
-                            className="w-1/2 px-2 py-1 text-xs border border-gray-300 rounded"
-                          />
+                          <span className="text-sm font-medium text-gray-600">unids</span>
                         </div>
                       </div>
                     </td>
@@ -408,12 +407,83 @@ const PurchaseOrderReceivePage = () => {
             <ul className="list-disc list-inside space-y-1">
               <li>Ingrese las cantidades que está recibiendo ahora (puede ser parcial)</li>
               <li>No puede recibir más de lo que está pendiente</li>
-              <li>Opcionalmente puede registrar información del lote</li>
               <li>Los costos de los productos se actualizarán automáticamente según la orden</li>
             </ul>
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <Modal
+          isOpen={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          title={isFullyReceived ? "Confirmar Recepción Completa" : "Confirmar Recepción Incompleta"}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className={`p-4 border-l-4 rounded ${isFullyReceived
+                ? 'bg-green-50 border-green-400'
+                : 'bg-amber-50 border-amber-400'
+              }`}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  {isFullyReceived
+                    ? <CheckCircle className={`h-5 w-5 text-green-400`} />
+                    : <AlertCircle className={`h-5 w-5 text-amber-400`} />
+                  }
+                </div>
+                <div className="ml-3">
+                  <p className={`text-sm ${isFullyReceived ? 'text-green-700' : 'text-amber-700'}`}>
+                    {isFullyReceived
+                      ? "¿Deseas formalizar la recepción total de este pedido? Todos los ítems quedarán marcados como recibidos y el inventario se actualizará."
+                      : "Estás registrando una entrega parcial. Quedarán productos pendientes para una futura recepción."
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {!isFullyReceived && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ClipboardList className="w-4 h-4" />
+                    Razón de la recepción incompleta <span className="text-red-500">*</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Por favor, indica por qué no se recibió el pedido completo (ej: falta de stock del proveedor, averías, etc.)
+                  </p>
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none min-h-[100px]"
+                  placeholder="Ej: El proveedor no envió el producto X por falta de stock..."
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleFinalSubmit}
+                disabled={!isFullyReceived && !notes.trim()}
+                className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${isFullyReceived ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Confirmar Recepción
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

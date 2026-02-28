@@ -14,6 +14,18 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 class PurchaseOrderController {
+  constructor() {
+    this.generateOrderNumber = this.generateOrderNumber.bind(this);
+    this.getAllPurchaseOrders = this.getAllPurchaseOrders.bind(this);
+    this.getPurchaseOrderById = this.getPurchaseOrderById.bind(this);
+    this.createPurchaseOrder = this.createPurchaseOrder.bind(this);
+    this.updatePurchaseOrder = this.updatePurchaseOrder.bind(this);
+    this.approvePurchaseOrder = this.approvePurchaseOrder.bind(this);
+    this.cancelPurchaseOrder = this.cancelPurchaseOrder.bind(this);
+    this.receiveMerchandise = this.receiveMerchandise.bind(this);
+    this.getPurchaseOrderStats = this.getPurchaseOrderStats.bind(this);
+  }
+
   // Generate unique order number
   async generateOrderNumber() {
     const date = new Date();
@@ -200,9 +212,24 @@ class PurchaseOrderController {
         });
       }
 
+      // NEW: Fetch last used invoice number for this PO if it exists
+      const lastMovement = await InventoryMovement.findOne({
+        where: {
+          reason: { [Op.like]: `OC ${order.order_number}%` }
+        },
+        order: [['created_at', 'DESC']],
+        attributes: ['document_number']
+      });
+
+      const orderJson = order.toJSON();
+      // If the last movement's document number is the PO number itself, it means no invoice was provided
+      orderJson.last_invoice_number = (lastMovement && lastMovement.document_number !== order.order_number)
+        ? lastMovement.document_number
+        : '';
+
       res.json({
         success: true,
-        data: order
+        data: orderJson
       });
     } catch (error) {
       next(error);
@@ -644,9 +671,7 @@ class PurchaseOrderController {
               warehouse_id: order.warehouse_id
             },
             defaults: {
-              quantity: 0,
-              min_stock: 0,
-              max_stock: 0
+              quantity: 0
             },
             transaction
           });
@@ -663,16 +688,15 @@ class PurchaseOrderController {
               warehouse_id: order.warehouse_id,
               presentation_id: detail.presentation_id,
               batch_id: receivedItem.batch_id || null,
-              type: 'ingreso',
-              subtype: 'compra',
+              movement_type: 'ingreso',
               package_quantity: packageQtyToReceive,
               loose_units: looseUnitsToReceive,
-              total_units: totalUnits,
+              quantity: totalUnits,
               unit_cost: detail.unit_cost,
-              document_type: 'purchase_order',
-              document_number: order.order_number,
-              reference_document: invoice_number || null,
-              notes: notes || `Recepción de OC ${order.order_number}`,
+              package_cost: detail.package_cost,
+              currency: order.currency || 'USD',
+              document_number: invoice_number || order.order_number,
+              reason: `OC ${order.order_number}${notes ? ': ' + notes : ''}`,
               user_id: req.user.id
             },
             { transaction }
@@ -686,8 +710,8 @@ class PurchaseOrderController {
                 warehouse_id: order.warehouse_id,
                 batch_number: receivedItem.batch_number,
                 quantity: totalUnits,
-                manufacture_date: receivedItem.manufacture_date || null,
-                expiry_date: receivedItem.expiry_date || null,
+                manufacturing_date: receivedItem.manufacture_date || null,
+                expiration_date: receivedItem.expiry_date || null,
                 cost: detail.unit_cost
               },
               { transaction }

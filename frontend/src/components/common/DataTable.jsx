@@ -1,4 +1,4 @@
-const DataTable = ({ columns, data, onRowClick }) => {
+const DataTable = ({ columns, data, onRowClick, rowClassName }) => {
   if (!data || data.length === 0) {
     return (
       <div className="text-center py-12">
@@ -20,21 +20,30 @@ const DataTable = ({ columns, data, onRowClick }) => {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, rowIndex) => (
-            <tr
-              key={rowIndex}
-              onClick={() => onRowClick && onRowClick(row)}
-              className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
-            >
-              {columns.map((column, colIndex) => (
-                <td key={colIndex} className={column.cellClassName}>
-                  {column.render
-                    ? column.render(row[column.accessor], row, rowIndex)
-                    : row[column.accessor]}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((row, rowIndex) => {
+            const customClass = typeof rowClassName === 'function' ? rowClassName(row) : (rowClassName || '');
+            return (
+              <tr
+                key={rowIndex}
+                onClick={() => onRowClick && onRowClick(row)}
+                className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} ${customClass}`}
+              >
+                {columns.map((column, colIndex) => {
+                  const value = typeof column.accessor === 'function'
+                    ? column.accessor(row)
+                    : row[column.accessor];
+
+                  return (
+                    <td key={colIndex} className={column.cellClassName}>
+                      {column.render
+                        ? column.render(value, row, rowIndex)
+                        : value}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

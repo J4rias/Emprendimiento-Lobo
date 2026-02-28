@@ -35,6 +35,11 @@ const PurchaseOrdersPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approvingOrderId, setApprovingOrderId] = useState(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [viewingOrder, setViewingOrder] = useState(null);
 
   // Debounce search
@@ -94,11 +99,16 @@ const PurchaseOrdersPage = () => {
     navigate(`/purchase-orders/edit/${order.id}`);
   };
 
-  const handleApprove = async (id) => {
-    if (!window.confirm('¿Está seguro de aprobar esta orden de compra?')) return;
+  const handleApproveClick = (id) => {
+    setApprovingOrderId(id);
+    setShowApproveModal(true);
+  };
 
+  const handleApproveConfirm = async () => {
     try {
-      await purchaseOrderService.approve(id);
+      await purchaseOrderService.approve(approvingOrderId);
+      setShowApproveModal(false);
+      setApprovingOrderId(null);
       fetchOrders();
       fetchStats();
     } catch (err) {
@@ -107,12 +117,23 @@ const PurchaseOrdersPage = () => {
     }
   };
 
-  const handleCancel = async (id) => {
-    const reason = window.prompt('Ingrese el motivo de cancelación:');
-    if (!reason) return;
+  const handleCancelClick = (id) => {
+    setCancellingOrderId(id);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancelReason.trim()) {
+      alert('Por favor, ingrese un motivo para la cancelación.');
+      return;
+    }
 
     try {
-      await purchaseOrderService.cancel(id, reason);
+      await purchaseOrderService.cancel(cancellingOrderId, cancelReason);
+      setShowCancelModal(false);
+      setCancelReason('');
+      setCancellingOrderId(null);
       fetchOrders();
       fetchStats();
     } catch (err) {
@@ -212,7 +233,7 @@ const PurchaseOrdersPage = () => {
 
           {row.status === 'draft' && hasPermission('purchases.approve') && (
             <button
-              onClick={() => handleApprove(row.id)}
+              onClick={() => handleApproveClick(row.id)}
               className="p-1 text-purple-600 hover:bg-purple-50 rounded"
               title="Aprobar"
             >
@@ -223,16 +244,23 @@ const PurchaseOrdersPage = () => {
           {['sent', 'confirmed', 'partially_received'].includes(row.status) && hasPermission('purchases.receive') && (
             <button
               onClick={() => handleReceive(row)}
-              className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
-              title="Recibir mercancía"
+              className={`p-1 rounded ${row.status === 'partially_received'
+                ? 'text-amber-600 hover:bg-amber-100'
+                : 'text-indigo-600 hover:bg-indigo-50'
+                }`}
+              title={row.status === 'partially_received' ? 'Continuar recepción parcial' : 'Recibir mercancía'}
             >
-              <Package className="h-4 w-4" />
+              {row.status === 'partially_received' ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <Package className="h-4 w-4" />
+              )}
             </button>
           )}
 
           {!['received', 'cancelled'].includes(row.status) && hasPermission('purchases.delete') && (
             <button
-              onClick={() => handleCancel(row.id)}
+              onClick={() => handleCancelClick(row.id)}
               className="p-1 text-red-600 hover:bg-red-50 rounded"
               title="Cancelar"
             >
@@ -245,7 +273,7 @@ const PurchaseOrdersPage = () => {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-[1600px] mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Órdenes de Compra</h1>
         <p className="text-gray-600">Gestiona las órdenes de compra a proveedores</p>
@@ -351,6 +379,11 @@ const PurchaseOrdersPage = () => {
           data={orders}
           loading={loading}
           emptyMessage="No se encontraron órdenes de compra"
+          rowClassName={(row) =>
+            row.status === 'partially_received'
+              ? 'bg-amber-50/50 hover:bg-amber-100/50 transition-colors'
+              : ''
+          }
         />
 
         {/* Pagination */}
@@ -383,7 +416,7 @@ const PurchaseOrdersPage = () => {
           isOpen={showViewModal}
           onClose={() => setShowViewModal(false)}
           title={`Orden de Compra: ${viewingOrder.order_number}`}
-          size="large"
+          size="xl"
         >
           <div className="space-y-6">
             {/* Header Info */}
@@ -474,6 +507,106 @@ const PurchaseOrdersPage = () => {
                 <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">{viewingOrder.notes}</p>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+      {/* Cancellation Modal */}
+      {showCancelModal && (
+        <Modal
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          title="Cancelar Orden de Compra"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">
+                    ¿Estás seguro de que deseas cancelar esta orden de compra? Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo de la cancelación *
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                rows="4"
+                placeholder="Indique brevemente por qué se cancela esta orden..."
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={handleCancelConfirm}
+                disabled={!cancelReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <XCircle className="w-4 h-4" />
+                Confirmar Cancelación
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Approval Modal */}
+      {showApproveModal && (
+        <Modal
+          isOpen={showApproveModal}
+          onClose={() => setShowApproveModal(false)}
+          title="Aprobar Orden de Compra"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <CheckCircle className="h-5 w-5 text-blue-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    ¿Estás seguro de que deseas aprobar esta orden de compra? Al hacerlo, la orden pasará a estado <strong>Enviada</strong> y podrá comenzar el proceso de recepción.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-gray-600 text-sm">
+              Esta acción notificará al proveedor (si está configurado) y formalizará la solicitud de mercancía para tu inventario.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowApproveModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApproveConfirm}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Confirmar y Aprobar
+              </button>
+            </div>
           </div>
         </Modal>
       )}
