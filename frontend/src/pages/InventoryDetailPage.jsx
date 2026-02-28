@@ -43,11 +43,13 @@ const InventoryDetailPage = () => {
     }
   };
 
+  const presentation = inventory?.product?.presentations?.[0];
+  const unitCost = parseFloat(presentation?.cost || 0);
+
   // Convert unit cost when currency changes
   useEffect(() => {
     const convertValue = async () => {
-      const presentation = inventory?.product?.presentations?.[0];
-      if (!presentation?.cost) {
+      if (!presentation) {
         setConvertedValue(null);
         return;
       }
@@ -74,10 +76,12 @@ const InventoryDetailPage = () => {
         if (response.ok) {
           const data = await response.json();
           setConvertedValue(data.data);
+        } else {
+          setConvertedValue({ error: true });
         }
       } catch (error) {
         console.error('Error converting currency:', error);
-        setConvertedValue(null);
+        setConvertedValue({ error: true });
       }
     };
 
@@ -181,11 +185,10 @@ const InventoryDetailPage = () => {
             {inventory.product.presentations.map((presentation) => (
               <div
                 key={presentation.id}
-                className={`p-4 rounded-lg border-2 ${
-                  presentation.is_default
-                    ? 'bg-blue-50 border-blue-300'
-                    : 'bg-gray-50 border-gray-200'
-                }`}
+                className={`p-4 rounded-lg border-2 ${presentation.is_default
+                  ? 'bg-blue-50 border-blue-300'
+                  : 'bg-gray-50 border-gray-200'
+                  }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -267,23 +270,30 @@ const InventoryDetailPage = () => {
               </select>
             </div>
             {(() => {
-              const presentation = inventory.product.presentations?.[0];
               const originalCurrency = presentation?.purchase_currency || 'USD';
               const cost = presentation?.cost || '0.00';
               const originalCurrencyInfo = currencies.find(c => c.code === originalCurrency);
+
+              if (convertedValue?.error) {
+                return (
+                  <div>
+                    <p className="text-2xl font-bold text-gray-400">
+                      N/A {selectedCurrency}
+                    </p>
+                    <p className="text-xs text-red-500 mt-1">
+                      Tasa no disponible
+                    </p>
+                  </div>
+                );
+              }
 
               if (!convertedValue) {
                 // Show in original currency
                 return (
                   <div>
                     <p className="text-2xl font-bold text-green-600">
-                      {originalCurrencyInfo?.symbol}{parseFloat(cost).toFixed(2)} {originalCurrency}
+                      {originalCurrencyInfo?.symbol}{parseFloat(cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {originalCurrency}
                     </p>
-                    {selectedCurrency !== originalCurrency && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Convirtiendo...
-                      </p>
-                    )}
                   </div>
                 );
               } else {
@@ -311,7 +321,7 @@ const InventoryDetailPage = () => {
             <p className="text-2xl font-bold text-yellow-600">{Math.floor(inventory.product.reorder_point)}</p>
           </div>
         </div>
-        
+
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 class InventoryController {
-    // Get inventory by warehouse
+  // Get inventory by warehouse
   async getByWarehouse(req, res, next) {
     try {
       const { warehouse_id } = req.params;
@@ -81,15 +81,15 @@ class InventoryController {
       // Filter items in JavaScript if needed
       let filteredInventory = inventoryWithPresentations;
       if (low_stock === 'true') {
-        filteredInventory = inventoryWithPresentations.filter(item => 
+        filteredInventory = inventoryWithPresentations.filter(item =>
           parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
         );
       }
-      
+
       if (expiring === 'true') {
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-        
+
         filteredInventory = inventoryWithPresentations.filter(item => {
           // Check if any batch is expiring within 30 days
           return item.product && item.product.batches && item.product.batches.some(batch => {
@@ -99,9 +99,9 @@ class InventoryController {
           });
         });
       }
-      
+
       if (out_of_stock === 'true') {
-        filteredInventory = inventoryWithPresentations.filter(item => 
+        filteredInventory = inventoryWithPresentations.filter(item =>
           parseFloat(item.quantity) <= 0
         );
       }
@@ -137,9 +137,9 @@ class InventoryController {
             model: Product,
             as: 'product',
             include: [
-            { model: Category, as: 'category' },
-            { model: ProductPresentation, as: 'presentations' }
-          ]
+              { model: Category, as: 'category' },
+              { model: ProductPresentation, as: 'presentations' }
+            ]
           }
         ]
       });
@@ -176,9 +176,9 @@ class InventoryController {
             model: Product,
             as: 'product',
             include: [
-            { model: Category, as: 'category' },
-            { model: ProductPresentation, as: 'presentations' }
-          ]
+              { model: Category, as: 'category' },
+              { model: ProductPresentation, as: 'presentations' }
+            ]
           }
         ],
         order: [['quantity', 'DESC']]
@@ -222,7 +222,7 @@ class InventoryController {
       });
 
       // Filter low stock items in JavaScript
-      const lowStockItems = inventory.filter(item => 
+      const lowStockItems = inventory.filter(item =>
         parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
       );
 
@@ -458,9 +458,16 @@ class InventoryController {
       const valuedItems = inventory.map(inv => {
         // Get default presentation or first available
         const defaultPresentation = inv.product?.presentations?.find(p => p.is_default) || inv.product?.presentations?.[0];
-        
-        // Use unit cost, not package cost
-        const cost = parseFloat(defaultPresentation?.cost || 0);
+
+        // Use unit cost, or calculate from package cost as fallback
+        let cost = parseFloat(defaultPresentation?.cost || 0);
+        const unitsPerPkg = parseInt(defaultPresentation?.units_per_package) || 1;
+        const packageCost = parseFloat(defaultPresentation?.package_cost || 0);
+
+        if (cost === 0 && packageCost > 0) {
+          cost = packageCost / unitsPerPkg;
+        }
+
         const currency = defaultPresentation?.purchase_currency || 'USD';
         const quantity = parseFloat(inv.quantity) || 0;
         const value = quantity * cost;

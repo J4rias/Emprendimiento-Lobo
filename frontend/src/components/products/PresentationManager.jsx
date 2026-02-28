@@ -334,6 +334,12 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
                       />
                     )}
+                    {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        Unitario: {currencies.find(c => c.code === presentation.purchase_currency)?.symbol || '$'}
+                        {(parseFloat(presentation.package_cost) / (parseInt(presentation.units_per_package) || 1)).toFixed(2)}
+                      </p>
+                    )}
                   </div>
 
                   {/* Moneda */}

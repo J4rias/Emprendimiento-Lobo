@@ -409,8 +409,8 @@ class ProductController {
           units_per_presentation: unitsPerPkg,
           package_price: package_price || 0,
           package_cost: package_cost || 0,
-          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : 0,
-          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0,
+          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : (defaultPresentation?.base_price || 0),
+          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : (defaultPresentation?.cost || 0),
           purchase_currency: purchase_currency || 'USD'
         };
 
@@ -746,6 +746,17 @@ class ProductController {
       // Update units_per_presentation if units_per_package is updated
       if (updateData.units_per_package !== undefined) {
         updateData.units_per_presentation = updateData.units_per_package;
+      }
+
+      // Recalcular costo unitario y precio base cuando cambian los valores del paquete
+      const finalUnitsPerPkg = parseInt(updateData.units_per_package ?? presentation.units_per_package) || 1;
+      const finalPackageCost = parseFloat(updateData.package_cost ?? presentation.package_cost) || 0;
+      const finalPackagePrice = parseFloat(updateData.package_price ?? presentation.package_price) || 0;
+
+      // Siempre recalcular si alguno de los 3 campos relevantes cambia
+      if (updateData.package_cost !== undefined || updateData.package_price !== undefined || updateData.units_per_package !== undefined) {
+        updateData.cost = finalPackageCost / finalUnitsPerPkg;
+        updateData.base_price = finalPackagePrice / finalUnitsPerPkg;
       }
 
       await presentation.update(updateData);

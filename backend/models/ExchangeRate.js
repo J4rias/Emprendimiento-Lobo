@@ -77,8 +77,8 @@ const ExchangeRate = sequelize.define('ExchangeRate', {
   ]
 });
 
-// Método para obtener la tasa de cambio efectiva para una fecha específica
-ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date()) {
+// Método para obtener la tasa de cambio efectiva para una fecha específica usando BFS (Grafos)
+ExchangeRate.getRate = async function (fromCurrency, toCurrency, date = new Date()) {
   // Si son la misma moneda, la tasa es 1
   if (fromCurrency === toCurrency) {
     return 1;
@@ -86,145 +86,96 @@ ExchangeRate.getRate = async function(fromCurrency, toCurrency, date = new Date(
 
   const effectiveDate = date instanceof Date ? date.toISOString().split('T')[0] : date;
 
-  // 1. Buscar tasa directa para la fecha específica
-  const rate = await ExchangeRate.findOne({
+  // Obtener todas las tasas activas históricas ordenadas por fecha reciente (para priorizar las más actuales)
+  // Lo ideal es traer solo las que aplican para effectiveDate o anteriores
+  const { Op } = require('sequelize');
+  const allRates = await ExchangeRate.findAll({
     where: {
-      from_currency: fromCurrency,
-      to_currency: toCurrency,
-      effective_date: effectiveDate,
-      is_active: true
-    },
-    order: [['created_at', 'DESC']]
-  });
-
-  if (rate) {
-    return parseFloat(rate.rate);
-  }
-
-  // 2. Buscar tasa inversa para la fecha específica
-  const inverseRate = await ExchangeRate.findOne({
-    where: {
-      from_currency: toCurrency,
-      to_currency: fromCurrency,
-      effective_date: effectiveDate,
-      is_active: true
-    },
-    order: [['created_at', 'DESC']]
-  });
-
-  if (inverseRate) {
-    return 1 / parseFloat(inverseRate.rate);
-  }
-
-  // 3. Buscar tasa directa más reciente
-  const latestRate = await ExchangeRate.findOne({
-    where: {
-      from_currency: fromCurrency,
-      to_currency: toCurrency,
-      is_active: true
+      is_active: true,
+      effective_date: {
+        [Op.lte]: effectiveDate
+      }
     },
     order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
   });
 
-  if (latestRate) {
-    return parseFloat(latestRate.rate);
+  if (!allRates || allRates.length === 0) {
+    throw new Error(`No hay tasas de cambio activas registradas en el sistema para calcular ${fromCurrency} a ${toCurrency}.`);
   }
 
-  // 4. Buscar tasa inversa más reciente
-  const latestInverseRate = await ExchangeRate.findOne({
-    where: {
-      from_currency: toCurrency,
-      to_currency: fromCurrency,
-      is_active: true
-    },
-    order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-  });
+  // 1. Construir el Grafo utilizando un mapa de Adyacencia
+  // graph = { 'USD': { 'VES': rate1, 'COP': rate2 }, 'VES': { 'USD': 1/rate1 } }
+  const graph = {};
 
-  if (latestInverseRate) {
-    return 1 / parseFloat(latestInverseRate.rate);
-  }
+  // Agregar solo LATEST rate for each combination para no sobreescribir con datos viejos accidentalmente
+  // Dado que iteramos sobre `allRates` que está ordenado por DESC, la PRIMERA vez que veamos una combinación será la más reciente.
+  const seenCombos = new Set();
 
-  // 5. NUEVO: Conversión triangular usando USD como moneda puente
-  // Si no encontramos tasa directa ni inversa, intentar conversión triangular
-  // Ejemplo: VES → COP = (VES → USD) × (USD → COP)
-  const bridgeCurrency = 'USD';
+  for (const rateObj of allRates) {
+    const from = rateObj.from_currency;
+    const to = rateObj.to_currency;
+    const rateVal = parseFloat(rateObj.rate);
 
-  if (fromCurrency !== bridgeCurrency && toCurrency !== bridgeCurrency) {
-    try {
-      // Buscar tasas más recientes para conversión triangular
-      const fromToBridge = await ExchangeRate.findOne({
-        where: {
-          from_currency: fromCurrency,
-          to_currency: bridgeCurrency,
-          is_active: true
-        },
-        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-      });
+    const directKey = `${from}-${to}`;
+    const inverseKey = `${to}-${from}`;
 
-      const bridgeToTo = await ExchangeRate.findOne({
-        where: {
-          from_currency: bridgeCurrency,
-          to_currency: toCurrency,
-          is_active: true
-        },
-        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-      });
+    if (!seenCombos.has(directKey)) {
+      // Inicializar nodos si no existen
+      if (!graph[from]) graph[from] = {};
+      if (!graph[to]) graph[to] = {};
 
-      // Si encontramos ambas tasas, hacer conversión triangular
-      if (fromToBridge && bridgeToTo) {
-        const triangularRate = parseFloat(fromToBridge.rate) * parseFloat(bridgeToTo.rate);
-        return triangularRate;
-      }
+      // Agregar arista directa
+      graph[from][to] = rateVal;
+      seenCombos.add(directKey);
+    }
 
-      // Intentar con tasas inversas para la triangulación
-      const bridgeToFrom = await ExchangeRate.findOne({
-        where: {
-          from_currency: bridgeCurrency,
-          to_currency: fromCurrency,
-          is_active: true
-        },
-        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-      });
+    if (!seenCombos.has(inverseKey)) {
+      // Inicializar nodos si no existen (ya hecho arriba igual)
+      if (!graph[from]) graph[from] = {};
+      if (!graph[to]) graph[to] = {};
 
-      if (bridgeToFrom && bridgeToTo) {
-        const triangularRate = (1 / parseFloat(bridgeToFrom.rate)) * parseFloat(bridgeToTo.rate);
-        return triangularRate;
-      }
-
-      const fromToBridge2 = await ExchangeRate.findOne({
-        where: {
-          from_currency: fromCurrency,
-          to_currency: bridgeCurrency,
-          is_active: true
-        },
-        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-      });
-
-      const toToBridge = await ExchangeRate.findOne({
-        where: {
-          from_currency: toCurrency,
-          to_currency: bridgeCurrency,
-          is_active: true
-        },
-        order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
-      });
-
-      if (fromToBridge2 && toToBridge) {
-        const triangularRate = parseFloat(fromToBridge2.rate) / parseFloat(toToBridge.rate);
-        return triangularRate;
-      }
-
-    } catch (triangularError) {
-      // Si falla la conversión triangular, continuar con el error original
-      console.error('Triangular conversion failed:', triangularError.message);
+      // Agregar arista inversa (1 / rate)
+      graph[to][from] = 1 / rateVal;
+      seenCombos.add(inverseKey);
     }
   }
 
-  throw new Error(`No exchange rate found for ${fromCurrency} to ${toCurrency}`);
+  // 2. Ejecutar Breadth-First Search (BFS) para encontrar el camino (y la tasa multiplicada)
+  // Queue guardará el nodo actual (moneda) y la tasa acumulada hasta el momento
+  const queue = [{ node: fromCurrency, cumulativeRate: 1 }];
+  const visited = new Set();
+  visited.add(fromCurrency);
+
+  while (queue.length > 0) {
+    const { node, cumulativeRate } = queue.shift();
+
+    // Si llegamos a nuestro destino, retornamos la tasa calculada!
+    if (node === toCurrency) {
+      return cumulativeRate;
+    }
+
+    // Explorar vecinos
+    const neighbors = graph[node];
+    if (neighbors) {
+      for (const [neighborCurrency, edgeRate] of Object.entries(neighbors)) {
+        if (!visited.has(neighborCurrency)) {
+          visited.add(neighborCurrency);
+
+          // La nueva tasa es la tasa que traíamos acumulada MULTIPLICADA por la arista hacia el vecino
+          const newCumulativeRate = cumulativeRate * edgeRate;
+
+          queue.push({ node: neighborCurrency, cumulativeRate: newCumulativeRate });
+        }
+      }
+    }
+  }
+
+  // 3. Si el BFS termina y no llegamos, no existe camino o combinación lógica.
+  throw new Error(`No se encontró ruta de conversión de ${fromCurrency} a ${toCurrency}`);
 };
 
 // Método para convertir un monto de una moneda a otra
-ExchangeRate.convert = async function(amount, fromCurrency, toCurrency, date = new Date()) {
+ExchangeRate.convert = async function (amount, fromCurrency, toCurrency, date = new Date()) {
   const rate = await ExchangeRate.getRate(fromCurrency, toCurrency, date);
   return amount * rate;
 };

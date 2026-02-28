@@ -20,7 +20,11 @@ class ExchangeRateController {
 
       if (from_currency) where.from_currency = from_currency;
       if (to_currency) where.to_currency = to_currency;
-      if (is_active !== undefined) where.is_active = is_active === 'true';
+      if (is_active !== undefined) {
+        if (is_active === 'false') where.is_active = false;
+        else if (is_active === 'all') { /* include all */ }
+        else where.is_active = is_active === 'true';
+      }
 
       if (date_from || date_to) {
         where.effective_date = {};
@@ -298,10 +302,10 @@ class ExchangeRateController {
     try {
       const { amount, from_currency, to_currency, date } = req.query;
 
-      if (!amount || !from_currency || !to_currency) {
+      if (amount === undefined || !from_currency || !to_currency) {
         return res.status(400).json({
           success: false,
-          message: 'Se requieren los parámetros: amount, from_currency, to_currency'
+          message: 'Se requieren los parámetros: amount (puede ser 0), from_currency, to_currency'
         });
       }
 
@@ -326,9 +330,9 @@ class ExchangeRateController {
         }
       });
     } catch (error) {
-      res.status(400).json({
+      res.status(404).json({
         success: false,
-        message: error.message
+        message: `No se encontró una tasa de cambio válida: ${error.message}`
       });
     }
   }
