@@ -132,17 +132,6 @@ const CategoriesPage = () => {
     '#F97316', // orange
   ];
 
-  if (loading && categories.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando categorías...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -198,7 +187,12 @@ const CategoriesPage = () => {
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {categories.map((category) => (
+        {loading ? (
+          <div className="col-span-full flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-gray-500 text-sm">Buscando categorías...</p>
+          </div>
+        ) : categories.map((category) => (
           <div
             key={category.id}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
@@ -257,7 +251,7 @@ const CategoriesPage = () => {
               {search ? 'No se encontraron categorías' : 'No hay categorías'}
             </h3>
             <p className="text-gray-500 mb-4">
-              {search 
+              {search
                 ? 'Intenta con otra búsqueda'
                 : 'Crea tu primera categoría para organizar tus productos'
               }
@@ -370,11 +364,10 @@ const CategoriesPage = () => {
                       key={color}
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, color }))}
-                      className={`h-10 rounded-lg border-2 transition-all ${
-                        formData.color === color
+                      className={`h-10 rounded-lg border-2 transition-all ${formData.color === color
                           ? 'border-gray-900 scale-110'
                           : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                        }`}
                       style={{ backgroundColor: color }}
                     />
                   ))}

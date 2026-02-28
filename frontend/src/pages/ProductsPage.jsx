@@ -35,9 +35,6 @@ const API_BASE_URL = API_URL.replace(/\/api$/, '');
 const ProductsPage = () => {
   const { token, hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -84,23 +81,6 @@ const ProductsPage = () => {
 
     return () => clearTimeout(timer);
   }, [search]);
-
-  // Track focus before debounced search triggers
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus after loading completes
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchProducts();
@@ -547,16 +527,6 @@ const ProductsPage = () => {
     { value: 'CAJA', label: 'Caja' },
   ];
 
-  if (loading && products.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando productos...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -603,7 +573,6 @@ const ProductsPage = () => {
               Buscar
             </label>
             <input
-              ref={searchInputRef}
               type="text"
               placeholder="Nombre, SKU o código de barras..."
               value={search}
@@ -672,7 +641,16 @@ const ProductsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {products.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                      <p className="mt-4 text-gray-500 text-sm">Buscando productos...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : products.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="text-center py-8 text-gray-500">
                     <Package className="h-12 w-12 mx-auto mb-2 text-gray-400" />

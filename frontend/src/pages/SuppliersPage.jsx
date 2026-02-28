@@ -6,9 +6,6 @@ import SupplierContactManager from '../components/suppliers/SupplierContactManag
 
 const SuppliersPage = () => {
   const { hasPermission } = useAuth();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,23 +35,6 @@ const SuppliersPage = () => {
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
-
-  // Track focus before debounced search triggers
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus after loading completes
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -152,14 +132,6 @@ const SuppliersPage = () => {
     }));
   };
 
-  if (loading && suppliers.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -204,7 +176,6 @@ const SuppliersPage = () => {
             Buscar
           </label>
           <input
-            ref={searchInputRef}
             type="text"
             placeholder="Buscar proveedores..."
             value={searchTerm}
@@ -240,93 +211,111 @@ const SuppliersPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {suppliers.map((supplier) => (
-                <tr key={supplier.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Building className="h-5 w-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
-                        {supplier.tax_id && (
-                          <div className="text-xs text-gray-500">RIF: {supplier.tax_id}</div>
-                        )}
-                      </div>
+              {loading ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                      <p className="mt-4 text-gray-500 text-sm">Buscando proveedores...</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {supplier.contacts && supplier.contacts.length > 0 ? (
-                      <div className="text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <User className="h-4 w-4 text-gray-400 mr-2" />
-                          {supplier.contacts.find(c => c.is_primary)?.name || supplier.contacts[0].name}
-                        </div>
-                        {supplier.contacts.length > 1 && (
-                          <span className="text-xs text-gray-500">
-                            +{supplier.contacts.length - 1} más
-                          </span>
-                        )}
-                        <div className="text-xs text-gray-500 mt-1">
-                          {(() => {
-                            const primaryContact = supplier.contacts.find(c => c.is_primary) || supplier.contacts[0];
-                            if (primaryContact.email || primaryContact.phone) {
-                              return [
-                                primaryContact.email && <div key="email" className="flex items-center">
-                                  <Mail className="h-3 w-3 mr-1" />
-                                  {primaryContact.email}
-                                </div>,
-                                primaryContact.phone && <div key="phone" className="flex items-center">
-                                  <Phone className="h-3 w-3 mr-1" />
-                                  {primaryContact.phone}
-                                </div>
-                              ];
-                            }
-                            return null;
-                          })()}
+                </tr>
+              ) : suppliers.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-8 text-gray-500">
+                    <Building className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                    No se encontraron proveedores
+                  </td>
+                </tr>
+              ) : (
+                suppliers.map((supplier) => (
+                  <tr key={supplier.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Building className="h-5 w-5 text-gray-400 mr-3" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
+                          {supplier.tax_id && (
+                            <div className="text-xs text-gray-500">RIF: {supplier.tax_id}</div>
+                          )}
                         </div>
                       </div>
-                    ) : (
-                      <span className="text-sm text-gray-500">Sin contactos</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${supplier.is_active
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                      }`}>
-                      {supplier.is_active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  {(hasPermission('suppliers.update') || hasPermission('suppliers.delete')) && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleView(supplier)}
-                        className="text-gray-600 hover:text-gray-900 mr-3"
-                        title="Ver detalles"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      {hasPermission('suppliers.update') && supplier.is_active && (
-                        <button
-                          onClick={() => handleEdit(supplier)}
-                          className="text-primary-600 hover:text-primary-900 mr-3"
-                          title="Editar"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                      )}
-                      {hasPermission('suppliers.delete') && supplier.is_active && (
-                        <button
-                          onClick={() => handleDelete(supplier.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {supplier.contacts && supplier.contacts.length > 0 ? (
+                        <div className="text-sm text-gray-900">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 text-gray-400 mr-2" />
+                            {supplier.contacts.find(c => c.is_primary)?.name || supplier.contacts[0].name}
+                          </div>
+                          {supplier.contacts.length > 1 && (
+                            <span className="text-xs text-gray-500">
+                              +{supplier.contacts.length - 1} más
+                            </span>
+                          )}
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(() => {
+                              const primaryContact = supplier.contacts.find(c => c.is_primary) || supplier.contacts[0];
+                              if (primaryContact.email || primaryContact.phone) {
+                                return [
+                                  primaryContact.email && <div key="email" className="flex items-center">
+                                    <Mail className="h-3 w-3 mr-1" />
+                                    {primaryContact.email}
+                                  </div>,
+                                  primaryContact.phone && <div key="phone" className="flex items-center">
+                                    <Phone className="h-3 w-3 mr-1" />
+                                    {primaryContact.phone}
+                                  </div>
+                                ];
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">Sin contactos</span>
                       )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${supplier.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
+                        {supplier.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    {(hasPermission('suppliers.update') || hasPermission('suppliers.delete')) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleView(supplier)}
+                          className="text-gray-600 hover:text-gray-900 mr-3"
+                          title="Ver detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {hasPermission('suppliers.update') && supplier.is_active && (
+                          <button
+                            onClick={() => handleEdit(supplier)}
+                            className="text-primary-600 hover:text-primary-900 mr-3"
+                            title="Editar"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        )}
+                        {hasPermission('suppliers.delete') && supplier.is_active && (
+                          <button
+                            onClick={() => handleDelete(supplier.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

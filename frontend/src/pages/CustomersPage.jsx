@@ -7,10 +7,6 @@ import { customerService } from '../services/api/customerService';
 
 const CustomersPage = () => {
   const { hasPermission } = useAuth();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
-
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -62,23 +58,6 @@ const CustomersPage = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  // Track focus before debounced search triggers
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus after loading completes
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchCustomers();
@@ -313,7 +292,6 @@ const CustomersPage = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
-              ref={searchInputRef}
               type="text"
               placeholder="Buscar por nombre, documento..."
               value={search}

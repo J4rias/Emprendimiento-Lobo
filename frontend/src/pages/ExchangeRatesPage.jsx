@@ -173,17 +173,6 @@ const ExchangeRatesPage = () => {
     return currencies.find(c => c.code === code)?.name || code;
   };
 
-  if (loading && rates.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando tasas de cambio...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -264,7 +253,16 @@ const ExchangeRatesPage = () => {
               </tr>
             </thead>
             <tbody>
-              {rates.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                      <p className="mt-4 text-gray-500 text-sm">Cargando tasas de cambio...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : rates.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center py-8 text-gray-500">
                     <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-400" />

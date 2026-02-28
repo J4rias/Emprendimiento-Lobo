@@ -4,9 +4,6 @@ import { Plus, Edit2, Trash2, Search, Building2, Globe, MapPin, Eye, X, AlertCir
 import ImageUpload from '../components/common/ImageUpload';
 
 const BrandsPage = () => {
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,23 +33,6 @@ const BrandsPage = () => {
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
-
-  // Track focus before debounced search triggers
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus after loading completes
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchBrands();
@@ -160,14 +140,6 @@ const BrandsPage = () => {
     }));
   };
 
-  if (loading && brands.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,7 +182,6 @@ const BrandsPage = () => {
             Buscar
           </label>
           <input
-            ref={searchInputRef}
             type="text"
             placeholder="Buscar marcas..."
             value={searchTerm}
@@ -247,78 +218,95 @@ const BrandsPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {brands.map((brand) => (
-                <tr key={brand.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {brand.logo_url ? (
-                        <img
-                          src={brand.logo_url}
-                          alt={brand.name}
-                          className="max-h-10 w-10 mr-3 object-cover"
-                        />
-                      ) : (
-                        <Building2 className="h-10 w-10 text-gray-400 mr-3" />
-                      )}
-                      <div className="text-sm font-medium text-gray-900">{brand.name}</div>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                      <p className="mt-4 text-gray-500 text-sm">Buscando marcas...</p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
-                      {brand.description || '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {brand.website ? (
-                      <a
-                        href={brand.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center text-sm text-primary-600 hover:text-primary-900"
-                      >
-                        <Globe className="h-4 w-4 mr-2" />
-                        {new URL(brand.website).hostname}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-gray-500">-</span>
-                    )}
-                  </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      brand.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {brand.is_active ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleView(brand)}
-                      className="text-gray-600 hover:text-gray-900 mr-3"
-                      title="Ver detalles"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleEdit(brand)}
-                      className="text-primary-600 hover:text-primary-900 mr-3"
-                      title="Editar"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    {brand.is_active && (
-                      <button
-                        onClick={() => handleDelete(brand.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
                   </td>
                 </tr>
-              ))}
+              ) : brands.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-8 text-gray-500">
+                    <Building2 className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                    No se encontraron marcas
+                  </td>
+                </tr>
+              ) : (
+                brands.map((brand) => (
+                  <tr key={brand.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {brand.logo_url ? (
+                          <img
+                            src={brand.logo_url}
+                            alt={brand.name}
+                            className="max-h-10 w-10 mr-3 object-cover"
+                          />
+                        ) : (
+                          <Building2 className="h-10 w-10 text-gray-400 mr-3" />
+                        )}
+                        <div className="text-sm font-medium text-gray-900">{brand.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {brand.description || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {brand.website ? (
+                        <a
+                          href={brand.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center text-sm text-primary-600 hover:text-primary-900"
+                        >
+                          <Globe className="h-4 w-4 mr-2" />
+                          {new URL(brand.website).hostname}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-gray-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${brand.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                        }`}>
+                        {brand.is_active ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleView(brand)}
+                        className="text-gray-600 hover:text-gray-900 mr-3"
+                        title="Ver detalles"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEdit(brand)}
+                        className="text-primary-600 hover:text-primary-900 mr-3"
+                        title="Editar"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      {brand.is_active && (
+                        <button
+                          onClick={() => handleDelete(brand.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -541,11 +529,10 @@ const BrandsPage = () => {
                 {/* Estado */}
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Estado</label>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    viewingBrand.is_active
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${viewingBrand.is_active
                       ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
-                  }`}>
+                    }`}>
                     {viewingBrand.is_active ? 'Activa' : 'Inactiva'}
                   </span>
                 </div>

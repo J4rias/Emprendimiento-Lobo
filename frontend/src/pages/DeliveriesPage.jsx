@@ -21,10 +21,6 @@ import Modal from '../components/common/Modal';
 
 const DeliveriesPage = () => {
   const { hasPermission } = useAuth();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
-
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -59,23 +55,6 @@ const DeliveriesPage = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  // Track focus
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchDeliveries();
@@ -421,7 +400,6 @@ const DeliveriesPage = () => {
             <div className="relative">
               <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
-                ref={searchInputRef}
                 type="text"
                 placeholder="Buscar por número de entrega o tracking..."
                 value={search}

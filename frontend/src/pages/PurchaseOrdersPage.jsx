@@ -25,10 +25,6 @@ import Modal from '../components/common/Modal';
 const PurchaseOrdersPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const searchInputRef = useRef(null);
-  const wasSearchFocused = useRef(false);
-  const cursorPosition = useRef(0);
-
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,23 +44,6 @@ const PurchaseOrdersPage = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  // Track focus
-  useEffect(() => {
-    if (document.activeElement === searchInputRef.current) {
-      wasSearchFocused.current = true;
-      cursorPosition.current = searchInputRef.current?.selectionStart || 0;
-    }
-  }, [debouncedSearch]);
-
-  // Restore focus
-  useEffect(() => {
-    if (!loading && wasSearchFocused.current && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.setSelectionRange(cursorPosition.current, cursorPosition.current);
-      wasSearchFocused.current = false;
-    }
-  }, [loading]);
 
   useEffect(() => {
     fetchOrders();
@@ -333,7 +312,6 @@ const PurchaseOrdersPage = () => {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
-                ref={searchInputRef}
                 type="text"
                 placeholder="Buscar por número, proveedor..."
                 value={search}
