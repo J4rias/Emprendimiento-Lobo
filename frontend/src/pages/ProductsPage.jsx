@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -138,6 +139,16 @@ const ProductsPage = () => {
     }
   };
 
+  // Auto-hide error after 3 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const fetchBrands = async () => {
     try {
       const response = await fetch(`${API_URL}/brands/active`, {
@@ -226,11 +237,21 @@ const ProductsPage = () => {
     setBarcodeError(null);
 
     try {
-      // Validate presentations
-      if (presentations.length === 0) {
-        setError('Debes agregar al menos una presentación al producto');
-        setLoading(false);
-        return;
+      // Validate presentations (optional but must be valid if present)
+      if (presentations.length > 0) {
+        const invalidPresentation = presentations.find(p => !p.units_per_package || p.units_per_package <= 0);
+        if (invalidPresentation) {
+          setError(`La presentación "${invalidPresentation.name || 'sin nombre'}" debe tener una cantidad de unidades mayor a 0`);
+          setLoading(false);
+          return;
+        }
+
+        const missingType = presentations.find(p => !p.presentation_type_id);
+        if (missingType) {
+          setError(`La presentación "${missingType.name || 'sin nombre'}" debe tener un tipo de unidad seleccionado (Ej: Botella, Bolsa, etc.)`);
+          setLoading(false);
+          return;
+        }
       }
 
       // Validate barcode if provided
@@ -269,6 +290,11 @@ const ProductsPage = () => {
         }
       });
 
+      // If creating a new product, include all presentations in the request
+      if (!editingProduct) {
+        submitData.append('presentations', JSON.stringify(presentations));
+      }
+
       // ImageUpload component already uploads the image and returns URL in imagePreview
       // If imagePreview is a full URL (new upload), include it
       if (imagePreview) {
@@ -285,19 +311,27 @@ const ProductsPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al guardar producto');
+        // If it's a validation error with details, show them nicely
+        const errorMsg = errorData.message || 'Error al guardar producto';
+        throw new Error(errorMsg);
       }
 
-      const productData = await response.json();
-      const productId = editingProduct ? editingProduct.id : productData.data.id;
+      const result = await response.json();
 
-      // Handle presentations
-      await savePresentations(productId);
+      // For updates, we still use the separate savePresentations logic for now
+      // to avoid refactoring the entire update flow (which handles deletions/updates separately)
+      if (editingProduct) {
+        await savePresentations(editingProduct.id);
+      }
 
       await fetchProducts();
       handleCloseModal();
+      toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado');
     } catch (err) {
-      setError(err.message);
+      console.error('Error in handleSubmit:', err);
+      // Ensure we extract the error message correctly
+      const errorMessage = err.message || 'Error al guardar el producto';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -351,8 +385,8 @@ const ProductsPage = () => {
         }
       }
     } catch (error) {
-      console.error('Error saving presentations:', error);
-      throw new Error('Error al guardar presentaciones: ' + error.message);
+      // Re-throw the original error to be handled by handleSubmit
+      throw error;
     }
   };
 
@@ -543,8 +577,8 @@ const ProductsPage = () => {
         )}
       </div>
 
-      {/* Error Alert */}
-      {error && (
+      {/* Error Alert - Only show when modal is NOT open */}
+      {error && !showModal && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-3">
           <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
           <div>
@@ -593,7 +627,7 @@ const ProductsPage = () => {
                 setCurrentPage(1);
               }}
               disabled={viewMode}
-                    className="input"
+              className="input"
             >
               <option value="">Todas las categorías</option>
               {categories.map((cat) => (
@@ -792,407 +826,423 @@ const ProductsPage = () => {
                 </div>
               </div>
 
-            <form onSubmit={handleSubmit} className="bg-white px-6 py-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Image */}
-                <div className="lg:col-span-1 space-y-4">
-                  {/* Product Image */}
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <ImageIcon className="h-5 w-5 text-blue-600" />
-                      Imagen del Producto
-                    </h3>
-                    <ImageUpload
-                      value={imagePreview}
-                      onChange={setImagePreview}
-                      type="products"
-                      placeholder="Click para subir imagen"
-                      previewSize="w-full h-48"
-                      disabled={viewMode}
-                    />
-                  </div>
-
-                  {/* Barcode Scanner Button - Only on large screens */}
-                  {!viewMode && (
-                    <button
-                      type="button"
-                      onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
-                      className="hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      title="Escanear código de barras"
-                    >
-                      <Camera className="w-5 h-5" />
-                      Escanear código de barras
-                    </button>
-                  )}
-                </div>
-
-                {/* Right Column - Form Fields */}
-                <div className="lg:col-span-2 space-y-4">
-                  {/* Barcode Scanner */}
-                  {showBarcodeScanner && (
-                    <div className="bg-gray-50 rounded-lg p-4 border-2 border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                          <Camera className="w-5 h-5 text-blue-600" />
-                          Escanear Código de Barras
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowBarcodeScanner(false);
-                            setScannerError(null);
-                          }}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="bg-black rounded-lg overflow-hidden h-72">
-                        {scannerError ? (
-                          <div className="flex items-center justify-center h-full p-6 text-center">
-                            <div>
-                              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                              <p className="text-white mb-2">Error al acceder a la cámara</p>
-                              <p className="text-gray-400 text-sm mb-4">{scannerError}</p>
-                              <button
-                                type="button"
-                                onClick={() => setShowBarcodeScanner(false)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                              >
-                                Cerrar
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <BarcodeScannerComponent
-                            onDetected={handleBarcodeDetected}
-                            onError={(err) => setScannerError(err)}
-                          />
-                        )}
-                      </div>
-
-                      <p className="text-sm text-gray-600 mt-3 text-center">
-                        Apunta la cámara al código de barras del producto
-                      </p>
+              <form onSubmit={handleSubmit} className="bg-white px-6 py-6">
+                {error && (
+                  <div className="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Error al guardar</p>
+                      <p className="text-sm">{error}</p>
                     </div>
-                  )}
+                    <button
+                      onClick={() => setError(null)}
+                      type="button"
+                      className="ml-auto text-red-600 hover:text-red-800"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Image */}
+                  <div className="lg:col-span-1 space-y-4">
+                    {/* Product Image */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5 text-blue-600" />
+                        Imagen del Producto
+                      </h3>
+                      <ImageUpload
+                        value={imagePreview}
+                        onChange={setImagePreview}
+                        type="products"
+                        placeholder="Click para subir imagen"
+                        previewSize="w-full h-48"
+                        disabled={viewMode}
+                      />
+                    </div>
 
-              {/* Basic Info */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-blue-600" />
-                  Información Básica
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre del Producto *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    disabled={viewMode}
-                    className="input"
-                    placeholder="Ej: Aceite de Soya 1L"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows="3"
-                    disabled={viewMode}
-                    className="input"
-                    placeholder="Descripción detallada del producto..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoría *
-                  </label>
-                  <select
-                    name="category_id"
-                    value={formData.category_id}
-                    onChange={handleChange}
-                    required
-                    disabled={viewMode}
-                    className="input"
-                  >
-                    <option value="">Seleccione una categoría</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Código de barras
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      name="barcode"
-                      value={formData.barcode || ''}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className={`input flex-1 ${barcodeError ? 'border-red-500 focus:ring-red-500' : ''}`}
-                      placeholder="Ej: 7730969301421"
-                    />
+                    {/* Barcode Scanner Button - Only on large screens */}
                     {!viewMode && (
                       <button
                         type="button"
                         onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
-                        className="lg:hidden px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                        className="hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         title="Escanear código de barras"
                       >
-                        <Camera className="w-4 h-4" />
-                        Escanear
+                        <Camera className="w-5 h-5" />
+                        Escanear código de barras
                       </button>
                     )}
                   </div>
-                  {barcodeError && (
-                    <div className="mt-2 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm text-red-800 font-medium">Código de barras duplicado</p>
-                        <p className="text-sm text-red-700 mt-1">{barcodeError}</p>
+
+                  {/* Right Column - Form Fields */}
+                  <div className="lg:col-span-2 space-y-4">
+                    {/* Barcode Scanner */}
+                    {showBarcodeScanner && (
+                      <div className="bg-gray-50 rounded-lg p-4 border-2 border-blue-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                            <Camera className="w-5 h-5 text-blue-600" />
+                            Escanear Código de Barras
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowBarcodeScanner(false);
+                              setScannerError(null);
+                            }}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <div className="bg-black rounded-lg overflow-hidden h-72">
+                          {scannerError ? (
+                            <div className="flex items-center justify-center h-full p-6 text-center">
+                              <div>
+                                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                                <p className="text-white mb-2">Error al acceder a la cámara</p>
+                                <p className="text-gray-400 text-sm mb-4">{scannerError}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowBarcodeScanner(false)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                  Cerrar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <BarcodeScannerComponent
+                              onDetected={handleBarcodeDetected}
+                              onError={(err) => setScannerError(err)}
+                            />
+                          )}
+                        </div>
+
+                        <p className="text-sm text-gray-600 mt-3 text-center">
+                          Apunta la cámara al código de barras del producto
+                        </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setBarcodeError(null)}
-                        className="text-red-400 hover:text-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    )}
+
+                    {/* Basic Info */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Tag className="h-5 w-5 text-blue-600" />
+                        Información Básica
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nombre del Producto *
+                          </label>
+                          <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            required
+                            disabled={viewMode}
+                            className="input"
+                            placeholder="Ej: Aceite de Soya 1L"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Descripción
+                          </label>
+                          <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            rows="3"
+                            disabled={viewMode}
+                            className="input"
+                            placeholder="Descripción detallada del producto..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Categoría *
+                          </label>
+                          <select
+                            name="category_id"
+                            value={formData.category_id}
+                            onChange={handleChange}
+                            required
+                            disabled={viewMode}
+                            className="input"
+                          >
+                            <option value="">Seleccione una categoría</option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Código de barras
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              name="barcode"
+                              value={formData.barcode || ''}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className={`input flex-1 ${barcodeError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                              placeholder="Ej: 7730969301421"
+                            />
+                            {!viewMode && (
+                              <button
+                                type="button"
+                                onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
+                                className="lg:hidden px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                                title="Escanear código de barras"
+                              >
+                                <Camera className="w-4 h-4" />
+                                Escanear
+                              </button>
+                            )}
+                          </div>
+                          {barcodeError && (
+                            <div className="mt-2 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="text-sm text-red-800 font-medium">Código de barras duplicado</p>
+                                <p className="text-sm text-red-700 mt-1">{barcodeError}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setBarcodeError(null)}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Marca
+                          </label>
+                          <select
+                            name="brand_id"
+                            value={formData.brand_id}
+                            onChange={handleChange}
+                            disabled={viewMode}
+                            className="input"
+                          >
+                            <option value="">Seleccione una marca</option>
+                            {brands.map((brand) => (
+                              <option key={brand.id} value={brand.id}>
+                                {brand.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Tamaño de Unidad Individual *
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              name="unit_size"
+                              step="0.1"
+                              value={formData.unit_size || ''}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className="input flex-1"
+                              placeholder="Ej: 500"
+                              required
+                            />
+                            <select
+                              name="unit_size_measure"
+                              value={formData.unit_size_measure}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className="input w-24"
+                              required
+                            >
+                              <option value="UND">UND</option>
+                              <option value="LT">LT</option>
+                              <option value="ML">ML</option>
+                              <option value="KG">KG</option>
+                              <option value="GR">GR</option>
+                              <option value="OZ">OZ</option>
+                            </select>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Tamaño de cada unidad individual (ej: 500 ML para una botella de 500ml). Este dato se usa en todas las presentaciones del producto.
+                          </p>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Presentation Section */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Box className="h-5 w-5 text-blue-600" />
+                        Presentaciones del Producto
+                      </h3>
+                      <PresentationManager
+                        presentations={presentations}
+                        onChange={setPresentations}
+                        readonly={viewMode}
+                        packagingTypes={packagingTypes}
+                        presentationTypes={presentationTypes}
+                        productUnitSize={formData.unit_size}
+                        productUnitMeasure={formData.unit_size_measure}
+                      />
+                    </div>
+
+                    {/* Stock Settings */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <BarChart className="h-5 w-5 text-blue-600" />
+                        Configuración de Stock
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Stock Mínimo
+                          </label>
+                          <input
+                            type="number"
+                            name="min_stock"
+                            value={formData.min_stock}
+                            onChange={handleChange}
+                            min="0"
+                            step="1"
+                            disabled={viewMode}
+                            className="input"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Stock Máximo
+                          </label>
+                          <input
+                            type="number"
+                            name="max_stock"
+                            value={formData.max_stock}
+                            onChange={handleChange}
+                            min="0"
+                            step="1"
+                            disabled={viewMode}
+                            className="input"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Punto de Reorden
+                          </label>
+                          <input
+                            type="number"
+                            name="reorder_point"
+                            value={formData.reorder_point}
+                            onChange={handleChange}
+                            min="0"
+                            step="1"
+                            disabled={viewMode}
+                            className="input"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Additional Settings */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-blue-600" />
+                        Configuración Adicional
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              name="is_perishable"
+                              checked={formData.is_perishable}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Producto Perecedero</span>
+                          </label>
+
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              name="has_batch_control"
+                              checked={formData.has_batch_control}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Control por Lote</span>
+                          </label>
+
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              name="is_active"
+                              checked={formData.is_active}
+                              onChange={handleChange}
+                              disabled={viewMode}
+                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Producto Activo</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 -mx-6 -mb-6 mt-6 flex justify-end gap-3 rounded-b-lg">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {viewMode ? 'Cerrar' : 'Cancelar'}
+                  </button>
+                  {!viewMode && (
+                    <button
+                      type="submit"
+                      disabled={loading || barcodeError}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          {editingProduct ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                          {editingProduct ? 'Actualizar' : 'Crear Producto'}
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Marca
-                  </label>
-                  <select
-                    name="brand_id"
-                    value={formData.brand_id}
-                    onChange={handleChange}
-                    disabled={viewMode}
-                    className="input"
-                  >
-                    <option value="">Seleccione una marca</option>
-                    {brands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tamaño de Unidad Individual *
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      name="unit_size"
-                      step="0.1"
-                      value={formData.unit_size || ''}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className="input flex-1"
-                      placeholder="Ej: 500"
-                      required
-                    />
-                    <select
-                      name="unit_size_measure"
-                      value={formData.unit_size_measure}
-                      onChange={handleChange}
-                      disabled={viewMode}
-                      className="input w-24"
-                      required
-                    >
-                      <option value="UND">UND</option>
-                      <option value="LT">LT</option>
-                      <option value="ML">ML</option>
-                      <option value="KG">KG</option>
-                      <option value="GR">GR</option>
-                      <option value="OZ">OZ</option>
-                    </select>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Tamaño de cada unidad individual (ej: 500 ML para una botella de 500ml). Este dato se usa en todas las presentaciones del producto.
-                  </p>
-                </div>
-              </div>
-              </div>
-
-              {/* Presentation Section */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Box className="h-5 w-5 text-blue-600" />
-                  Presentaciones del Producto
-                </h3>
-                <PresentationManager
-                  presentations={presentations}
-                  onChange={setPresentations}
-                  readonly={viewMode}
-                  packagingTypes={packagingTypes}
-                  presentationTypes={presentationTypes}
-                  productUnitSize={formData.unit_size}
-                  productUnitMeasure={formData.unit_size_measure}
-                />
-              </div>
-
-              {/* Stock Settings */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart className="h-5 w-5 text-blue-600" />
-                  Configuración de Stock
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stock Mínimo
-                    </label>
-                    <input
-                      type="number"
-                      name="min_stock"
-                      value={formData.min_stock}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stock Máximo
-                    </label>
-                    <input
-                      type="number"
-                      name="max_stock"
-                      value={formData.max_stock}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Punto de Reorden
-                    </label>
-                    <input
-                      type="number"
-                      name="reorder_point"
-                      value={formData.reorder_point}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      disabled={viewMode}
-                      className="input"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Settings */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-blue-600" />
-                  Configuración Adicional
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        name="is_perishable"
-                        checked={formData.is_perishable}
-                        onChange={handleChange}
-                        disabled={viewMode}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Producto Perecedero</span>
-                    </label>
-
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        name="has_batch_control"
-                        checked={formData.has_batch_control}
-                        onChange={handleChange}
-                        disabled={viewMode}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Control por Lote</span>
-                    </label>
-
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        name="is_active"
-                        checked={formData.is_active}
-                        onChange={handleChange}
-                        disabled={viewMode}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Producto Activo</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 -mx-6 -mb-6 mt-6 flex justify-end gap-3 rounded-b-lg">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  {viewMode ? 'Cerrar' : 'Cancelar'}
-                </button>
-                {!viewMode && (
-                  <button
-                    type="submit"
-                    disabled={loading || barcodeError}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        {editingProduct ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                        {editingProduct ? 'Actualizar' : 'Crear Producto'}
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </form>
+              </form>
             </div>
           </div>
         </div>
@@ -1245,11 +1295,10 @@ const ProductsPage = () => {
                     {/* Status Badge */}
                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                       <label className="block text-sm font-medium text-gray-500 mb-2">Estado</label>
-                      <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                        viewingProduct.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${viewingProduct.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
                         {viewingProduct.is_active ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>

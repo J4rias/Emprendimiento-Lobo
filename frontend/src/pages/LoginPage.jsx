@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { companyName } = useCompany();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -44,7 +46,7 @@ const LoginPage = () => {
         <div className="bg-white rounded-lg shadow-xl p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900">
-              Emprendimiento Lobo 4
+              {companyName}
             </h2>
             <p className="mt-2 text-sm text-gray-600">
               Ingrese sus credenciales para continuar

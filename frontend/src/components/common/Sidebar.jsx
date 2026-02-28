@@ -24,12 +24,10 @@ import {
   Receipt,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useCompany } from '../../context/CompanyContext';
 import { useState, useEffect } from 'react';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { hasPermission } = useAuth();
-  const { companyName } = useCompany();
   const location = useLocation();
   const [productsOpen, setProductsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
@@ -41,11 +39,11 @@ const Sidebar = ({ isOpen, onClose }) => {
   // Efecto para controlar el estado de los acordeones basado en la ruta actual
   useEffect(() => {
     const currentPath = location.pathname;
-    
+
     // Verificar si la ruta actual pertenece a algún acordeón
     const isInProducts = productsRoutes.some(route => currentPath === route);
     const isInConfig = configRoutes.some(route => currentPath === route);
-    
+
     // Actualizar estados
     setProductsOpen(isInProducts);
     setConfigOpen(isInConfig);
@@ -211,11 +209,10 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div key={`${item.name.toLowerCase()}-accordion`} className="space-y-1">
           <button
             onClick={toggleOpen}
-            className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-              isOpen
-                ? 'bg-primary-50 text-primary-700'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isOpen
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center">
               <item.icon className="mr-3 h-5 w-5" />
@@ -227,7 +224,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               <ChevronRight className="h-4 w-4" />
             )}
           </button>
-          
+
           {isOpen && (
             <div className="ml-8 space-y-1">
               {visibleSubItems.map((subItem) => (
@@ -236,10 +233,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                   to={subItem.path}
                   onClick={() => onClose()}
                   className={({ isActive }) =>
-                    `flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    `flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${isActive
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                 >
@@ -258,10 +254,9 @@ const Sidebar = ({ isOpen, onClose }) => {
         to={item.path}
         onClick={() => onClose()}
         className={({ isActive }) =>
-          `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-            isActive
-              ? 'bg-primary-50 text-primary-700'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+          `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive
+            ? 'bg-primary-50 text-primary-700'
+            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
           }`
         }
       >
@@ -283,9 +278,8 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="h-full flex flex-col">
           {/* Close button (mobile only) */}
@@ -298,13 +292,8 @@ const Sidebar = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {/* Company name */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-primary-700 truncate">{companyName}</p>
-          </div>
-
           {/* Navigation */}
-          <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-4 pt-4 pb-4 space-y-1 overflow-y-auto">
             {visibleItems.map((item) => renderMenuItem(item))}
           </nav>
         </div>

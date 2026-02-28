@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -340,10 +340,40 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    const handleAutofill = () => {
+      // Intentar deshabilitar autocompletado en todos los inputs y forms
+      const elements = document.querySelectorAll('input, form');
+      elements.forEach(el => {
+        if (!el.getAttribute('autocomplete')) {
+          el.setAttribute('autocomplete', 'off');
+          // Truco adicional para algunos navegadores: usar un valor aleatorio o 'new-password'
+          // si el navegador ignora 'off'
+        }
+      });
+    };
+
+    // Ejecutar al inicio
+    handleAutofill();
+
+    // Observar cambios en el DOM para manejar elementos dinámicos (modales, etc.)
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          handleAutofill();
+        }
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <AuthProvider>
       <CompanyProvider>
-      <AppRoutes />
+        <AppRoutes />
       </CompanyProvider>
       <Toaster
         position="top-right"

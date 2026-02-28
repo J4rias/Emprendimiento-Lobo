@@ -60,6 +60,14 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
       isNew: true
     };
 
+    // Generar nombre inicial
+    const initialName = generatePresentationName(newPresentation.units_per_package, newPresentation.packaging_type_id);
+    if (initialName) {
+      newPresentation.name = initialName;
+    } else {
+      newPresentation.name = 'Presentación estándar';
+    }
+
     const updatedPresentations = [...localPresentations, newPresentation];
     setLocalPresentations(updatedPresentations);
     onChange(updatedPresentations);

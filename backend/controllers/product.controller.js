@@ -1,4 +1,5 @@
 const { Product, Category, ProductPresentation, Barcode, Inventory, Warehouse, Brand, PackagingType, PresentationType } = require('../models');
+const { sequelize } = require('../config/database');
 const { Op } = require('sequelize');
 const skuConfig = require('../config/sku');
 
@@ -113,6 +114,7 @@ class ProductController {
 
   // Create product
   async create(req, res, next) {
+    const transaction = await sequelize.transaction();
     try {
       const {
         name,
@@ -126,16 +128,58 @@ class ProductController {
         max_stock,
         reorder_point,
         image_url,
-        // Presentation fields
-        packaging_type_id,
-        presentation_type_id,
-        units_per_package,
         unit_size,
         unit_size_measure,
-        package_price,
-        package_cost,
-        purchase_currency
+        // New: multiple presentations
+        presentations: presentationsData
       } = req.body;
+
+      // Basic validation
+      if (!name || name.trim() === '') {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, message: 'El nombre del producto es obligatorio' });
+      }
+      if (!category_id) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, message: 'La categoría es obligatoria' });
+      }
+      if (unit_size === undefined || unit_size === null || unit_size === '') {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, message: 'El tamaño de la unidad es obligatorio' });
+      }
+
+      // Parse presentations if provided as string (from FormData)
+      let presentations = [];
+      if (presentationsData) {
+        try {
+          presentations = typeof presentationsData === 'string'
+            ? JSON.parse(presentationsData)
+            : presentationsData;
+        } catch (e) {
+          await transaction.rollback();
+          return res.status(400).json({ success: false, message: 'Formato de presentaciones inválido' });
+        }
+      }
+
+      // Pre-validate presentations if they exist
+      if (presentations.length > 0) {
+        for (const p of presentations) {
+          if (!p.units_per_package || p.units_per_package <= 0) {
+            await transaction.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `La presentación "${p.name || 'sin nombre'}" debe tener una cantidad válida de unidades`
+            });
+          }
+          if (!p.presentation_type_id) {
+            await transaction.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `La presentación "${p.name || 'sin nombre'}" debe tener un tipo de unidad seleccionado`
+            });
+          }
+        }
+      }
 
       // Get image URL from processed files if uploaded, or use provided image_url
       const finalImageUrl = req.processedFiles && req.processedFiles.length > 0
@@ -150,6 +194,7 @@ class ProductController {
         });
 
         if (existingBarcode) {
+          await transaction.rollback();
           return res.status(400).json({
             success: false,
             message: 'El código de barras ya está asignado a otro producto'
@@ -164,8 +209,7 @@ class ProductController {
         brandName = brand?.name || null;
       }
 
-      // Generate SKU - will be updated after presentations are created
-      // For now, create a temporary SKU
+      // Generate temporary SKU
       const tempSku = `TEMP-${Date.now()}`;
 
       // Create product
@@ -184,31 +228,60 @@ class ProductController {
         reorder_point,
         image_url: finalImageUrl,
         created_by: req.userId
-      });
+      }, { transaction });
 
-      // Create default presentation if presentation data provided
-      if (packaging_type_id || presentation_type_id || units_per_package) {
-        const presentationName = `${name} - Presentación estándar`;
-        const unitsPerPkg = parseInt(units_per_package) || 1;
+      // Create presentations if provided
+      if (presentations.length > 0) {
+        for (const p of presentations) {
+          const unitsPerPkg = parseInt(p.units_per_package) || 1;
+          await ProductPresentation.create({
+            product_id: product.id,
+            packaging_type_id: p.packaging_type_id || null,
+            presentation_type_id: p.presentation_type_id || null,
+            name: p.name || `${name} - ${unitsPerPkg} unidades`,
+            units_per_package: unitsPerPkg,
+            units_per_presentation: unitsPerPkg,
+            package_price: p.package_price || 0,
+            package_cost: p.package_cost || 0,
+            base_price: p.package_price ? (parseFloat(p.package_price) / unitsPerPkg) : 0,
+            cost: p.package_cost ? (parseFloat(p.package_cost) / unitsPerPkg) : 0,
+            purchase_currency: p.purchase_currency || 'USD',
+            is_default: p.is_default || false,
+            is_active: true
+          }, { transaction });
+        }
+      } else {
+        // Fallback or old logic: check if single presentation fields are present in body
+        const {
+          packaging_type_id,
+          presentation_type_id,
+          units_per_package,
+          package_price,
+          package_cost,
+          purchase_currency
+        } = req.body;
 
-        await ProductPresentation.create({
-          product_id: product.id,
-          packaging_type_id: packaging_type_id || null,
-          presentation_type_id: presentation_type_id || null,
-          name: presentationName,
-          units_per_package: unitsPerPkg,
-          units_per_presentation: unitsPerPkg, // For compatibility
-          package_price: package_price || 0,
-          package_cost: package_cost || 0,
-          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : 0,
-          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0,
-          purchase_currency: purchase_currency || 'USD',
-          is_default: true,
-          is_active: true
-        });
+        if (packaging_type_id || presentation_type_id || units_per_package) {
+          const unitsPerPkg = parseInt(units_per_package) || 1;
+          await ProductPresentation.create({
+            product_id: product.id,
+            packaging_type_id: packaging_type_id || null,
+            presentation_type_id: presentation_type_id || null,
+            name: `${name} - Presentación estándar`,
+            units_per_package: unitsPerPkg,
+            units_per_presentation: unitsPerPkg,
+            package_price: package_price || 0,
+            package_cost: package_cost || 0,
+            base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : 0,
+            cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0,
+            purchase_currency: purchase_currency || 'USD',
+            is_default: true,
+            is_active: true
+          }, { transaction });
+        }
       }
 
-      // Optional: create barcode record for scanner-based workflows
+      // Create barcode record
       if (normalizedBarcode) {
         await Barcode.create({
           product_id: product.id,
@@ -217,8 +290,23 @@ class ProductController {
           type: 'EAN13',
           is_primary: true,
           is_active: true
-        });
+        }, { transaction });
       }
+
+      // Generate final SKU
+      const finalSku = skuConfig.generate({
+        brandName,
+        productName: name,
+        unit_size: unit_size || null,
+        unit_size_measure: unit_size_measure || 'UND',
+        brand_id: brand_id,
+        existingSku: null
+      });
+
+      // Update product with final SKU
+      await product.update({ sku: finalSku }, { transaction });
+
+      await transaction.commit();
 
       // Reload with associations
       await product.reload({
@@ -237,26 +325,13 @@ class ProductController {
         ]
       });
 
-      // Generate final SKU based on product data
-      const finalSku = skuConfig.generate({
-        brandName,
-        productName: name,
-        unit_size: unit_size || null,
-        unit_size_measure: unit_size_measure || 'UND',
-        brand_id: brand_id,
-        existingSku: null
-      });
-
-      // Update product with final SKU
-      await product.update({ sku: finalSku });
-      product.sku = finalSku;
-
       res.status(201).json({
         success: true,
-        message: 'Product created successfully',
+        message: 'Producto creado exitosamente',
         data: product
       });
     } catch (error) {
+      await transaction.rollback();
       next(error);
     }
   }
@@ -270,6 +345,17 @@ class ProductController {
       const barcode = updateData.barcode;
       delete updateData.barcode;
       delete updateData.created_by;
+
+      // Basic validation for updates
+      if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
+        return res.status(400).json({ success: false, message: 'El nombre del producto no puede estar vacío' });
+      }
+      if (updateData.category_id !== undefined && !updateData.category_id) {
+        return res.status(400).json({ success: false, message: 'La categoría no puede estar vacía' });
+      }
+      if (updateData.unit_size !== undefined && (updateData.unit_size === null || updateData.unit_size === '')) {
+        return res.status(400).json({ success: false, message: 'El tamaño de la unidad no puede estar vacío' });
+      }
 
       // Extract presentation fields (unit_size and unit_size_measure are now product fields)
       const {
@@ -578,6 +664,16 @@ class ProductController {
         });
       }
 
+      // If name is missing, generate one or use a default
+      let presentationName = name;
+      if (!presentationName || presentationName.trim() === '') {
+        presentationName = `${product.name} - Presentación ${units_per_package || 1} unidades`;
+      }
+
+      if (units_per_package === undefined || units_per_package === null || units_per_package <= 0) {
+        return res.status(400).json({ success: false, message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
+      }
+
       // If this is set as default, unmark all other presentations as default
       if (is_default) {
         await ProductPresentation.update(
@@ -586,17 +682,22 @@ class ProductController {
         );
       }
 
+      // Calculate base price and cost if not provided
+      const unitsPerPkg = parseInt(units_per_package) || 1;
+      const calcBasePrice = package_price ? (parseFloat(package_price) / unitsPerPkg) : 0;
+      const calcCost = package_cost ? (parseFloat(package_cost) / unitsPerPkg) : 0;
+
       const presentation = await ProductPresentation.create({
         product_id: id,
-        name,
+        name: presentationName,
         packaging_type_id: packaging_type_id || null,
         presentation_type_id: presentation_type_id || null,
-        units_per_package: units_per_package || 1,
-        unit_size: unit_size || null,
-        unit_size_measure: unit_size_measure || 'UND',
-        units_per_presentation: units_per_package || 1, // For compatibility
+        units_per_package: unitsPerPkg,
+        units_per_presentation: unitsPerPkg, // For compatibility
         package_price: package_price || 0,
         package_cost: package_cost || 0,
+        base_price: calcBasePrice,
+        cost: calcCost,
         purchase_currency: purchase_currency || 'USD',
         is_default: is_default || false,
         is_active: is_active !== undefined ? is_active : true
@@ -631,6 +732,15 @@ class ProductController {
           success: false,
           message: 'Presentation not found'
         });
+      }
+
+      // Validaciones básicas para edición
+      if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
+        return res.status(400).json({ success: false, message: 'El nombre de la presentación no puede estar vacío' });
+      }
+
+      if (updateData.units_per_package !== undefined && (updateData.units_per_package === null || updateData.units_per_package <= 0)) {
+        return res.status(400).json({ success: false, message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
       }
 
       // Update units_per_presentation if units_per_package is updated

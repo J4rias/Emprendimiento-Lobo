@@ -1,8 +1,10 @@
 import { Menu, LogOut, User, Settings } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+  const { companyName } = useCompany();
 
   const handleLogout = () => {
     if (window.confirm('¿Está seguro que desea cerrar sesión?')) {
@@ -23,7 +25,7 @@ const Navbar = ({ onMenuClick }) => {
             </button>
             <div className="flex-shrink-0 flex items-center ml-4 lg:ml-0">
               <h1 className="text-xl font-bold text-primary-600">
-                Sistema de Gestión de Víveres
+                {companyName}
               </h1>
             </div>
           </div>

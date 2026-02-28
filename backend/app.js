@@ -111,6 +111,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/company', companyRoutes); // Movido arriba para que el GET público no sea atrapado por la protección de /api
 app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/quotes', quoteRoutes);
@@ -130,7 +131,6 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/supplier-payments', supplierPaymentRoutes);
 app.use('/api/credit-notes', creditNoteRoutes);
 app.use('/api/deliveries', deliveryRoutes);
-app.use('/api/company', companyRoutes);
 
 // 404 handler
 app.use((req, res) => {

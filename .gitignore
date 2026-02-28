@@ -7,6 +7,8 @@ yarn.lock
 .env.local
 .env.*.local
 .env.production
+.env.empresa1
+.env.empresa2
 
 # Logs
 logs/
