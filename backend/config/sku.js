@@ -36,7 +36,13 @@ module.exports = {
     if (!text) return '';
 
     const normalized = this.normalize(text);
-    const words = normalized.split(/[\s\-\_\.]+/);
+    // Eliminar números, comas y unidades de medida comunes
+    // Las unidades más largas van primero para evitar matches parciales (LT antes que L)
+    const withoutMetrics = normalized
+      .replace(/\d+\s*(UNIDADES|UNIDAD|BOTELLAS|BOTELLA|PAQUETE|CAJA|BOLSA|ML|LT|KG|GR|OZ|UND|L)/gi, '')
+      .replace(/[0-9,+*/<>=!]/g, '') // Eliminar números, comas y caracteres especiales
+      .trim();
+    const words = withoutMetrics.split(/[\s\-\_\.]+/);
 
     // Filtrar palabras de ruido
     const cleanWords = words.filter(word => {
@@ -67,6 +73,7 @@ module.exports = {
   /**
    * Extrae nombre corto del producto (2-3 letras por palabra)
    * Ejemplo: ACEITE-COMESTIBLE-SOYA → ACE-COM-SOY
+   * Nota: Limita a 2-3 palabras para evitar redundancia con la marca
    */
   getShortName: function(productName) {
     if (!productName) return 'PRO';
@@ -74,8 +81,9 @@ module.exports = {
     const cleaned = this.cleanText(productName);
     const parts = cleaned.split('-');
 
-    // Tomar las primeras 2-4 palabras significativas y abreviarlas
-    const significantParts = parts.slice(0, 4);
+    // Tomar las primeras 2-3 palabras significativas y abreviarlas
+    // (3 como máximo para evitar redundancia con marca)
+    const significantParts = parts.slice(0, 3);
 
     const abbreviated = significantParts.map(word => {
       if (word.length <= 3) return word;
@@ -133,6 +141,21 @@ module.exports = {
   },
 
   /**
+   * Elimina referencias a la marca del nombre corto para evitar redundancia
+   * Ej: shortName="ACE-VEG-VAT", brandCode="VAT" → "ACE-VEG"
+   */
+  removeRedundantBrand: function(shortName, brandCode) {
+    if (!shortName || !brandCode) return shortName;
+
+    const parts = shortName.split('-');
+    // Eliminar cualquier parte que coincida con el código de marca
+    const filtered = parts.filter(part => part !== brandCode);
+
+    // Si quedan partes, unirlas; si no, devolver al menos 2 caracteres
+    return filtered.length > 0 ? filtered.join('-') : shortName.substring(0, 2);
+  },
+
+  /**
    * Genera SKU completo
    * @param {Object} options - { brandName, productName, unit_size, unit_size_measure, brand_id, existingSku }
    */
@@ -148,7 +171,10 @@ module.exports = {
 
     // Extraer componentes
     const brandCode = this.getBrandCode(brandName);
-    const shortName = this.getShortName(productName);
+    let shortName = this.getShortName(productName);
+    // OPCIÓN B: Eliminar marca redundante del shortName
+    shortName = this.removeRedundantBrand(shortName, brandCode);
+
     const { content, uom } = this.getProductInfo(unit_size, unit_size_measure);
     const hash = this.generateHash(brand_id, productName, content, uom, existingSku);
 
