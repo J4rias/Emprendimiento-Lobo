@@ -85,23 +85,9 @@ export const printSaleTicket = (sale, companyInfo = {}) => {
 
       <!-- Totals -->
       <div style="margin-bottom: 10px;">
-        <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-          <span>Subtotal:</span>
-          <span>${formatCurrency(subtotal)}</span>
-        </div>
-        ${discount > 0 ? `
-          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-            <span>Descuento:</span>
-            <span>-${formatCurrency(discount)}</span>
-          </div>
-        ` : ''}
-        <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-          <span>IGV (18%):</span>
-          <span>${formatCurrency(tax)}</span>
-        </div>
         <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; font-weight: bold; border-top: 1px solid #000;">
           <span>TOTAL:</span>
-          <span>${formatCurrency(total)}</span>
+          <span>${formatCurrency(subtotal - discount)}</span>
         </div>
       </div>
 

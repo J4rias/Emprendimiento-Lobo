@@ -6,9 +6,9 @@ const generateSaleNumber = async () => {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
-  
+
   const prefix = `VEN-${year}${month}${day}`;
-  
+
   const lastSale = await Sale.findOne({
     where: {
       sale_number: {
@@ -17,19 +17,19 @@ const generateSaleNumber = async () => {
     },
     order: [['sale_number', 'DESC']]
   });
-  
+
   let sequence = 1;
   if (lastSale) {
     const lastSequence = parseInt(lastSale.sale_number.split('-').pop());
     sequence = lastSequence + 1;
   }
-  
+
   return `${prefix}-${String(sequence).padStart(4, '0')}`;
 };
 
 exports.createSale = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const {
       customer_id,
@@ -54,7 +54,7 @@ exports.createSale = async (req, res) => {
     }
 
     const sale_number = await generateSaleNumber();
-    
+
     let subtotal = 0;
     let tax_amount = 0;
     const saleDetails = [];
@@ -81,8 +81,8 @@ exports.createSale = async (req, res) => {
 
       if (!inventory || inventory.available_quantity < item.quantity) {
         await transaction.rollback();
-        return res.status(400).json({ 
-          message: `Stock insuficiente para ${product.name}. Disponible: ${inventory?.available_quantity || 0}` 
+        return res.status(400).json({
+          message: `Stock insuficiente para ${product.name}. Disponible: ${inventory?.available_quantity || 0}`
         });
       }
 
@@ -90,7 +90,7 @@ exports.createSale = async (req, res) => {
       const item_subtotal = unit_price * item.quantity;
       const item_discount = item.discount_percent ? (item_subtotal * item.discount_percent / 100) : 0;
       const taxable_amount = item_subtotal - item_discount;
-      const item_tax = taxable_amount * (item.tax_percent || 16) / 100;
+      const item_tax = taxable_amount * (item.tax_percent || 0) / 100;
       const item_total = taxable_amount + item_tax;
 
       subtotal += item_subtotal;
@@ -104,7 +104,7 @@ exports.createSale = async (req, res) => {
         unit_price: unit_price,
         discount_percent: item.discount_percent || 0,
         discount_amount: item_discount,
-        tax_percent: item.tax_percent || 16,
+        tax_percent: item.tax_percent || 0,
         tax_amount: item_tax,
         subtotal: item_subtotal,
         total: item_total,
@@ -233,18 +233,18 @@ exports.createSale = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error('Error creating sale:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al crear la venta',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 exports.getSales = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
+    const {
+      page = 1,
+      limit = 10,
       search = '',
       status,
       sale_type,
@@ -299,13 +299,13 @@ exports.getSales = async (req, res) => {
           as: 'customer',
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'document_number']
         },
-        { 
-          model: Warehouse, 
+        {
+          model: Warehouse,
           as: 'warehouse',
           attributes: ['id', 'name']
         },
-        { 
-          model: User, 
+        {
+          model: User,
           as: 'seller',
           attributes: ['id', 'username', 'first_name', 'last_name']
         }
@@ -327,9 +327,9 @@ exports.getSales = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching sales:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al obtener las ventas',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -344,33 +344,33 @@ exports.getSaleById = async (req, res) => {
           model: SaleDetail,
           as: 'details',
           include: [
-            { 
-              model: Product, 
+            {
+              model: Product,
               as: 'product',
               attributes: ['id', 'name', 'sku']
             },
-            { 
-              model: ProductPresentation, 
+            {
+              model: ProductPresentation,
               as: 'presentation',
-              attributes: ['id', 'name', 'unit_type']
+              attributes: ['id', 'name']
             },
             {
               model: Batch,
               as: 'batch',
-              attributes: ['id', 'batch_number', 'expiry_date']
+              attributes: ['id', 'batch_number', 'expiration_date']
             }
           ]
         },
-        { 
-          model: Customer, 
+        {
+          model: Customer,
           as: 'customer'
         },
-        { 
-          model: Warehouse, 
+        {
+          model: Warehouse,
           as: 'warehouse'
         },
-        { 
-          model: User, 
+        {
+          model: User,
           as: 'seller',
           attributes: ['id', 'username', 'first_name', 'last_name']
         },
@@ -396,16 +396,16 @@ exports.getSaleById = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching sale:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al obtener la venta',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 exports.updateSale = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -419,8 +419,8 @@ exports.updateSale = async (req, res) => {
 
     if (sale.status === 'completed' || sale.status === 'cancelled') {
       await transaction.rollback();
-      return res.status(400).json({ 
-        message: 'No se puede modificar una venta completada o cancelada' 
+      return res.status(400).json({
+        message: 'No se puede modificar una venta completada o cancelada'
       });
     }
 
@@ -448,16 +448,16 @@ exports.updateSale = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error('Error updating sale:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al actualizar la venta',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 exports.cancelSale = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -514,16 +514,16 @@ exports.cancelSale = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error('Error cancelling sale:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al cancelar la venta',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 exports.addPayment = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const { payment_method, amount, reference, notes } = req.body;
@@ -537,15 +537,15 @@ exports.addPayment = async (req, res) => {
 
     if (sale.sale_type !== 'credit') {
       await transaction.rollback();
-      return res.status(400).json({ 
-        message: 'Solo se pueden agregar pagos a ventas a crédito' 
+      return res.status(400).json({
+        message: 'Solo se pueden agregar pagos a ventas a crédito'
       });
     }
 
     if (sale.status === 'cancelled') {
       await transaction.rollback();
-      return res.status(400).json({ 
-        message: 'No se pueden agregar pagos a una venta cancelada' 
+      return res.status(400).json({
+        message: 'No se pueden agregar pagos a una venta cancelada'
       });
     }
 
@@ -606,9 +606,9 @@ exports.addPayment = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error('Error adding payment:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al registrar el pago',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -631,11 +631,11 @@ exports.getSalesStats = async (req, res) => {
 
     const totalSales = await Sale.count({ where });
 
-    const totalRevenue = await Sale.sum('total', { 
-      where: { 
+    const totalRevenue = await Sale.sum('total', {
+      where: {
         ...where,
         status: { [Op.in]: ['completed', 'pending'] }
-      } 
+      }
     });
 
     const salesByType = await Sale.findAll({
@@ -695,9 +695,9 @@ exports.getSalesStats = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching sales stats:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error al obtener estadísticas de ventas',
-      error: error.message 
+      error: error.message
     });
   }
 };

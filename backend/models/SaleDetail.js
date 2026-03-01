@@ -68,7 +68,7 @@ const SaleDetail = sequelize.define('SaleDetail', {
   tax_percent: {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: false,
-    defaultValue: 16.00,
+    defaultValue: 0.00,
     comment: 'Porcentaje de impuesto (IVA)'
   },
   tax_amount: {

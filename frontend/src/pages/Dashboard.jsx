@@ -30,27 +30,35 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Cargar datos básicos
+      // Basic data
       const productsData = await productService.getAll({ limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
-
-      // Cargar datos de stock bajo
       const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
-
-      // Cargar valoración del inventario
       const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
-
-      // Cargar categorías con conteo de productos
       const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
       setCategoriesStats(categoriesData.data || []);
 
+      // Stats for TODAY
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isoToday = today.toISOString().split('T')[0];
+      const todayStats = await saleService.getSalesStats({ start_date: isoToday }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
+
+      // Stats for MONTH
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const isoMonth = firstDayOfMonth.toISOString().split('T')[0];
+      const monthStatsData = await saleService.getSalesStats({ start_date: isoMonth }).catch(() => ({ stats: { totalRevenue: 0 } }));
+
+      // Pending sales
+      const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
+
       setStats({
         totalProducts: productsData.pagination?.total || 0,
-        todaySales: 0,
-        todayRevenue: 0,
+        todaySales: todayStats.stats?.totalSales || 0,
+        todayRevenue: todayStats.stats?.totalRevenue || 0,
         lowStock: lowStockData.data?.length || 0,
         inventoryValue: valuationData.data?.totalValue || 0,
-        pendingSales: 0,
-        monthRevenue: 0
+        pendingSales: pendingData.pagination?.total || 0,
+        monthRevenue: monthStatsData.stats?.totalRevenue || 0
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);

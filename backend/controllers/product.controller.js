@@ -45,7 +45,7 @@ class ProductController {
         }
       ];
 
-      if (price_list_id) {
+      if (price_list_id && price_list_id !== 'null' && price_list_id !== 'undefined') {
         // Only show products in the price list AND with price > 0
         include.push({
           model: PriceListDetail,
@@ -58,7 +58,8 @@ class ProductController {
           attributes: []
         });
 
-        // Also filter the presentations include to only show those in the price list with price > 0
+        // Also filter and mandate the presentations to be in the price list
+        presentationInclude.required = true;
         presentationInclude.include.push({
           model: PriceListDetail,
           as: 'priceListDetails',
@@ -70,8 +71,7 @@ class ProductController {
           attributes: []
         });
 
-        // In POS (when price_list_id is present), also filter by stock > 0
-        // Find the index of the inventory include and make it required with a where clause
+        // In POS (when price_list_id is present), also filter by total stock > 0
         const inventoryInclude = include.find(inc => inc.as === 'inventories');
         if (inventoryInclude) {
           inventoryInclude.required = true;
