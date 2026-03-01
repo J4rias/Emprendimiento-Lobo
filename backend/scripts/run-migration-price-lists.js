@@ -19,7 +19,7 @@ async function run() {
         await queryInterface.createTable('price_lists', {
             id: {
                 type: DataTypes.INTEGER,
-                primary_key: true,
+                primaryKey: true,
                 autoIncrement: true,
                 allowNull: false
             },
@@ -89,7 +89,7 @@ async function run() {
         await queryInterface.createTable('price_list_details', {
             id: {
                 type: DataTypes.INTEGER,
-                primary_key: true,
+                primaryKey: true,
                 autoIncrement: true,
                 allowNull: false
             },
