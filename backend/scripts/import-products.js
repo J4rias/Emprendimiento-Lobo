@@ -2,7 +2,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 require('dotenv').config();
 const { sequelize } = require('../config/database');
-const { Product, Category, PriceList } = require('../models');
+const { Product, Category, PriceList, PriceListDetail, ProductPresentation } = require('../models');
 
 /**
  * Script para importar productos desde el archivo Excel
@@ -204,12 +204,9 @@ async function importProducts() {
           name: productName.substring(0, 200),
           description: `${description} - Marca: ${brand || 'N/A'} - Presentación: ${presentation} - Empaque: ${packageType}`,
           category_id: categoryId,
-          brand: brand || null,
-          manufacturer: null,
+          brand_id: null, // Ahora usa brand_id
           unit_of_measure: parsedWeight.unit || 'UND',
-          tax_rate: 16.00,
           is_perishable: category.toUpperCase().includes('COMESTIBLE') || category.toUpperCase().includes('LACTEOS'),
-          has_batch_control: false,
           min_stock: unitsPerLot * 2,
           max_stock: unitsPerLot * 10,
           reorder_point: unitsPerLot * 3,
@@ -218,28 +215,31 @@ async function importProducts() {
           updated_by: adminUserId
         });
 
-        // Si hay información de precios, crear las listas de precios
-        if (priceInfo) {
-          // Crear precios para cada moneda
-          const currencies = [
-            { currency: 'USD', price: priceInfo.priceUSD, unitPrice: priceInfo.unitPrice },
-            { currency: 'VES', price: priceInfo.priceVES, unitPrice: priceInfo.unitPrice },
-            { currency: 'COP', price: priceInfo.priceCOP, unitPrice: priceInfo.unitPrice }
-          ];
+        // Crear una presentación por defecto para el producto
+        const productPresentation = await ProductPresentation.create({
+          product_id: product.id,
+          name: presentation || 'Unidad',
+          units_per_package: unitsPerLot,
+          package_cost: 0,
+          package_price: priceInfo?.priceUSD || 0,
+          is_active: true
+        });
 
-          for (const { currency, price } of currencies) {
-            if (price > 0) {
-              await PriceList.create({
-                product_id: product.id,
-                name: `Precio ${currency}`,
-                currency,
-                price,
-                min_quantity: 1,
-                is_active: true,
-                created_by: adminUserId,
-                updated_by: adminUserId
-              });
-            }
+        // Si hay información de precios, vincular a la lista Minorista
+        if (priceInfo) {
+          const retailList = await PriceList.findOne({ where: { code: 'LP-0001' } });
+
+          if (retailList) {
+            await PriceListDetail.create({
+              price_list_id: retailList.id,
+              product_id: product.id,
+              presentation_id: productPresentation.id,
+              package_cost: 0,
+              unit_cost: 0,
+              package_price: priceInfo.priceUSD,
+              unit_price: priceInfo.priceUSD / unitsPerLot,
+              margin_percentage: 0
+            });
           }
         }
 
