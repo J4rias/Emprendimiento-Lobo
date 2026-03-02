@@ -182,7 +182,12 @@ const POSPage = () => {
   const getProductStock = (product, presentation) => {
     const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity), 0);
     const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
-    return { totalUnits, availablePackages: Math.floor(totalUnits / unitsPerPkg), unitsPerPkg };
+    return {
+      totalUnits,
+      availablePackages: Math.floor(totalUnits / unitsPerPkg),
+      looseUnits: totalUnits % unitsPerPkg,
+      unitsPerPkg
+    };
   };
 
   const getPrice = (productId, presentationId, presentation) => {
@@ -197,7 +202,7 @@ const POSPage = () => {
     const pres = product.presentations?.[0];
     if (!pres) { toast.error('Producto sin presentaciones configuradas'); return; }
 
-    const { totalUnits, availablePackages, unitsPerPkg } = getProductStock(product, pres);
+    const { totalUnits, availablePackages, looseUnits, unitsPerPkg } = getProductStock(product, pres);
     const { pkgPrice, unitPrice } = getPrice(product.id, pres.id, pres);
 
     const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id);
@@ -210,7 +215,9 @@ const POSPage = () => {
       }
       updateQuantity(existing.product_id, existing.presentation_id, existing.quantity + 1, maxQty);
     } else {
-      if (availablePackages <= 0) { toast.error('Sin stock disponible'); return; }
+      if (totalUnits <= 0) { toast.error('Sin stock disponible'); return; }
+      const isOnlyUnits = availablePackages <= 0 && looseUnits > 0;
+
       setCart(prev => [...prev, {
         product_id: product.id,
         presentation_id: pres.id,
@@ -220,10 +227,10 @@ const POSPage = () => {
         quantity: 1,
         stock_units: totalUnits,
         stock_packages: availablePackages,
-        sellByUnit: false,
+        sellByUnit: isOnlyUnits,
         package_price: pkgPrice,
         unit_price_each: unitPrice || (pkgPrice / unitsPerPkg),
-        current_price: pkgPrice,
+        current_price: isOnlyUnits ? (unitPrice || (pkgPrice / unitsPerPkg)) : pkgPrice,
         tax_percent: 0,
         discount_percent: customer?.discountPercentage || 0
       }]);
@@ -231,10 +238,19 @@ const POSPage = () => {
   };
 
   const toggleSellMode = (productId, presentationId) => {
+    let hasError = false;
     setCart(prev => prev.map(item => {
       if (item.product_id !== productId || item.presentation_id !== presentationId) return item;
+
       const nowByUnit = !item.sellByUnit;
       const maxQty = nowByUnit ? item.stock_units : item.stock_packages;
+
+      // Prevent switching to packages if none are available
+      if (!nowByUnit && maxQty <= 0) {
+        hasError = true;
+        return item; // Keep unchanged
+      }
+
       const newQty = Math.min(item.quantity, maxQty) || 1;
       return {
         ...item,
@@ -243,6 +259,10 @@ const POSPage = () => {
         current_price: nowByUnit ? item.unit_price_each : item.package_price
       };
     }));
+
+    if (hasError) {
+      toast.error('No hay paquetes completos disponibles');
+    }
   };
 
   const updateQuantity = (productId, presentationId, newQty, maxStock = null) => {
@@ -477,9 +497,9 @@ const POSPage = () => {
               <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                 {products.map(product => {
                   const pres = product.presentations?.[0];
-                  const { availablePackages } = getProductStock(product, pres);
+                  const { availablePackages, looseUnits, totalUnits, unitsPerPkg } = getProductStock(product, pres);
                   const { pkgPrice } = getPrice(product.id, pres?.id, pres);
-                  const lowStock = availablePackages <= 3;
+                  const lowStock = totalUnits <= unitsPerPkg * 3;
 
                   return (
                     <div
@@ -499,8 +519,9 @@ const POSPage = () => {
                         {product.name}
                       </h3>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[10px] font-medium ${lowStock ? 'text-amber-600' : 'text-gray-400'}`}>
-                          {availablePackages} disp
+                        <span className={`text-[10px] font-medium flex flex-col leading-tight ${lowStock ? 'text-amber-600' : 'text-gray-500'}`}>
+                          <span>{availablePackages} disp</span>
+                          {looseUnits > 0 && <span className="text-[9px] text-gray-400">+{looseUnits} uds</span>}
                         </span>
                         <span className="text-sm font-bold text-blue-600">
                           {formatMoney(pkgPrice)}
@@ -707,7 +728,7 @@ const POSPage = () => {
       </div>
 
       {/* ═══════════════ CHECKOUT MODAL ═══════════════ */}
-      <Modal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} title="Cobrar Venta" size="md">
+      <Modal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} title="Cobrar Venta" size="lg">
         <div className="space-y-4">
           {/* Sale Type */}
           <div>

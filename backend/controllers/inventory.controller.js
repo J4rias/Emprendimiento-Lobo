@@ -1,4 +1,4 @@
-const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate, InventoryMovement, User } = require('../models');
+const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate, InventoryMovement, User, Barcode } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -21,18 +21,35 @@ class InventoryController {
       const where = warehouse_id === 'all' ? {} : { warehouse_id };
       const productWhere = {};
 
-      if (search) {
-        productWhere[Op.or] = [
-          { name: { [Op.like]: `%${search}%` } },
-          { sku: { [Op.like]: `%${search}%` } }
-        ];
-      }
+      // Search and category filters are best handled by finding matching products first
+      // This avoids complex join issues with findAndCountAll and ensures barcode search works
+      if (search || category_id) {
+        const productSearchWhere = {};
+        if (search) {
+          productSearchWhere[Op.or] = [
+            { name: { [Op.like]: `%${search}%` } },
+            { sku: { [Op.like]: `%${search}%` } },
+            sequelize.where(sequelize.col('barcodes.barcode'), { [Op.like]: `%${search}%` })
+          ];
+        }
+        if (category_id) {
+          productSearchWhere.category_id = category_id;
+        }
 
-      if (category_id) {
-        productWhere.category_id = category_id;
+        const matchingProducts = await Product.findAll({
+          where: productSearchWhere,
+          include: [{ model: Barcode, as: 'barcodes', attributes: [] }],
+          attributes: ['id'],
+          raw: true
+        });
+
+        const matchingProductIds = matchingProducts.map(p => p.id);
+        where.product_id = { [Op.in]: matchingProductIds.length > 0 ? matchingProductIds : [0] };
       }
 
       const { rows: inventory, count } = await Inventory.findAndCountAll({
+        distinct: true,
+        subQuery: false,
         where,
         include: [
           {
@@ -40,7 +57,8 @@ class InventoryController {
             as: 'product',
             where: productWhere,
             include: [
-              { model: Category, as: 'category' }
+              { model: Category, as: 'category' },
+              { model: Barcode, as: 'barcodes', attributes: ['barcode'] }
             ]
           },
           {

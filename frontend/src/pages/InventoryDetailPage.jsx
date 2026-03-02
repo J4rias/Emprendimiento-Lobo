@@ -15,6 +15,7 @@ const InventoryDetailPage = () => {
   const [error, setError] = useState(null);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [convertedValue, setConvertedValue] = useState(null);
+  const [movements, setMovements] = useState([]);
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -24,7 +25,20 @@ const InventoryDetailPage = () => {
 
   useEffect(() => {
     fetchInventoryDetail();
+    fetchMovements();
   }, [id]);
+
+  const fetchMovements = async () => {
+    try {
+      const response = await inventoryService.getMovements({
+        product_id: inventory?.product_id, // We'll get this from inventory state later if needed
+        limit: 10
+      });
+      setMovements(response.data);
+    } catch (err) {
+      console.error('Error fetching movements:', err);
+    }
+  };
 
   const fetchInventoryDetail = async () => {
     try {
@@ -36,6 +50,13 @@ const InventoryDetailPage = () => {
       if (presentation?.purchase_currency) {
         setSelectedCurrency(presentation.purchase_currency);
       }
+
+      // Also fetch movements once we have the product_id
+      const movResponse = await inventoryService.getMovements({
+        product_id: response.data.product_id,
+        limit: 10
+      });
+      setMovements(movResponse.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar detalles del inventario');
     } finally {
@@ -250,7 +271,23 @@ const InventoryDetailPage = () => {
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
             <p className="text-sm text-gray-600">Stock Actual</p>
-            <p className="text-2xl font-bold text-blue-600">{Math.floor(inventory.quantity)}</p>
+            <p className="text-2xl font-bold text-blue-600 mb-1">{Math.floor(inventory.quantity)}</p>
+            {(() => {
+              const defaultPres = inventory?.product?.presentations?.find(p => p.is_default) || inventory?.product?.presentations?.[0];
+              const unitsPerPacking = defaultPres?.units_per_package || 1;
+              const totalUnits = Math.floor(inventory.quantity);
+              const totalPackages = Math.floor(totalUnits / unitsPerPacking);
+              const totalUnitsInPackages = totalPackages * unitsPerPacking;
+              const totalLooseUnits = totalUnits % unitsPerPacking;
+
+              return (
+                <div className="text-xs text-blue-700 font-medium">
+                  {totalPackages} {totalPackages === 1 ? 'Paquete' : 'Paquetes'} ({totalUnitsInPackages} uds)
+                  <br />
+                  y {totalLooseUnits} {totalLooseUnits === 1 ? 'unidad suelta' : 'unidades sueltas'}
+                </div>
+              );
+            })()}
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-2" />
@@ -350,6 +387,63 @@ const InventoryDetailPage = () => {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Movement History */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <ArrowRightLeft className="w-5 h-5 text-gray-500" />
+          Historial de Movimientos
+        </h2>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-gray-500">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+              <tr>
+                <th className="px-4 py-3">Fecha</th>
+                <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Cantidad</th>
+                <th className="px-4 py-3">Motivo</th>
+                <th className="px-4 py-3">Usuario</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {movements.length > 0 ? (
+                movements.map((movement) => (
+                  <tr key={movement.id} className="bg-white hover:bg-gray-50 text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {new Date(movement.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${movement.movement_type.includes('positivo') || ['compra', 'devolucion_cliente'].includes(movement.movement_type)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                        }`}>
+                        {movement.movement_type.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium">
+                      {movement.movement_type.includes('positivo') || ['compra', 'devolucion_cliente'].includes(movement.movement_type) ? '+' : '-'}
+                      {parseFloat(movement.quantity)} uds
+                    </td>
+                    <td className="px-4 py-3">
+                      {movement.reason || '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {movement.user ? `${movement.user.first_name || ''} ${movement.user.last_name || ''}`.trim() || movement.user.username : 'Sistema'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center text-gray-400">
+                    No hay movimientos registrados para este producto
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
