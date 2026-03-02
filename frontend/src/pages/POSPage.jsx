@@ -31,6 +31,48 @@ const PAYMENT_METHODS = [
 
 const emptyPaymentLine = () => ({ currency: 'USD', method: 'cash', amount: '' });
 
+// ──────────────────────── COMPONENTS ───────────────────────
+const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
+  const [localValue, setLocalValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
+      const displayPrice = (item.current_price || 0) * rate;
+      setLocalValue(displayCurrency === 'USD' && !item.current_price ? '' : displayPrice.toFixed(2));
+    }
+  }, [item.current_price, displayCurrency, exchangeRates, isFocused]);
+
+  const handleChange = (e) => {
+    setLocalValue(e.target.value);
+    updatePrice(item.product_id, item.presentation_id, item.sellByUnit, e.target.value);
+  };
+
+  const handleBlur = (e) => {
+    setIsFocused(false);
+    if (!e.target.value || parseFloat(e.target.value) < 0) {
+      let originalUSD = item.sellByUnit ? item.unit_price_each : item.package_price;
+      let rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
+      updatePrice(item.product_id, item.presentation_id, item.sellByUnit, originalUSD * rate);
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      value={localValue}
+      onChange={handleChange}
+      onFocus={() => setIsFocused(true)}
+      onBlur={handleBlur}
+      className="w-24 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+      title="Editar precio unitario"
+    />
+  );
+};
+
 // ──────────────────────── COMPONENT ────────────────────────
 const POSPage = () => {
   const { user, hasPermission } = useAuth();
@@ -771,22 +813,11 @@ const POSPage = () => {
                           <span className="text-[10px] text-gray-400 font-medium">
                             {CURRENCIES.find(c => c.code === displayCurrency)?.symbol}
                           </span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={displayCurrency === 'USD' ? (item.current_price || '') : (item.current_price * (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1)).toFixed(2)}
-                            onChange={(e) => updatePrice(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
-                            onBlur={(e) => {
-                              // Fallback to original price if cleared
-                              if (!e.target.value || parseFloat(e.target.value) < 0) {
-                                let originalUSD = item.sellByUnit ? item.unit_price_each : item.package_price;
-                                let originalDisplay = displayCurrency === 'USD' ? originalUSD : (originalUSD * (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1));
-                                updatePrice(item.product_id, item.presentation_id, item.sellByUnit, originalDisplay);
-                              }
-                            }}
-                            className="w-24 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
-                            title="Editar precio unitario"
+                          <PriceEditor
+                            item={item}
+                            displayCurrency={displayCurrency}
+                            exchangeRates={exchangeRates}
+                            updatePrice={updatePrice}
                           />
                         </div>
                       ) : (
