@@ -98,13 +98,13 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
 
   const getCustomerDisplayName = (customer) => {
     if (customer.type === 'natural') {
-      return `${customer.first_name} ${customer.last_name}`;
+      return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Sin nombre';
     }
-    return customer.business_name || customer.trade_name;
+    return customer.businessName || customer.tradeName || 'Sin nombre';
   };
 
   const getCustomerDocumentLabel = (customer) => {
-    return `${customer.document_type}: ${customer.document_number}`;
+    return `${customer.documentType || ''}-${customer.documentNumber || ''}`;
   };
 
   return (
@@ -164,26 +164,26 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
             </div>
 
             {/* Credit Information */}
-            {selectedCustomer.credit_limit > 0 && (
+            {selectedCustomer.creditLimit > 0 && (
               <div className="mt-3 pt-3 border-t border-blue-200">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-blue-700">Límite de Crédito:</span>
                     <p className="font-semibold text-blue-900">
-                      $ {selectedCustomer.credit_limit?.toFixed(2) || '0.00'}
+                      $ {parseFloat(selectedCustomer.creditLimit || 0).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <span className="text-blue-700">Días de Crédito:</span>
                     <p className="font-semibold text-blue-900">
-                      {selectedCustomer.credit_days || 0} días
+                      {selectedCustomer.creditDays || 0} días
                     </p>
                   </div>
-                  {selectedCustomer.discount_percentage > 0 && (
+                  {selectedCustomer.discountPercentage > 0 && (
                     <div>
                       <span className="text-blue-700">Descuento:</span>
                       <p className="font-semibold text-green-600">
-                        {selectedCustomer.discount_percentage}%
+                        {selectedCustomer.discountPercentage}%
                       </p>
                     </div>
                   )}
@@ -201,9 +201,8 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                       </div>
                       <div>
                         <span className="text-blue-700">Crédito Disponible:</span>
-                        <p className={`font-semibold ${
-                          creditValidation.has_available_credit ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <p className={`font-semibold ${creditValidation.has_available_credit ? 'text-green-600' : 'text-red-600'
+                          }`}>
                           $ {creditValidation.available_credit?.toFixed(2) || '0.00'}
                         </p>
                       </div>
@@ -233,9 +232,8 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                 <button
                   key={customer.id}
                   onClick={() => handleSelectCustomer(customer)}
-                  className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
-                    selectedCustomer?.id === customer.id ? 'bg-blue-50' : ''
-                  }`}
+                  className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${selectedCustomer?.id === customer.id ? 'bg-blue-50' : ''
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -253,15 +251,15 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                       {customer.phone && (
                         <p className="text-sm text-gray-500">Tel: {customer.phone}</p>
                       )}
-                      {customer.credit_limit > 0 && (
+                      {customer.creditLimit > 0 && (
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-green-600 flex items-center gap-1">
                             <CreditCard className="w-3 h-3" />
-                            Crédito: $ {customer.credit_limit.toFixed(2)}
+                            Crédito: $ {parseFloat(customer.creditLimit || 0).toFixed(2)}
                           </span>
-                          {customer.discount_percentage > 0 && (
+                          {customer.discountPercentage > 0 && (
                             <span className="text-xs text-blue-600">
-                              Desc: {customer.discount_percentage}%
+                              Desc: {customer.discountPercentage}%
                             </span>
                           )}
                         </div>

@@ -406,8 +406,8 @@ const SalesPage = () => {
                 <p className="text-sm font-medium text-gray-800">
                   {selectedSale.customer
                     ? (selectedSale.customer.type === 'natural'
-                      ? `${selectedSale.customer.first_name} ${selectedSale.customer.last_name}`
-                      : selectedSale.customer.business_name)
+                      ? `${selectedSale.customer.firstName} ${selectedSale.customer.lastName}`
+                      : selectedSale.customer.businessName)
                     : 'Cliente General'}
                 </p>
               </div>

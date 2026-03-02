@@ -96,8 +96,8 @@ const POSPage = () => {
   useEffect(() => { loadExchangeRates(); }, []);
 
   useEffect(() => {
-    if (customer && customer.discount_percentage > 0) {
-      setCart(prev => prev.map(item => ({ ...item, discount_percent: customer.discount_percentage })));
+    if (customer && customer.discountPercentage > 0) {
+      setCart(prev => prev.map(item => ({ ...item, discount_percent: customer.discountPercentage })));
     }
   }, [customer]);
 
@@ -225,7 +225,7 @@ const POSPage = () => {
         unit_price_each: unitPrice || (pkgPrice / unitsPerPkg),
         current_price: pkgPrice,
         tax_percent: 0,
-        discount_percent: customer?.discount_percentage || 0
+        discount_percent: customer?.discountPercentage || 0
       }]);
     }
   };
@@ -270,8 +270,8 @@ const POSPage = () => {
   // ──────────────────── CUSTOMERS ────────────────────
   const handleCustomerSelect = (c) => {
     setCustomer(c);
-    if (c.discount_percentage > 0) {
-      setCart(prev => prev.map(i => ({ ...i, discount_percent: c.discount_percentage })));
+    if (c.discountPercentage > 0) {
+      setCart(prev => prev.map(i => ({ ...i, discount_percent: c.discountPercentage })));
     }
   };
 
@@ -283,8 +283,8 @@ const POSPage = () => {
   const getCustomerDisplayName = () => {
     if (!customer) return '';
     return customer.type === 'natural'
-      ? `${customer.first_name} ${customer.last_name}`
-      : customer.business_name || customer.trade_name;
+      ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+      : customer.businessName || customer.tradeName || '';
   };
 
   // ──────────────────── TOTALS ────────────────────
@@ -542,8 +542,8 @@ const POSPage = () => {
                   <User className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-blue-900 truncate">{getCustomerDisplayName()}</p>
-                    <p className="text-[10px] text-blue-600 truncate">{customer.document_type}: {customer.document_number}
-                      {customer.discount_percentage > 0 && <span className="text-green-600 ml-1"> • {customer.discount_percentage}% desc</span>}
+                    <p className="text-[10px] text-blue-600 truncate">{customer.documentType}-{customer.documentNumber}
+                      {customer.discountPercentage > 0 && <span className="text-green-600 ml-1"> • {customer.discountPercentage}% desc</span>}
                     </p>
                   </div>
                 </div>
@@ -624,7 +624,7 @@ const POSPage = () => {
                 </div>
 
                 {/* Discount row (only if customer discount or expanded) */}
-                {(item.discount_percent > 0 || (customer && customer.discount_percentage > 0)) && (
+                {(item.discount_percent > 0 || (customer && customer.discountPercentage > 0)) && (
                   <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100">
                     <label className="text-[10px] text-gray-500">Desc:</label>
                     <input
@@ -632,10 +632,10 @@ const POSPage = () => {
                       value={item.discount_percent}
                       onChange={e => updateDiscount(item.product_id, item.presentation_id, e.target.value)}
                       className="w-12 px-1 py-0.5 text-[10px] border border-gray-200 rounded text-center"
-                      disabled={customer && customer.discount_percentage > 0}
+                      disabled={customer && customer.discountPercentage > 0}
                     />
                     <span className="text-[10px] text-gray-400">%</span>
-                    {customer && customer.discount_percentage > 0 && (
+                    {customer && customer.discountPercentage > 0 && (
                       <span className="text-[10px] text-green-600 font-medium">(Cliente)</span>
                     )}
                   </div>
@@ -731,7 +731,7 @@ const POSPage = () => {
 
           {saleType === 'credit' && customer && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              Venta a crédito para <strong>{getCustomerDisplayName()}</strong>. Plazo: {customer.credit_days} días.
+              Venta a crédito para <strong>{getCustomerDisplayName()}</strong>. Plazo: {customer.creditDays} días.
             </div>
           )}
 

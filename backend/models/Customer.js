@@ -20,10 +20,10 @@ const Customer = sequelize.define('Customer', {
     comment: 'Tipo de cliente: natural o jurídica'
   },
   documentType: {
-    type: DataTypes.ENUM('DNI', 'RUC', 'CE', 'PASSPORT', 'OTHER'),
+    type: DataTypes.ENUM('V', 'E', 'J', 'G', 'P'),
     allowNull: false,
-    defaultValue: 'DNI',
-    comment: 'Tipo de documento de identidad'
+    defaultValue: 'V',
+    comment: 'Tipo de documento venezolano: V (venezolano), E (extranjero), J (jurídico/RIF), G (gubernamental), P (pasaporte)'
   },
   documentNumber: {
     type: DataTypes.STRING(20),
@@ -81,7 +81,7 @@ const Customer = sequelize.define('Customer', {
   country: {
     type: DataTypes.STRING(100),
     allowNull: true,
-    defaultValue: 'Perú'
+    defaultValue: 'Venezuela'
   },
   postalCode: {
     type: DataTypes.STRING(10),
@@ -145,6 +145,19 @@ const Customer = sequelize.define('Customer', {
   ],
   hooks: {
     beforeValidate: async (customer) => {
+      // Convert empty strings to null for optional fields
+      const optionalFields = [
+        'email', 'phone', 'mobile', 'address', 'city', 'state',
+        'postalCode', 'businessName', 'tradeName', 'firstName',
+        'lastName', 'notes'
+      ];
+
+      optionalFields.forEach(field => {
+        if (customer[field] === '') {
+          customer[field] = null;
+        }
+      });
+
       // Generar código automático si no existe
       if (!customer.code) {
         const lastCustomer = await Customer.findOne({
@@ -160,7 +173,7 @@ const Customer = sequelize.define('Customer', {
 });
 
 // Método para obtener el nombre completo
-Customer.prototype.getFullName = function() {
+Customer.prototype.getFullName = function () {
   if (this.type === 'juridical') {
     return this.businessName || this.tradeName;
   }
@@ -168,13 +181,13 @@ Customer.prototype.getFullName = function() {
 };
 
 // Método para verificar disponibilidad de crédito
-Customer.prototype.hasAvailableCredit = function(amount) {
+Customer.prototype.hasAvailableCredit = function (amount) {
   const availableCredit = parseFloat(this.creditLimit) - parseFloat(this.creditUsed || 0);
   return availableCredit >= amount;
 };
 
 // Personalizar JSON para excluir campos sensibles
-Customer.prototype.toJSON = function() {
+Customer.prototype.toJSON = function () {
   const values = { ...this.get() };
   delete values.isDeleted;
   return values;

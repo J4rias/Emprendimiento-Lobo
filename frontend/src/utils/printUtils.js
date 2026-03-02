@@ -19,7 +19,7 @@ export const printHTML = (content, title = 'Imprimir') => {
   const printerSettings = JSON.parse(localStorage.getItem('pos_printer_settings') || '{"width": "80mm", "margin": "0mm", "zoom": "1.0"}');
   const width = printerSettings.width || '80mm';
   const margin = printerSettings.margin || '0mm';
-  const zoom = printerSettings.zoom || '1.0';
+  const zoom = printerSettings.zoom || '1.2';
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -35,13 +35,16 @@ export const printHTML = (content, title = 'Imprimir') => {
           }
 
           body {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            line-height: 1.2;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            line-height: 1.1;
             color: #000;
             background: #fff;
             width: ${width};
             zoom: ${zoom};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            image-rendering: pixelated;
           }
 
           @media print {

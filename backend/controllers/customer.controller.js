@@ -211,7 +211,7 @@ class CustomerController {
         address,
         city,
         state,
-        country: country || 'Perú',
+        country: country || 'Venezuela',
         postalCode,
         creditLimit: creditLimit || 0,
         creditDays: creditDays || 0,
@@ -278,7 +278,7 @@ class CustomerController {
       }
 
       if (updateData.type === 'natural' &&
-          ((!updateData.firstName && !customer.firstName) || (!updateData.lastName && !customer.lastName))) {
+        ((!updateData.firstName && !customer.firstName) || (!updateData.lastName && !customer.lastName))) {
         return res.status(400).json({
           success: false,
           message: 'El nombre y apellido son obligatorios para personas naturales'
