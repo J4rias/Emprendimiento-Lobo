@@ -33,7 +33,7 @@ const emptyPaymentLine = () => ({ currency: 'USD', method: 'cash', amount: '' })
 
 // ──────────────────────── COMPONENT ────────────────────────
 const POSPage = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { companySettings } = useCompany();
   const searchInputRef = useRef(null);
 
@@ -193,7 +193,7 @@ const POSPage = () => {
   const getPrice = (productId, presentationId, presentation) => {
     const key = `${productId}-${presentationId}`;
     const detail = priceListDetails[key];
-    const pkgPrice = detail && parseFloat(detail.package_price) > 0 ? parseFloat(detail.package_price) : (presentation?.sale_price || 0);
+    const pkgPrice = detail && parseFloat(detail.package_price) > 0 ? parseFloat(detail.package_price) : (presentation?.package_price || 0);
     const unitPrice = detail && parseFloat(detail.unit_price) > 0 ? parseFloat(detail.unit_price) : 0;
     return { pkgPrice, unitPrice };
   };
@@ -205,19 +205,22 @@ const POSPage = () => {
     const { totalUnits, availablePackages, looseUnits, unitsPerPkg } = getProductStock(product, pres);
     const { pkgPrice, unitPrice } = getPrice(product.id, pres.id, pres);
 
-    const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id);
+    const targetSellByUnit = availablePackages <= 0 && looseUnits > 0;
+    const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id && i.sellByUnit === targetSellByUnit);
+
+    const currentTotalUnitsInCart = cart.filter(i => i.product_id === product.id && i.presentation_id === pres.id)
+      .reduce((sum, i) => sum + (i.sellByUnit ? i.quantity : i.quantity * i.units_per_package), 0);
+
+    const unitsToAdd = targetSellByUnit ? 1 : unitsPerPkg;
+
+    if (currentTotalUnitsInCart + unitsToAdd > totalUnits) {
+      toast.error(`Stock global insuficiente. Disponibles: ${totalUnits} unidades totales`);
+      return;
+    }
 
     if (existing) {
-      const maxQty = existing.sellByUnit ? totalUnits : availablePackages;
-      if (existing.quantity + 1 > maxQty) {
-        toast.error(`Stock insuficiente. Disponibles: ${maxQty}`);
-        return;
-      }
-      updateQuantity(existing.product_id, existing.presentation_id, existing.quantity + 1, maxQty);
+      updateQuantity(existing.product_id, existing.presentation_id, existing.sellByUnit, existing.quantity + 1);
     } else {
-      if (totalUnits <= 0) { toast.error('Sin stock disponible'); return; }
-      const isOnlyUnits = availablePackages <= 0 && looseUnits > 0;
-
       setCart(prev => [...prev, {
         product_id: product.id,
         presentation_id: pres.id,
@@ -227,61 +230,113 @@ const POSPage = () => {
         quantity: 1,
         stock_units: totalUnits,
         stock_packages: availablePackages,
-        sellByUnit: isOnlyUnits,
+        sellByUnit: targetSellByUnit,
         package_price: pkgPrice,
         unit_price_each: unitPrice || (pkgPrice / unitsPerPkg),
-        current_price: isOnlyUnits ? (unitPrice || (pkgPrice / unitsPerPkg)) : pkgPrice,
+        current_price: targetSellByUnit ? (unitPrice || (pkgPrice / unitsPerPkg)) : pkgPrice,
         tax_percent: 0,
         discount_percent: customer?.discountPercentage || 0
       }]);
     }
   };
 
-  const toggleSellMode = (productId, presentationId) => {
-    let hasError = false;
-    setCart(prev => prev.map(item => {
-      if (item.product_id !== productId || item.presentation_id !== presentationId) return item;
+  const toggleSellMode = (productId, presentationId, currentSellByUnit) => {
+    const item = cart.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === currentSellByUnit);
+    if (!item) return;
 
-      const nowByUnit = !item.sellByUnit;
-      const maxQty = nowByUnit ? item.stock_units : item.stock_packages;
+    const targetByUnit = !currentSellByUnit;
+    const maxTargetQty = targetByUnit ? item.stock_units : item.stock_packages;
 
-      // Prevent switching to packages if none are available
-      if (!nowByUnit && maxQty <= 0) {
-        hasError = true;
-        return item; // Keep unchanged
+    if (!targetByUnit && maxTargetQty <= 0) {
+      toast.error('No hay paquetes completos disponibles');
+      return;
+    }
+
+    setCart(prev => {
+      const existingOther = prev.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === targetByUnit);
+
+      // Convert quantity properly based on the new unit
+      let convertedQty = targetByUnit
+        ? item.quantity * item.units_per_package
+        : Math.floor(item.quantity / item.units_per_package);
+
+      if (!targetByUnit && convertedQty < 1) {
+        convertedQty = 1; // Ensure at least 1 package if they force the conversion
       }
 
-      const newQty = Math.min(item.quantity, maxQty) || 1;
-      return {
-        ...item,
-        sellByUnit: nowByUnit,
-        quantity: newQty,
-        current_price: nowByUnit ? item.unit_price_each : item.package_price
-      };
-    }));
+      let finalQty = convertedQty;
+      if (existingOther) {
+        finalQty += existingOther.quantity;
+      }
+      finalQty = Math.max(1, Math.min(finalQty, maxTargetQty));
 
-    if (hasError) {
-      toast.error('No hay paquetes completos disponibles');
-    }
+      // Validate global stock with new configuration
+      const proposedUnits = targetByUnit ? finalQty : finalQty * item.units_per_package;
+
+      if (proposedUnits > item.stock_units) {
+        finalQty = targetByUnit ? item.stock_units : Math.floor(item.stock_units / item.units_per_package);
+      }
+
+      if (!existingOther) {
+        return prev.map(i => {
+          if (i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === currentSellByUnit) {
+            return {
+              ...i,
+              sellByUnit: targetByUnit,
+              quantity: finalQty,
+              current_price: targetByUnit ? i.unit_price_each : i.package_price
+            };
+          }
+          return i;
+        });
+      } else {
+        return prev
+          .filter(i => !(i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === currentSellByUnit))
+          .map(i => {
+            if (i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === targetByUnit) {
+              return { ...i, quantity: finalQty };
+            }
+            return i;
+          });
+      }
+    });
   };
 
-  const updateQuantity = (productId, presentationId, newQty, maxStock = null) => {
-    if (newQty <= 0) { removeFromCart(productId, presentationId); return; }
-    const item = cart.find(i => i.product_id === productId && i.presentation_id === presentationId);
-    const available = maxStock !== null ? maxStock : (item?.sellByUnit ? item?.stock_units : item?.stock_packages) || 999999;
-    if (newQty > available) { toast.error(`Stock insuficiente. Disponibles: ${available}`); return; }
+  const updateQuantity = (productId, presentationId, sellByUnit, newQty) => {
+    if (newQty <= 0) { removeFromCart(productId, presentationId, sellByUnit); return; }
+
+    const item = cart.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === sellByUnit);
+    if (!item) return;
+
+    const otherItem = cart.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === !sellByUnit);
+    const otherUnits = otherItem ? (otherItem.sellByUnit ? otherItem.quantity : otherItem.quantity * otherItem.units_per_package) : 0;
+
+    const proposedUnits = sellByUnit ? newQty : newQty * item.units_per_package;
+    if (proposedUnits + otherUnits > item.stock_units) {
+      const availableUnitsForThis = item.stock_units - otherUnits;
+      const maxAllowedQty = sellByUnit ? availableUnitsForThis : Math.floor(availableUnitsForThis / item.units_per_package);
+      toast.error(`Stock insuficiente. Máximo disponible en esta unidad: ${maxAllowedQty}`);
+      return;
+    }
+
     setCart(prev => prev.map(i =>
-      i.product_id === productId && i.presentation_id === presentationId ? { ...i, quantity: newQty } : i
+      i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === sellByUnit ? { ...i, quantity: newQty } : i
     ));
   };
 
-  const removeFromCart = (pid, presId) => {
-    setCart(prev => prev.filter(i => !(i.product_id === pid && i.presentation_id === presId)));
+  const removeFromCart = (pid, presId, sellByUnit) => {
+    setCart(prev => prev.filter(i => !(i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit)));
   };
 
-  const updateDiscount = (pid, presId, val) => {
+  const updateDiscount = (pid, presId, sellByUnit, val) => {
     setCart(prev => prev.map(i =>
-      i.product_id === pid && i.presentation_id === presId ? { ...i, discount_percent: parseFloat(val) || 0 } : i
+      i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit ? { ...i, discount_percent: parseFloat(val) || 0 } : i
+    ));
+  };
+
+  const updatePrice = (pid, presId, sellByUnit, newPrice) => {
+    setCart(prev => prev.map(i =>
+      i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit ? { ...i, current_price: parseFloat(newPrice) || 0 } : i
     ));
   };
 
@@ -308,6 +363,12 @@ const POSPage = () => {
   };
 
   // ──────────────────── TOTALS ────────────────────
+  const calculateItemSubtotal = (item) => {
+    const sub = item.quantity * item.current_price;
+    const disc = sub * (item.discount_percent / 100);
+    return sub - disc;
+  };
+
   const calculateTotals = useCallback(() => {
     let subtotal = 0, totalDiscount = 0;
     cart.forEach(item => {
@@ -399,17 +460,14 @@ const POSPage = () => {
         paymentLines: [...paymentLines]
       });
 
+      toast.success(`¡Venta ${response.sale.sale_number} completada!`);
+      clearCart();
       setShowCheckoutModal(false);
       setShowResultModal(true);
 
-      toast.success(`¡Venta ${response.sale.sale_number} completada!`);
-
-      // Clear
-      setCart([]);
-      setCustomer(null);
-      setPaymentLines([emptyPaymentLine()]);
-      setSaleType('cash');
+      // Real-time inventory refresh
       loadProducts();
+
     } catch (error) {
       toast.error(error.response?.data?.message || 'Error al procesar la venta');
     } finally { setLoading(false); }
@@ -598,7 +656,7 @@ const POSPage = () => {
                     <p className="text-[10px] text-gray-400">{item.presentation_name}</p>
                   </div>
                   <button
-                    onClick={() => removeFromCart(item.product_id, item.presentation_id)}
+                    onClick={() => removeFromCart(item.product_id, item.presentation_id, item.sellByUnit)}
                     className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition ml-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -609,7 +667,7 @@ const POSPage = () => {
                 <div className="flex items-center justify-between gap-2">
                   {/* Package/Unit toggle */}
                   <button
-                    onClick={() => toggleSellMode(item.product_id, item.presentation_id)}
+                    onClick={() => toggleSellMode(item.product_id, item.presentation_id, item.sellByUnit)}
                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition ${item.sellByUnit
                       ? 'bg-violet-100 text-violet-700'
                       : 'bg-blue-100 text-blue-700'
@@ -620,45 +678,78 @@ const POSPage = () => {
                     {item.sellByUnit ? 'Und' : 'Paq'}
                   </button>
 
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.presentation_id, item.quantity - 1)}
-                      className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center hover:bg-gray-300 transition"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="w-8 text-center text-xs font-bold">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.presentation_id, item.quantity + 1)}
-                      className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center hover:bg-gray-300 transition"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Qty Controls */}
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded p-0.5 shadow-sm mt-1">
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.presentation_id, item.sellByUnit, item.quantity - 1)}
+                        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+                        disabled={item.quantity <= 1}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateQuantity(item.product_id, item.presentation_id, item.sellByUnit, parseInt(e.target.value) || 1)}
+                        className="w-8 text-center text-xs font-semibold text-gray-800 bg-transparent border-none p-0 focus:ring-0 appearance-none"
+                      />
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.presentation_id, item.sellByUnit, item.quantity + 1)}
+                        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
 
-                  {/* Price + subtotal */}
-                  <div className="text-right">
-                    <p className="text-[10px] text-gray-400">{formatMoney(item.current_price)} c/u</p>
-                    <p className="text-xs font-bold text-gray-800">{formatMoney(item.quantity * item.current_price)}</p>
+                    {/* Subtotal & Price Edit */}
+                    <div className="flex flex-col items-end border-l border-gray-200 pl-2 ml-1">
+                      {hasPermission('sales.edit_price') ? (
+                        <div className="flex items-center gap-0.5 mb-1">
+                          <span className="text-[10px] text-gray-400 font-medium">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.current_price || ''}
+                            onChange={(e) => updatePrice(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
+                            onBlur={(e) => {
+                              // Fallback to original price if cleared
+                              if (!e.target.value || parseFloat(e.target.value) < 0) {
+                                const original = item.sellByUnit ? item.unit_price_each : item.package_price;
+                                updatePrice(item.product_id, item.presentation_id, item.sellByUnit, original);
+                              }
+                            }}
+                            className="w-16 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                            title="Editar precio unitario"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-500 mb-1">{formatMoney(item.current_price)} c/u</span>
+                      )}
+                      <span className="w-24 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
+                        {formatMoney(calculateItemSubtotal(item))}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Discount row (only if customer discount or expanded) */}
-                {(item.discount_percent > 0 || (customer && customer.discountPercentage > 0)) && (
-                  <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100">
-                    <label className="text-[10px] text-gray-500">Desc:</label>
-                    <input
-                      type="number" min="0" max="100"
-                      value={item.discount_percent}
-                      onChange={e => updateDiscount(item.product_id, item.presentation_id, e.target.value)}
-                      className="w-12 px-1 py-0.5 text-[10px] border border-gray-200 rounded text-center"
-                      disabled={customer && customer.discountPercentage > 0}
-                    />
-                    <span className="text-[10px] text-gray-400">%</span>
-                    {customer && customer.discountPercentage > 0 && (
-                      <span className="text-[10px] text-green-600 font-medium">(Cliente)</span>
-                    )}
+                {/* Row 3: discount (optional) */}
+                {(customer?.discountPercentage > 0 || item.discount_percent > 0) && (
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className="text-gray-500">Descuento:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={item.discount_percent || 0}
+                        onChange={(e) => updateDiscount(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
+                        className="w-10 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-400">%</span>
+                    </div>
                   </div>
                 )}
               </div>

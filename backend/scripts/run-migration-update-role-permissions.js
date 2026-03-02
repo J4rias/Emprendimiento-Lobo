@@ -16,8 +16,8 @@ const ROLE_PERMISSIONS = {
   ],
   Cajero: [
     'products.view', 'inventory.view', 'sales.quotes.view', 'sales.quotes.create',
-    'sales.view', 'sales.create', 'sales.cancel', 'sales.return', 'reports.view',
-    'customers.view', 'customers.create', 'customers.update',
+    'sales.view', 'sales.create', 'sales.cancel', 'sales.return', 'sales.edit_price',
+    'reports.view', 'customers.view', 'customers.create', 'customers.update',
     'credit_notes.view', 'credit_notes.create',
     'deliveries.view'
   ],
