@@ -7,6 +7,8 @@ import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
 
+import { formatMoney } from '../utils/formatUtils';
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -78,7 +80,7 @@ const Dashboard = () => {
     {
       name: 'Ventas del Día',
       value: stats.todaySales,
-      subtitle: `$${stats.todayRevenue.toFixed(2)}`,
+      subtitle: formatMoney(stats.todayRevenue),
       icon: ShoppingCart,
       color: 'bg-green-500',
       link: '/ventas'
@@ -92,7 +94,7 @@ const Dashboard = () => {
     },
     {
       name: 'Valor Inventario',
-      value: `$${stats.inventoryValue.toFixed(2)}`,
+      value: formatMoney(stats.inventoryValue),
       icon: DollarSign,
       color: 'bg-purple-500',
       link: '/inventario'
@@ -106,7 +108,7 @@ const Dashboard = () => {
     },
     {
       name: 'Ingresos del Mes',
-      value: `$${stats.monthRevenue.toFixed(2)}`,
+      value: formatMoney(stats.monthRevenue),
       icon: TrendingUp,
       color: 'bg-indigo-500',
       link: '/ventas'

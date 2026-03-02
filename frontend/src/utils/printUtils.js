@@ -96,7 +96,13 @@ export const printHTML = (content, title = 'Imprimir') => {
  * @returns {string} Formatted currency
  */
 export const formatCurrency = (amount, currency = '$') => {
-  return `${currency} ${parseFloat(amount).toFixed(2)}`;
+  const val = parseFloat(amount);
+  if (isNaN(val)) return `${currency} 0,00`;
+
+  return `${currency} ${val.toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
 };
 
 /**

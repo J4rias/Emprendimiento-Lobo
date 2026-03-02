@@ -153,7 +153,7 @@ const SalesPage = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Ingresos Totales</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  ${(stats.totalRevenue || 0).toFixed(2)}
+                  {formatMoney(stats.totalRevenue || 0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">

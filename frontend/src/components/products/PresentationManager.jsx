@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Package, Star, Trash2, DollarSign } from 'lucide-react';
+import { formatMoney } from '../../utils/formatUtils';
 
 const PresentationManager = ({ presentations = [], onChange, readonly = false, packagingTypes = [], presentationTypes = [], productUnitSize = '', productUnitMeasure = 'UND' }) => {
   const [localPresentations, setLocalPresentations] = useState([]);
@@ -163,8 +164,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
               {getDefaultPresentation().package_price > 0 && (
                 <div className="flex items-center">
                   <DollarSign className="h-3 w-3 mr-1" />
-                  Precio: {currencies.find(c => c.code === getDefaultPresentation().purchase_currency)?.symbol || '$'}
-                  {(parseFloat(getDefaultPresentation().package_price) || 0).toFixed(2)}
+                  Precio: {formatMoney(getDefaultPresentation().package_price, currencies.find(c => c.code === getDefaultPresentation().purchase_currency)?.symbol)}
                 </div>
               )}
             </div>
@@ -301,8 +301,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                     <label className="block text-xs text-gray-500 mb-1">Precio/Paquete</label>
                     {readonly ? (
                       <p className="text-gray-700">
-                        {currencies.find(c => c.code === presentation.purchase_currency)?.symbol || '$'}
-                        {presentation.package_price?.toFixed(2) || '0.00'}
+                        {formatMoney(presentation.package_price, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
                       </p>
                     ) : (
                       <input
@@ -321,8 +320,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                     <label className="block text-xs text-gray-500 mb-1">Costo/Paquete</label>
                     {readonly ? (
                       <p className="text-gray-700">
-                        {currencies.find(c => c.code === presentation.purchase_currency)?.symbol || '$'}
-                        {presentation.package_cost?.toFixed(2) || '0.00'}
+                        {formatMoney(presentation.package_cost, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
                       </p>
                     ) : (
                       <input
@@ -336,8 +334,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                     )}
                     {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
                       <p className="text-xs text-blue-600 mt-0.5">
-                        Unitario: {currencies.find(c => c.code === presentation.purchase_currency)?.symbol || '$'}
-                        {(parseFloat(presentation.package_cost) / (parseInt(presentation.units_per_package) || 1)).toFixed(2)}
+                        Unitario: {formatMoney((parseFloat(presentation.package_cost) / (parseInt(presentation.units_per_package) || 1)), currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
                       </p>
                     )}
                   </div>

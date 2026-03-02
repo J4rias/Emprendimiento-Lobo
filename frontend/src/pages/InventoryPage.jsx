@@ -5,6 +5,7 @@ import { Package, AlertTriangle, Calendar, DollarSign, Search, Filter, Download,
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TransferFormModal from '../components/transfers/TransferFormModal';
+import { formatMoney } from '../utils/formatUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -69,8 +70,8 @@ const InventoryPage = () => {
   });
 
   const handleSelectItem = (itemId) => {
-    setSelectedItems(prev => 
-      prev.includes(itemId) 
+    setSelectedItems(prev =>
+      prev.includes(itemId)
         ? prev.filter(id => id !== itemId)
         : [...prev, itemId]
     );
@@ -295,7 +296,7 @@ const InventoryPage = () => {
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Valor Total</p>
               <p className="text-2xl font-bold text-green-600">
-                ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'} USD
+                {formatMoney(valuationData?.data?.totalValue || 0)} USD
               </p>
 
               {/* Botón para ver desglose */}
@@ -354,11 +355,10 @@ const InventoryPage = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                (filters.lowStock || filters.expiring || filters.outOfStock)
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${(filters.lowStock || filters.expiring || filters.outOfStock)
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               title="Filtros rápidos"
             >
               <Filter className="w-4 h-4" />
@@ -632,7 +632,7 @@ const InventoryPage = () => {
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">Total Convertido</p>
                 <p className="text-3xl font-bold text-green-600">
-                  ${valuationData?.data?.totalValue?.toFixed(2) || '0.00'} USD
+                  {formatMoney(valuationData?.data?.totalValue || 0)} USD
                 </p>
               </div>
 
@@ -652,7 +652,7 @@ const InventoryPage = () => {
                             <span className="text-sm text-gray-500">{currency}</span>
                           </div>
                           <p className="text-lg font-bold text-gray-900">
-                            {currencyInfo?.symbol}{value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatMoney(value, currencyInfo?.symbol)}
                           </p>
                           {conversion && (
                             <div className="mt-2 pt-2 border-t border-gray-200">
