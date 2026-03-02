@@ -37,10 +37,9 @@ const POSPage = () => {
   const { companySettings } = useCompany();
   const searchInputRef = useRef(null);
 
-  // Helper for currency formatting with thousands separator
-  const formatMoney = (amount, symbol = '$') => {
-    return `${symbol} ${parseFloat(amount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  // ──────────────────── NEW FEATURE: UI Currency Masking ────────────────────
+  const [displayCurrency, setDisplayCurrency] = useState('COP');
+
 
   // Products & search
   const [products, setProducts] = useState([]);
@@ -60,6 +59,7 @@ const POSPage = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [saleType, setSaleType] = useState('cash');
   const [paymentLines, setPaymentLines] = useState([emptyPaymentLine()]);
+  const [activePaymentCurrency, setActivePaymentCurrency] = useState('USD');
   const [loading, setLoading] = useState(false);
 
   // Post-sale
@@ -72,6 +72,24 @@ const POSPage = () => {
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const getEffectiveRate = useCallback((from, to) => {
+    return calculateEffectiveRate(from, to, exchangeRates);
+  }, [exchangeRates]);
+
+  // Helper for currency formatting with thousands separator (masks to displayCurrency)
+  const formatMoney = (amount, forceCurrency = null) => {
+    const targetCurrency = forceCurrency || displayCurrency;
+    const currencyDef = CURRENCIES.find(c => c.code === targetCurrency) || CURRENCIES[0];
+
+    let displayAmount = parseFloat(amount || 0);
+    if (targetCurrency !== 'USD') {
+      const rate = calculateEffectiveRate('USD', targetCurrency, exchangeRates);
+      displayAmount = rate !== null ? displayAmount * rate : displayAmount;
+    }
+
+    return `${currencyDef.symbol} ${displayAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   // ──────────────────── EFFECTS ────────────────────
   useEffect(() => {
@@ -190,11 +208,26 @@ const POSPage = () => {
     };
   };
 
-  const getPrice = (productId, presentationId, presentation) => {
-    const key = `${productId}-${presentationId}`;
+  const getPrice = (product, presentation) => {
+    if (!presentation) return { pkgPrice: 0, unitPrice: 0 };
+
+    const key = `${product.id}-${presentation.id}`;
     const detail = priceListDetails[key];
-    const pkgPrice = detail && parseFloat(detail.package_price) > 0 ? parseFloat(detail.package_price) : (presentation?.package_price || 0);
-    const unitPrice = detail && parseFloat(detail.unit_price) > 0 ? parseFloat(detail.unit_price) : 0;
+
+    let pkgPrice = detail && parseFloat(detail.package_price) > 0 ? parseFloat(detail.package_price) : (parseFloat(presentation.package_price) || 0);
+    let unitPrice = detail && parseFloat(detail.unit_price) > 0 ? parseFloat(detail.unit_price) : 0;
+
+    // If the original price was calculated based on a non-USD purchase cost (like COP),
+    // and the price list didn't convert it, we must normalize it to USD internally for the cart.
+    const purchaseCurrency = presentation.purchase_currency || 'USD';
+    if (purchaseCurrency !== 'USD') {
+      const rate = calculateEffectiveRate('USD', purchaseCurrency, exchangeRates);
+      if (rate && rate > 0) {
+        pkgPrice = pkgPrice / rate;
+        unitPrice = unitPrice / rate;
+      }
+    }
+
     return { pkgPrice, unitPrice };
   };
 
@@ -203,7 +236,7 @@ const POSPage = () => {
     if (!pres) { toast.error('Producto sin presentaciones configuradas'); return; }
 
     const { totalUnits, availablePackages, looseUnits, unitsPerPkg } = getProductStock(product, pres);
-    const { pkgPrice, unitPrice } = getPrice(product.id, pres.id, pres);
+    const { pkgPrice, unitPrice } = getPrice(product, pres);
 
     const targetSellByUnit = availablePackages <= 0 && looseUnits > 0;
     const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id && i.sellByUnit === targetSellByUnit);
@@ -334,9 +367,19 @@ const POSPage = () => {
     ));
   };
 
-  const updatePrice = (pid, presId, sellByUnit, newPrice) => {
+  const updatePrice = (pid, presId, sellByUnit, newDisplayPrice) => {
+    let usdPrice = parseFloat(newDisplayPrice) || 0;
+
+    // If the user typed the price while viewing in another currency (e.g. COP), convert it back to USD to store in cart
+    if (displayCurrency !== 'USD') {
+      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
+      if (rate && rate > 0) {
+        usdPrice = usdPrice / rate;
+      }
+    }
+
     setCart(prev => prev.map(i =>
-      i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit ? { ...i, current_price: parseFloat(newPrice) || 0 } : i
+      i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit ? { ...i, current_price: usdPrice } : i
     ));
   };
 
@@ -386,10 +429,6 @@ const POSPage = () => {
     };
   }, [cart]);
 
-  const getEffectiveRate = useCallback((from, to) => {
-    return calculateEffectiveRate(from, to, exchangeRates);
-  }, [exchangeRates]);
-
   const convertToOtherCurrency = (usdAmount, targetCurrency) => {
     const rate = getEffectiveRate('USD', targetCurrency);
     return rate !== null ? usdAmount * rate : null;
@@ -437,7 +476,10 @@ const POSPage = () => {
         customer_id: customer?.id || null,
         warehouse_id: 1,
         sale_type: saleType,
-        payment_method: paymentLines[0]?.method || 'cash',
+        payment_lines: paymentLines.map(line => ({
+          ...line,
+          exchange_rate: getEffectiveRate('USD', line.currency) || 1
+        })),
         items: cart.map(item => ({
           product_id: item.product_id,
           presentation_id: item.presentation_id,
@@ -446,7 +488,6 @@ const POSPage = () => {
           discount_percent: item.discount_percent,
           tax_percent: item.tax_percent
         })),
-        paid_amount: saleType === 'cash' ? paidUSD : 0,
         notes: ''
       };
 
@@ -475,7 +516,11 @@ const POSPage = () => {
 
   const handlePrintTicket = () => {
     if (completedSale) {
-      printSaleTicket(completedSale, companySettings);
+      printSaleTicket(completedSale, companySettings, {
+        displayCurrency,
+        currencySymbol: CURRENCIES.find(c => c.code === displayCurrency)?.symbol || '$',
+        exchangeRate: calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1
+      });
     }
   };
 
@@ -509,6 +554,22 @@ const POSPage = () => {
               </select>
             </div>
           )}
+
+          {/* Display Currency Toggle */}
+          <div className="flex bg-slate-800 rounded p-0.5 border border-slate-700">
+            {CURRENCIES.map(curr => (
+              <button
+                key={curr.code}
+                onClick={() => setDisplayCurrency(curr.code)}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${displayCurrency === curr.code
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                  }`}
+              >
+                {curr.code}
+              </button>
+            ))}
+          </div>
 
           {/* Clock */}
           <div className="flex items-center gap-1 text-slate-400 text-xs">
@@ -556,7 +617,7 @@ const POSPage = () => {
                 {products.map(product => {
                   const pres = product.presentations?.[0];
                   const { availablePackages, looseUnits, totalUnits, unitsPerPkg } = getProductStock(product, pres);
-                  const { pkgPrice } = getPrice(product.id, pres?.id, pres);
+                  const { pkgPrice } = getPrice(product, pres);
                   const lowStock = totalUnits <= unitsPerPkg * 3;
 
                   return (
@@ -707,28 +768,31 @@ const POSPage = () => {
                     <div className="flex flex-col items-end border-l border-gray-200 pl-2 ml-1">
                       {hasPermission('sales.edit_price') ? (
                         <div className="flex items-center gap-0.5 mb-1">
-                          <span className="text-[10px] text-gray-400 font-medium">$</span>
+                          <span className="text-[10px] text-gray-400 font-medium">
+                            {CURRENCIES.find(c => c.code === displayCurrency)?.symbol}
+                          </span>
                           <input
                             type="number"
                             step="0.01"
                             min="0"
-                            value={item.current_price || ''}
+                            value={displayCurrency === 'USD' ? (item.current_price || '') : (item.current_price * (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1)).toFixed(2)}
                             onChange={(e) => updatePrice(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
                             onBlur={(e) => {
                               // Fallback to original price if cleared
                               if (!e.target.value || parseFloat(e.target.value) < 0) {
-                                const original = item.sellByUnit ? item.unit_price_each : item.package_price;
-                                updatePrice(item.product_id, item.presentation_id, item.sellByUnit, original);
+                                let originalUSD = item.sellByUnit ? item.unit_price_each : item.package_price;
+                                let originalDisplay = displayCurrency === 'USD' ? originalUSD : (originalUSD * (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1));
+                                updatePrice(item.product_id, item.presentation_id, item.sellByUnit, originalDisplay);
                               }
                             }}
-                            className="w-16 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                            className="w-24 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
                             title="Editar precio unitario"
                           />
                         </div>
                       ) : (
                         <span className="text-[10px] text-gray-500 mb-1">{formatMoney(item.current_price)} c/u</span>
                       )}
-                      <span className="w-24 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
+                      <span className="w-32 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
                         {formatMoney(calculateItemSubtotal(item))}
                       </span>
                     </div>
@@ -795,7 +859,7 @@ const POSPage = () => {
                     <div key={cur.code} className="flex justify-between text-xs">
                       <span className="text-gray-500">{cur.name} ({cur.code})</span>
                       <span className="font-medium text-gray-700">
-                        {converted !== null ? formatMoney(converted, cur.symbol) : 'Sin tasa'}
+                        {converted !== null ? formatMoney(totals.totalRaw, cur.code) : 'Sin tasa'}
                       </span>
                     </div>
                   );
@@ -812,7 +876,7 @@ const POSPage = () => {
               disabled={cart.length === 0}
               className="w-full mt-3 bg-emerald-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
-              Cobrar $ {totals.total}
+              Cobrar {formatMoney(totals.totalRaw)}
             </button>
           </div>
         </div>
@@ -896,8 +960,9 @@ const POSPage = () => {
                       step="0.01"
                       value={line.amount}
                       onChange={e => updatePaymentLine(idx, 'amount', e.target.value)}
+                      onFocus={() => setActivePaymentCurrency(line.currency)}
                       placeholder="0.00"
-                      className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm text-right font-medium bg-white"
+                      className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm text-right font-medium bg-white focus:ring-2 focus:ring-blue-500"
                     />
 
                     {/* Remove line */}
@@ -916,18 +981,49 @@ const POSPage = () => {
                   <span className="text-gray-500">Total a pagar:</span>
                   <span className="font-bold text-gray-800">{formatMoney(totals.total)}</span>
                 </div>
+
+                {/* Breakdown by currency */}
+                <div className="pt-1 space-y-1 border-y border-gray-100 py-1.5 my-1">
+                  {CURRENCIES.map(curr => {
+                    const totalForCurr = paymentLines
+                      .filter(l => l.currency === curr.code)
+                      .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
+
+                    if (totalForCurr <= 0) return null;
+
+                    return (
+                      <div key={curr.code} className="flex justify-between text-[11px]">
+                        <span className="text-slate-400">Recibido en {curr.name}:</span>
+                        <span className="font-medium text-slate-600">
+                          {curr.symbol} {totalForCurr.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Total recibido (USD):</span>
+                  <span className="text-gray-500">Total recibido:</span>
                   <span className="font-bold text-gray-800">{formatMoney(getTotalPaidUSD())}</span>
                 </div>
-                {getTotalPaidUSD() >= parseFloat(totals.total) && (
-                  <div className="flex justify-between text-sm border-t border-gray-200 pt-1.5">
-                    <span className="text-green-700 font-medium">Cambio:</span>
-                    <span className="text-green-700 font-bold">
-                      {formatMoney(Math.max(0, getTotalPaidUSD() - parseFloat(totals.total)))}
-                    </span>
-                  </div>
-                )}
+
+                <div className="flex justify-between text-sm border-t border-gray-200 pt-1.5 mt-1.5">
+                  {getTotalPaidUSD() >= parseFloat(totals.total) ? (
+                    <>
+                      <span className="text-green-700 font-medium">Cambio ({activePaymentCurrency}):</span>
+                      <span className="text-green-700 font-bold">
+                        {formatMoney(Math.max(0, getTotalPaidUSD() - parseFloat(totals.total)), activePaymentCurrency)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-amber-700 font-medium">Faltante ({activePaymentCurrency}):</span>
+                      <span className="text-amber-700 font-bold">
+                        {formatMoney(parseFloat(totals.total) - getTotalPaidUSD(), activePaymentCurrency)}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}

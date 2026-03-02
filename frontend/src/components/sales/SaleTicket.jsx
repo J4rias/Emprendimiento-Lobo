@@ -11,8 +11,20 @@ import {
  * Generate and print sale ticket
  * @param {object} sale - Sale object with details
  * @param {object} companyInfo - Company information
+ * @param {object} printOptions - Options like displayCurrency and exchangeRate
  */
-export const printSaleTicket = (sale, companyInfo = {}) => {
+export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
+  const {
+    displayCurrency = 'USD',
+    currencySymbol = '$',
+    exchangeRate = 1
+  } = printOptions;
+
+  // Custom formatter for the ticket
+  const tFormat = (amount) => {
+    const val = parseFloat(amount || 0) * exchangeRate;
+    return `${currencySymbol} ${val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
   const {
     name = 'EMPRENDIMIENTO LOBO',
     address = '',
@@ -78,10 +90,10 @@ export const printSaleTicket = (sale, companyInfo = {}) => {
                   ${detail.product?.name || 'Producto'}
                 </div>
                 ${detail.presentation?.name ? `<div style="font-size: 11px; margin-bottom: 1px;">${detail.presentation.name}</div>` : ''}
-                <div style="font-size: 10px;">${formatCurrency(detail.unit_price || 0)} x ud.</div>
+                <div style="font-size: 10px;">${tFormat(detail.unit_price || 0)} x ud.</div>
               </td>
               <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 15%;">${detail.quantity || 0}</td>
-              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 25%; font-weight: bold;">${formatCurrency(detail.total || 0)}</td>
+              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 25%; font-weight: bold;">${tFormat(detail.total || 0)}</td>
             </tr>
           `).join('') || ''}
         </tbody>
@@ -93,7 +105,7 @@ export const printSaleTicket = (sale, companyInfo = {}) => {
       <div style="margin-bottom: 10px;">
         <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 16px; font-weight: bold; border-top: 2px solid #000;">
           <span>TOTAL:</span>
-          <span>${formatCurrency(subtotal - discount)}</span>
+          <span>${tFormat(subtotal - discount)}</span>
         </div>
       </div>
 
@@ -101,11 +113,11 @@ export const printSaleTicket = (sale, companyInfo = {}) => {
         <div style="margin-bottom: 8px; font-size: 11px;">
           <div style="display: flex; justify-content: space-between; padding: 2px 0;">
             <span>Efectivo:</span>
-            <span>${formatCurrency(paid)}</span>
+            <span>${tFormat(paid)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; padding: 2px 0;">
             <span>Cambio:</span>
-            <span>${formatCurrency(change)}</span>
+            <span>${tFormat(change)}</span>
           </div>
         </div>
       ` : `

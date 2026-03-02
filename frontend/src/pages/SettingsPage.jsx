@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2, Printer, Users, Lock, Unlock, Search, X } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -34,12 +34,228 @@ const SettingsPage = () => {
     zoom: '1.0'
   });
 
+  // Users state
+  const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    first_name: '',
+    last_name: '',
+    phone: '',
+    role_id: '',
+    is_active: true,
+  });
+  const [usersLoading, setUsersLoading] = useState(false);
+
   const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+  const moduleNames = {
+    inventory: 'Inventario',
+    sales: 'Ventas',
+    categories: 'Categorías',
+    brands: 'Marcas',
+    price_lists: 'Listas de Precios',
+    customers: 'Clientes',
+    suppliers: 'Proveedores',
+    warehouses: 'Almacenes',
+    users: 'Usuarios',
+    roles: 'Roles',
+    reports: 'Reportes',
+    company: 'Empresa',
+    purchases: 'Compras',
+    products: 'Productos',
+    stock: 'Stock',
+    credit_notes: 'Notas de Crédito',
+    supplier_payments: 'Pagos a Proveedores',
+    settings: 'Configuraciones'
+  };
 
   useEffect(() => {
     fetchRoles();
     fetchPermissions();
-  }, []);
+    fetchUsers();
+  }, [userSearch, userRoleFilter]);
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const params = new URLSearchParams({
+        ...(userSearch && { search: userSearch }),
+        ...(userRoleFilter && { roleId: userRoleFilter }),
+      });
+
+      const response = await fetch(`${API_URL}/users?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setUsers(data.data.users || []);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleUserSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const url = editingUser
+        ? `${API_URL}/users/${editingUser.id}`
+        : `${API_URL}/users`;
+
+      const method = editingUser ? 'PUT' : 'POST';
+
+      const payload = { ...userFormData };
+      if (editingUser && !payload.password) {
+        delete payload.password;
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowUserModal(false);
+        resetUserForm();
+        fetchUsers();
+        toast.success(editingUser ? 'Usuario actualizado' : 'Usuario creado');
+      } else {
+        toast.error(data.message || 'Error al guardar el usuario');
+      }
+    } catch (error) {
+      console.error('Error saving user:', error);
+      toast.error('Error al guardar el usuario');
+    }
+  };
+
+  const handleUserEdit = (user) => {
+    setEditingUser(user);
+    setUserFormData({
+      username: user.username,
+      email: user.email,
+      password: '',
+      first_name: user.first_name,
+      last_name: user.last_name,
+      phone: user.phone || '',
+      role_id: user.role_id,
+      is_active: user.is_active,
+    });
+    setShowUserModal(true);
+  };
+
+  const handleUserToggleActive = async (user) => {
+    const action = user.is_active ? 'desactivar' : 'activar';
+    if (!window.confirm(`¿Está seguro de ${action} este usuario?`)) return;
+
+    try {
+      const response = await fetch(`${API_URL}/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_active: !user.is_active }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        fetchUsers();
+        toast.success(`Usuario ${user.is_active ? 'desactivado' : 'activado'}`);
+      } else {
+        toast.error(data.message || 'Error al actualizar el usuario');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error('Error al actualizar el usuario');
+    }
+  };
+
+  const resetUserForm = () => {
+    setEditingUser(null);
+    setUserFormData({
+      username: '',
+      email: '',
+      password: '',
+      first_name: '',
+      last_name: '',
+      phone: '',
+      role_id: '',
+      is_active: true,
+    });
+  };
+
+  const userColumns = [
+    { header: 'Usuario', accessor: 'username' },
+    {
+      header: 'Nombre',
+      accessor: (row) => `${row.first_name} ${row.last_name}`,
+    },
+    { header: 'Email', accessor: 'email' },
+    {
+      header: 'Rol',
+      accessor: (row) => row.role?.name || '-',
+    },
+    {
+      header: 'Estado',
+      accessor: (row) => (
+        <span className={`px-2 py-1 text-[10px] font-semibold rounded-full ${row.is_active
+          ? 'bg-green-100 text-green-800'
+          : 'bg-gray-100 text-gray-800'
+          }`}>
+          {row.is_active ? 'Activo' : 'Inactivo'}
+        </span>
+      ),
+    },
+    {
+      header: 'Acciones',
+      accessor: (row) => (
+        <div className="flex gap-2">
+          {hasPermission('users.update') && (
+            <>
+              <button
+                onClick={() => handleUserEdit(row)}
+                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                title="Editar"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleUserToggleActive(row)}
+                className={`p-1 ${row.is_active
+                  ? 'text-orange-600 hover:bg-orange-50'
+                  : 'text-green-600 hover:bg-green-50'
+                  } rounded`}
+                title={row.is_active ? 'Desactivar' : 'Activar'}
+              >
+                {row.is_active ? (
+                  <Lock className="h-4 w-4" />
+                ) : (
+                  <Unlock className="h-4 w-4" />
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   const fetchRoles = async () => {
     try {
@@ -339,6 +555,18 @@ const SettingsPage = () => {
             <Printer className="inline-block h-5 w-5 mr-2" />
             Impresora (POS)
           </button>
+          {hasPermission('users.view') && (
+            <button
+              onClick={() => setActiveTab('usuarios')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'usuarios'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              <Users className="inline-block h-5 w-5 mr-2" />
+              Usuarios
+            </button>
+          )}
         </nav>
       </div>
 
@@ -366,6 +594,59 @@ const SettingsPage = () => {
               data={roles}
               loading={loading}
               emptyMessage="No se encontraron roles"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Usuarios Tab */}
+      {activeTab === 'usuarios' && hasPermission('users.view') && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div className="flex-1 max-w-lg flex gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar usuarios..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="input pl-9 w-full"
+                />
+              </div>
+              <select
+                value={userRoleFilter}
+                onChange={(e) => setUserRoleFilter(e.target.value)}
+                className="input w-48"
+              >
+                <option value="">Todos los roles</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasPermission('users.create') && (
+              <button
+                onClick={() => {
+                  resetUserForm();
+                  setShowUserModal(true);
+                }}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus className="h-5 w-5" />
+                Nuevo Usuario
+              </button>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg shadow">
+            <DataTable
+              columns={userColumns}
+              data={users}
+              loading={usersLoading}
+              emptyMessage="No se encontraron usuarios"
             />
           </div>
         </div>
@@ -534,101 +815,114 @@ const SettingsPage = () => {
         )
       }
 
-      {/* Create/Edit Modal */}
-      {
-        showModal && (
-          <Modal
-            isOpen={showModal}
-            onClose={() => {
-              setShowModal(false);
-              resetForm();
-            }}
-            title={editingRole ? 'Editar Rol' : 'Nuevo Rol'}
-            size="large"
-          >
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre *
-                  </label>
+      {/* Create/Edit Role Modal */}
+      {showModal && (
+        <Modal
+          isOpen={showModal}
+          onClose={() => {
+            setShowModal(false);
+            resetForm();
+          }}
+          title={editingRole ? 'Editar Rol' : 'Nuevo Rol'}
+          size="xl"
+        >
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Nombre del Rol *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="input w-full shadow-sm border-gray-300 focus:ring-primary-500 focus:border-primary-500 rounded-md"
+                  placeholder="Ej: Administrador, Cajero..."
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Descripción
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  className="input w-full shadow-sm border-gray-300 focus:ring-primary-500 focus:border-primary-500 rounded-md"
+                  rows="1"
+                  placeholder="Describe las funciones de este rol..."
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-50 rounded-md transition-colors">
                   <input
-                    type="text"
-                    value={formData.name}
+                    type="checkbox"
+                    checked={formData.is_active}
                     onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
+                      setFormData({ ...formData, is_active: e.target.checked })
                     }
-                    className="input"
-                    required
+                    className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 h-full pt-6">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) =>
-                        setFormData({ ...formData, is_active: e.target.checked })
-                      }
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Rol activo</span>
-                  </label>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className="input"
-                    rows="2"
-                  />
-                </div>
+                  <span className="text-sm font-semibold text-gray-700 font-medium">Estado Activo</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Permisos del Sistema</h3>
+                <span className="text-xs text-gray-400 font-normal">Pulsa el cuadro junto al título para marcar todo el bloque</span>
               </div>
 
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Permisos</h3>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
                   {Object.entries(permissionsByModule).map(([module, perms]) => {
                     const allSelected = perms.every((p) =>
                       formData.permissions.includes(p.id)
                     );
 
                     return (
-                      <div key={module} className="border rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div key={module} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="bg-gray-50/50 border-b border-gray-100 p-4 flex items-center gap-3 rounded-t-xl">
                           <button
                             type="button"
                             onClick={() => toggleModulePermissions(module)}
-                            className="p-1 hover:bg-gray-100 rounded"
+                            className="p-1 hover:bg-white rounded-md transition-colors shadow-sm bg-white"
+                            title="Seleccionar todos"
                           >
                             {allSelected ? (
                               <CheckSquare className="h-5 w-5 text-primary-600" />
                             ) : (
-                              <Square className="h-5 w-5 text-gray-400" />
+                              <Square className="h-5 w-5 text-gray-300" />
                             )}
                           </button>
-                          <h4 className="font-medium text-gray-900 capitalize">
-                            {module}
+                          <h4 className="font-bold text-gray-900 capitalize text-sm flex-1">
+                            Módulo: {moduleNames[module] || module}
                           </h4>
+                          <span className="text-[10px] bg-white border border-gray-100 px-2 py-0.5 rounded-full text-gray-400 uppercase tracking-tighter">
+                            {perms.length} perms
+                          </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 ml-7">
+
+                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
                           {perms.map((permission) => (
                             <label
                               key={permission.id}
-                              className="flex items-center gap-2 text-sm"
+                              className="flex items-start gap-3 text-sm cursor-pointer group hover:bg-blue-50/50 p-1.5 rounded transition-all"
                             >
-                              <input
-                                type="checkbox"
-                                checked={formData.permissions.includes(permission.id)}
-                                onChange={() => togglePermission(permission.id)}
-                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                              />
-                              <span className="text-gray-700">
+                              <div className="pt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.permissions.includes(permission.id)}
+                                  onChange={() => togglePermission(permission.id)}
+                                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                              </div>
+                              <span className="text-gray-700 group-hover:text-blue-700 leading-tight">
                                 {permission.description}
                               </span>
                             </label>
@@ -639,27 +933,155 @@ const SettingsPage = () => {
                   })}
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="btn-secondary"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary">
-                  {editingRole ? 'Actualizar' : 'Crear'} Rol
-                </button>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+                className="btn-secondary px-6"
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary px-8">
+                {editingRole ? 'Actualizar' : 'Crear'} Rol
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* User Modal */}
+      {showUserModal && (
+        <Modal
+          isOpen={showUserModal}
+          onClose={() => {
+            setShowUserModal(false);
+            resetUserForm();
+          }}
+          title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+          size="md"
+        >
+          <form onSubmit={handleUserSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Usuario *
+                </label>
+                <input
+                  type="text"
+                  value={userFormData.username}
+                  onChange={(e) => setUserFormData({ ...userFormData, username: e.target.value })}
+                  className="input w-full"
+                  required
+                  disabled={!!editingUser}
+                />
               </div>
-            </form>
-          </Modal>
-        )
-      }
-    </div >
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={userFormData.email}
+                  onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                  className="input w-full"
+                  required
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  value={userFormData.first_name}
+                  onChange={(e) => setUserFormData({ ...userFormData, first_name: e.target.value })}
+                  className="input w-full"
+                  required
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Apellido *
+                </label>
+                <input
+                  type="text"
+                  value={userFormData.last_name}
+                  onChange={(e) => setUserFormData({ ...userFormData, last_name: e.target.value })}
+                  className="input w-full"
+                  required
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rol *
+                </label>
+                <select
+                  value={userFormData.role_id}
+                  onChange={(e) => setUserFormData({ ...userFormData, role_id: e.target.value })}
+                  className="input w-full"
+                  required
+                >
+                  <option value="">Seleccione rol</option>
+                  {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Teléfono
+                </label>
+                <input
+                  type="text"
+                  value={userFormData.phone}
+                  onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contraseña {editingUser && '(Dejar vacío para no cambiar)'}
+                </label>
+                <input
+                  type="password"
+                  value={userFormData.password}
+                  onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                  className="input w-full"
+                  required={!editingUser}
+                  placeholder={editingUser ? '••••••••' : 'Contraseña'}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={userFormData.is_active}
+                    onChange={(e) => setUserFormData({ ...userFormData, is_active: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Usuario Activo</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => { setShowUserModal(false); resetUserForm(); }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary">
+                {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
   );
 };
 

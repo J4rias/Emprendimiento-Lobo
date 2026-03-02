@@ -166,19 +166,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       name: 'Configuración',
       icon: Shield,
-      permission: 'users.view',
+      permission: 'settings.manage',
       isAccordion: true,
       items: [
-        {
-          name: 'Usuarios',
-          path: '/usuarios',
-          permission: 'users.view',
-        },
-        {
-          name: 'Roles',
-          path: '/roles',
-          permission: 'roles.manage',
-        },
         {
           name: 'Configuración General',
           path: '/configuracion',

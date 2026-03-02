@@ -35,13 +35,23 @@ exports.createSale = async (req, res) => {
       customer_id,
       warehouse_id,
       sale_type,
-      payment_method,
+      payment_lines = [],
       items,
       discount_amount = 0,
       notes,
-      paid_amount = 0,
       quote_id
     } = req.body;
+
+    // Calculate total paid USD early
+    let paid_amount = 0;
+    if (sale_type === 'cash' && payment_lines.length > 0) {
+      paid_amount = payment_lines.reduce((sum, line) => {
+        const amount = parseFloat(line.amount) || 0;
+        const rate = parseFloat(line.exchange_rate) || 1;
+        // In POS the sum of (amount / rate) forms the USD equivalent
+        return sum + (amount / rate);
+      }, 0);
+    }
 
     if (!items || items.length === 0) {
       await transaction.rollback();
@@ -162,7 +172,7 @@ exports.createSale = async (req, res) => {
       user_id: req.user.id,
       sale_date: new Date(),
       sale_type,
-      payment_method: sale_type === 'cash' ? payment_method : null,
+      payment_method: sale_type === 'cash' && payment_lines.length > 0 ? payment_lines[0].method : null,
       subtotal,
       tax_amount,
       discount_amount,
@@ -182,14 +192,21 @@ exports.createSale = async (req, res) => {
       }, { transaction });
     }
 
-    if (sale_type === 'cash' && paid_amount > 0) {
-      await SalePayment.create({
-        sale_id: sale.id,
-        payment_date: new Date(),
-        payment_method,
-        amount: paid_amount,
-        created_by: req.user.id
-      }, { transaction });
+    if (sale_type === 'cash' && payment_lines.length > 0) {
+      for (const payLine of payment_lines) {
+        if (parseFloat(payLine.amount) > 0) {
+          await SalePayment.create({
+            sale_id: sale.id,
+            payment_date: new Date(),
+            payment_method: payLine.method || 'cash',
+            amount: payLine.amount,
+            currency: payLine.currency || 'USD',
+            exchange_rate: payLine.exchange_rate || 1,
+            reference: payLine.reference || null,
+            created_by: req.user.id
+          }, { transaction });
+        }
+      }
     }
 
     if (sale_type === 'cash') {
@@ -526,7 +543,7 @@ exports.addPayment = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { payment_method, amount, reference, notes } = req.body;
+    const { payment_lines = [], notes } = req.body; // Adapt to new multi-payment support
 
     const sale = await Sale.findByPk(id);
 
@@ -549,18 +566,35 @@ exports.addPayment = async (req, res) => {
       });
     }
 
-    const payment = await SalePayment.create({
-      sale_id: sale.id,
-      payment_date: new Date(),
-      payment_method,
-      amount,
-      reference: reference || null,
-      notes: notes || null,
-      created_by: req.user.id
-    }, { transaction });
+    if (!payment_lines || payment_lines.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'No se enviaron líneas de pago' });
+    }
 
-    const newPaidAmount = parseFloat(sale.paid_amount) + parseFloat(amount);
-    const newStatus = newPaidAmount >= parseFloat(sale.total) ? 'completed' : 'pending';
+    let newlyPaidUSD = 0;
+    const createdPayments = [];
+
+    for (const payLine of payment_lines) {
+      const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
+      newlyPaidUSD += amountUSD;
+
+      const payment = await SalePayment.create({
+        sale_id: sale.id,
+        payment_date: new Date(),
+        payment_method: payLine.method || 'cash',
+        amount: payLine.amount,
+        currency: payLine.currency || 'USD',
+        exchange_rate: payLine.exchange_rate || 1,
+        reference: payLine.reference || null,
+        notes: notes || null,
+        created_by: req.user.id
+      }, { transaction });
+
+      createdPayments.push(payment);
+    }
+
+    const newPaidAmount = parseFloat(sale.paid_amount) + newlyPaidUSD;
+    const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 
     await sale.update({
       paid_amount: newPaidAmount,
@@ -598,8 +632,8 @@ exports.addPayment = async (req, res) => {
     });
 
     res.json({
-      message: 'Pago registrado exitosamente',
-      payment,
+      message: 'Pagos registrados exitosamente',
+      payments: createdPayments,
       sale: updatedSale
     });
 
