@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { priceListService } from '../services/api/priceListService';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from '../components/common/Modal';
 import {
     Tags, Plus, Search, Edit, Trash2, Copy, Download,
@@ -35,6 +37,7 @@ const PriceListsPage = () => {
     const [details, setDetails] = useState([]);
     const [detailSearch, setDetailSearch] = useState('');
     const [loadingProducts, setLoadingProducts] = useState(false);
+    const [exchangeRates, setExchangeRates] = useState([]);
 
     // Delete modal
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -44,7 +47,17 @@ const PriceListsPage = () => {
 
     useEffect(() => {
         fetchLists();
+        loadExchangeRates();
     }, [searchTerm, statusFilter, page]);
+
+    const loadExchangeRates = async () => {
+        try {
+            const res = await exchangeRateService.getLatest();
+            setExchangeRates(res.data || []);
+        } catch (err) {
+            console.error('Error loading rates:', err);
+        }
+    };
 
     const fetchLists = async () => {
         try {
@@ -154,7 +167,8 @@ const PriceListsPage = () => {
                             unit_cost: currentUnitCost,
                             package_price: pkgPrice,
                             unit_price: parseFloat(existing.unit_price) || 0,
-                            margin_percentage: Math.round(margin * 10) / 10
+                            margin_percentage: Math.round(margin * 10) / 10,
+                            base_currency: item.presentation?.purchase_currency || 'USD'
                         };
                     } else {
                         // New product with stock that wasn't in the list
@@ -169,7 +183,8 @@ const PriceListsPage = () => {
                             unit_cost: currentUnitCost,
                             package_price: 0,
                             unit_price: 0,
-                            margin_percentage: 0
+                            margin_percentage: 0,
+                            base_currency: item.presentation?.purchase_currency || 'USD'
                         };
                     }
                 });
@@ -189,7 +204,8 @@ const PriceListsPage = () => {
                             unit_cost: parseFloat(d.presentation?.cost || d.unit_cost) || 0,
                             package_price: parseFloat(d.package_price) || 0,
                             unit_price: parseFloat(d.unit_price) || 0,
-                            margin_percentage: parseFloat(d.margin_percentage) || 0
+                            margin_percentage: parseFloat(d.margin_percentage) || 0,
+                            base_currency: d.presentation?.purchase_currency || 'USD'
                         });
                     }
                 });
@@ -217,7 +233,8 @@ const PriceListsPage = () => {
                     unit_cost: parseFloat(item.presentation.cost) || 0,
                     package_price: 0,
                     unit_price: 0,
-                    margin_percentage: 0
+                    margin_percentage: 0,
+                    base_currency: item.presentation?.purchase_currency || 'USD'
                 })));
             }
         } catch (err) {
@@ -369,6 +386,27 @@ const PriceListsPage = () => {
       </body></html>`);
         printWindow.document.close();
         printWindow.print();
+    };
+
+    // ===================== RENDER HELPER =====================
+    const renderBaseValue = (usdAmount, currency, colorClass = "text-gray-400 text-[10px]") => {
+        if (!currency || currency === 'USD' || !exchangeRates || exchangeRates.length === 0) return null;
+
+        const rate = calculateEffectiveRate('USD', currency, exchangeRates);
+        if (!rate) return null;
+
+        const converted = usdAmount * rate;
+        const formatted = currency === 'COP'
+            ? converted.toLocaleString('de-DE', { maximumFractionDigits: 0 })
+            : converted.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        return (
+            <div className="flex flex-col items-end leading-tight mt-0.5 font-medium">
+                <span className={colorClass}>
+                    {currency}: {formatted}
+                </span>
+            </div>
+        );
     };
 
     // ===================== FILTERED DETAILS =====================
@@ -561,24 +599,36 @@ const PriceListsPage = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-gray-700">{d.presentation_name}</td>
-                                                    <td className="px-4 py-3 text-right text-gray-500">
-                                                        ${d.package_cost.toFixed(2)}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right text-gray-500">
-                                                        ${d.unit_cost.toFixed(2)}
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex flex-col items-end">
+                                                            <div className="text-gray-900 font-medium">${d.package_cost.toFixed(2)}</div>
+                                                            {renderBaseValue(d.package_cost, d.base_currency)}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={d.package_price || ''}
-                                                            onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                            className="w-28 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                        />
+                                                        <div className="flex flex-col items-end">
+                                                            <div className="text-gray-900 font-medium">${d.unit_cost.toFixed(2)}</div>
+                                                            {renderBaseValue(d.unit_cost, d.base_currency)}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={d.package_price || ''}
+                                                                onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
+                                                                className="w-28 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                            />
+                                                            {renderBaseValue(d.package_price || 0, d.base_currency, "text-blue-500 text-[10px]")}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-medium text-gray-900">
-                                                        ${d.unit_price.toFixed(2)}
+                                                        <div className="flex flex-col items-end">
+                                                            <div className="text-gray-900 font-bold">${d.unit_price.toFixed(2)}</div>
+                                                            {renderBaseValue(d.unit_price, d.base_currency, "text-blue-600 font-bold text-[10px]")}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
