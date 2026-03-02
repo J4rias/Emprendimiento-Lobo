@@ -15,6 +15,12 @@ export const printHTML = (content, title = 'Imprimir') => {
     return;
   }
 
+  // Obtener configuración de la impresora (o usar 80mm por defecto)
+  const printerSettings = JSON.parse(localStorage.getItem('pos_printer_settings') || '{"width": "80mm", "margin": "0mm", "zoom": "1.0"}');
+  const width = printerSettings.width || '80mm';
+  const margin = printerSettings.margin || '0mm';
+  const zoom = printerSettings.zoom || '1.0';
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -31,14 +37,16 @@ export const printHTML = (content, title = 'Imprimir') => {
           body {
             font-family: 'Courier New', Courier, monospace;
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.2;
             color: #000;
             background: #fff;
+            width: ${width};
+            zoom: ${zoom};
           }
 
           @media print {
             body {
-              margin: 0;
+              margin: ${margin};
               padding: 0;
             }
 
@@ -49,7 +57,14 @@ export const printHTML = (content, title = 'Imprimir') => {
 
           @page {
             margin: 0;
-            size: 80mm auto;
+            size: ${width} auto;
+          }
+          
+          /* Evitar que el navegador corte palabras de forma brusca */
+          div, p, td, th {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            hyphens: auto;
           }
         </style>
       </head>
@@ -57,11 +72,11 @@ export const printHTML = (content, title = 'Imprimir') => {
         ${content}
         <script>
           window.onload = function() {
-            window.print();
-            // Close window after printing or canceling
+            // Un pequeño delay para asegurar que los estilos carguen
             setTimeout(function() {
+              window.print();
               window.close();
-            }, 100);
+            }, 250);
           };
         </script>
       </body>

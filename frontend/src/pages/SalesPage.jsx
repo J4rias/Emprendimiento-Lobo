@@ -4,8 +4,10 @@ import { saleService } from '../services/api/saleService';
 import Modal from '../components/common/Modal';
 import { formatMoney, formatDate } from '../utils/formatUtils';
 import { printSaleTicket } from '../components/sales/SaleTicket';
+import { useCompany } from '../context/CompanyContext';
 
 const SalesPage = () => {
+  const { companySettings } = useCompany();
   const [sales, setSales] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,7 @@ const SalesPage = () => {
 
   const handlePrintTicket = () => {
     if (selectedSale) {
-      printSaleTicket(selectedSale);
+      printSaleTicket(selectedSale, companySettings);
     }
   };
 

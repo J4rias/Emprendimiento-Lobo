@@ -9,6 +9,7 @@ import { saleService } from '../services/api/saleService';
 import { priceListService } from '../services/api/priceListService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 import { toast } from 'react-hot-toast';
 import CustomerSearch from '../components/CustomerSearch';
 import Modal from '../components/common/Modal';
@@ -33,6 +34,7 @@ const emptyPaymentLine = () => ({ currency: 'USD', method: 'cash', amount: '' })
 // ──────────────────────── COMPONENT ────────────────────────
 const POSPage = () => {
   const { user } = useAuth();
+  const { companySettings } = useCompany();
   const searchInputRef = useRef(null);
 
   // Helper for currency formatting with thousands separator
@@ -395,7 +397,7 @@ const POSPage = () => {
 
   const handlePrintTicket = () => {
     if (completedSale) {
-      printSaleTicket(completedSale);
+      printSaleTicket(completedSale, companySettings);
     }
   };
 
