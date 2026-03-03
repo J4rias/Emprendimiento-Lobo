@@ -16,8 +16,8 @@ export const calculateEffectiveRate = (from, to, exchangeRates) => {
     const graph = {};
 
     exchangeRates.forEach(r => {
-        const f = r.from_currency; // Direct from
-        const t = r.to_currency;   // Direct to
+        const f = r.from_currency.toUpperCase(); // Direct from
+        const t = r.to_currency.toUpperCase();   // Direct to
         const v = parseFloat(r.rate);
 
         if (!graph[f]) graph[f] = {};
@@ -29,14 +29,17 @@ export const calculateEffectiveRate = (from, to, exchangeRates) => {
         if (graph[t][f] === undefined) graph[t][f] = 1 / v;
     });
 
+    const targetFrom = from.toUpperCase();
+    const targetTo = to.toUpperCase();
+
     // 2. BFS to find the shortest path and multiply rates
-    const queue = [{ node: from, cumulativeRate: 1 }];
-    const visited = new Set([from]);
+    const queue = [{ node: targetFrom, cumulativeRate: 1 }];
+    const visited = new Set([targetFrom]);
 
     while (queue.length > 0) {
         const { node, cumulativeRate } = queue.shift();
 
-        if (node === to) {
+        if (node === targetTo) {
             return cumulativeRate;
         }
 

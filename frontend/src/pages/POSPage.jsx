@@ -39,10 +39,12 @@ const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
   useEffect(() => {
     if (!isFocused) {
       const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
-      const displayPrice = (item.current_price || 0) * rate;
-      setLocalValue(displayCurrency === 'USD' && !item.current_price ? '' : displayPrice.toFixed(2));
+      // Always show the PACKAGE price in the editor, even if selling by unit
+      const basePrice = item.package_price;
+      const displayPrice = (basePrice || 0) * rate;
+      setLocalValue(displayCurrency === 'USD' && !basePrice ? '' : displayPrice.toFixed(2));
     }
-  }, [item.current_price, displayCurrency, exchangeRates, isFocused]);
+  }, [item.package_price, displayCurrency, exchangeRates, isFocused]);
 
   const handleChange = (e) => {
     setLocalValue(e.target.value);
@@ -95,6 +97,7 @@ const POSPage = () => {
   // Price lists
   const [priceLists, setPriceLists] = useState([]);
   const [selectedPriceList, setSelectedPriceList] = useState(null);
+  const [selectedPriceListCurrency, setSelectedPriceListCurrency] = useState('USD');
   const [priceListDetails, setPriceListDetails] = useState({});
 
   // Payment / checkout
@@ -217,15 +220,18 @@ const POSPage = () => {
   const selectPriceList = async (listId) => {
     if (!listId) {
       setSelectedPriceList(null);
+      setSelectedPriceListCurrency('USD');
       setPriceListDetails({});
       localStorage.removeItem('lastPriceListId');
       return;
     }
     try {
       const res = await priceListService.getById(listId);
+      const data = res.data;
       const map = {};
-      (res.data?.details || []).forEach(d => { map[`${d.product_id}-${d.presentation_id}`] = d; });
+      (data?.details || []).forEach(d => { map[`${d.product_id}-${d.presentation_id}`] = d; });
       setPriceListDetails(map);
+      setSelectedPriceListCurrency(data?.currency || 'USD');
 
       // Update this last to trigger loadProducts ONLY AFTER the details are ready
       setSelectedPriceList(listId);
@@ -265,9 +271,12 @@ const POSPage = () => {
     let unitPrice = detail && parseFloat(detail.unit_price) > 0 ? parseFloat(detail.unit_price) : 0;
 
     // Use high precision for normalization to avoid rounding jitter later
-    const purchaseCurrency = presentation.purchase_currency || 'USD';
-    if (purchaseCurrency !== 'USD') {
-      const rate = calculateEffectiveRate('USD', purchaseCurrency, exchangeRates);
+    // If the price comes from a specific list detail, we use the LIST currency.
+    // Otherwise, we fallback to the presentation's purchase currency.
+    const sourceCurrency = detail ? selectedPriceListCurrency : (presentation.purchase_currency || 'USD');
+
+    if (sourceCurrency !== 'USD') {
+      const rate = calculateEffectiveRate('USD', sourceCurrency, exchangeRates);
       if (rate && rate > 0) {
         pkgPrice = Math.round((pkgPrice / rate) * 1000000) / 1000000;
         unitPrice = Math.round((unitPrice / rate) * 1000000) / 1000000;
@@ -413,20 +422,33 @@ const POSPage = () => {
     ));
   };
 
-  const updatePrice = (pid, presId, sellByUnit, newDisplayPrice) => {
-    let usdPrice = parseFloat(newDisplayPrice) || 0;
+  const updatePrice = (pid, presId, sellByUnit, newDisplayPackagePrice) => {
+    let usdPackagePrice = parseFloat(newDisplayPackagePrice) || 0;
 
-    // Use high precision (6 decimals) when converting back to USD to store in cart
+    // 1. Normalize the PACKAGE price to USD with high precision (6 decimals)
     if (displayCurrency !== 'USD') {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
       if (rate && rate > 0) {
-        usdPrice = Math.round((usdPrice / rate) * 1000000) / 1000000;
+        usdPackagePrice = Math.round((usdPackagePrice / rate) * 1000000) / 1000000;
       }
     }
 
-    setCart(prev => prev.map(i =>
-      i.product_id === pid && i.presentation_id === presId && i.sellByUnit === sellByUnit ? { ...i, current_price: usdPrice } : i
-    ));
+    setCart(prev => prev.map(i => {
+      if (i.product_id === pid && i.presentation_id === presId) {
+        // Calculate the unit price from the new package price
+        const unitsPerPkg = i.units_per_package || 1;
+        const usdUnitPrice = Math.round((usdPackagePrice / unitsPerPkg) * 1000000) / 1000000;
+
+        return {
+          ...i,
+          package_price: usdPackagePrice,
+          unit_price_each: usdUnitPrice,
+          // If selling by unit, current price is the unit price; otherwise it's the package price
+          current_price: i.sellByUnit ? usdUnitPrice : usdPackagePrice
+        };
+      }
+      return i;
+    }));
   };
 
   const clearCart = () => { setCart([]); setCustomer(null); };
