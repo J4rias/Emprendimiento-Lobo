@@ -4,33 +4,39 @@ const saleController = require('../controllers/sale.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
-router.post('/', 
-  auth, 
-  authorize('sales.create'), 
+router.post('/',
+  auth,
+  authorize('sales.create'),
   saleController.createSale
 );
 
-router.get('/', 
-  auth, 
-  authorize('sales.view'), 
+router.get('/',
+  auth,
+  authorize('sales.view'),
   saleController.getSales
 );
 
-router.get('/stats', 
-  auth, 
-  authorize('sales.view'), 
+router.get('/stats',
+  auth,
+  authorize('sales.view'),
   saleController.getSalesStats
 );
 
-router.get('/:id', 
-  auth, 
-  authorize('sales.view'), 
+router.get('/daily-closure',
+  auth,
+  authorize('sales.view'),
+  saleController.getDailyClosure
+);
+
+router.get('/:id',
+  auth,
+  authorize('sales.view'),
   saleController.getSaleById
 );
 
-router.put('/:id', 
-  auth, 
-  authorize('sales.update'), 
+router.put('/:id',
+  auth,
+  authorize('sales.update'),
   saleController.updateSale
 );
 
@@ -40,9 +46,9 @@ router.post('/:id/cancel',
   saleController.cancelSale
 );
 
-router.post('/:id/payments', 
-  auth, 
-  authorize('sales.create'), 
+router.post('/:id/payments',
+  auth,
+  authorize('sales.create'),
   saleController.addPayment
 );
 

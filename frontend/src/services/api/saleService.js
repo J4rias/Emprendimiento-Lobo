@@ -34,6 +34,11 @@ export const saleService = {
   getSalesStats: async (params = {}) => {
     const response = await api.get('/sales/stats', { params });
     return response.data;
+  },
+
+  getDailyClosure: async (params = {}) => {
+    const response = await api.get('/sales/daily-closure', { params });
+    return response.data;
   }
 };
 

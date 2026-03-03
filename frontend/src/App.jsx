@@ -33,6 +33,7 @@ import CreditNoteCreatePage from './pages/CreditNoteCreatePage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
 import PriceListsPage from './pages/PriceListsPage';
+import DailyReportPage from './pages/DailyReportPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();

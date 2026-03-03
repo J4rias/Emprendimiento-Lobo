@@ -22,6 +22,7 @@ import {
   Truck,
   FileX,
   Receipt,
+  Calculator,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -162,6 +163,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: BarChart3,
       path: '/reportes',
       permission: 'reports.view',
+    },
+    {
+      name: 'Cierre de Caja',
+      icon: Calculator,
+      path: '/cierre-caja',
+      permission: 'sales.view', // Can be refined later
     },
     {
       name: 'Configuración',

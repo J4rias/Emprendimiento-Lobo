@@ -1,0 +1,207 @@
+import { useState, useEffect } from 'react';
+import { saleService } from '../services/api/saleService';
+import { userService } from '../services/api/userService';
+import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
+import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+const DailyReportPage = () => {
+    const { user, hasPermission } = useAuth();
+    const { companySettings } = useCompany();
+
+    const [loading, setLoading] = useState(false);
+    const [report, setReport] = useState(null);
+    const [users, setUsers] = useState([]);
+
+    const [filters, setFilters] = useState({
+        date: new Date().toISOString().split('T')[0],
+        user_id: hasPermission('sales.view_all') ? '' : user?.id
+    });
+
+    useEffect(() => {
+        if (hasPermission('users.view')) {
+            loadUsers();
+        }
+    }, []);
+
+    useEffect(() => {
+        loadReport();
+    }, [filters]);
+
+    const loadUsers = async () => {
+        try {
+            const response = await userService.getActive();
+            setUsers(response.data || []);
+        } catch (err) {
+            console.error('Error loading users:', err);
+        }
+    };
+
+    const loadReport = async () => {
+        try {
+            setLoading(true);
+            const res = await saleService.getDailyClosure(filters);
+            setReport(res);
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al cargar el reporte de caja.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const getMethodLabel = (method) => {
+        const methods = {
+            cash: 'Efectivo',
+            card: 'Tarjeta',
+            transfer: 'Transferencia'
+        };
+        return methods[method] || method;
+    };
+
+    return (
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Cierre de Caja</h1>
+                    <p className="text-gray-500 text-sm mt-1">Resumen diario de ventas y cuadre multi-moneda</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {hasPermission('users.view') && (
+                        <select
+                            value={filters.user_id}
+                            onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
+                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-48"
+                        >
+                            <option value="">Todos los cajeros</option>
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    <input
+                        type="date"
+                        value={filters.date}
+                        onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
+                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
+                    />
+
+                    <button
+                        onClick={handlePrint}
+                        disabled={loading || !report}
+                        className="w-full md:w-auto px-4 py-2 bg-slate-800 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-slate-700 disabled:bg-slate-300"
+                    >
+                        <Printer className="w-4 h-4" />
+                        Imprimir Arqueo
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+            ) : !report ? (
+                <div className="text-center py-12 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
+                    No hay datos para mostrar.
+                </div>
+            ) : (
+                <div className="space-y-6 print-container">
+
+                    {/* Tarjetas de Resumen Global */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div className="p-4 bg-emerald-100 rounded-lg text-emerald-600">
+                                <DollarSign className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas Totales (Base USD)</p>
+                                <div className="text-3xl font-bold text-gray-900 mt-1">
+                                    ${report.totalSalesUSD?.toFixed(2) || '0.00'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                            <div className="p-4 bg-blue-100 rounded-lg text-blue-600">
+                                <Wallet className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Operaciones</p>
+                                <div className="text-3xl font-bold text-gray-900 mt-1">
+                                    {report.salesCount || 0}
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">Facturas procesadas</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Desglose de Caja Fuerte (Multimoneda) */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 bg-slate-50">
+                            <h2 className="text-lg font-semibold text-gray-800">Desglose Físico en Caja</h2>
+                            <p className="text-sm text-gray-500 mt-1">Sumatoria exacta por divisa de pagos ingresados hoy.</p>
+                        </div>
+
+                        <div className="p-6">
+                            {Object.keys(report.paymentsBreakdown || {}).length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <AlertCircle className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                                    No se registraron pagos finalizados para esta fecha.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {Object.entries(report.paymentsBreakdown).map(([currency, methods]) => (
+                                        <div key={currency} className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <div className="bg-slate-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                                <span className="font-bold text-slate-700">Recibido en {currency}</span>
+                                            </div>
+                                            <div className="divide-y divide-gray-100">
+                                                {Object.entries(methods).map(([method, amount]) => (
+                                                    <div key={method} className="flex justify-between items-center px-4 py-3 hover:bg-slate-50">
+                                                        <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
+                                                        <span className="font-semibold text-gray-900">
+                                                            {currency === 'USD' ? '$' : ''}
+                                                            {amount.toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="bg-slate-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
+                                                <span className="text-slate-600">Total {currency}:</span>
+                                                <span className="text-slate-900">
+                                                    {Object.values(methods).reduce((a, b) => a + b, 0).toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+            @media print {
+               body * { visibility: hidden; }
+               .print-container, .print-container * { visibility: visible; }
+               .print-container { position: absolute; left: 0; top: 0; width: 100%; }
+               .shadow-sm, .shadow-md, .shadow { box-shadow: none !important; border: 1px solid #ddd; }
+               @page { size: auto; margin: 20mm; }
+            }
+          `}} />
+
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default DailyReportPage;

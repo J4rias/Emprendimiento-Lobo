@@ -735,3 +735,85 @@ exports.getSalesStats = async (req, res) => {
     });
   }
 };
+
+exports.getDailyClosure = async (req, res) => {
+  try {
+    const { date, user_id } = req.query;
+
+    // Default to today in local timezone if not provided
+    let targetDate = new Date();
+    if (date) {
+      targetDate = new Date(date);
+    }
+
+    // Set start and end of the day for the query
+    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+
+    const where = {
+      sale_date: {
+        [Op.between]: [startOfDay, endOfDay]
+      },
+      status: { [Op.in]: ['completed', 'pending'] } // Assuming only non-cancelled sales count for closure
+    };
+
+    if (user_id) {
+      where.user_id = user_id;
+    }
+
+    // 1. Fetch total sales base (USD) amount and count
+    const totalSalesUSD = await Sale.sum('total', { where }) || 0;
+    const salesCount = await Sale.count({ where });
+
+    // 2. Fetch all sales IDs to get their payments
+    const sales = await Sale.findAll({
+      where,
+      attributes: ['id']
+    });
+
+    const saleIds = sales.map(s => s.id);
+
+    // 3. Aggregate payments by Currency and Method
+    // We want to sum the literal 'amount' paid in that currency
+    const paymentsBreakdown = {};
+
+    if (saleIds.length > 0) {
+      const payments = await SalePayment.findAll({
+        where: { sale_id: { [Op.in]: saleIds } },
+        attributes: [
+          'currency',
+          'method',
+          [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
+        ],
+        group: ['currency', 'method'],
+        raw: true
+      });
+
+      // Format output into a clean nested object: { "COP": { "cash": 50000, "transfer": 200 }, "USD": ... }
+      payments.forEach(p => {
+        const curr = p.currency || 'USD';
+        const method = p.method;
+        const total = parseFloat(p.total_amount) || 0;
+
+        if (!paymentsBreakdown[curr]) {
+          paymentsBreakdown[curr] = {};
+        }
+        paymentsBreakdown[curr][method] = total;
+      });
+    }
+
+    res.json({
+      date: startOfDay.toISOString().split('T')[0],
+      totalSalesUSD,
+      salesCount,
+      paymentsBreakdown
+    });
+
+  } catch (error) {
+    console.error('Error generating daily closure:', error);
+    res.status(500).json({
+      message: 'Error al generar el cierre de caja',
+      error: error.message
+    });
+  }
+};

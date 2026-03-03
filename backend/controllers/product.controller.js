@@ -515,9 +515,9 @@ class ProductController {
             });
           }
 
-          // Deactivate other barcodes for this product
+          // Deactivate other barcodes for this product since it's a replacement from the main form
           await Barcode.update(
-            { is_primary: false },
+            { is_primary: false, is_active: false },
             { where: { product_id: product.id } }
           );
 
