@@ -17,9 +17,9 @@ export const printHTML = (content, title = 'Imprimir') => {
 
   // Obtener configuración de la impresora (o usar 80mm por defecto)
   const printerSettings = JSON.parse(localStorage.getItem('pos_printer_settings') || '{"width": "72mm", "margin": "0mm", "zoom": "1.0"}');
-  const width = printerSettings.width || '80mm';
+  const width = printerSettings.width || '72mm';
   const margin = printerSettings.margin || '0mm';
-  const zoom = printerSettings.zoom || '1.2';
+  const zoom = printerSettings.zoom || '1.0';
 
   printWindow.document.write(`
     <!DOCTYPE html>
