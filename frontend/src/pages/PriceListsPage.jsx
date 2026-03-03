@@ -168,7 +168,8 @@ const PriceListsPage = () => {
                             package_price: pkgPrice,
                             unit_price: parseFloat(existing.unit_price) || 0,
                             margin_percentage: Math.round(margin * 10) / 10,
-                            base_currency: item.presentation?.purchase_currency || 'USD'
+                            base_currency: 'USD',
+                            native_currency: item.presentation?.purchase_currency || 'USD'
                         };
                     } else {
                         // New product with stock that wasn't in the list
@@ -184,7 +185,8 @@ const PriceListsPage = () => {
                             package_price: 0,
                             unit_price: 0,
                             margin_percentage: 0,
-                            base_currency: item.presentation?.purchase_currency || 'USD'
+                            base_currency: 'USD',
+                            native_currency: item.presentation?.purchase_currency || 'USD'
                         };
                     }
                 });
@@ -205,7 +207,8 @@ const PriceListsPage = () => {
                             package_price: parseFloat(d.package_price) || 0,
                             unit_price: parseFloat(d.unit_price) || 0,
                             margin_percentage: parseFloat(d.margin_percentage) || 0,
-                            base_currency: d.presentation?.purchase_currency || 'USD'
+                            base_currency: 'USD',
+                            native_currency: d.presentation?.purchase_currency || 'USD'
                         });
                     }
                 });
@@ -234,7 +237,8 @@ const PriceListsPage = () => {
                     package_price: 0,
                     unit_price: 0,
                     margin_percentage: 0,
-                    base_currency: item.presentation?.purchase_currency || 'USD'
+                    base_currency: 'USD',
+                    native_currency: item.presentation?.purchase_currency || 'USD'
                 })));
             }
         } catch (err) {
@@ -264,7 +268,8 @@ const PriceListsPage = () => {
                 ...d,
                 package_price: Math.round(pkgPrice * 100) / 100,
                 unit_price: Math.round(unitPrice * 100) / 100,
-                margin_percentage: Math.round(pct * 10) / 10
+                margin_percentage: Math.round(pct * 10) / 10,
+                package_price_cop_str: undefined
             };
         }));
         toast.success(`Margen del ${pct}% aplicado a todos los productos`);
@@ -278,14 +283,27 @@ const PriceListsPage = () => {
 
             if (field === 'package_price') {
                 item.package_price = numVal;
+                item.package_price_cop_str = undefined;
                 item.unit_price = item.units_per_package > 0
                     ? Math.round((numVal / item.units_per_package) * 100) / 100
                     : 0;
                 item.margin_percentage = item.package_cost > 0
                     ? Math.round(((numVal - item.package_cost) / item.package_cost * 100) * 10) / 10
                     : 0;
+            } else if (field === 'package_price_cop') {
+                item.package_price_cop_str = value;
+                const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+                const usdVal = numVal / rate;
+                item.package_price = Math.round(usdVal * 100) / 100;
+                item.unit_price = item.units_per_package > 0
+                    ? Math.round((usdVal / item.units_per_package) * 100) / 100
+                    : 0;
+                item.margin_percentage = item.package_cost > 0
+                    ? Math.round(((usdVal - item.package_cost) / item.package_cost * 100) * 10) / 10
+                    : 0;
             } else if (field === 'margin_percentage') {
                 item.margin_percentage = numVal;
+                item.package_price_cop_str = undefined;
                 item.package_price = item.package_cost > 0
                     ? Math.round(item.package_cost * (1 + numVal / 100) * 100) / 100
                     : 0;
@@ -389,22 +407,40 @@ const PriceListsPage = () => {
     };
 
     // ===================== RENDER HELPER =====================
-    const renderBaseValue = (usdAmount, currency, colorClass = "text-gray-400 text-[10px]") => {
-        if (!currency || currency === 'USD' || !exchangeRates || exchangeRates.length === 0) return null;
+    const renderCostDisplay = (usdAmount, baseCurrency, isBold = false) => {
+        if (baseCurrency !== 'USD') {
+            const isCOP = baseCurrency === 'COP';
+            const formatted = usdAmount.toLocaleString('de-DE', {
+                minimumFractionDigits: isCOP ? 0 : 2,
+                maximumFractionDigits: isCOP ? 0 : 2
+            });
+            return (
+                <div className="flex flex-col items-end leading-tight">
+                    <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>
+                        {isCOP ? `COP ${formatted}` : `${baseCurrency} ${formatted}`}
+                    </div>
+                </div>
+            );
+        }
 
-        const rate = calculateEffectiveRate('USD', currency, exchangeRates);
-        if (!rate) return null;
+        const rate = calculateEffectiveRate('USD', 'COP', exchangeRates);
+        const usdFormatted = usdAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        const converted = usdAmount * rate;
-        const formatted = currency === 'COP'
-            ? converted.toLocaleString('de-DE', { maximumFractionDigits: 0 })
-            : converted.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (!rate) {
+            return (
+                <div className="flex flex-col items-end leading-tight">
+                    <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>USD ${usdFormatted}</div>
+                </div>
+            );
+        }
+
+        const copConverted = usdAmount * rate;
+        const copFormatted = copConverted.toLocaleString('de-DE', { maximumFractionDigits: 0 });
 
         return (
-            <div className="flex flex-col items-end leading-tight mt-0.5 font-medium">
-                <span className={colorClass}>
-                    {currency}: {formatted}
-                </span>
+            <div className="flex flex-col items-end leading-tight gap-0.5">
+                <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>COP {copFormatted}</div>
+                <div className="text-gray-500 font-medium text-[11px]">USD ${usdFormatted}</div>
             </div>
         );
     };
@@ -599,36 +635,50 @@ const PriceListsPage = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-gray-700">{d.presentation_name}</td>
-                                                    <td className="px-4 py-3 text-right">
-                                                        <div className="flex flex-col items-end">
-                                                            <div className="text-gray-900 font-medium">${d.package_cost.toFixed(2)}</div>
-                                                            {renderBaseValue(d.package_cost, d.base_currency)}
-                                                        </div>
+                                                    <td className={`px-4 py-3 text-right ${d.native_currency === 'USD' ? 'bg-green-50' : ''}`}>
+                                                        {renderCostDisplay(d.package_cost, d.base_currency, false)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <div className="flex flex-col items-end">
-                                                            <div className="text-gray-900 font-medium">${d.unit_cost.toFixed(2)}</div>
-                                                            {renderBaseValue(d.unit_cost, d.base_currency)}
-                                                        </div>
+                                                        {renderCostDisplay(d.unit_cost, d.base_currency, false)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex flex-col items-end gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={d.package_price || ''}
-                                                                onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                className="w-28 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
-                                                            />
-                                                            {renderBaseValue(d.package_price || 0, d.base_currency, "text-blue-500 text-[10px]")}
+                                                            {d.base_currency === 'USD' ? (
+                                                                <>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-gray-500 font-medium text-xs">COP</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="100"
+                                                                            min="0"
+                                                                            value={d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : '')}
+                                                                            onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
+                                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="text-gray-500 font-medium text-[11px]">
+                                                                        USD ${(d.package_price || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-gray-500 font-medium text-xs">{d.base_currency}</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            step={d.base_currency === 'COP' ? "100" : "0.01"}
+                                                                            min="0"
+                                                                            value={d.package_price || ''}
+                                                                            onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
+                                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                                        />
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-right font-medium text-gray-900">
-                                                        <div className="flex flex-col items-end">
-                                                            <div className="text-gray-900 font-bold">${d.unit_price.toFixed(2)}</div>
-                                                            {renderBaseValue(d.unit_price, d.base_currency, "text-blue-600 font-bold text-[10px]")}
-                                                        </div>
+                                                    <td className="px-4 py-3 text-right">
+                                                        {renderCostDisplay(d.unit_price, d.base_currency, true)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
