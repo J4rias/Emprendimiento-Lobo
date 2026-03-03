@@ -44,7 +44,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
 
   // Building ticket HTML
   const ticketHTML = `
-    <div style="width: 100%; padding: 1mm; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000;">
+    <div style="width: 100%; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000;">
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 8px;">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 2px;">${name.toUpperCase()}</div>
