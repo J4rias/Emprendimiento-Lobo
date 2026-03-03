@@ -167,7 +167,7 @@ const PriceListsPage = () => {
                             unit_cost: currentUnitCost,
                             package_price: pkgPrice,
                             unit_price: parseFloat(existing.unit_price) || 0,
-                            margin_percentage: Math.round(margin * 10) / 10,
+                            margin_percentage: Math.round(margin * 10000) / 10000,
                             base_currency: 'USD',
                             native_currency: item.presentation?.purchase_currency || 'USD'
                         };
@@ -266,9 +266,9 @@ const PriceListsPage = () => {
             const unitPrice = d.units_per_package > 0 ? pkgPrice / d.units_per_package : 0;
             return {
                 ...d,
-                package_price: Math.round(pkgPrice * 100) / 100,
-                unit_price: Math.round(unitPrice * 100) / 100,
-                margin_percentage: Math.round(pct * 10) / 10,
+                package_price: Math.round(pkgPrice * 1000000) / 1000000,
+                unit_price: Math.round(unitPrice * 1000000) / 1000000,
+                margin_percentage: Math.round(pct * 10000) / 10000,
                 package_price_cop_str: undefined
             };
         }));
@@ -285,30 +285,30 @@ const PriceListsPage = () => {
                 item.package_price = numVal;
                 item.package_price_cop_str = undefined;
                 item.unit_price = item.units_per_package > 0
-                    ? Math.round((numVal / item.units_per_package) * 100) / 100
+                    ? Math.round((numVal / item.units_per_package) * 1000000) / 1000000
                     : 0;
                 item.margin_percentage = item.package_cost > 0
-                    ? Math.round(((numVal - item.package_cost) / item.package_cost * 100) * 10) / 10
+                    ? Math.round(((numVal - item.package_cost) / item.package_cost * 100) * 10000) / 10000
                     : 0;
             } else if (field === 'package_price_cop') {
                 item.package_price_cop_str = value;
                 const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
                 const usdVal = numVal / rate;
-                item.package_price = Math.round(usdVal * 100) / 100;
+                item.package_price = Math.round(usdVal * 1000000) / 1000000;
                 item.unit_price = item.units_per_package > 0
-                    ? Math.round((usdVal / item.units_per_package) * 100) / 100
+                    ? Math.round((usdVal / item.units_per_package) * 1000000) / 1000000
                     : 0;
                 item.margin_percentage = item.package_cost > 0
-                    ? Math.round(((usdVal - item.package_cost) / item.package_cost * 100) * 10) / 10
+                    ? Math.round(((usdVal - item.package_cost) / item.package_cost * 100) * 10000) / 10000
                     : 0;
             } else if (field === 'margin_percentage') {
                 item.margin_percentage = numVal;
                 item.package_price_cop_str = undefined;
                 item.package_price = item.package_cost > 0
-                    ? Math.round(item.package_cost * (1 + numVal / 100) * 100) / 100
+                    ? Math.round(item.package_cost * (1 + numVal / 100) * 1000000) / 1000000
                     : 0;
                 item.unit_price = item.units_per_package > 0
-                    ? Math.round((item.package_price / item.units_per_package) * 100) / 100
+                    ? Math.round((item.package_price / item.units_per_package) * 1000000) / 1000000
                     : 0;
             }
 
@@ -435,7 +435,8 @@ const PriceListsPage = () => {
         }
 
         const copConverted = usdAmount * rate;
-        const copFormatted = copConverted.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+        // Use 0 decimals for COP display
+        const copFormatted = copConverted.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
         return (
             <div className="flex flex-col items-end leading-tight gap-0.5">

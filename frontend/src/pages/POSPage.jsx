@@ -130,7 +130,12 @@ const POSPage = () => {
       displayAmount = rate !== null ? displayAmount * rate : displayAmount;
     }
 
-    return `${currencyDef.symbol} ${displayAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    // COP doesn't use decimals in practice, round to 0 to avoid jitter like .25
+    const isCOP = targetCurrency === 'COP';
+    return `${currencyDef.symbol} ${displayAmount.toLocaleString('de-DE', {
+      minimumFractionDigits: isCOP ? 0 : 2,
+      maximumFractionDigits: isCOP ? 0 : 2
+    })}`;
   };
 
   // ──────────────────── EFFECTS ────────────────────
@@ -259,14 +264,13 @@ const POSPage = () => {
     let pkgPrice = detail && parseFloat(detail.package_price) > 0 ? parseFloat(detail.package_price) : (parseFloat(presentation.package_price) || 0);
     let unitPrice = detail && parseFloat(detail.unit_price) > 0 ? parseFloat(detail.unit_price) : 0;
 
-    // If the original price was calculated based on a non-USD purchase cost (like COP),
-    // and the price list didn't convert it, we must normalize it to USD internally for the cart.
+    // Use high precision for normalization to avoid rounding jitter later
     const purchaseCurrency = presentation.purchase_currency || 'USD';
     if (purchaseCurrency !== 'USD') {
       const rate = calculateEffectiveRate('USD', purchaseCurrency, exchangeRates);
       if (rate && rate > 0) {
-        pkgPrice = pkgPrice / rate;
-        unitPrice = unitPrice / rate;
+        pkgPrice = Math.round((pkgPrice / rate) * 1000000) / 1000000;
+        unitPrice = Math.round((unitPrice / rate) * 1000000) / 1000000;
       }
     }
 
@@ -412,11 +416,11 @@ const POSPage = () => {
   const updatePrice = (pid, presId, sellByUnit, newDisplayPrice) => {
     let usdPrice = parseFloat(newDisplayPrice) || 0;
 
-    // If the user typed the price while viewing in another currency (e.g. COP), convert it back to USD to store in cart
+    // Use high precision (6 decimals) when converting back to USD to store in cart
     if (displayCurrency !== 'USD') {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
       if (rate && rate > 0) {
-        usdPrice = usdPrice / rate;
+        usdPrice = Math.round((usdPrice / rate) * 1000000) / 1000000;
       }
     }
 

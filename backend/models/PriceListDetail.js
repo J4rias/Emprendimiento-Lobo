@@ -33,25 +33,25 @@ const PriceListDetail = sequelize.define('PriceListDetail', {
         }
     },
     package_cost: {
-        type: DataTypes.DECIMAL(18, 2),
+        type: DataTypes.DECIMAL(18, 6),
         allowNull: false,
         defaultValue: 0,
         comment: 'Costo del paquete (snapshot del costo al momento de crear/actualizar)'
     },
     unit_cost: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(18, 6),
         allowNull: false,
         defaultValue: 0,
         comment: 'Costo unitario (package_cost / units_per_package)'
     },
     package_price: {
-        type: DataTypes.DECIMAL(18, 2),
+        type: DataTypes.DECIMAL(18, 6),
         allowNull: false,
         defaultValue: 0,
         comment: 'Precio de venta por paquete'
     },
     unit_price: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(18, 6),
         allowNull: false,
         defaultValue: 0,
         comment: 'Precio unitario (package_price / units_per_package)'
