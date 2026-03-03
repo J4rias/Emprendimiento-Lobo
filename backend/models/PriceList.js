@@ -86,28 +86,32 @@ const PriceList = sequelize.define('PriceList', {
     }
   ],
   hooks: {
-    beforeValidate: async (priceList) => {
+    beforeValidate: async (priceList, options) => {
       // Generar código automático si no existe
       if (!priceList.code) {
         const lastPriceList = await PriceList.findOne({
           order: [['id', 'DESC']],
-          paranoid: false
+          paranoid: false,
+          transaction: options.transaction
         });
 
         const nextNumber = lastPriceList ? lastPriceList.id + 1 : 1;
         priceList.code = `LP-${String(nextNumber).padStart(4, '0')}`;
       }
     },
-    beforeSave: async (priceList) => {
+    beforeSave: async (priceList, options) => {
       // Si se marca como default, desmarcar las demás
       if (priceList.isDefault && priceList.changed('isDefault')) {
         await PriceList.update(
           { isDefault: false },
           {
-            where: {
+            where: priceList.id ? {
               isDefault: true,
               id: { [sequelize.Sequelize.Op.ne]: priceList.id }
-            }
+            } : {
+              isDefault: true
+            },
+            transaction: options.transaction
           }
         );
       }
