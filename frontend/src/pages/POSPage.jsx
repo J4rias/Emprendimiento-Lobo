@@ -142,6 +142,28 @@ const POSPage = () => {
   };
 
   // ──────────────────── EFFECTS ────────────────────
+  // Initial Load from LocalStorage
+  useEffect(() => {
+    const savedCart = localStorage.getItem('pos_cart');
+    const savedCustomer = localStorage.getItem('pos_customer');
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch (e) { console.error('Error parsing saved cart', e); }
+    }
+    if (savedCustomer) {
+      try {
+        setCustomer(JSON.parse(savedCustomer));
+      } catch (e) { console.error('Error parsing saved customer', e); }
+    }
+  }, []);
+
+  // Persist to LocalStorage whenever cart/customer change
+  useEffect(() => {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+    localStorage.setItem('pos_customer', JSON.stringify(customer));
+  }, [cart, customer]);
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000);
     return () => clearInterval(timer);
@@ -451,7 +473,12 @@ const POSPage = () => {
     }));
   };
 
-  const clearCart = () => { setCart([]); setCustomer(null); };
+  const clearCart = () => {
+    setCart([]);
+    setCustomer(null);
+    localStorage.removeItem('pos_cart');
+    localStorage.removeItem('pos_customer');
+  };
 
   // ──────────────────── CUSTOMERS ────────────────────
   const handleCustomerSelect = (c) => {
