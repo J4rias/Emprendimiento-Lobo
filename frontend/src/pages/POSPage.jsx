@@ -29,7 +29,7 @@ const PAYMENT_METHODS = [
   { id: 'transfer', label: 'Transferencia', icon: Smartphone, activeClass: 'bg-violet-100 text-violet-700' }
 ];
 
-const emptyPaymentLine = () => ({ currency: 'USD', method: 'cash', amount: '' });
+const emptyPaymentLine = () => ({ currency: 'COP', method: 'cash', amount: '' });
 
 // ──────────────────────── COMPONENTS ───────────────────────
 const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
@@ -101,7 +101,7 @@ const POSPage = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [saleType, setSaleType] = useState('cash');
   const [paymentLines, setPaymentLines] = useState([emptyPaymentLine()]);
-  const [activePaymentCurrency, setActivePaymentCurrency] = useState('USD');
+  const [activePaymentCurrency, setActivePaymentCurrency] = useState('COP');
   const [loading, setLoading] = useState(false);
 
   // Post-sale
@@ -463,10 +463,10 @@ const POSPage = () => {
     });
     const finalTotal = subtotal - totalDiscount;
     return {
-      subtotal: subtotal.toFixed(2),
-      discount: totalDiscount.toFixed(2),
-      tax: (0).toFixed(2),
-      total: finalTotal.toFixed(2),
+      subtotal: subtotal,
+      discount: totalDiscount,
+      tax: 0,
+      total: finalTotal,
       totalRaw: finalTotal
     };
   }, [cart]);
@@ -545,6 +545,9 @@ const POSPage = () => {
 
       toast.success(`¡Venta ${response.sale.sale_number} completada!`);
       clearCart();
+      setSaleType('cash');
+      setPaymentLines([emptyPaymentLine()]);
+      setSearchTerm('');
       setShowCheckoutModal(false);
       setShowResultModal(true);
 
