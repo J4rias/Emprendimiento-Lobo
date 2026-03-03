@@ -29,7 +29,7 @@ const SettingsPage = () => {
   const [companyLoading, setCompanyLoading] = useState(false);
   // Printer settings state
   const [printerSettings, setPrinterSettings] = useState({
-    width: '80mm',
+    width: '72mm',
     margin: '0mm',
     zoom: '1.0'
   });
@@ -747,9 +747,9 @@ const SettingsPage = () => {
                     onChange={(e) => setPrinterSettings({ ...printerSettings, width: e.target.value })}
                     className="input w-full"
                   >
-                    <option value="80mm">80mm (Estándar DIG E200L)</option>
+                    <option value="72mm">72mm (DIG E200L — área imprimible real)</option>
+                    <option value="80mm">80mm (Ancho total del papel)</option>
                     <option value="58mm">58mm (Impresoras pequeñas)</option>
-                    <option value="72mm">72mm (Área de impresión real 80mm)</option>
                   </select>
                   <p className="mt-1 text-xs text-gray-400">La DIG E200L usa papel de 80mm.</p>
                 </div>

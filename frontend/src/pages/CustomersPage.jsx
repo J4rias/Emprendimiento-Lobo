@@ -440,9 +440,9 @@ const CustomersPage = () => {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Límite de Crédito ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Límite de Crédito (COP)</label>
                   <input type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange}
-                    min="0" step="0.01" className="input w-full" />
+                    min="0" step="1" className="input w-full" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Días de Crédito</label>
@@ -524,7 +524,7 @@ const CustomersPage = () => {
             )}
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Límite de Crédito</p>
-              <p className="text-gray-900">$ {parseFloat(viewingCustomer.creditLimit || 0).toFixed(2)}</p>
+              <p className="text-gray-900">COP {Math.round(parseFloat(viewingCustomer.creditLimit || 0)).toLocaleString('de-DE')}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Días de Crédito</p>

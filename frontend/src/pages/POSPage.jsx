@@ -1178,6 +1178,7 @@ const POSPage = () => {
         onSelect={handleCustomerSelect}
         validateCredit={saleType === 'credit'}
         saleAmount={parseFloat(totals.total)}
+        exchangeRates={exchangeRates}
       />
     </div>
   );

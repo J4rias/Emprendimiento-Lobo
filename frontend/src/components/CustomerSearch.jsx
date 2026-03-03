@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, X, User, AlertCircle, CreditCard, ChevronRight, UserPlus } from 'lucide-react';
 import { customerService } from '../services/api/customerService';
+import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from './common/Modal';
 import CustomerQuickAdd from './CustomerQuickAdd';
 
-const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, saleAmount = 0 }) => {
+const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, saleAmount = 0, exchangeRates = [] }) => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -58,14 +59,20 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
 
     if (validateCredit && saleAmount > 0) {
       try {
-        const validation = await customerService.validateCredit(customer.id, saleAmount);
-        setCreditValidation(validation);
+        // Credits are managed in COP — convert the USD sale amount to COP
+        const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+        const saleAmountCOP = Math.round(saleAmount * copRate);
 
-        if (!validation.has_available_credit) {
+        const validation = await customerService.validateCredit(customer.id, saleAmountCOP);
+        const creditData = validation.data || validation;
+        setCreditValidation(creditData);
+
+        if (!creditData.hasAvailableCredit) {
+          const available = Math.round(parseFloat(creditData.availableCredit || 0));
           setError(
             `El cliente no tiene crédito suficiente. ` +
-            `Disponible: $ ${validation.available_credit?.toFixed(2) || '0.00'}, ` +
-            `Requerido: $ ${saleAmount.toFixed(2)}`
+            `Disponible: COP ${available.toLocaleString('de-DE')}, ` +
+            `Requerido: COP ${saleAmountCOP.toLocaleString('de-DE')}`
           );
           return;
         }
@@ -181,7 +188,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                               <div className="flex items-center gap-3 mt-1">
                                 <span className="text-xs text-green-600 flex items-center gap-1">
                                   <CreditCard className="w-3 h-3" />
-                                  Crédito: $ {parseFloat(customer.creditLimit || 0).toFixed(2)}
+                                  Crédito: COP {Math.round(parseFloat(customer.creditLimit || 0)).toLocaleString('de-DE')}
                                 </span>
                                 {customer.discountPercentage > 0 && (
                                   <span className="text-xs text-blue-600">

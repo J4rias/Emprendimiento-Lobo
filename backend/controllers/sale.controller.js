@@ -131,7 +131,8 @@ exports.createSale = async (req, res) => {
     const total = subtotal - discount_amount + tax_amount;
     const change_amount = sale_type === 'cash' ? Math.max(0, paid_amount - total) : 0;
 
-    // CRITICAL: Validate credit if sale_type is credit
+    // For credit sales, update the customer's credit_used
+    // Credit validation (in COP) is already handled by the frontend before reaching here
     if (sale_type === 'credit' && customer_id) {
       const customer = await Customer.findByPk(customer_id, { transaction });
 
@@ -143,23 +144,8 @@ exports.createSale = async (req, res) => {
         });
       }
 
-      // Calculate current credit used
+      // Accumulate the sale total (USD) to credit_used
       const currentCreditUsed = parseFloat(customer.credit_used || 0);
-      const creditLimit = parseFloat(customer.credit_limit || 0);
-      const availableCredit = creditLimit - currentCreditUsed;
-
-      // Validate that customer has enough credit
-      if (total > availableCredit) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: `El cliente no tiene crédito suficiente. Disponible: ${availableCredit.toFixed(2)}, Requerido: ${total.toFixed(2)}`,
-          available_credit: availableCredit,
-          required_amount: total
-        });
-      }
-
-      // Update customer credit_used
       await customer.update({
         credit_used: currentCreditUsed + total
       }, { transaction });
