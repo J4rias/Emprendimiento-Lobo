@@ -28,10 +28,12 @@ export const printHTML = (content, title = 'Imprimir') => {
         <meta charset="UTF-8">
         <title>${title}</title>
         <style>
-          * {
-            margin: 0;
-            padding: 0;
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
             box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
 
           body {
@@ -41,16 +43,19 @@ export const printHTML = (content, title = 'Imprimir') => {
             color: #000;
             background: #fff;
             width: ${width};
+            max-width: ${width};
+            overflow: hidden;
             zoom: ${zoom};
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
             image-rendering: pixelated;
           }
 
           @media print {
-            body {
-              margin: ${margin};
-              padding: 0;
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: ${width} !important;
+              max-width: ${width} !important;
+              overflow: hidden !important;
             }
 
             .no-print {
@@ -59,7 +64,7 @@ export const printHTML = (content, title = 'Imprimir') => {
           }
 
           @page {
-            margin: 0;
+            margin: 0 !important;
             size: ${width} auto;
           }
           

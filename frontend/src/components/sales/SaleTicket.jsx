@@ -20,9 +20,14 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
     exchangeRate = 1
   } = printOptions;
 
-  // Custom formatter for the ticket
+  // Custom formatter for the ticket — 0 decimals for COP
+  const isCOP = displayCurrency === 'COP';
   const tFormat = (amount) => {
     const val = parseFloat(amount || 0) * exchangeRate;
+    if (isCOP) {
+      const rounded = Math.round(val);
+      return `${currencySymbol} ${rounded.toLocaleString('de-DE')}`;
+    }
     const roundedVal = Math.round(val * 100) / 100;
     return `${currencySymbol} ${roundedVal.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
@@ -44,7 +49,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
 
   // Building ticket HTML
   const ticketHTML = `
-    <div style="width: 100%; padding: 1mm; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000;">
+    <div style="width: 100%; max-width: 100%; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000; overflow: hidden;">
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 8px;">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 2px;">${name.toUpperCase()}</div>
@@ -75,7 +80,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
       <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
 
       <!-- Products -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13px;">
+      <table style="width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 8px; font-size: 13px;">
         <thead>
           <tr>
             <th style="text-align: left; border-bottom: 2px solid #000; padding: 2px 0;">PRODUCTO</th>
@@ -93,8 +98,8 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
                 ${detail.presentation?.name ? `<div style="font-size: 11px; margin-bottom: 1px;">${detail.presentation.name}</div>` : ''}
                 <div style="font-size: 10px;">${tFormat(detail.unit_price || 0)} x ud.</div>
               </td>
-              <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 15%;">${detail.quantity || 0}</td>
-              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 25%; font-weight: bold;">${tFormat(detail.total || 0)}</td>
+              <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 12%;">${detail.quantity || 0}</td>
+              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 28%; font-weight: bold; overflow: hidden; text-overflow: clip; white-space: nowrap;">${tFormat(detail.total || 0)}</td>
             </tr>
           `).join('') || ''}
         </tbody>
