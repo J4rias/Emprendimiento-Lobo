@@ -50,11 +50,17 @@ async function run() {
         const pldDesc = await queryInterface.describeTable('price_list_details').catch(() => null);
         if (pldDesc) {
             // Ampliamos decimales para soportar COP también en estas columnas de precios
+            console.log('   Ampliando columnas de costo y precio...');
             await sequelize.query('ALTER TABLE price_list_details \
                 MODIFY package_cost DECIMAL(18,6), \
                 MODIFY unit_cost DECIMAL(18,6), \
                 MODIFY package_price DECIMAL(18,6), \
                 MODIFY unit_price DECIMAL(18,6);\
+            ').catch(() => { });
+
+            console.log('   Ampliando columna margin_percentage...');
+            await sequelize.query('ALTER TABLE price_list_details \
+                MODIFY margin_percentage DECIMAL(10,4);\
             ').catch(() => { });
         }
 
