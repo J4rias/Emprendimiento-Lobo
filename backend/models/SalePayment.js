@@ -34,13 +34,13 @@ const SalePayment = sequelize.define('SalePayment', {
     comment: 'Moneda en la que se recibió el pago'
   },
   exchange_rate: {
-    type: DataTypes.DECIMAL(15, 4),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 1.0000,
     comment: 'Tasa de cambio aplicada respecto a la moneda base (USD)'
   },
   amount: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     comment: 'Monto del pago'
   },

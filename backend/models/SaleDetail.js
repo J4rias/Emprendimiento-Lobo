@@ -49,7 +49,7 @@ const SaleDetail = sequelize.define('SaleDetail', {
     comment: 'Cantidad vendida'
   },
   unit_price: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     comment: 'Precio unitario al momento de la venta'
   },
@@ -78,12 +78,12 @@ const SaleDetail = sequelize.define('SaleDetail', {
     comment: 'Monto de impuesto'
   },
   subtotal: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     comment: 'Subtotal de la línea (cantidad * precio)'
   },
   total: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     comment: 'Total de la línea (subtotal - descuento + impuesto)'
   },

@@ -23,7 +23,8 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
   // Custom formatter for the ticket
   const tFormat = (amount) => {
     const val = parseFloat(amount || 0) * exchangeRate;
-    return `${currencySymbol} ${val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const roundedVal = Math.round(val * 100) / 100;
+    return `${currencySymbol} ${roundedVal.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
   const {
     name = 'EMPRENDIMIENTO LOBO',

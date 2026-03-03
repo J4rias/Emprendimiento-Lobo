@@ -58,37 +58,37 @@ const Sale = sequelize.define('Sale', {
     comment: 'Método de pago (solo para ventas de contado)'
   },
   subtotal: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Subtotal antes de impuestos'
   },
   tax_amount: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Monto de impuestos (IVA)'
   },
   discount_amount: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Monto de descuento aplicado'
   },
   total: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Total de la venta'
   },
   paid_amount: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Monto pagado'
   },
   change_amount: {
-    type: DataTypes.DECIMAL(15, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Vuelto entregado'
