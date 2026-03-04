@@ -39,7 +39,8 @@ exports.createSale = async (req, res) => {
       items,
       discount_amount = 0,
       notes,
-      quote_id
+      quote_id,
+      exchange_rate = 1
     } = req.body;
 
     // Calculate total paid USD early
@@ -158,6 +159,7 @@ exports.createSale = async (req, res) => {
       user_id: req.user.id,
       sale_date: new Date(),
       sale_type,
+      exchange_rate,
       payment_method: sale_type === 'cash' && payment_lines.length > 0 ? payment_lines[0].method : null,
       subtotal,
       tax_amount,
@@ -606,6 +608,17 @@ exports.addPayment = async (req, res) => {
             reserved_quantity: inventory.reserved_quantity - detail.quantity
           }, { transaction });
         }
+      }
+    }
+
+    // Update customer's credit_used to restore available credit
+    if (sale.customer_id) {
+      const customer = await Customer.findByPk(sale.customer_id, { transaction });
+      if (customer) {
+        const currentCreditUsed = parseFloat(customer.credit_used || 0);
+        // Ensure credit_used doesn't drop below 0 due to rounding
+        const updatedCreditUsed = Math.max(0, currentCreditUsed - newlyPaidUSD);
+        await customer.update({ credit_used: updatedCreditUsed }, { transaction });
       }
     }
 

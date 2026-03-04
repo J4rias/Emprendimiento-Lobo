@@ -571,6 +571,7 @@ const POSPage = () => {
         customer_id: customer?.id || null,
         warehouse_id: 1,
         sale_type: saleType,
+        exchange_rate: getEffectiveRate('USD', 'COP') || 1,
         payment_lines: paymentLines.map(line => ({
           ...line,
           exchange_rate: getEffectiveRate('USD', line.currency) || 1

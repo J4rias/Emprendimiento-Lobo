@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer } from 'lucide-react';
+import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from '../components/common/Modal';
-import { formatMoney, formatDate } from '../utils/formatUtils';
+import { formatDate } from '../utils/formatUtils';
 import { printSaleTicket } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
 
@@ -26,11 +28,46 @@ const SalesPage = () => {
   });
   const [selectedSale, setSelectedSale] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [exchangeRates, setExchangeRates] = useState([]);
+
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSale, setPaymentSale] = useState(null);
+  const [paymentData, setPaymentData] = useState({
+    amount_cop: '',
+    method: 'cash',
+    reference: '',
+    notes: ''
+  });
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  // COP formatter: convert USD amount to COP using sale's specific rate if available, otherwise current rate
+  const copFormat = (usdAmount, saleExchangeRate = null) => {
+    const val = parseFloat(usdAmount || 0);
+    const rate = saleExchangeRate ? parseFloat(saleExchangeRate) : (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
+    const cop = Math.round(val * rate);
+    return `COP ${cop.toLocaleString('de-DE')}`;
+  };
 
   useEffect(() => {
     loadSales();
     loadStats();
-  }, [pagination.page, searchTerm, filters]);
+    loadExchangeRates();
+  }, [pagination.page, searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
+
+  // Optionally reset to page 1 when search or filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
+
+  const loadExchangeRates = async () => {
+    try {
+      const data = await exchangeRateService.getLatest();
+      setExchangeRates(data.data || []);
+    } catch (e) {
+      console.error('Error loading exchange rates:', e);
+    }
+  };
 
   const loadSales = async () => {
     setLoading(true);
@@ -91,9 +128,59 @@ const SalesPage = () => {
     }
   };
 
+  const handleOpenPaymentModal = (sale) => {
+    setPaymentSale(sale);
+    setPaymentData({
+      amount_cop: '',
+      method: 'cash',
+      reference: '',
+      notes: ''
+    });
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!paymentData.amount_cop || parseFloat(paymentData.amount_cop) <= 0) {
+      alert('Debe ingresar un monto válido mayor a 0');
+      return;
+    }
+
+    // Convert COP to USD for payload
+    const rate = paymentSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+    const amountUSD = parseFloat(paymentData.amount_cop) / rate;
+
+    setSubmittingPayment(true);
+    try {
+      await saleService.addPayment(paymentSale.id, {
+        payment_lines: [{
+          amount: amountUSD,
+          method: paymentData.method,
+          currency: 'USD',
+          exchange_rate: 1, // Already converted to USD base
+          reference: paymentData.reference
+        }],
+        notes: paymentData.notes
+      });
+
+      alert('Pago registrado exitosamente');
+      setShowPaymentModal(false);
+      loadSales();
+      loadStats();
+    } catch (error) {
+      console.error('Error adding payment:', error);
+      alert(error.response?.data?.message || 'Error al registrar el pago');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   const handlePrintTicket = () => {
     if (selectedSale) {
-      printSaleTicket(selectedSale, companySettings);
+      printSaleTicket(selectedSale, companySettings, {
+        displayCurrency: 'COP', // Optional if we want it to default to the ticket's setup
+        exchangeRate: selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1
+      });
     }
   };
 
@@ -153,7 +240,7 @@ const SalesPage = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Ingresos Totales</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {formatMoney(stats.totalRevenue || 0)}
+                  {copFormat(stats.totalRevenue || 0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -312,7 +399,7 @@ const SalesPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-bold text-gray-900">
-                        {formatMoney(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount))}
+                        {copFormat(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount), sale.exchange_rate)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -327,6 +414,15 @@ const SalesPage = () => {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
+                        {sale.sale_type === 'credit' && sale.status === 'pending' && (
+                          <button
+                            onClick={() => handleOpenPaymentModal(sale)}
+                            className="text-emerald-600 hover:text-emerald-800"
+                            title="Abonar Pago"
+                          >
+                            <CreditCard className="w-5 h-5" />
+                          </button>
+                        )}
                         {sale.status !== 'cancelled' && (
                           <button
                             onClick={() => handleCancelSale(sale.id)}
@@ -447,10 +543,10 @@ const SalesPage = () => {
                           {parseFloat(detail.quantity)}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600 font-medium">
-                          {formatMoney(detail.unit_price)}
+                          {copFormat(detail.unit_price, selectedSale.exchange_rate)}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-gray-900">
-                          {formatMoney(detail.total)}
+                          {copFormat(detail.total, selectedSale.exchange_rate)}
                         </td>
                       </tr>
                     ))}
@@ -466,13 +562,21 @@ const SalesPage = () => {
                 <h3 className="text-sm font-bold text-gray-800 mb-2">Historial de Pagos</h3>
                 {selectedSale.payments?.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedSale.payments.map((p, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded">
-                        <span className="text-gray-500">{formatDate(p.payment_date)}</span>
-                        <span className="font-semibold text-slate-700 capitalize">{p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
-                        <span className="font-bold text-emerald-600">{formatMoney(p.amount)}</span>
-                      </div>
-                    ))}
+                    {selectedSale.payments.map((p, idx) => {
+                      let amountCOP = parseFloat(p.amount || 0);
+                      if (p.currency !== 'COP') {
+                        const amountUSD = parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1);
+                        amountCOP = amountUSD * parseFloat(selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
+                      }
+
+                      return (
+                        <div key={idx} className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded">
+                          <span className="text-gray-500">{formatDate(p.payment_date)}</span>
+                          <span className="font-semibold text-slate-700 capitalize">{p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
+                          <span className="font-bold text-emerald-600">COP {Math.round(amountCOP).toLocaleString('de-DE')}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs text-gray-400 italic">No hay pagos registrados</p>
@@ -483,11 +587,11 @@ const SalesPage = () => {
               <div className="w-full md:w-64 space-y-2">
                 <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2 mt-2">
                   <span className="text-gray-900">Total</span>
-                  <span className="text-blue-600">{formatMoney(parseFloat(selectedSale.subtotal) - parseFloat(selectedSale.discount_amount))}</span>
+                  <span className="text-blue-600">{copFormat(parseFloat(selectedSale.subtotal) - parseFloat(selectedSale.discount_amount), selectedSale.exchange_rate)}</span>
                 </div>
                 <div className="flex justify-between text-xs pt-1">
                   <span className="text-gray-500 italic">Monto Pagado</span>
-                  <span className="font-semibold text-emerald-600">{formatMoney(selectedSale.paid_amount || 0)}</span>
+                  <span className="font-semibold text-emerald-600">{copFormat(selectedSale.paid_amount || 0, selectedSale.exchange_rate)}</span>
                 </div>
               </div>
             </div>
@@ -500,6 +604,130 @@ const SalesPage = () => {
               </div>
             )}
           </div>
+        )}
+      </Modal>
+
+      {/* Add Payment Modal */}
+      <Modal
+        isOpen={showPaymentModal}
+        onClose={() => !submittingPayment && setShowPaymentModal(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-emerald-600" />
+            <span>Registrar Abono a Venta {paymentSale?.sale_number}</span>
+          </div>
+        }
+        size="md"
+      >
+        {paymentSale && (
+          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 flex justify-between items-center">
+              <div>
+                <p className="text-xs text-emerald-800 font-semibold">Saldo Pendiente (Aprox)</p>
+                <p className="text-lg font-bold text-emerald-900">
+                  {copFormat((parseFloat(paymentSale.total) - parseFloat(paymentSale.paid_amount || 0)), paymentSale.exchange_rate)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-emerald-800 font-semibold">Cliente</p>
+                <p className="text-sm font-medium text-emerald-900 truncate max-w-[150px]">
+                  {paymentSale.customer?.name || 'Cliente'}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Monto a Abonar (COP)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                  $
+                </span>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="1"
+                  value={paymentData.amount_cop}
+                  onChange={(e) => setPaymentData({ ...paymentData, amount_cop: e.target.value })}
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-lg"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Método de Pago
+                </label>
+                <select
+                  required
+                  value={paymentData.method}
+                  onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="cash">Efectivo</option>
+                  <option value="card">Tarjeta / Punto</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Referencia
+                </label>
+                <input
+                  type="text"
+                  value={paymentData.reference}
+                  onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Ej. #12345"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notas adicionales
+              </label>
+              <textarea
+                value={paymentData.notes}
+                onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                rows="2"
+                placeholder="Observaciones sobre el pago..."
+              ></textarea>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                disabled={submittingPayment}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={submittingPayment}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {submittingPayment ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4" />
+                    Registrar Abono
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         )}
       </Modal>
     </div>

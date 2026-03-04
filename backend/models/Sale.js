@@ -57,6 +57,12 @@ const Sale = sequelize.define('Sale', {
     allowNull: true,
     comment: 'Método de pago (solo para ventas de contado)'
   },
+  exchange_rate: {
+    type: DataTypes.DECIMAL(18, 6),
+    allowNull: false,
+    defaultValue: 1.0000,
+    comment: 'Tasa de cambio (USD a COP) al momento de la venta'
+  },
   subtotal: {
     type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
