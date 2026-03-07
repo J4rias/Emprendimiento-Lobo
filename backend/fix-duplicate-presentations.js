@@ -52,27 +52,47 @@ async function fixDuplicatePresentations() {
                     console.log(`   - Fusionando ID: ${slave.id} en ID: ${master.id} (Master)`);
 
                     // A. Mapear referencias externas
+
                     // SaleDetail
                     await SaleDetail.update({ presentation_id: master.id }, { where: { presentation_id: slave.id }, transaction: t });
 
                     // InventoryMovement
                     await InventoryMovement.update({ presentation_id: master.id }, { where: { presentation_id: slave.id }, transaction: t });
 
-                    // Barcode
-                    // OJO: Si el slave tiene un barcode que el master no tiene, lo movemos. 
-                    // Si ya existe un barcode igual para el master, el update fallará por UNIQUE, así que lo manejamos uno a uno.
+                    // Barcode (Handle Unique Conflicts)
                     const slaveBarcodes = await Barcode.findAll({ where: { presentation_id: slave.id }, transaction: t });
                     for (const sb of slaveBarcodes) {
                         try {
                             await sb.update({ presentation_id: master.id }, { transaction: t });
                         } catch (e) {
-                            console.log(`     ! Barcode ${sb.barcode} ya existe en master o hay conflicto. Eliminando duplicado de barcode.`);
+                            console.log(`     ! Barcode ${sb.barcode} ya existe en master. Eliminando duplicado.`);
                             await sb.destroy({ transaction: t });
                         }
                     }
 
-                    // PriceListDetail
-                    await PriceListDetail.update({ presentation_id: master.id }, { where: { presentation_id: slave.id }, transaction: t });
+                    // PriceListDetail (Handle Unique Conflicts)
+                    const slavePrices = await PriceListDetail.findAll({ where: { presentation_id: slave.id }, transaction: t });
+                    for (const sp of slavePrices) {
+                        try {
+                            const masterPrice = await PriceListDetail.findOne({
+                                where: {
+                                    price_list_id: sp.price_list_id,
+                                    presentation_id: master.id
+                                },
+                                transaction: t
+                            });
+
+                            if (masterPrice) {
+                                console.log(`     ! Registro en lista de precios #${sp.price_list_id} ya existe para master. Eliminando duplicado.`);
+                                await sp.destroy({ transaction: t });
+                            } else {
+                                await sp.update({ presentation_id: master.id }, { transaction: t });
+                            }
+                        } catch (e) {
+                            console.log(`     ! Error procesando precio en lista #${sp.price_list_id}. Eliminando por seguridad.`);
+                            await sp.destroy({ transaction: t });
+                        }
+                    }
 
                     // QuoteDetail
                     await QuoteDetail.update({ productPresentationId: master.id }, { where: { productPresentationId: slave.id }, transaction: t });
@@ -88,11 +108,6 @@ async function fixDuplicatePresentations() {
 
                     // DeliveryDetail
                     await DeliveryDetail.update({ presentation_id: master.id }, { where: { presentation_id: slave.id }, transaction: t });
-
-                    // B. Gestionar Inventario (No tiene presentation_id directo, pero el stock de bultos/unidades 
-                    // suele estar amarrado al producto. No obstante, si hay lógica de stock por presentación futura...)
-                    // Nota: En este sistema el inventario es por product_id + warehouse_id. 
-                    // Pero los movimientos de inventario sí tienen presentation_id.
 
                     // C. Eliminar la presentación duplicada
                     await slave.destroy({ transaction: t });
