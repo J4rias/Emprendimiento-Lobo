@@ -50,6 +50,22 @@ export const supplierPaymentService = {
   },
 
   /**
+   * Get total payable balance for a supplier
+   */
+  getPayableBalance: async (supplierId) => {
+    const response = await api.get(`/supplier-payments/payable-balance/${supplierId}`);
+    return response.data;
+  },
+
+  /**
+   * Get available credit balance (saldo a favor) for a supplier
+   */
+  getCreditBalance: async (supplierId) => {
+    const response = await api.get(`/supplier-payments/credit-balance/${supplierId}`);
+    return response.data;
+  },
+
+  /**
    * Get payment statistics
    */
   getStats: async (params = {}) => {

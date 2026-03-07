@@ -96,6 +96,12 @@ const SaleDetail = sequelize.define('SaleDetail', {
     type: DataTypes.TEXT,
     allowNull: true,
     comment: 'Notas específicas del item'
+  },
+  is_unit: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Indica si la venta se hizo por unidad (true) o por bulto/empaque (false)'
   }
 }, {
   tableName: 'sale_details',

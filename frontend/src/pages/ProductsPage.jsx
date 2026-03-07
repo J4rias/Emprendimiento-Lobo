@@ -22,12 +22,16 @@ import {
   Box,
   BarChart,
   Settings,
-  Star
+  Star,
+  Download,
+  FileText
 } from 'lucide-react';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
 import ImageUpload from '../components/common/ImageUpload';
 import PresentationManager from '../components/products/PresentationManager';
 import { presentationService } from '../services/api/presentationService';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import { formatMoney } from '../utils/formatUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -57,6 +61,71 @@ const ProductsPage = () => {
   const [barcodeError, setBarcodeError] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [presentations, setPresentations] = useState([]);
+  const [exchangeRates, setExchangeRates] = useState([]);
+
+  // Fetch exchange rates on load
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const data = await exchangeRateService.getLatest();
+        setExchangeRates(data.data || []);
+      } catch (err) {
+        console.error('Error fetching rates:', err);
+      }
+    };
+    fetchRates();
+  }, []);
+
+  const getEffectiveRate = (from, to) => {
+    if (!exchangeRates || exchangeRates.length === 0 || from === to) return 1;
+
+    // 1. Try Direct
+    const direct = exchangeRates.find(r => r.from_currency === from && r.to_currency === to);
+    if (direct) return parseFloat(direct.rate);
+
+    // 2. Try Inverse
+    const inverse = exchangeRates.find(r => r.from_currency === to && r.to_currency === from);
+    if (inverse) return 1 / parseFloat(inverse.rate);
+
+    // 3. Try 1-step bridge (e.g. from -> VES -> to)
+    const bridgeCurrency = 'VES';
+    if (from !== bridgeCurrency && to !== bridgeCurrency) {
+      const rate1 = getEffectiveRate(from, bridgeCurrency);
+      const rate2 = getEffectiveRate(bridgeCurrency, to);
+      if (rate1 !== 1 && rate2 !== 1) {
+        return rate1 * rate2;
+      }
+    }
+
+    return 1;
+  };
+
+  const calculateStockAndValue = (product) => {
+    const totalUnits = (product.inventories || []).reduce((sum, inv) => sum + parseFloat(inv.quantity || 0), 0);
+
+    // Find package presentation (one with units_per_package > 1)
+    const pkgPresentation = (product.presentations || []).find(p => p.is_active && p.units_per_package > 1)
+      || (product.presentations || []).find(p => p.is_active)
+      || { units_per_package: 1, cost: 0, purchase_currency: 'USD' };
+
+    const unitsPerPackage = pkgPresentation.units_per_package || 1;
+    const bultos = Math.floor(totalUnits / unitsPerPackage);
+    const unidades = Math.round((totalUnits % unitsPerPackage) * 100) / 100;
+
+    // Use cost per unit
+    const costPerUnitOriginal = parseFloat(pkgPresentation.cost || 0);
+    const originalCurrency = pkgPresentation.purchase_currency || 'USD';
+
+    let costPerUnitCOP = costPerUnitOriginal;
+    if (originalCurrency !== 'COP') {
+      const rate = getEffectiveRate(originalCurrency, 'COP');
+      costPerUnitCOP = costPerUnitOriginal * rate;
+    }
+
+    const totalValueCOP = totalUnits * costPerUnitCOP;
+
+    return { bultos, unidades, totalValueCOP, unitsPerPackage };
+  };
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -527,6 +596,33 @@ const ProductsPage = () => {
     { value: 'CAJA', label: 'Caja' },
   ];
 
+  const handleDownloadCSV = async () => {
+    try {
+      const response = await fetch(`${API_URL}/products/export-csv`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Error al exportar productos');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `productos_activos_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Lista de productos exportada con éxito');
+    } catch (err) {
+      console.error('Error downloading CSV:', err);
+      toast.error('No se pudo descargar la lista de productos');
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -536,15 +632,25 @@ const ProductsPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
           <p className="text-gray-600">Gestión de productos del inventario</p>
         </div>
-        {hasPermission('products.create') && (
+        <div className="flex gap-2">
           <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2"
+            onClick={handleDownloadCSV}
+            className="btn-secondary flex items-center gap-2"
+            title="Exportar productos activos a CSV"
           >
-            <Plus className="h-5 w-5" />
-            Nuevo Producto
+            <FileText className="h-5 w-5 text-red-600" />
+            <span>CSV</span>
           </button>
-        )}
+          {hasPermission('products.create') && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="h-5 w-5" />
+              Nuevo Producto
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error Alert - Only show when modal is NOT open */}
@@ -629,14 +735,13 @@ const ProductsPage = () => {
             <thead>
               <tr>
                 <th>Imagen</th>
-                <th>SKU</th>
                 <th>Producto</th>
                 <th>Categoría</th>
-                <th>Marca</th>
-                <th>Stock Min/Max</th>
+                <th className="text-center">Stock Actual (Bultos / Unid)</th>
                 <th>Estado</th>
+                <th className="text-right">Valor Inventario (COP)</th>
                 {(hasPermission('products.update') || hasPermission('products.delete')) && (
-                  <th>Acciones</th>
+                  <th className="text-center">Acciones</th>
                 )}
               </tr>
             </thead>
@@ -665,62 +770,81 @@ const ProductsPage = () => {
                         <img
                           src={`${API_BASE_URL}${product.image_url}`}
                           alt={product.name}
-                          className="w-12 h-12 object-cover rounded"
+                          className="w-12 h-12 object-cover rounded shadow-sm border border-gray-100"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                          <ImageIcon className="h-6 w-6 text-gray-400" />
+                        <div className="w-12 h-12 bg-gray-50 rounded flex items-center justify-center border border-gray-100">
+                          <ImageIcon className="h-6 w-6 text-gray-300" />
                         </div>
                       )}
                     </td>
-                    <td className="font-mono text-sm">{product.sku}</td>
                     <td>
-                      <div>
-                        <div className="font-medium text-gray-900">{product.name}</div>
-                        {product.description && (
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {product.description}
-                          </div>
-                        )}
+                      <div className="flex flex-col">
+                        <span className="font-bold text-gray-900 leading-tight">{product.name}</span>
+                        <span className="text-[10px] font-mono text-gray-400 uppercase tracking-tighter mt-0.5">{product.sku}</span>
                       </div>
                     </td>
                     <td>
                       {product.category ? (
                         <span
-                          className="px-2 py-1 text-xs rounded-full text-white font-medium inline-flex items-center gap-1.5"
+                          className="px-2 py-0.5 text-[10px] rounded-md text-white font-bold uppercase tracking-wider"
                           style={{ backgroundColor: product.category.color || '#6B7280' }}
                         >
                           {product.category.name}
                         </span>
                       ) : (
-                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                        <span className="px-2 py-0.5 text-[10px] rounded-md bg-gray-100 text-gray-400 uppercase font-bold">
                           N/A
                         </span>
                       )}
                     </td>
-                    <td>{product.brand?.name || '-'}</td>
-                    <td>
-                      <span className="text-sm text-gray-600">
-                        {product.min_stock} / {product.max_stock}
-                      </span>
+                    <td className="text-center">
+                      {(() => {
+                        const { bultos, unidades, unitsPerPackage } = calculateStockAndValue(product);
+                        return (
+                          <div className="flex flex-col items-center">
+                            <span className="text-sm font-bold text-gray-800">
+                              {bultos} <span className="text-[10px] text-gray-500 font-normal uppercase">Bultos</span>
+                            </span>
+                            {unitsPerPackage > 1 && (
+                              <span className="text-[11px] text-gray-500 italic">
+                                + {unidades} <span className="text-[9px] uppercase">Unid</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>
                       {product.is_active ? (
-                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
                           Activo
                         </span>
                       ) : (
-                        <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
                           Inactivo
                         </span>
                       )}
                     </td>
+                    <td className="text-right">
+                      {(() => {
+                        const { totalValueCOP } = calculateStockAndValue(product);
+                        return (
+                          <span className="text-sm font-black text-slate-900">
+                            {formatMoney(totalValueCOP, '$', 0)}
+                            <span className="text-[10px] text-gray-400 ml-1 font-normal">COP</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     {(hasPermission('products.update') || hasPermission('products.delete')) && (
-                      <td>
-                        <div className="flex items-center gap-2">
+                      <td className="text-center">
+                        <div className="flex items-center justify-center">
                           <button
                             onClick={() => handleView(product)}
-                            className="p-1 text-gray-600 hover:text-gray-800"
+                            className="text-gray-600 hover:text-gray-900 mr-3"
                             title="Ver detalles"
                           >
                             <Eye className="h-4 w-4" />
@@ -728,7 +852,7 @@ const ProductsPage = () => {
                           {hasPermission('products.update') && product.is_active && (
                             <button
                               onClick={() => handleEdit(product)}
-                              className="p-1 text-blue-600 hover:text-blue-800"
+                              className="text-primary-600 hover:text-primary-900 mr-3"
                               title="Editar"
                             >
                               <Edit className="h-4 w-4" />
@@ -737,7 +861,7 @@ const ProductsPage = () => {
                           {hasPermission('products.delete') && product.is_active && (
                             <button
                               onClick={() => handleDelete(product.id)}
-                              className="p-1 text-red-600 hover:text-red-800"
+                              className="text-red-600 hover:text-red-900"
                               title="Eliminar"
                             >
                               <Trash2 className="h-4 w-4" />

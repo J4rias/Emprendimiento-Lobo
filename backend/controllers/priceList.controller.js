@@ -143,6 +143,7 @@ class PriceListController {
                             {
                                 model: Product,
                                 as: 'product',
+                                where: { is_active: true },
                                 attributes: ['id', 'sku', 'name', 'image_url']
                             },
                             {
@@ -438,19 +439,61 @@ class PriceListController {
                 return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
             }
 
+            // Get product IDs to fetch inventory
+            const productIds = priceList.details.map(d => d.product?.id).filter(Boolean);
+
+            // Fetch total inventory per product
+            let inventoryByProduct = {};
+            if (productIds.length > 0) {
+                const inventories = await Inventory.findAll({
+                    where: { product_id: productIds },
+                    attributes: ['product_id', [sequelize.fn('SUM', sequelize.col('quantity')), 'total_quantity']],
+                    group: ['product_id']
+                });
+
+                inventories.forEach(inv => {
+                    inventoryByProduct[inv.product_id] = parseFloat(inv.get('total_quantity')) || 0;
+                });
+            }
+
+            // Convert to COP if needed
+            let rateToCop = 1;
+            if (priceList.currency && priceList.currency !== 'COP') {
+                try {
+                    rateToCop = await ExchangeRate.getRate(priceList.currency, 'COP');
+                } catch (e) {
+                    console.error('Failed to get exchange rate to COP for CSV export', e);
+                }
+            }
+
             // Build CSV
-            const headers = ['SKU', 'Producto', 'Presentación', 'Uds/Paquete', 'Costo/Paquete', 'Costo Unitario', 'Precio/Paquete', 'Precio Unitario', 'Margen %'];
-            const rows = priceList.details.map(d => [
-                d.product?.sku || '',
-                `"${(d.product?.name || '').replace(/"/g, '""')}"`,
-                `"${(d.presentation?.name || '').replace(/"/g, '""')}"`,
-                d.presentation?.units_per_package || 1,
-                parseFloat(d.package_cost).toFixed(2),
-                parseFloat(d.unit_cost).toFixed(2),
-                parseFloat(d.package_price).toFixed(2),
-                parseFloat(d.unit_price).toFixed(2),
-                parseFloat(d.margin_percentage).toFixed(1)
-            ].join(','));
+            const headers = ['SKU', 'Producto', 'Presentación', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', `Costo/Paquete (${priceList.currency})`, `Costo/Paquete (COP)`, `Costo Unitario (${priceList.currency})`, `Costo Unitario (COP)`, `Precio/Paquete (${priceList.currency})`, `Precio/Paquete (COP)`, `Precio Unitario (${priceList.currency})`, `Precio Unitario (COP)`, 'Margen %'];
+
+            const rows = priceList.details.map(d => {
+                const unitsPerPackage = d.presentation?.units_per_package || 1;
+                const totalLooseUnits = inventoryByProduct[d.product?.id] || 0;
+
+                const stockPackages = Math.floor(totalLooseUnits / unitsPerPackage);
+                const stockRemainingUnits = totalLooseUnits % unitsPerPackage;
+
+                return [
+                    d.product?.sku || '',
+                    `"${(d.product?.name || '').replace(/"/g, '""')}"`,
+                    `"${(d.presentation?.name || '').replace(/"/g, '""')}"`,
+                    stockPackages,
+                    stockRemainingUnits,
+                    unitsPerPackage,
+                    parseFloat(d.package_cost).toFixed(2),
+                    (parseFloat(d.package_cost) * rateToCop).toFixed(2),
+                    parseFloat(d.unit_cost).toFixed(2),
+                    (parseFloat(d.unit_cost) * rateToCop).toFixed(2),
+                    parseFloat(d.package_price).toFixed(2),
+                    (parseFloat(d.package_price) * rateToCop).toFixed(2),
+                    parseFloat(d.unit_price).toFixed(2),
+                    (parseFloat(d.unit_price) * rateToCop).toFixed(2),
+                    parseFloat(d.margin_percentage).toFixed(1)
+                ].join(',');
+            });
 
             const csv = [headers.join(','), ...rows].join('\n');
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, X, AlertCircle, User, Phone, MapPin, BadgeDollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, X, AlertCircle, User, Phone, MapPin, BadgeDollarSign, Receipt } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
+import CustomerStatementModal from '../components/customers/CustomerStatementModal';
 import { useAuth } from '../context/AuthContext';
 import { customerService } from '../services/api/customerService';
 
@@ -57,6 +58,7 @@ const CustomersPage = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [viewingCustomer, setViewingCustomer] = useState(null);
+  const [statementCustomer, setStatementCustomer] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
 
@@ -127,6 +129,7 @@ const CustomersPage = () => {
   };
 
   const handleView = (customer) => { setViewingCustomer(customer); setShowViewModal(true); };
+  const handleShowStatement = (customer) => { setStatementCustomer(customer); };
 
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
@@ -212,6 +215,9 @@ const CustomersPage = () => {
         <div className="flex gap-2">
           <button onClick={() => handleView(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Ver detalles">
             <Eye className="h-4 w-4" />
+          </button>
+          <button onClick={() => handleShowStatement(row)} className="p-1 text-teal-600 hover:bg-teal-50 rounded" title="Estado de Cuenta (Kardex)">
+            <Receipt className="h-4 w-4" />
           </button>
           {hasPermission('customers.update') && (
             <button onClick={() => handleEdit(row)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Editar">
@@ -542,6 +548,14 @@ const CustomersPage = () => {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* Statement Modal */}
+      {statementCustomer && (
+        <CustomerStatementModal
+          customer={statementCustomer}
+          onClose={() => setStatementCustomer(null)}
+        />
       )}
     </div>
   );

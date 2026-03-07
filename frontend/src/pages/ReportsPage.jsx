@@ -219,9 +219,17 @@ const ReportsPage = () => {
   };
 
   const generateInventoryCSV = () => {
-    let csv = 'SKU,Producto,Almacén,Cantidad,Costo Unitario,Valor Total\n';
+    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Costo Unitario,Valor Total\n';
     reportData.forEach(item => {
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${item.quantity},${item.product?.cost || 0},${item.value || 0}\n`;
+      const presentations = item.product?.presentations || [];
+      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
+      const unitsPerPackage = defaultPresentation?.units_per_package || 1;
+
+      const totalUnits = item.quantity || 0;
+      const stockPackages = Math.floor(totalUnits / unitsPerPackage);
+      const stockRemainingUnits = totalUnits % unitsPerPackage;
+
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.cost || 0},${item.value || 0}\n`;
     });
     return csv;
   };
@@ -243,9 +251,17 @@ const ReportsPage = () => {
   };
 
   const generateLowStockCSV = () => {
-    let csv = 'SKU,Producto,Almacén,Stock Actual,Stock Mínimo,Estado\n';
+    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Stock Mínimo,Estado\n';
     reportData.forEach(item => {
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${item.quantity},${item.product?.minimum_stock || 0},"Crítico"\n`;
+      const presentations = item.product?.presentations || [];
+      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
+      const unitsPerPackage = defaultPresentation?.units_per_package || 1;
+
+      const totalUnits = item.quantity || 0;
+      const stockPackages = Math.floor(totalUnits / unitsPerPackage);
+      const stockRemainingUnits = totalUnits % unitsPerPackage;
+
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.minimum_stock || 0},"Crítico"\n`;
     });
     return csv;
   };

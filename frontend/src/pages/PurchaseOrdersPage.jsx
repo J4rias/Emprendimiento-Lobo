@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatMoney } from '../utils/formatUtils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import { supplierService } from '../services/api/supplierService';
+import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import {
   Plus,
   Search,
@@ -17,7 +21,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  CreditCard
 } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
@@ -34,6 +39,8 @@ const PurchaseOrdersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -41,6 +48,8 @@ const PurchaseOrdersPage = () => {
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [viewingOrder, setViewingOrder] = useState(null);
+  const [exchangeRates, setExchangeRates] = useState([]);
+  const [statsPeriod, setStatsPeriod] = useState('this_week');
 
   // Debounce search
   useEffect(() => {
@@ -52,8 +61,99 @@ const PurchaseOrdersPage = () => {
 
   useEffect(() => {
     fetchOrders();
+    loadExchangeRates();
+  }, [currentPage, debouncedSearch, statusFilter, supplierFilter]);
+
+  useEffect(() => {
     fetchStats();
-  }, [currentPage, debouncedSearch, statusFilter]);
+    fetchSuppliers();
+  }, [statsPeriod]);
+
+  const loadExchangeRates = async () => {
+    try {
+      const data = await exchangeRateService.getLatest();
+      setExchangeRates(data.data || []);
+    } catch (e) {
+      console.error('Error loading exchange rates:', e);
+    }
+  };
+
+  const fetchSuppliers = async () => {
+    try {
+      const resp = await supplierService.getActive();
+      setSuppliers(resp.data || []);
+    } catch (e) {
+      console.error('Error loading suppliers:', e);
+    }
+  };
+
+  const copFormat = (amount, currency) => {
+    const val = parseFloat(amount || 0);
+    if (currency === 'COP') return `COP ${val.toLocaleString('de-DE')}`;
+    const rate = calculateEffectiveRate(currency, 'COP', exchangeRates) || 1;
+    const cop = Math.round(val * rate);
+    return `COP ${cop.toLocaleString('de-DE')}`;
+  };
+
+  const calculateTotalValueInCOP = () => {
+    if (!stats?.value_by_currency) return 0;
+    let total = 0;
+    stats.value_by_currency.forEach(item => {
+      if (item.currency === 'COP') {
+        total += parseFloat(item.total || 0);
+      } else {
+        const rate = calculateEffectiveRate(item.currency, 'COP', exchangeRates) || 1;
+        total += parseFloat(item.total || 0) * rate;
+      }
+    });
+    return total;
+  };
+
+  const getDateRangeForPeriod = (period) => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    let date_from, date_to;
+
+    switch (period) {
+      case 'this_week':
+        const currentDay = start.getDay();
+        const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+        start.setDate(start.getDate() - distanceToMonday);
+        date_from = start.toISOString();
+        date_to = today.toISOString();
+        break;
+      case 'this_month':
+        start.setDate(1);
+        date_from = start.toISOString();
+        date_to = today.toISOString();
+        break;
+      case 'last_month':
+        start.setMonth(start.getMonth() - 1);
+        start.setDate(1);
+        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+        date_from = start.toISOString();
+        date_to = endOfLastMonth.toISOString();
+        break;
+      case 'last_30_days':
+        start.setDate(start.getDate() - 30);
+        date_from = start.toISOString();
+        date_to = today.toISOString();
+        break;
+      case 'this_year':
+        start.setMonth(0, 1);
+        date_from = start.toISOString();
+        date_to = today.toISOString();
+        break;
+      case 'all':
+      default:
+        return {};
+    }
+    return { date_from, date_to };
+  };
 
   const fetchOrders = async () => {
     try {
@@ -62,7 +162,8 @@ const PurchaseOrdersPage = () => {
         page: currentPage,
         limit: 20,
         search: debouncedSearch,
-        status: statusFilter || undefined
+        status: statusFilter || undefined,
+        supplier_id: supplierFilter || undefined
       });
       setOrders(response.data);
       setTotalPages(response.pagination.totalPages);
@@ -77,7 +178,8 @@ const PurchaseOrdersPage = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await purchaseOrderService.getStats();
+      const dates = getDateRangeForPeriod(statsPeriod);
+      const response = await purchaseOrderService.getStats(dates);
       setStats(response.data);
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -167,6 +269,27 @@ const PurchaseOrdersPage = () => {
     );
   };
 
+  const getPaymentBadge = (paymentStatus) => {
+    const pStatusConfig = {
+      paid: { label: 'Pagada', color: 'bg-emerald-100 text-emerald-700', icon: DollarSign },
+      partial: { label: 'Abonada', color: 'bg-blue-100 text-blue-700', icon: DollarSign },
+      pending: { label: 'Pendiente Pago', color: 'bg-gray-100 text-gray-600', icon: Clock }
+    };
+
+    // Only show if we actually have a payment status definition
+    if (!paymentStatus || !pStatusConfig[paymentStatus]) return null;
+
+    const pConfig = pStatusConfig[paymentStatus];
+    const UserIcon = pConfig.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pConfig.color} mt-1`}>
+        <UserIcon className="w-3 h-3" />
+        {pConfig.label}
+      </span>
+    );
+  };
+
   const columns = [
     {
       header: 'Número',
@@ -200,14 +323,26 @@ const PurchaseOrdersPage = () => {
     {
       header: 'Total',
       accessor: (row) => (
-        <div className="font-semibold text-gray-900">
-          {row.currency} {parseFloat(row.total).toFixed(2)}
+        <div className="flex flex-col">
+          <span className="font-semibold text-gray-900">
+            {formatMoney(row.total, row.currency)}
+          </span>
+          {row.currency !== 'COP' && (
+            <span className="text-xs text-emerald-600 font-medium mt-0.5">
+              ≈ {copFormat(row.total, row.currency)}
+            </span>
+          )}
         </div>
       )
     },
     {
       header: 'Estado',
-      accessor: (row) => getStatusBadge(row.status)
+      accessor: (row) => (
+        <div className="flex flex-col items-start gap-1">
+          {getStatusBadge(row.status)}
+          {['received', 'partially_received', 'confirmed'].includes(row.status) && getPaymentBadge(row.payment_status)}
+        </div>
+      )
     },
     {
       header: 'Acciones',
@@ -220,6 +355,16 @@ const PurchaseOrdersPage = () => {
           >
             <Eye className="h-4 w-4" />
           </button>
+
+          {['partially_received', 'received'].includes(row.status) && hasPermission('supplier_payments.create') && (
+            <button
+              onClick={() => navigate('/supplier-payments', { state: { prefillOrder: row } })}
+              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+              title="Registrar Pago"
+            >
+              <CreditCard className="h-4 w-4" />
+            </button>
+          )}
 
           {row.status === 'draft' && hasPermission('purchases.update') && (
             <button
@@ -274,9 +419,26 @@ const PurchaseOrdersPage = () => {
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Órdenes de Compra</h1>
-        <p className="text-gray-600">Gestiona las órdenes de compra a proveedores</p>
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Órdenes de Compra</h1>
+          <p className="text-gray-600">Gestiona las órdenes de compra a proveedores</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Mostrar estadísticas de:</label>
+          <select
+            value={statsPeriod}
+            onChange={(e) => setStatsPeriod(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          >
+            <option value="this_week">Esta Semana</option>
+            <option value="this_month">Este Mes</option>
+            <option value="last_month">Mes Anterior</option>
+            <option value="last_30_days">Últimos 30 días</option>
+            <option value="this_year">Este Año</option>
+            <option value="all">Histórico Completo</option>
+          </select>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -300,21 +462,27 @@ const PurchaseOrdersPage = () => {
 
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Valor Total</span>
+              <span className="text-sm text-gray-600">Valor Total (COP)</span>
               <DollarSign className="w-5 h-5 text-green-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">
-              ${parseFloat(stats.total_value || 0).toFixed(2)}
+            <p className="text-2xl font-bold text-gray-900 break-all">
+              {formatMoney(calculateTotalValueInCOP(), '$', 0)}
             </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Este Mes</span>
+              <span className="text-sm text-gray-600">
+                {statsPeriod === 'this_week' ? 'Esta Semana' :
+                  statsPeriod === 'this_month' ? 'Este Mes' :
+                    statsPeriod === 'last_month' ? 'Mes Anterior' :
+                      statsPeriod === 'last_30_days' ? 'Últimos 30 días' :
+                        statsPeriod === 'this_year' ? 'Este Año' : 'Total Histórico'}
+              </span>
               <TrendingUp className="w-5 h-5 text-purple-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              {stats.by_status?.length || 0}
+              {stats.total_orders || 0}
             </p>
           </div>
         </div>
@@ -347,6 +515,20 @@ const PurchaseOrdersPage = () => {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+
+            <select
+              value={supplierFilter}
+              onChange={(e) => {
+                setSupplierFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Todos los proveedores</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
 
             <select
               value={statusFilter}
@@ -437,8 +619,23 @@ const PurchaseOrdersPage = () => {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Estado</label>
-                <div className="mt-1">{getStatusBadge(viewingOrder.status)}</div>
+                <div className="mt-1 flex flex-col items-start">
+                  {getStatusBadge(viewingOrder.status)}
+                  {getPaymentBadge(viewingOrder.payment_status)}
+                </div>
               </div>
+              {viewingOrder.invoices && viewingOrder.invoices.length > 0 && (
+                <div className="col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100 ring-1 ring-blue-500/20">
+                  <label className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 block">Documentos/Facturas del Proveedor</label>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingOrder.invoices.map((inv, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-white text-blue-700 font-bold rounded-full border border-blue-200 shadow-sm text-sm">
+                        #{inv}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Products Table */}
@@ -468,10 +665,10 @@ const PurchaseOrdersPage = () => {
                           {detail.received_package_quantity}p + {detail.received_loose_units}u
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          ${parseFloat(detail.unit_cost).toFixed(2)}
+                          {formatMoney(detail.unit_cost, viewingOrder.currency)}
                         </td>
                         <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
-                          ${parseFloat(detail.line_total).toFixed(2)}
+                          {formatMoney(detail.line_total, viewingOrder.currency)}
                         </td>
                       </tr>
                     ))}
@@ -484,27 +681,116 @@ const PurchaseOrdersPage = () => {
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{viewingOrder.currency} {parseFloat(viewingOrder.subtotal).toFixed(2)}</span>
+                <span className="font-medium">{formatMoney(viewingOrder.subtotal, viewingOrder.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Descuento:</span>
-                <span className="font-medium text-red-600">-{viewingOrder.currency} {parseFloat(viewingOrder.discount_amount).toFixed(2)}</span>
+                <span className="font-medium text-red-600">-{formatMoney(viewingOrder.discount_amount, viewingOrder.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Impuestos:</span>
-                <span className="font-medium">{viewingOrder.currency} {parseFloat(viewingOrder.tax_amount).toFixed(2)}</span>
+                <span className="font-medium">{formatMoney(viewingOrder.tax_amount, viewingOrder.currency)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
-                <span className="text-blue-600">{viewingOrder.currency} {parseFloat(viewingOrder.total).toFixed(2)}</span>
+                <span className="text-blue-600">{formatMoney(viewingOrder.total, viewingOrder.currency)}</span>
               </div>
             </div>
 
+            {/* Reception History */}
+            {viewingOrder.reception_history && viewingOrder.reception_history.length > 0 && (
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
+                  Historial de Recepciones
+                </h3>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-[#f8fafc]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Documento</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Cantidad (U)</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Recibido por</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {viewingOrder.reception_history.map((rec) => (
+                        <tr key={rec.id} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                            {new Date(rec.date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="font-bold text-blue-600">{rec.document_number || viewingOrder.order_number}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-center font-bold text-green-600">
+                            +{parseFloat(rec.quantity).toLocaleString('de-DE')}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 italic">
+                            {rec.user}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Payment History */}
+            {viewingOrder.payment_history && viewingOrder.payment_history.length > 0 && (
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
+                  Historial de Pagos
+                </h3>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-[#f8fafc]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Referencia de Pago</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Método</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Monto Distribuido (OC)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {viewingOrder.payment_history.map((pay, idx) => {
+                        const methodLabels = { cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque', card: 'Tarjeta', credit_balance: 'Saldo a Favor' };
+                        const methodColors = { cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700', check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700', credit_balance: 'bg-indigo-100 text-indigo-700', other: 'bg-gray-100 text-gray-700' };
+                        const badgeColor = methodColors[pay.payment_method] || methodColors.other;
+                        const label = methodLabels[pay.payment_method] || pay.payment_method;
+
+                        return (
+                          <tr key={pay.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                            <td className="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
+                              {new Date(pay.payment_date).toLocaleDateString('es-PE')}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className="font-bold text-blue-600">{pay.payment_number}</span>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColor}`}>
+                                {label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-bold text-gray-900">
+                              {viewingOrder.currency} {parseFloat(pay.allocated_amount_po_currency).toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Notes */}
             {viewingOrder.notes && (
-              <div>
-                <label className="text-sm font-medium text-gray-700">Notas</label>
-                <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">{viewingOrder.notes}</p>
+              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
+                <label className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1 block">Notas de la Orden</label>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingOrder.notes}</p>
               </div>
             )}
           </div>

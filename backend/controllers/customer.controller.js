@@ -1,4 +1,4 @@
-const { Customer, PriceList, Sale, SalePayment } = require('../models');
+const { Customer, PriceList, Sale, SalePayment, CreditNote, ExchangeRate } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -649,6 +649,210 @@ class CustomerController {
           aging_bucket: item.daysOverdue <= 30 ? '0-30' : item.daysOverdue <= 60 ? '31-60' : item.daysOverdue <= 90 ? '61-90' : '+90'
         }))
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get unified statement (ledger) for a single customer
+  async getStatement(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const customer = await Customer.findOne({
+        where: { id, isDeleted: false }
+      });
+
+      if (!customer) {
+        return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+      }
+
+      // 1. Fetch Sales (Debts/Invoices) - Excluding cancelled ones
+      const sales = await Sale.findAll({
+        where: {
+          customer_id: id,
+          status: { [Op.notIn]: ['cancelled'] },
+          sale_type: 'credit' // Usually we only care about credit sales for statements, or all sales? Let's include all to be thorough, but distinguish cash vs credit.
+        },
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'exchange_rate', 'sale_type', 'status']
+      });
+
+      const cashSales = await Sale.findAll({
+        where: {
+          customer_id: id,
+          status: { [Op.notIn]: ['cancelled'] },
+          sale_type: 'cash'
+        },
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'exchange_rate', 'sale_type', 'status']
+      });
+
+      // 2. Fetch Payments (Credits/Assets)
+      const payments = await SalePayment.findAll({
+        include: [{
+          model: Sale,
+          as: 'sale',
+          where: { customer_id: id },
+          attributes: ['id', 'sale_number']
+        }],
+        attributes: ['id', 'payment_date', 'payment_method', 'amount', 'currency', 'reference']
+      });
+
+      // 3. Fetch Credit Notes (Refunds/Assets)
+      let creditNotes = [];
+      try {
+        if (CreditNote) {
+          creditNotes = await CreditNote.findAll({
+            where: {
+              customer_id: id,
+              status: { [Op.in]: ['approved', 'applied'] }
+            },
+            attributes: ['id', 'credit_note_number', 'credit_note_date', 'total', 'refund_method', 'type']
+          });
+        }
+      } catch (e) { /* ignore if CreditNote is not fully migrated visually yet */ }
+
+      // Unify data into Ledger
+      const ledger = [];
+      const summary = {};
+
+      const allSales = [...sales, ...cashSales];
+
+      // Process Sales (Charges)
+      for (const sale of allSales) {
+        const amountOrig = parseFloat(sale.total || 0);
+        const saleCurrency = 'USD'; // Assuming sales totals are in USD in database (common pattern in this app)
+        const rate = parseFloat(sale.exchange_rate || 1);
+
+        const amtUSD = amountOrig; // If total is USD
+        const amtCOP = amountOrig * rate;
+
+        // Record in USD
+        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) };
+        if (sale.sale_type === 'credit') summary['USD'].total_invoiced += amtUSD;
+        ledger.push({
+          id: `sale_${sale.id}_usd`,
+          type: 'charge',
+          date: new Date(sale.sale_date),
+          reference: sale.sale_number,
+          amount: amtUSD,
+          currency: 'USD',
+          description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
+          original_amount: amountOrig,
+          original_currency: saleCurrency,
+          original_data: sale
+        });
+
+        // Record in COP
+        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) * rate };
+        if (sale.sale_type === 'credit') summary['COP'].total_invoiced += amtCOP;
+        ledger.push({
+          id: `sale_${sale.id}_cop`,
+          type: 'charge',
+          date: new Date(sale.sale_date),
+          reference: sale.sale_number,
+          amount: amtCOP,
+          currency: 'COP',
+          description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
+          original_amount: amountOrig,
+          original_currency: saleCurrency,
+          original_data: sale
+        });
+      }
+
+      // Process Payments (Credits)
+      for (const pay of payments) {
+        const payCurrency = pay.currency || 'USD';
+        const amountOrig = parseFloat(pay.amount || 0);
+        const rate = parseFloat(pay.sale?.exchange_rate || 1);
+
+        let amtUSD, amtCOP;
+        if (payCurrency === 'USD') {
+          amtUSD = amountOrig;
+          amtCOP = amountOrig * rate;
+        } else if (payCurrency === 'COP') {
+          amtCOP = amountOrig;
+          amtUSD = amountOrig / rate;
+        } else {
+          amtUSD = amountOrig; // Simplified
+          amtCOP = amountOrig * rate;
+        }
+
+        // Record in USD
+        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) };
+        summary['USD'].total_paid += amtUSD;
+        ledger.push({
+          id: `pay_${pay.id}_usd`,
+          type: pay.payment_method === 'credit_balance' ? 'internal_transfer' : 'payment',
+          date: new Date(pay.payment_date),
+          reference: `PAGO-${pay.id}`,
+          amount: amtUSD,
+          currency: 'USD',
+          description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
+          isInternal: pay.payment_method === 'credit_balance',
+          original_amount: amountOrig,
+          original_currency: payCurrency,
+          original_data: pay
+        });
+
+        // Record in COP
+        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) * rate };
+        summary['COP'].total_paid += amtCOP;
+        ledger.push({
+          id: `pay_${pay.id}_cop`,
+          type: pay.payment_method === 'credit_balance' ? 'internal_transfer' : 'payment',
+          date: new Date(pay.payment_date),
+          reference: `PAGO-${pay.id}`,
+          amount: amtCOP,
+          currency: 'COP',
+          description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
+          isInternal: pay.payment_method === 'credit_balance',
+          original_amount: amountOrig,
+          original_currency: payCurrency,
+          original_data: pay
+        });
+      }
+
+      // Process Credit Notes (Credits)
+      for (const note of creditNotes) {
+        const amountUSD = parseFloat(note.total || 0);
+        const rate = 1; // Credit notes usually stored in USD values too
+
+        ledger.push({
+          id: `cn_${note.id}_usd`,
+          type: 'credit',
+          date: new Date(note.credit_note_date),
+          reference: note.credit_note_number,
+          amount: amountUSD,
+          currency: 'USD',
+          description: `Nota de Crédito (${note.refund_method})`,
+          isInternal: false,
+          original_data: note
+        });
+      }
+
+      // Calculate Final Balances
+      for (const curr in summary) {
+        summary[curr].balance = Math.max(0, summary[curr].total_invoiced - summary[curr].total_paid);
+      }
+
+      // Sort Ledger chronologically
+      ledger.sort((a, b) => a.date - b.date);
+
+      res.json({
+        success: true,
+        data: {
+          customer: {
+            id: customer.id,
+            name: customer.getFullName ? customer.getFullName() : customer.firstName + ' ' + customer.lastName,
+            documentNumber: customer.documentNumber,
+            credit_limit: parseFloat(customer.credit_limit || 0),
+            credit_used: parseFloat(customer.credit_used || 0)
+          },
+          summary: summary,
+          ledger: ledger
+        }
+      });
+
     } catch (error) {
       next(error);
     }

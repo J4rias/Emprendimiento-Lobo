@@ -43,7 +43,6 @@ export const customerService = {
     return response.data;
   },
 
-  // Validate credit availability
   validateCredit: async (id, amount) => {
     const response = await api.get(`/customers/${id}/credit/validate`, {
       params: { amount }
@@ -54,6 +53,12 @@ export const customerService = {
   // Get customer statistics
   getStats: async (id) => {
     const response = await api.get(`/customers/${id}/stats`);
+    return response.data;
+  },
+
+  // Get customer statement (ledger)
+  getStatement: async (id) => {
+    const response = await api.get(`/customers/${id}/statement`);
     return response.data;
   }
 };

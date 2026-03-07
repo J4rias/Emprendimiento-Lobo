@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard } from 'lucide-react';
+import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard, RefreshCcw } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
@@ -7,6 +7,7 @@ import Modal from '../components/common/Modal';
 import { formatDate } from '../utils/formatUtils';
 import { printSaleTicket } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
+import SaleReturnModal from '../components/sales/SaleReturnModal';
 
 const SalesPage = () => {
   const { companySettings } = useCompany();
@@ -40,6 +41,10 @@ const SalesPage = () => {
     notes: ''
   });
   const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  // Return Modal State
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnSale, setReturnSale] = useState(null);
 
   // COP formatter: convert USD amount to COP using sale's specific rate if available, otherwise current rate
   const copFormat = (usdAmount, saleExchangeRate = null) => {
@@ -102,6 +107,14 @@ const SalesPage = () => {
     }
   };
 
+  const getCustomerName = (customer) => {
+    if (!customer) return 'Cliente General';
+    if (customer.type === 'juridical') {
+      return customer.businessName || customer.tradeName || 'Empresa Sin Nombre';
+    }
+    return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Cliente Sin Nombre';
+  };
+
   const handleViewDetail = async (saleId) => {
     try {
       const data = await saleService.getSaleById(saleId);
@@ -137,6 +150,17 @@ const SalesPage = () => {
       notes: ''
     });
     setShowPaymentModal(true);
+  };
+
+  const handleOpenReturnModal = async (saleId) => {
+    try {
+      const data = await saleService.getSaleById(saleId);
+      setReturnSale(data.sale);
+      setShowReturnModal(true);
+    } catch (error) {
+      console.error('Error loading sale detail for return:', error);
+      alert('Error al cargar el detalle de la venta para devolución');
+    }
   };
 
   const handlePaymentSubmit = async (e) => {
@@ -390,8 +414,8 @@ const SalesPage = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {sale.customer?.name || 'Cliente General'}
+                      <span className="text-sm text-gray-900 font-medium">
+                        {getCustomerName(sale.customer)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -423,7 +447,16 @@ const SalesPage = () => {
                             <CreditCard className="w-5 h-5" />
                           </button>
                         )}
-                        {sale.status !== 'cancelled' && (
+                        {sale.status === 'completed' && (
+                          <button
+                            onClick={() => handleOpenReturnModal(sale.id)}
+                            className="text-rose-600 hover:text-rose-800"
+                            title="Generar Devolución"
+                          >
+                            <RefreshCcw className="w-5 h-5" />
+                          </button>
+                        )}
+                        {sale.status !== 'cancelled' && sale.status !== 'returned' && (
                           <button
                             onClick={() => handleCancelSale(sale.id)}
                             className="text-red-600 hover:text-red-800"
@@ -500,11 +533,7 @@ const SalesPage = () => {
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Cliente</p>
                 <p className="text-sm font-medium text-gray-800">
-                  {selectedSale.customer
-                    ? (selectedSale.customer.type === 'natural'
-                      ? `${selectedSale.customer.firstName} ${selectedSale.customer.lastName}`
-                      : selectedSale.customer.businessName)
-                    : 'Cliente General'}
+                  {getCustomerName(selectedSale.customer)}
                 </p>
               </div>
               <div>
@@ -730,6 +759,18 @@ const SalesPage = () => {
           </form>
         )}
       </Modal>
+
+      {/* Return Modal */}
+      <SaleReturnModal
+        isOpen={showReturnModal}
+        onClose={() => setShowReturnModal(false)}
+        sale={returnSale}
+        onReturnSuccess={() => {
+          setShowReturnModal(false);
+          loadSales();
+          loadStats();
+        }}
+      />
     </div>
   );
 };

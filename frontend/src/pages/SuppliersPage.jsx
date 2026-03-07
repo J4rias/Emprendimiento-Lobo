@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api/axios';
-import { Plus, Edit, Trash2, Search, Building, User, Mail, Phone, Eye, Calendar, Clock, AlertCircle, X, Tag, BookText, Contact } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Building, User, Mail, Phone, Eye, Calendar, Clock, AlertCircle, X, Tag, BookText, Contact, FileText } from 'lucide-react';
 import SupplierContactManager from '../components/suppliers/SupplierContactManager';
+import SupplierStatementModal from '../components/suppliers/SupplierStatementModal';
 
 const SuppliersPage = () => {
   const { hasPermission } = useAuth();
@@ -13,6 +14,11 @@ const SuppliersPage = () => {
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState(null);
+
+  // Statement Modal State
+  const [showStatementModal, setShowStatementModal] = useState(false);
+  const [statementSupplier, setStatementSupplier] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -292,6 +298,16 @@ const SuppliersPage = () => {
                           title="Ver detalles"
                         >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setStatementSupplier(supplier);
+                            setShowStatementModal(true);
+                          }}
+                          className="text-emerald-600 hover:text-emerald-900 mr-3"
+                          title="Estado de Cuenta"
+                        >
+                          <FileText className="h-4 w-4" />
                         </button>
                         {hasPermission('suppliers.update') && supplier.is_active && (
                           <button
@@ -709,6 +725,17 @@ const SuppliersPage = () => {
         </div>
       )
       }
+
+      {/* Statement Modal */}
+      {showStatementModal && statementSupplier && (
+        <SupplierStatementModal
+          supplier={statementSupplier}
+          onClose={() => {
+            setShowStatementModal(false);
+            setStatementSupplier(null);
+          }}
+        />
+      )}
     </div >
   );
 };

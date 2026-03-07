@@ -36,6 +36,9 @@ class InventoryController {
           productSearchWhere.category_id = category_id;
         }
 
+        // Only active products
+        productSearchWhere.is_active = true;
+
         const matchingProducts = await Product.findAll({
           where: productSearchWhere,
           include: [{ model: Barcode, as: 'barcodes', attributes: [] }],
@@ -55,7 +58,7 @@ class InventoryController {
           {
             model: Product,
             as: 'product',
-            where: productWhere,
+            where: { is_active: true },
             include: [
               { model: Category, as: 'category' },
               { model: Barcode, as: 'barcodes', attributes: ['barcode'] }
@@ -154,6 +157,7 @@ class InventoryController {
           {
             model: Product,
             as: 'product',
+            where: { is_active: true },
             include: [
               { model: Category, as: 'category' },
               { model: ProductPresentation, as: 'presentations' }
@@ -193,6 +197,7 @@ class InventoryController {
           {
             model: Product,
             as: 'product',
+            where: { is_active: true },
             include: [
               { model: Category, as: 'category' },
               { model: ProductPresentation, as: 'presentations' }
@@ -231,6 +236,7 @@ class InventoryController {
         include: [{
           model: Product,
           as: 'product',
+          where: { is_active: true },
           include: [{ model: Category, as: 'category' }]
         }, {
           model: Warehouse,
@@ -425,6 +431,7 @@ class InventoryController {
           {
             model: Product,
             as: 'product',
+            where: { is_active: true },
             include: [{ model: Category, as: 'category' }]
           },
           {
@@ -460,6 +467,7 @@ class InventoryController {
         include: [{
           model: Product,
           as: 'product',
+          where: { is_active: true },
           include: [{
             model: ProductPresentation,
             as: 'presentations'

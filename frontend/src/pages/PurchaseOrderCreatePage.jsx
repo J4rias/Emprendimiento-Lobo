@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { supplierService } from '../services/api/supplierService';
 import { productService } from '../services/api/productService';
+import { formatMoney } from '../utils/formatUtils';
 import api from '../services/api/axios';
 import {
   ArrowLeft,
@@ -191,6 +192,8 @@ const PurchaseOrderCreatePage = () => {
       loose_units: 0,
       unit_cost: presentation.cost || 0,
       package_cost: presentation.package_cost || 0,
+      suggested_unit_cost: presentation.cost || 0,
+      suggested_package_cost: presentation.package_cost || 0,
       discount_percent: 0,
       tax_percent: 0
     };
@@ -624,6 +627,11 @@ const PurchaseOrderCreatePage = () => {
                             onChange={(e) => updateItem(index, 'package_cost', e.target.value)}
                             className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded"
                           />
+                          {item.suggested_package_cost > 0 && (
+                            <div className="text-xs text-gray-400 mt-0.5" title="Último costo registrado">
+                              Ant: {formatMoney(item.suggested_package_cost, formData.currency)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <input
@@ -638,7 +646,7 @@ const PurchaseOrderCreatePage = () => {
                         </td>
 
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                          ${calculateItemTotal(item).toFixed(2)}
+                          {formatMoney(calculateItemTotal(item), formData.currency)}
                         </td>
                         <td className="px-4 py-3">
                           <button
@@ -676,15 +684,15 @@ const PurchaseOrderCreatePage = () => {
             <div className="max-w-md ml-auto space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{formData.currency} {totals.subtotal}</span>
+                <span className="font-medium">{formatMoney(totals.subtotal, formData.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Descuento:</span>
-                <span className="font-medium text-red-600">-{formData.currency} {totals.discount}</span>
+                <span className="font-medium text-red-600">-{formatMoney(totals.discount, formData.currency)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
-                <span className="text-blue-600">{formData.currency} {totals.total}</span>
+                <span className="text-blue-600">{formatMoney(totals.total, formData.currency)}</span>
               </div>
             </div>
           </div>

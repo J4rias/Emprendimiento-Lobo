@@ -9,13 +9,13 @@
  * @param {string} currency - The currency symbol (default: '$')
  * @returns {string} Formatted string
  */
-export const formatMoney = (amount, currency = '$') => {
+export const formatMoney = (amount, currency = '$', decimals = 2) => {
     const val = parseFloat(amount);
-    if (isNaN(val)) return `${currency} 0,00`;
+    if (isNaN(val)) return `${currency} 0${decimals > 0 ? ',' + '0'.repeat(decimals) : ''}`;
 
     return `${currency} ${val.toLocaleString('es-ES', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
     })}`;
 };
 

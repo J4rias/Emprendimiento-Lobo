@@ -8,7 +8,10 @@ const {
   User,
   Inventory,
   InventoryMovement,
-  Batch
+  Batch,
+  SupplierPayment,
+  SupplierPaymentAllocation,
+  ExchangeRate
 } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
@@ -26,22 +29,24 @@ class PurchaseOrderController {
     this.getPurchaseOrderStats = this.getPurchaseOrderStats.bind(this);
   }
 
-  // Generate unique order number
-  async generateOrderNumber() {
+  // Generate unique order number (with transaction lock to prevent collisions)
+  async generateOrderNumber(transaction) {
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const prefix = `OC-${year}${month}${day}`;
 
-    // Find the last order of the day
+    // Find the last order of the day with exclusive lock
     const lastOrder = await PurchaseOrder.findOne({
       where: {
         order_number: {
           [Op.like]: `${prefix}%`
         }
       },
-      order: [['order_number', 'DESC']]
+      order: [['order_number', 'DESC']],
+      lock: transaction.LOCK.UPDATE,
+      transaction
     });
 
     let sequence = 1;
@@ -76,7 +81,8 @@ class PurchaseOrderController {
       if (search) {
         where[Op.or] = [
           { order_number: { [Op.like]: `%${search}%` } },
-          { notes: { [Op.like]: `%${search}%` } }
+          { notes: { [Op.like]: `%${search}%` } },
+          { '$supplier.name$': { [Op.like]: `%${search}%` } }
         ];
       }
 
@@ -139,9 +145,34 @@ class PurchaseOrderController {
         order: [[sortBy, sortOrder.toUpperCase()]]
       });
 
+      // NEW: Attach last_invoice_number to each order for the list view integration
+      const ordersWithInvoice = await Promise.all(orders.map(async (order) => {
+        const lastMovement = await InventoryMovement.findOne({
+          where: {
+            reason: { [Op.like]: `OC ${order.order_number}%` },
+            document_number: { [Op.ne]: order.order_number }
+          },
+          order: [['created_at', 'DESC']],
+          attributes: ['document_number']
+        });
+
+        const orderJson = order.toJSON();
+        orderJson.last_invoice_number = lastMovement ? lastMovement.document_number : '';
+
+        // Calculate payment status
+        const allocs = await SupplierPaymentAllocation.findAll({
+          where: { purchase_order_id: order.id },
+          include: [{ model: SupplierPayment, as: 'payment', where: { status: { [Op.ne]: 'cancelled' } }, attributes: [] }]
+        });
+        const totalPaid = allocs.reduce((sum, a) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0);
+        orderJson.payment_status = totalPaid >= parseFloat(order.total) - 0.01 ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+        return orderJson;
+      }));
+
       res.json({
         success: true,
-        data: orders,
+        data: ordersWithInvoice,
         pagination: {
           total: count,
           page: parseInt(page),
@@ -212,20 +243,80 @@ class PurchaseOrderController {
         });
       }
 
-      // NEW: Fetch last used invoice number for this PO if it exists
-      const lastMovement = await InventoryMovement.findOne({
+      // Fetch all inventory movements related to this PO for history and invoices
+      const movements = await InventoryMovement.findAll({
         where: {
           reason: { [Op.like]: `OC ${order.order_number}%` }
         },
-        order: [['created_at', 'DESC']],
-        attributes: ['document_number']
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'username', 'first_name', 'last_name']
+          }
+        ],
+        order: [['created_at', 'DESC']]
       });
 
       const orderJson = order.toJSON();
-      // If the last movement's document number is the PO number itself, it means no invoice was provided
-      orderJson.last_invoice_number = (lastMovement && lastMovement.document_number !== order.order_number)
-        ? lastMovement.document_number
-        : '';
+
+      // Extract unique invoice numbers (excluding the PO number itself)
+      const uniqueInvoices = [...new Set(movements
+        .map(m => m.document_number)
+        .filter(doc => doc && doc !== order.order_number)
+      )];
+
+      orderJson.invoices = uniqueInvoices;
+      orderJson.last_invoice_number = uniqueInvoices[0] || '';
+
+      // Group movements by document + date for a cleaner history (avoid per-product duplicates)
+      const groupedHistory = {};
+      for (const m of movements) {
+        const dateKey = m.created_at ? new Date(m.created_at).toISOString().slice(0, 16) : 'unknown';
+        const key = `${m.document_number || 'N/A'}_${dateKey}`;
+        if (!groupedHistory[key]) {
+          groupedHistory[key] = {
+            id: m.id,
+            date: m.created_at,
+            document_number: m.document_number,
+            quantity: 0,
+            user: m.user ? `${m.user.first_name} ${m.user.last_name}` : 'Sistema',
+            notes: m.reason,
+            product_count: 0
+          };
+        }
+        groupedHistory[key].quantity += parseInt(m.quantity || 0);
+        groupedHistory[key].product_count += 1;
+      }
+
+      orderJson.reception_history = Object.values(groupedHistory);
+
+      // Calculate payment status and history for single order
+      const allocs = await SupplierPaymentAllocation.findAll({
+        where: { purchase_order_id: order.id },
+        include: [{
+          model: SupplierPayment,
+          as: 'payment',
+          where: { status: { [Op.ne]: 'cancelled' } },
+          attributes: ['id', 'payment_number', 'payment_date', 'payment_method', 'amount', 'currency']
+        }]
+      });
+
+      const totalPaid = allocs.reduce((sum, a) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0);
+      orderJson.payment_status = totalPaid >= parseFloat(order.total) - 0.01 ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+      orderJson.payment_history = allocs.map(a => ({
+        id: a.payment.id,
+        payment_number: a.payment.payment_number,
+        payment_date: a.payment.payment_date,
+        payment_method: a.payment.payment_method,
+        total_payment_amount: a.payment.amount,
+        payment_currency: a.payment.currency,
+        allocated_amount: a.allocated_amount,
+        allocated_amount_po_currency: a.allocated_amount_po_currency,
+        exchange_rate_used: a.exchange_rate_used
+      })).sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
+
 
       res.json({
         success: true,
@@ -261,7 +352,7 @@ class PurchaseOrderController {
       }
 
       // Generate order number
-      const order_number = await this.generateOrderNumber();
+      const order_number = await this.generateOrderNumber(transaction);
 
       // Calculate totals
       let subtotal = 0;
@@ -725,9 +816,35 @@ class PurchaseOrderController {
           });
 
           if (presentation) {
-            // Update package_cost and unit cost based on the purchase order
-            const newPackageCost = detail.package_cost;
-            const newUnitCost = detail.unit_cost;
+            // Check if we need to convert currencies
+            let newPackageCost = detail.package_cost;
+            let newUnitCost = detail.unit_cost;
+
+            if (order.currency && presentation.purchase_currency && order.currency !== presentation.purchase_currency) {
+              try {
+                // Determine transaction date for accurate historical rate, defaulting to right now
+                const rateDate = new Date();
+
+                // Convert costs from the PO currency to the Presentation's base currency
+                newPackageCost = await ExchangeRate.convert(
+                  detail.package_cost,
+                  order.currency,
+                  presentation.purchase_currency,
+                  rateDate
+                );
+
+                newUnitCost = await ExchangeRate.convert(
+                  detail.unit_cost,
+                  order.currency,
+                  presentation.purchase_currency,
+                  rateDate
+                );
+              } catch (conversionError) {
+                console.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
+                // In case of failure, we will temporarily preserve the raw value to avoid transaction crash,
+                // but the system will log this. Ideally an alert should be triggered.
+              }
+            }
 
             await presentation.update(
               {
@@ -830,7 +947,14 @@ class PurchaseOrderController {
         group: ['status']
       });
 
-      const totalValue = await PurchaseOrder.sum('total', { where });
+      const valueByCurrency = await PurchaseOrder.findAll({
+        where,
+        attributes: [
+          'currency',
+          [sequelize.fn('SUM', sequelize.col('total')), 'total']
+        ],
+        group: ['currency']
+      });
 
       const pendingOrders = await PurchaseOrder.count({
         where: {
@@ -846,7 +970,7 @@ class PurchaseOrderController {
         data: {
           total_orders: totalOrders,
           pending_orders: pendingOrders,
-          total_value: totalValue || 0,
+          value_by_currency: valueByCurrency,
           by_status: ordersByStatus
         }
       });

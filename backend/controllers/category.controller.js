@@ -7,7 +7,7 @@ class CategoryController {
     try {
       const { page = 1, limit = 50, search } = req.query;
       const offset = (page - 1) * limit;
-      
+
       const where = {};
       if (search) {
         where[Op.or] = [
@@ -30,7 +30,10 @@ class CategoryController {
       const categoriesWithCount = await Promise.all(
         categories.map(async (category) => {
           const productCount = await Product.count({
-            where: { category_id: category.id }
+            where: {
+              category_id: category.id,
+              is_active: true
+            }
           });
           return {
             ...category.toJSON(),
@@ -58,9 +61,9 @@ class CategoryController {
   async getById(req, res, next) {
     try {
       const { id } = req.params;
-      
+
       const category = await Category.findByPk(id);
-      
+
       if (!category) {
         return res.status(404).json({
           success: false,
@@ -117,7 +120,7 @@ class CategoryController {
       const { name, description, color } = req.body;
 
       const category = await Category.findByPk(id);
-      
+
       if (!category) {
         return res.status(404).json({
           success: false,
@@ -128,7 +131,7 @@ class CategoryController {
       // Check if name is being changed and if new name already exists
       if (name && name.trim() !== category.name) {
         const existingCategory = await Category.findOne({
-          where: { 
+          where: {
             name: name.trim(),
             id: { [Op.ne]: id }
           }
@@ -169,7 +172,7 @@ class CategoryController {
           attributes: ['id']
         }]
       });
-      
+
       if (!category) {
         return res.status(404).json({
           success: false,

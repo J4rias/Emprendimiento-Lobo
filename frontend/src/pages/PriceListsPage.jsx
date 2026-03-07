@@ -801,11 +801,11 @@ const PriceListsPage = () => {
                                             <div className="text-xs text-gray-400">{list.validity_days} días</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center">
                                                 {hasPermission('price_lists.update') && (
                                                     <button
                                                         onClick={() => openEditor(list)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                        className="text-primary-600 hover:text-primary-900 mr-3"
                                                         title="Editar"
                                                     >
                                                         <Edit className="w-4 h-4" />
@@ -814,7 +814,7 @@ const PriceListsPage = () => {
                                                 {hasPermission('price_lists.create') && (
                                                     <button
                                                         onClick={() => handleDuplicate(list)}
-                                                        className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                                        className="text-emerald-600 hover:text-emerald-900 mr-3"
                                                         title="Duplicar"
                                                     >
                                                         <Copy className="w-4 h-4" />
@@ -822,7 +822,7 @@ const PriceListsPage = () => {
                                                 )}
                                                 <button
                                                     onClick={() => handleExportCSV(list.id)}
-                                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                                    className="text-gray-600 hover:text-gray-900 mr-3"
                                                     title="Exportar CSV"
                                                 >
                                                     <Download className="w-4 h-4" />
@@ -830,7 +830,7 @@ const PriceListsPage = () => {
                                                 {hasPermission('price_lists.delete') && (
                                                     <button
                                                         onClick={() => { setDeletingId(list.id); setShowDeleteModal(true); }}
-                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        className="text-red-600 hover:text-red-900"
                                                         title="Eliminar"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

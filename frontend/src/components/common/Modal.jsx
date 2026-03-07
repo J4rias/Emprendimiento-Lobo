@@ -8,11 +8,16 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     md: 'max-w-2xl',
     lg: 'max-w-4xl',
     xl: 'max-w-6xl',
+    '2xl': 'max-w-7xl',
+    '3xl': 'max-w-[80rem]',
+    '4xl': 'max-w-[90rem]',
+    '5xl': 'max-w-[100rem]',
+    'full': 'max-w-[95vw]',
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+      <div className="flex items-center justify-center min-h-screen px-4 py-8 text-center sm:p-0 sm:px-10 lg:px-20">
         {/* Overlay */}
         <div
           className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"

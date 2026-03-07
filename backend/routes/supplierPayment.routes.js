@@ -41,6 +41,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/supplier-payments/credit-balance/:supplierId
+ * @desc    Get available credit balance (unallocated funds) for a supplier
+ * @access  Private (requires payments.view permission)
+ */
+router.get(
+  '/credit-balance/:supplierId',
+  authenticate,
+  authorize('supplier_payments.view'),
+  supplierPaymentController.getSupplierCreditBalance
+);
+
+/**
  * @route   GET /api/supplier-payments/by-po/:poId
  * @desc    Get payments and balance summary for a specific purchase order
  * @access  Private (requires payments.view permission)

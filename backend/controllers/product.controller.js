@@ -37,7 +37,12 @@ class ProductController {
         { model: Category, as: 'category' },
         { model: Brand, as: 'brand' },
         presentationInclude,
-        { model: Barcode, as: 'barcodes' },
+        {
+          model: Barcode,
+          as: 'barcodes',
+          where: { is_active: true },
+          required: false
+        },
         {
           model: Inventory,
           as: 'inventories',
@@ -91,7 +96,14 @@ class ProductController {
       }
 
       if (category_id) where.category_id = category_id;
-      if (is_active !== undefined) where.is_active = is_active === 'true' || is_active === true;
+
+      // Default to only active products unless specified
+      if (is_active !== undefined) {
+        where.is_active = is_active === 'true' || is_active === true;
+      } else {
+        where.is_active = true;
+      }
+
       if (is_perishable !== undefined) where.is_perishable = is_perishable === 'true' || is_perishable === true;
 
       const { rows: products, count } = await Product.findAndCountAll({
@@ -136,7 +148,12 @@ class ProductController {
               { model: PresentationType, as: 'presentationType' }
             ]
           },
-          { model: Barcode, as: 'barcodes' },
+          {
+            model: Barcode,
+            as: 'barcodes',
+            where: { is_active: true },
+            required: false
+          },
           {
             model: Inventory,
             as: 'inventories',
@@ -615,6 +632,7 @@ class ProductController {
         include: [{
           model: Product,
           as: 'product',
+          where: { is_active: true },
           include: [
             { model: Category, as: 'category' },
             { model: ProductPresentation, as: 'presentations' }
@@ -911,6 +929,67 @@ class ProductController {
         data: updatedPresentation,
         message: 'Default presentation updated successfully'
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async exportCSV(req, res, next) {
+    try {
+      const products = await Product.findAll({
+        where: { is_active: true },
+        include: [
+          {
+            model: ProductPresentation,
+            as: 'presentations',
+            where: { is_default: true },
+            required: false
+          },
+          {
+            model: Barcode,
+            as: 'barcodes',
+            where: { is_active: true },
+            required: false
+          }
+        ]
+      });
+
+      // CSV Header
+      let csvContent = 'ID Producto,SKU,Nombre,Descripcion,Tamano Unidad,Medida Unidad,ID Presentación,Unidades por Paquete,Unidades por Presentación,Costo Paquete,Costo Unitario,Moneda,ID Barcode,Codigo de Barras\n';
+
+      products.forEach(product => {
+        const defaultPresentation = product.presentations && product.presentations[0] ? product.presentations[0] : {};
+        const barcodes = product.barcodes || [];
+
+        // If there are multiple barcodes, we could list them all or just the primary one.
+        // User asked for "id and barcode of each product", if there are many we list them separated by semicolon or multiple rows.
+        // Let's go with one row per product and list barcodes separated by semicolon if there are multiple.
+        const barcodeIds = barcodes.map(b => b.id).join('; ');
+        const barcodeStrings = barcodes.map(b => b.barcode).join('; ');
+
+        const row = [
+          product.id,
+          `"${product.sku}"`,
+          `"${product.name}"`,
+          `"${(product.description || '').replace(/"/g, '""')}"`,
+          product.unit_size,
+          `"${product.unit_size_measure || ''}"`,
+          defaultPresentation.id || '',
+          defaultPresentation.units_per_package || '',
+          defaultPresentation.units_per_presentation || '',
+          defaultPresentation.package_cost || '',
+          defaultPresentation.cost || '',
+          defaultPresentation.purchase_currency || '',
+          `"${barcodeIds}"`,
+          `"${barcodeStrings}"`
+        ];
+
+        csvContent += row.join(',') + '\n';
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=productos_activos.csv');
+      return res.status(200).send('\uFEFF' + csvContent);
     } catch (error) {
       next(error);
     }

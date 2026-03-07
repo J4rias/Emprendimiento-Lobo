@@ -29,7 +29,6 @@ import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import PurchaseOrderCreatePage from './pages/PurchaseOrderCreatePage';
 import PurchaseOrderReceivePage from './pages/PurchaseOrderReceivePage';
 import CreditNotesPage from './pages/CreditNotesPage';
-import CreditNoteCreatePage from './pages/CreditNoteCreatePage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
 import PriceListsPage from './pages/PriceListsPage';
@@ -301,16 +300,6 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <CreditNotesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/credit-notes/create"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <CreditNoteCreatePage />
             </AppLayout>
           </PrivateRoute>
         }

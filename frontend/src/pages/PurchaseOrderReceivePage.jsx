@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatMoney } from '../utils/formatUtils';
 import { useNavigate, useParams } from 'react-router-dom';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import {
@@ -8,7 +9,8 @@ import {
   X,
   CheckCircle,
   Calendar,
-  ClipboardList
+  ClipboardList,
+  PackageCheck
 } from 'lucide-react';
 import Modal from '../components/common/Modal';
 
@@ -100,6 +102,14 @@ const PurchaseOrderReceivePage = () => {
 
       return updated;
     }));
+  };
+
+  const handleReceiveAll = () => {
+    setReceivedItems(prev => prev.map(item => ({
+      ...item,
+      receiving_packages: item.pending_packages,
+      receiving_units: item.pending_units
+    })));
   };
 
   const handleReceive = () => {
@@ -247,7 +257,7 @@ const PurchaseOrderReceivePage = () => {
           <div>
             <div className="text-sm text-blue-700">Total Orden</div>
             <div className="font-medium text-blue-900">
-              {order.currency} {parseFloat(order.total).toFixed(2)}
+              {formatMoney(order.total, order.currency)}
             </div>
           </div>
           <div>
@@ -295,7 +305,17 @@ const PurchaseOrderReceivePage = () => {
       {/* Receiving Table */}
       <div className="bg-white rounded-lg shadow mb-6">
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Productos a Recibir</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Productos a Recibir</h2>
+            <button
+              onClick={handleReceiveAll}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+              title="Llenar todos los campos con las cantidades pendientes"
+            >
+              <PackageCheck className="w-4 h-4" />
+              Recibir Todo
+            </button>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -423,8 +443,8 @@ const PurchaseOrderReceivePage = () => {
         >
           <div className="space-y-4">
             <div className={`p-4 border-l-4 rounded ${isFullyReceived
-                ? 'bg-green-50 border-green-400'
-                : 'bg-amber-50 border-amber-400'
+              ? 'bg-green-50 border-green-400'
+              : 'bg-amber-50 border-amber-400'
               }`}>
               <div className="flex">
                 <div className="flex-shrink-0">

@@ -60,6 +60,14 @@ router.get(
   customerController.getCustomerStats
 );
 
+// Get customer statement (ledger)
+router.get(
+  '/:id/statement',
+  authenticate,
+  authorize('customers.view'),
+  customerController.getStatement
+);
+
 // Create customer
 router.post(
   '/',

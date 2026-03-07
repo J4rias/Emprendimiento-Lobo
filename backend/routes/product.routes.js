@@ -14,6 +14,9 @@ router.use(auth);
 // Get all products
 router.get('/', productController.getAll);
 
+// Export products to CSV
+router.get('/export-csv', productController.exportCSV);
+
 // Search by barcode
 router.get('/barcode/:barcode', productController.searchByBarcode);
 

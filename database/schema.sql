@@ -515,6 +515,7 @@ CREATE TABLE IF NOT EXISTS sale_details (
   total DECIMAL(15,2) NOT NULL,
   cost_price DECIMAL(15,2) NULL COMMENT 'Costo para análisis de rentabilidad',
   notes TEXT,
+  is_unit BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Indica si la venta se hizo por unidad (true) o por bulto/empaque (false)',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
@@ -808,6 +809,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 20260223000001  add-credit-used-to-customers
 -- 20260223000002  add-fields-to-supplier-payments (invoice_number, status)
 -- 20260223000003  add-delivered-status-to-sales (ENUM +delivered)
+-- 20260307055119  add-is-unit-to-sale-details
+--                   - Permite diferenciar unidades de paquetes en ventas y corregir descuentos de stock.
 -- ========================================
 -- CAMPOS PENDIENTES DE IMPLEMENTACIÓN FUTURA
 -- ========================================

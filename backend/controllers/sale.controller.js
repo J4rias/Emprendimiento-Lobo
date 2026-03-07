@@ -98,6 +98,7 @@ exports.createSale = async (req, res) => {
       }
 
       const unit_price = item.unit_price || presentation.base_price;
+      const is_unit = item.is_unit || false;
       const item_subtotal = unit_price * item.quantity;
       const item_discount = item.discount_percent ? (item_subtotal * item.discount_percent / 100) : 0;
       const taxable_amount = item_subtotal - item_discount;
@@ -107,11 +108,23 @@ exports.createSale = async (req, res) => {
       subtotal += item_subtotal;
       tax_amount += item_tax;
 
+      // Calculate base units for inventory deduction
+      // If sold as package, multiply quantity by units_per_package
+      const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
+
+      if (inventory.available_quantity < units_to_deduct) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: `Stock insuficiente para ${product.name}. Necesario: ${units_to_deduct}, Disponible: ${inventory.available_quantity}`
+        });
+      }
+
       saleDetails.push({
         product_id: item.product_id,
         presentation_id: item.presentation_id,
         batch_id: item.batch_id || null,
         quantity: item.quantity,
+        is_unit: is_unit,
         unit_price: unit_price,
         discount_percent: item.discount_percent || 0,
         discount_amount: item_discount,
@@ -124,8 +137,8 @@ exports.createSale = async (req, res) => {
       });
 
       await inventory.update({
-        available_quantity: inventory.available_quantity - item.quantity,
-        reserved_quantity: inventory.reserved_quantity + item.quantity
+        available_quantity: inventory.available_quantity - units_to_deduct,
+        reserved_quantity: inventory.reserved_quantity + units_to_deduct
       }, { transaction });
     }
 
@@ -193,6 +206,18 @@ exports.createSale = async (req, res) => {
             reference: payLine.reference || null,
             created_by: req.user.id
           }, { transaction });
+
+          // If payment is via credit_balance, deduct it from Customer
+          if (payLine.method === 'credit_balance' && customer_id) {
+            const customer = await Customer.findByPk(customer_id, { transaction });
+            if (customer) {
+              // The payment amount is in the specified currency, we need to deduct the equivalent in the Customer's base currency (always USD for balance in this system)
+              const amountUSD = parseFloat(payLine.amount) / (parseFloat(payLine.exchange_rate) || 1);
+              const currentBalance = parseFloat(customer.creditBalance || 0);
+              const newBalance = Math.max(0, currentBalance - amountUSD);
+              await customer.update({ creditBalance: newBalance }, { transaction });
+            }
+          }
         }
       }
     }
@@ -302,7 +327,7 @@ exports.getSales = async (req, res) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'document_number']
+          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'documentNumber']
         },
         {
           model: Warehouse,
@@ -468,7 +493,11 @@ exports.cancelSale = async (req, res) => {
     const { reason } = req.body;
 
     const sale = await Sale.findByPk(id, {
-      include: [{ model: SaleDetail, as: 'details' }]
+      include: [{
+        model: SaleDetail,
+        as: 'details',
+        include: [{ model: ProductPresentation, as: 'presentation' }]
+      }]
     });
 
     if (!sale) {
@@ -490,14 +519,16 @@ exports.cancelSale = async (req, res) => {
       });
 
       if (inventory) {
+        const units_to_return = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
+
         if (sale.status === 'completed') {
           await inventory.update({
-            available_quantity: inventory.available_quantity + detail.quantity
+            available_quantity: inventory.available_quantity + units_to_return
           }, { transaction });
         } else if (sale.status === 'pending') {
           await inventory.update({
-            available_quantity: inventory.available_quantity + detail.quantity,
-            reserved_quantity: inventory.reserved_quantity - detail.quantity
+            available_quantity: inventory.available_quantity + units_to_return,
+            reserved_quantity: inventory.reserved_quantity - units_to_return
           }, { transaction });
         }
       }
@@ -592,7 +623,8 @@ exports.addPayment = async (req, res) => {
 
     if (newStatus === 'completed') {
       const saleDetails = await SaleDetail.findAll({
-        where: { sale_id: sale.id }
+        where: { sale_id: sale.id },
+        include: [{ model: ProductPresentation, as: 'presentation' }]
       });
 
       for (const detail of saleDetails) {
@@ -604,8 +636,9 @@ exports.addPayment = async (req, res) => {
         });
 
         if (inventory) {
+          const units_to_unreserve = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
           await inventory.update({
-            reserved_quantity: inventory.reserved_quantity - detail.quantity
+            reserved_quantity: inventory.reserved_quantity - units_to_unreserve
           }, { transaction });
         }
       }

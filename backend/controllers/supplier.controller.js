@@ -1,4 +1,4 @@
-const { Supplier, SupplierContact } = require('../models');
+const { Supplier, SupplierContact, PurchaseOrder, SupplierPayment, SupplierPaymentAllocation, ExchangeRate } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -77,10 +77,10 @@ const getById = async (req, res, next) => {
 // Create new supplier
 const create = async (req, res, next) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { contacts, ...supplierData } = req.body;
-    
+
     // Create supplier
     const supplier = await Supplier.create({
       ...supplierData,
@@ -129,11 +129,11 @@ const create = async (req, res, next) => {
 // Update supplier
 const update = async (req, res, next) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const { contacts, ...supplierData } = req.body;
-    
+
     console.log('Update supplier - req.body:', req.body);
     console.log('Update supplier - supplierData:', supplierData);
     console.log('Update supplier - contacts:', contacts);
@@ -163,7 +163,7 @@ const update = async (req, res, next) => {
 
       const existingContactIds = existingContacts.map(c => c.id);
       const newContactIds = contacts.filter(c => c.id).map(c => c.id);
-      
+
       // Ensure only one contact is marked as primary
       const hasPrimary = contacts.some(c => c.is_primary);
       const processedContacts = contacts.map((contact, index) => ({
@@ -290,11 +290,172 @@ const getActive = async (req, res, next) => {
   }
 };
 
+// Get unified statement (ledger) for a single supplier
+const getStatement = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Validate supplier exists
+    const supplier = await Supplier.findByPk(id);
+    if (!supplier) {
+      return res.status(404).json({ success: false, message: 'Supplier not found' });
+    }
+
+    // 1. Fetch Purchase Orders (Debts/Liabilities) - Excluding cancelled ones
+    const purchaseOrders = await PurchaseOrder.findAll({
+      where: {
+        supplier_id: id,
+        status: { [Op.notIn]: ['cancelled'] }
+      },
+      attributes: ['id', 'order_number', 'order_date', 'total', 'currency', 'status']
+    });
+
+    // 2. Fetch Supplier Payments (Assets/Credits) - Excluding cancelled ones
+    const payments = await SupplierPayment.findAll({
+      where: {
+        supplier_id: id,
+        status: { [Op.notIn]: ['cancelled'] }
+      },
+      attributes: ['id', 'payment_number', 'payment_date', 'payment_method', 'amount', 'currency', 'status'],
+      include: [{
+        model: SupplierPaymentAllocation,
+        as: 'allocations'
+      }]
+    });
+
+    // 3. Unify data into Ledger
+    const ledger = [];
+    const summary = {};
+
+    // Process Purchase Orders (Charges)
+    for (const po of purchaseOrders) {
+      const amountOrig = parseFloat(po.total || 0);
+      const poCurrency = po.currency || 'USD';
+
+      // Get rates
+      const rateToUSD = await ExchangeRate.getRate(poCurrency, 'USD', po.order_date);
+      const rateToCOP = await ExchangeRate.getRate(poCurrency, 'COP', po.order_date);
+
+      const amtUSD = amountOrig * rateToUSD;
+      const amtCOP = amountOrig * rateToCOP;
+
+      // Record in USD
+      if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
+      summary['USD'].total_invoiced += amtUSD;
+      ledger.push({
+        id: `po_${po.id}_usd`,
+        type: 'charge',
+        date: new Date(po.order_date),
+        reference: po.order_number,
+        amount: amtUSD,
+        currency: 'USD',
+        description: `Orden de Compra: ${po.status}`,
+        original_amount: amountOrig,
+        original_currency: poCurrency,
+        original_data: po
+      });
+
+      // Record in COP
+      if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
+      summary['COP'].total_invoiced += amtCOP;
+      ledger.push({
+        id: `po_${po.id}_cop`,
+        type: 'charge',
+        date: new Date(po.order_date),
+        reference: po.order_number,
+        amount: amtCOP,
+        currency: 'COP',
+        description: `Orden de Compra: ${po.status}`,
+        original_amount: amountOrig,
+        original_currency: poCurrency,
+        original_data: po
+      });
+    }
+
+    // Process Payments (Credits)
+    for (const pay of payments) {
+      const amountOrig = parseFloat(pay.amount || 0);
+      const payCurrency = pay.currency || 'USD';
+
+      // For payments, we use the exchange_rate stored in the payment if it exists, 
+      // otherwise we fetch it from the system.
+      let rateToUSD, rateToCOP;
+
+      if (pay.exchange_rate && pay.exchange_rate_from && pay.exchange_rate_to) {
+        // If we have a saved rate, we should use it. 
+        // This part gets tricky if the saved rate is VES-USD but we need COP.
+        // For now, let's keep it simple and fetch if needed.
+        rateToUSD = await ExchangeRate.getRate(payCurrency, 'USD', pay.payment_date);
+        rateToCOP = await ExchangeRate.getRate(payCurrency, 'COP', pay.payment_date);
+      } else {
+        rateToUSD = await ExchangeRate.getRate(payCurrency, 'USD', pay.payment_date);
+        rateToCOP = await ExchangeRate.getRate(payCurrency, 'COP', pay.payment_date);
+      }
+
+      const amtUSD = amountOrig * rateToUSD;
+      const amtCOP = amountOrig * rateToCOP;
+
+      // USD
+      if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
+      summary['USD'].total_paid += amtUSD;
+      ledger.push({
+        id: `pay_${pay.id}_usd`,
+        type: 'payment',
+        date: new Date(pay.payment_date),
+        reference: pay.payment_number,
+        amount: amtUSD,
+        currency: 'USD',
+        description: `Abono (${pay.payment_method})`,
+        original_amount: amountOrig,
+        original_currency: payCurrency,
+        original_data: pay
+      });
+
+      // COP
+      if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
+      summary['COP'].total_paid += amtCOP;
+      ledger.push({
+        id: `pay_${pay.id}_cop`,
+        type: 'payment',
+        date: new Date(pay.payment_date),
+        reference: pay.payment_number,
+        amount: amtCOP,
+        currency: 'COP',
+        description: `Abono (${pay.payment_method})`,
+        original_amount: amountOrig,
+        original_currency: payCurrency,
+        original_data: pay
+      });
+    }
+
+    // 4. Calculate Final Balances
+    for (const currency in summary) {
+      summary[currency].balance = summary[currency].total_invoiced - summary[currency].total_paid;
+    }
+
+    // 5. Sort Ledger chronologically
+    ledger.sort((a, b) => a.date - b.date);
+
+    res.json({
+      success: true,
+      data: {
+        supplier: { id: supplier.id, name: supplier.name, company_name: supplier.company_name },
+        summary: summary,
+        ledger: ledger
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
   deleteSupplier,
-  getActive
+  getActive,
+  getStatement
 };

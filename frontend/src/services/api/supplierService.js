@@ -37,5 +37,11 @@ export const supplierService = {
   delete: async (id) => {
     const response = await api.delete(`/suppliers/${id}`);
     return response.data;
+  },
+
+  // Get supplier statement (ledger)
+  getStatement: async (id) => {
+    const response = await api.get(`/suppliers/${id}/statement`);
+    return response.data;
   }
 };

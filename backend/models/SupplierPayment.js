@@ -72,6 +72,21 @@ const SupplierPayment = sequelize.define('SupplierPayment', {
     allowNull: true,
     comment: 'Número de factura del proveedor asociada al pago'
   },
+  exchange_rate: {
+    type: DataTypes.DECIMAL(12, 6),
+    allowNull: true,
+    comment: 'Tasa de cambio usada en el pago (congelada)'
+  },
+  exchange_rate_from: {
+    type: DataTypes.STRING(3),
+    allowNull: true,
+    comment: 'Moneda origen de la tasa (ej: USD)'
+  },
+  exchange_rate_to: {
+    type: DataTypes.STRING(3),
+    allowNull: true,
+    comment: 'Moneda destino de la tasa (ej: VES)'
+  },
   status: {
     type: DataTypes.ENUM('recorded', 'confirmed', 'cancelled'),
     allowNull: false,

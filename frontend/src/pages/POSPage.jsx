@@ -579,7 +579,8 @@ const POSPage = () => {
         items: cart.map(item => ({
           product_id: item.product_id,
           presentation_id: item.presentation_id,
-          quantity: item.sellByUnit ? item.quantity : item.quantity,
+          quantity: item.quantity,
+          is_unit: item.sellByUnit,
           unit_price: item.current_price,
           discount_percent: item.discount_percent,
           tax_percent: item.tax_percent
@@ -1025,18 +1026,43 @@ const POSPage = () => {
                     <div className="flex gap-1">
                       {PAYMENT_METHODS.map(pm => {
                         const Icon = pm.icon;
+
+                        // Disable credit balance if not a customer or balance is 0
+                        const isCreditBalance = pm.id === 'credit_balance';
+                        const disableWallet = isCreditBalance && (!customer || !customer.creditBalance || parseFloat(customer.creditBalance) <= 0);
+
                         return (
                           <button
                             key={pm.id}
                             type="button"
-                            onClick={() => updatePaymentLine(idx, 'method', pm.id)}
+                            disabled={disableWallet}
+                            onClick={() => {
+                              if (!disableWallet) {
+                                updatePaymentLine(idx, 'method', pm.id);
+                                // Auto-fill amount based on credit balance if it's the wallet
+                                if (isCreditBalance && customer?.creditBalance) {
+                                  const totals = calculateTotals();
+                                  const maxNeeded = parseFloat(totals.total) - getTotalPaidUSD();
+                                  const maxAvailable = parseFloat(customer.creditBalance); // Balance in USD
+                                  const availableInLineCurrency = convertToOtherCurrency(maxAvailable, line.currency) || maxAvailable;
+                                  const neededInLineCurrency = convertToOtherCurrency(Math.max(0, maxNeeded), line.currency) || Math.max(0, maxNeeded);
+
+                                  const toApply = Math.min(availableInLineCurrency, neededInLineCurrency);
+                                  if (toApply > 0) {
+                                    updatePaymentLine(idx, 'amount', toApply.toFixed(2));
+                                  }
+                                }
+                              }
+                            }}
                             className={`p-1.5 rounded transition ${line.method === pm.id
                               ? pm.activeClass
-                              : 'text-gray-400 hover:text-gray-600'
+                              : disableWallet
+                                ? 'text-gray-300 cursor-not-allowed hidden' // hide if no balance to save space
+                                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                               }`}
-                            title={pm.label}
+                            title={pm.label + (isCreditBalance && customer ? ` ($${parseFloat(customer.creditBalance || 0).toFixed(2)})` : '')}
                           >
-                            <Icon className="w-3.5 h-3.5" />
+                            <Icon className="w-4 h-4" />
                           </button>
                         );
                       })}

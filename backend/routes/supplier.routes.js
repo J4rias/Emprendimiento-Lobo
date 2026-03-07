@@ -16,6 +16,9 @@ router.get('/active', authorize('suppliers.view'), supplierController.getActive)
 // Get supplier by ID
 router.get('/:id', authorize('suppliers.view'), supplierController.getById);
 
+// Get supplier statement (ledger)
+router.get('/:id/statement', authorize('suppliers.view'), supplierController.getStatement);
+
 // Create new supplier
 router.post('/', authorize('suppliers.create'), supplierController.create);
 

@@ -32,6 +32,7 @@ const InventoryMovement = require('./InventoryMovement');
 const PurchaseOrder = require('./PurchaseOrder');
 const PurchaseOrderDetail = require('./PurchaseOrderDetail');
 const SupplierPayment = require('./SupplierPayment');
+const SupplierPaymentAllocation = require('./SupplierPaymentAllocation');
 const CreditNote = require('./CreditNote');
 const CreditNoteDetail = require('./CreditNoteDetail');
 const Delivery = require('./Delivery');
@@ -290,6 +291,14 @@ PurchaseOrder.hasMany(SupplierPayment, { foreignKey: 'purchase_order_id', as: 'p
 SupplierPayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(SupplierPayment, { foreignKey: 'created_by', as: 'supplierPayments' });
 
+// SupplierPaymentAllocation - SupplierPayment (Many to One)
+SupplierPaymentAllocation.belongsTo(SupplierPayment, { foreignKey: 'payment_id', as: 'payment' });
+SupplierPayment.hasMany(SupplierPaymentAllocation, { foreignKey: 'payment_id', as: 'allocations' });
+
+// SupplierPaymentAllocation - PurchaseOrder (Many to One)
+SupplierPaymentAllocation.belongsTo(PurchaseOrder, { foreignKey: 'purchase_order_id', as: 'purchaseOrder' });
+PurchaseOrder.hasMany(SupplierPaymentAllocation, { foreignKey: 'purchase_order_id', as: 'paymentAllocations' });
+
 // CreditNote - Sale (Many to One)
 CreditNote.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
 Sale.hasMany(CreditNote, { foreignKey: 'sale_id', as: 'creditNotes' });
@@ -394,6 +403,7 @@ module.exports = {
   PurchaseOrder,
   PurchaseOrderDetail,
   SupplierPayment,
+  SupplierPaymentAllocation,
   CreditNote,
   CreditNoteDetail,
   Delivery,

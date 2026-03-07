@@ -49,6 +49,7 @@ coverage/
 *.sql.backup
 *.db
 pending_migrations.txt
+temp_diff.txt
 
 # MCP
 .mcp.json

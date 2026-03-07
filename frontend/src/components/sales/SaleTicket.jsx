@@ -89,19 +89,26 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
           </tr>
         </thead>
         <tbody>
-          ${sale.details?.map(detail => `
+          ${sale.details?.map(detail => {
+    const isUnit = detail.is_unit;
+    const unitLabel = isUnit ? 'Ud' : 'Paq';
+    return `
             <tr>
-              <td style="padding: 4px 0; vertical-align: top; width: 60%;">
+              <td style="padding: 4px 0; vertical-align: top; width: 55%;">
                 <div style="font-weight: bold; line-height: 1.1; margin-bottom: 1px;">
                   ${detail.product?.name || 'Producto'}
                 </div>
-                ${detail.presentation?.name ? `<div style="font-size: 11px; margin-bottom: 1px;">${detail.presentation.name}</div>` : ''}
-                <div style="font-size: 10px;">${tFormat(detail.unit_price || 0)} x ud.</div>
+                ${detail.presentation?.name ? `<div style="font-size: 11px; color: #444;">${detail.presentation.name}</div>` : ''}
               </td>
-              <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 12%;">${detail.quantity || 0}</td>
-              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 28%; font-weight: bold; overflow: hidden; text-overflow: clip; white-space: nowrap;">${tFormat(detail.total || 0)}</td>
+              <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 20%; font-size: 12px;">
+                <div>${Math.round(detail.quantity || 0)} ${unitLabel}</div>
+                <div style="font-size: 10px; color: #666;">x ${tFormat(detail.unit_price || 0)}</div>
+              </td>
+              <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 25%; font-weight: bold;">
+                <div style="margin-top: 2px;">${tFormat(detail.total || 0)}</div>
+              </td>
             </tr>
-          `).join('') || ''}
+          `}).join('') || ''}
         </tbody>
       </table>
 
