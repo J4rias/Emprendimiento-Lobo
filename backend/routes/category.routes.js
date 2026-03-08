@@ -23,6 +23,12 @@ router.get('/:id', categoryController.getById);
 router.post('/',
   authorize('products.create'),
   [
+    body('code')
+      .trim()
+      .notEmpty()
+      .withMessage('El código de la categoría es requerido')
+      .isLength({ max: 10 })
+      .withMessage('El código no puede exceder 10 caracteres'),
     body('name')
       .trim()
       .notEmpty()
@@ -47,6 +53,12 @@ router.post('/',
 router.put('/:id',
   authorize('products.create'),
   [
+    body('code')
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage('El código de la categoría no puede estar vacío')
+      .isLength({ max: 10 }),
     body('name')
       .optional()
       .trim()

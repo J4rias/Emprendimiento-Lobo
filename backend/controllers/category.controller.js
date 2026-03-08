@@ -83,21 +83,28 @@ class CategoryController {
   // Create category
   async create(req, res, next) {
     try {
-      const { name, description, color } = req.body;
+      const { code, name, description, color } = req.body;
 
-      // Check if category name already exists
+      // Check if category name or code already exists
       const existingCategory = await Category.findOne({
-        where: { name: name.trim() }
+        where: {
+          [Op.or]: [
+            { name: name.trim() },
+            { code: code.trim().toUpperCase() }
+          ]
+        }
       });
 
       if (existingCategory) {
+        const field = existingCategory.name === name.trim() ? 'nombre' : 'código';
         return res.status(400).json({
           success: false,
-          message: 'Ya existe una categoría con ese nombre'
+          message: `Ya existe una categoría con ese ${field}`
         });
       }
 
       const category = await Category.create({
+        code: code.trim().toUpperCase(),
         name: name.trim(),
         description: description?.trim() || null,
         color: color || '#6B7280'
@@ -117,7 +124,7 @@ class CategoryController {
   async update(req, res, next) {
     try {
       const { id } = req.params;
-      const { name, description, color } = req.body;
+      const { code, name, description, color } = req.body;
 
       const category = await Category.findByPk(id);
 
@@ -128,24 +135,34 @@ class CategoryController {
         });
       }
 
-      // Check if name is being changed and if new name already exists
+      // Check if name or code is being changed and if they already exist
+      const where = {
+        id: { [Op.ne]: id },
+        [Op.or]: []
+      };
+
       if (name && name.trim() !== category.name) {
-        const existingCategory = await Category.findOne({
-          where: {
-            name: name.trim(),
-            id: { [Op.ne]: id }
-          }
-        });
+        where[Op.or].push({ name: name.trim() });
+      }
+
+      if (code && code.trim().toUpperCase() !== category.code) {
+        where[Op.or].push({ code: code.trim().toUpperCase() });
+      }
+
+      if (where[Op.or].length > 0) {
+        const existingCategory = await Category.findOne({ where });
 
         if (existingCategory) {
+          const field = existingCategory.name === name?.trim() ? 'nombre' : 'código';
           return res.status(400).json({
             success: false,
-            message: 'Ya existe una categoría con ese nombre'
+            message: `Ya existe una categoría con ese ${field}`
           });
         }
       }
 
       await category.update({
+        code: code ? code.trim().toUpperCase() : category.code,
         name: name ? name.trim() : category.name,
         description: description !== undefined ? description?.trim() || null : category.description,
         color: color || category.color
@@ -205,6 +222,7 @@ class CategoryController {
       const categories = await Category.findAll({
         attributes: [
           'id',
+          'code',
           'name',
           'description',
           'color',
