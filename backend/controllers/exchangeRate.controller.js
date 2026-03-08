@@ -24,6 +24,9 @@ class ExchangeRateController {
         if (is_active === 'false') where.is_active = false;
         else if (is_active === 'all') { /* include all */ }
         else where.is_active = is_active === 'true';
+      } else {
+        // Por defecto mostrar solo las activas
+        where.is_active = true;
       }
 
       if (date_from || date_to) {
@@ -163,10 +166,15 @@ class ExchangeRateController {
       });
 
       if (existing) {
-        return res.status(400).json({
-          success: false,
-          message: `Ya existe una tasa de cambio de ${from_currency} a ${to_currency} para la fecha ${effective_date}`
-        });
+        if (!existing.is_active) {
+          // Si existe una pero está inactiva, la eliminamos físicamente para crear la nueva sin conflicto
+          await existing.destroy();
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: `Ya existe una tasa de cambio de ${from_currency} a ${to_currency} para la fecha ${effective_date}`
+          });
+        }
       }
 
       // Crear la tasa de cambio
@@ -282,11 +290,8 @@ class ExchangeRateController {
         });
       }
 
-      // Soft delete - marcar como inactivo
-      await exchangeRate.update({
-        is_active: false,
-        updated_by: req.userId
-      });
+      // Real delete - no mantenemos historial de tasas erróneas
+      await exchangeRate.destroy();
 
       res.json({
         success: true,
