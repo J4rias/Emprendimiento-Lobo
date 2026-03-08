@@ -739,6 +739,7 @@ const ProductsPage = () => {
                 <th>Categoría</th>
                 <th className="text-center">Stock Actual (Bultos / Unid)</th>
                 <th>Estado</th>
+                <th className="text-center">Actualizado</th>
                 <th className="text-right">Valor Inventario (COP)</th>
                 {(hasPermission('products.update') || hasPermission('products.delete')) && (
                   <th className="text-center">Acciones</th>
@@ -826,6 +827,20 @@ const ProductsPage = () => {
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
                           Inactivo
                         </span>
+                      )}
+                    </td>
+                    <td className="text-center">
+                      {product.updated_at ? (
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-medium text-gray-700 capitalize">
+                            {new Date(product.updated_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {new Date(product.updated_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
                       )}
                     </td>
                     <td className="text-right">
