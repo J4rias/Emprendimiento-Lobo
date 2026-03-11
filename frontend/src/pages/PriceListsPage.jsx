@@ -78,6 +78,13 @@ const PriceListsPage = () => {
     };
 
     // ===================== STATUS HELPERS =====================
+    const getCostInUSD = (cost, currency) => {
+        if (!cost) return 0;
+        if (currency === 'USD') return parseFloat(cost);
+        const rate = calculateEffectiveRate('USD', currency, exchangeRates) || 1;
+        return parseFloat(cost) / rate;
+    };
+
     const getListStatus = (list) => {
         if (list.status === 'inactive') return 'inactive';
         if (!list.validUntil) return 'active';
@@ -154,7 +161,8 @@ const PriceListsPage = () => {
                     if (existing) {
                         // Keep price from list, but update cost to current system value
                         const pkgPrice = parseFloat(existing.package_price) || 0;
-                        const margin = currentPkgCost > 0 ? ((pkgPrice - currentPkgCost) / currentPkgCost * 100) : 0;
+                        const costUsd = getCostInUSD(currentPkgCost, item.presentation?.purchase_currency);
+                        const margin = costUsd > 0 ? ((pkgPrice - costUsd) / costUsd * 100) : 0;
 
                         return {
                             product_id: existing.product_id,
@@ -261,8 +269,8 @@ const PriceListsPage = () => {
     const applyGeneralMargin = () => {
         const pct = parseFloat(formData.basePercentage) || 0;
         setDetails(prev => prev.map(d => {
-            const pkgCost = d.package_cost;
-            const pkgPrice = pkgCost > 0 ? pkgCost * (1 + pct / 100) : 0;
+            const pkgCostUsd = getCostInUSD(d.package_cost, d.native_currency);
+            const pkgPrice = pkgCostUsd > 0 ? pkgCostUsd * (1 + pct / 100) : 0;
             const unitPrice = d.units_per_package > 0 ? pkgPrice / d.units_per_package : 0;
             return {
                 ...d,
@@ -281,14 +289,16 @@ const PriceListsPage = () => {
             const item = { ...updated[index] };
             const numVal = parseFloat(value) || 0;
 
+            const itemCostUsd = getCostInUSD(item.package_cost, item.native_currency);
+
             if (field === 'package_price') {
                 item.package_price = numVal;
                 item.package_price_cop_str = undefined;
                 item.unit_price = item.units_per_package > 0
                     ? Math.round((numVal / item.units_per_package) * 1000000) / 1000000
                     : 0;
-                item.margin_percentage = item.package_cost > 0
-                    ? Math.round(((numVal - item.package_cost) / item.package_cost * 100) * 10000) / 10000
+                item.margin_percentage = itemCostUsd > 0
+                    ? Math.round(((numVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
                     : 0;
             } else if (field === 'package_price_cop') {
                 item.package_price_cop_str = value;
@@ -298,14 +308,14 @@ const PriceListsPage = () => {
                 item.unit_price = item.units_per_package > 0
                     ? Math.round((usdVal / item.units_per_package) * 1000000) / 1000000
                     : 0;
-                item.margin_percentage = item.package_cost > 0
-                    ? Math.round(((usdVal - item.package_cost) / item.package_cost * 100) * 10000) / 10000
+                item.margin_percentage = itemCostUsd > 0
+                    ? Math.round(((usdVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
                     : 0;
             } else if (field === 'margin_percentage') {
                 item.margin_percentage = numVal;
                 item.package_price_cop_str = undefined;
-                item.package_price = item.package_cost > 0
-                    ? Math.round(item.package_cost * (1 + numVal / 100) * 1000000) / 1000000
+                item.package_price = itemCostUsd > 0
+                    ? Math.round(itemCostUsd * (1 + numVal / 100) * 1000000) / 1000000
                     : 0;
                 item.unit_price = item.units_per_package > 0
                     ? Math.round((item.package_price / item.units_per_package) * 1000000) / 1000000
@@ -637,10 +647,10 @@ const PriceListsPage = () => {
                                                     </td>
                                                     <td className="px-4 py-3 text-gray-700">{d.presentation_name}</td>
                                                     <td className={`px-4 py-3 text-right ${d.native_currency === 'USD' ? 'bg-green-50' : ''}`}>
-                                                        {renderCostDisplay(d.package_cost, d.base_currency, false)}
+                                                        {renderCostDisplay(d.package_cost, d.native_currency, false)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        {renderCostDisplay(d.unit_cost, d.base_currency, false)}
+                                                        {renderCostDisplay(d.unit_cost, d.native_currency, false)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex flex-col items-end gap-1">
