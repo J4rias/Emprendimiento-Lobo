@@ -22,7 +22,50 @@ async function main() {
       console.error('Error: PriceList "Precio Publico" not found.');
       process.exit(1);
     }
-    console.log(`Found PriceList: ${priceList.name} (ID: ${priceList.id})`);
+    console.log(`Found PriceList: ${priceList.name} (ID: ${priceList.id}, Currency: ${priceList.currency})`);
+
+    // Fetch the latest conversion rate from COP to the PriceList base currency
+    let copToBaseRate = 1;
+    if (priceList.currency !== 'COP') {
+      const { ExchangeRate } = require('../models');
+
+      // Helper function to get latest rate
+      const getLatestRate = async (from, to) => {
+        return await ExchangeRate.findOne({
+          where: { from_currency: from, to_currency: to, is_active: true },
+          order: [['effective_date', 'DESC'], ['created_at', 'DESC']]
+        });
+      };
+
+      // Try direct route COP -> USD
+      let rateObj = await getLatestRate('COP', priceList.currency);
+      if (rateObj) {
+        copToBaseRate = parseFloat(rateObj.rate);
+      } else {
+        // Try reverse direct route USD -> COP
+        rateObj = await getLatestRate(priceList.currency, 'COP');
+        if (rateObj && parseFloat(rateObj.rate) > 0) {
+          copToBaseRate = 1 / parseFloat(rateObj.rate);
+        } else {
+          // Indirect route: COP -> VES -> USD
+          // Because the system typically acts as USD->VES and VES->COP
+          const vesToCop = await getLatestRate('VES', 'COP');
+          const usdToVes = await getLatestRate('USD', 'VES');
+
+          if (vesToCop && usdToVes && parseFloat(vesToCop.rate) > 0 && parseFloat(usdToVes.rate) > 0) {
+            // 1 USD = usdToVes VES
+            // 1 VES = vesToCop COP
+            // => 1 USD = (usdToVes * vesToCop) COP
+            // => 1 COP = 1 / (usdToVes * vesToCop) USD
+            copToBaseRate = 1 / (parseFloat(usdToVes.rate) * parseFloat(vesToCop.rate));
+            console.log(`Using cross exchange rate: 1 USD = ${parseFloat(usdToVes.rate)} VES, 1 VES = ${parseFloat(vesToCop.rate)} COP => 1 COP = ${copToBaseRate} ${priceList.currency}`);
+          } else {
+             console.error(`Error: Could not find active exchange rate (direct or crossed through VES) between COP and ${priceList.currency}.`);
+             process.exit(1);
+          }
+        }
+      }
+    }
 
     // 3. Read and Parse CSV
     const csvFilePath = path.join(__dirname, '../data.csv');
@@ -58,7 +101,10 @@ async function main() {
         
         let rawPackagePrice = record['Precio de Venta'] || '0';
         rawPackagePrice = rawPackagePrice.replace(/\./g, '').replace(',', '.');
-        const packagePrice = parseFloat(rawPackagePrice);
+        let packagePriceCop = parseFloat(rawPackagePrice);
+        
+        // Convert to PriceList base currency
+        const packagePrice = packagePriceCop * copToBaseRate;
 
         // Skip rows without ID Presentación or ID Producto
         if (!presentationId || !productId) {

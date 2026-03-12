@@ -246,7 +246,7 @@ ID Producto,SKU,Nombre,Descripcion,Tamano Unidad,Medida Unidad,ID Presentación,
 627,ZEX-BOM-HK-W-100-UND-5EE1,BOMBILLOS HK 100 W,BOMBILLOS HK 100 W,100.00,UND,452,10,10,"95000,00",10200.00,COP,250,4050300046501,100000
 628,ZEX-PLA-BER-ESP-1-UND-D367,"Plagatox Espiral, 1 X 10 ","Plagatox Espiral, 1 X 10 ",10.00,UND,453,60,60,"120000,00",2266.67,COP,251,6949147784739,150000
 629,ZEX-SET-MAN-1-UND-285A,"Set para Manicure, 1 X 1","Set para Manicure, 1 X 1",1.00,UND,454,6,6,"7000,00",9000.00,COP,252,5123556567799,8000
-630,OSB-ESC-IND-1-UND-7381,ESCOBA INDUSTRIAL ,ESCOBA INDUSTIAL,1.00,UND,455,12,12,,7750.00,,253,29,
+630,OSB-ESC-IND-1-UND-7381,ESCOBA INDUSTRIAL ,ESCOBA INDUSTIAL,1.00,UND,455,12,12,"95000,00",7750.00,COP,,,98000
 631,ZEX-REF-MAX-SUR-400-ML-B4E4,"Refresco Maxi Surtido, 400 ml","Refresco Maxi Surtido, 400 ml",400.00,ML,456,24,24,"25000,00",1041.67,COP,255,7705518010390,26500
 632,ZEX-HID-BLU-640-ML-7E37,"Suro Hidralyte Blue Berry, 640 ml ","Suro Hidralyte Blue Berry, 640 ml ",640.00,ML,457,24,24,"86000,00",3583.33,COP,256,7702354959326,88000
 633,ZEX-HID-MAR-640-ML-12B8,"Suero Hidralyte Maracuya, 640 ml","Suero Hidralyte Maracuya, 640 ml",640.00,ML,458,24,24,"86000,00",3583.33,COP,257,7702354959302,88000
@@ -273,7 +273,7 @@ ID Producto,SKU,Nombre,Descripcion,Tamano Unidad,Medida Unidad,ID Presentación,
 662,HEI-COM-POS-186-GR-EA81,"Compota Heinz Postre de Frutas, 186 gr","Compota Heinz Postre de Frutas, 186 gr",186.00,GR,68,24,24,"18,98",0.79,USD,292,7591112158947,56000
 663,SIN-PAS-PRE-1-KG-1CC1,"Pasta Corta Sindoni Premium Caracol, 1 kg","Pasta Corta Sindoni Premium Caracol, 1 kg",1.00,KG,69,12,12,"22,66",1.89,USD,293,7591674000067,60000
 664,GEN-DET-POL-ARI-800-GR-CC37,"Detergente en Polvo Ariel, 800 gr","Detergente en Polvo Ariel, 800 gr",800.00,GR,,15,15,"53,00",,USD,297,7500435250962,142000
-665,GEN-SER-MIM-Z-1-UND-A15C,Servilleta Mimlot Tipo Z,Servilleta Mimlot Tipo Z,1.00,UND,71,,,,18.48,,298,7599963000101,
+665,GEN-SER-MIM-Z-1-UND-A15C,Servilleta Mimlot Tipo Z,Servilleta Mimlot Tipo Z,1.00,UND,71,,,"10,00",18.48,COP,298,7599963000101,12
 666,GEN-SER-DIE-X-1-UND-A843,Servilleta 10 de Diez,Servilleta 10 de Diez,1.00,UND,,30,30,"63000,00",,COP,299,7704269661561,68000
 667,GEN-PAP-FAM-ACO-4-UND-4238,"Papel Familia AcolchaMax Extra Grande, 1 X 4","Papel Familia AcolchaMax Extra Grande, 1 X 4",4.00,UND,73,1,1,"7000,00",1.40,COP,300,7702026148560,8000
 668,GEN-JAB-COC-PRE-1-UND-D4CE,Jabón Coco Prendas Delicadas,Jabón Coco Prendas Delicadas,1.00,UND,74,1,1,"1666,00",01.01,COP,301,7702310018364,2000
@@ -285,7 +285,7 @@ ID Producto,SKU,Nombre,Descripcion,Tamano Unidad,Medida Unidad,ID Presentación,
 675,NES-CRE-LEC-300-GR-2C8A,"Crema de Leche Nestle, 300 gr ","Crema de Leche Nestle, 300 gr ",300.00,GR,,48,48,"155,00",,USD,307,7891000005422,336000
 676,IDE-ACE-VEG-1-LT-912B,"Aceite Ideal Vegetal, 1 lt","Aceite Ideal Vegetal, 1 lt",1.00,LT,,12,12,"74000,00",,COP,308,7709535305194,76000
 677,CAR-VIN-1-LT-DA00,"Vinagre Cárdenas, 1 lt","Vinagre Cárdenas, 1 lt",1.00,LT,,12,12,"34000,00",,COP,309,116992263738459,40000
-678,GEN-ACE-COP-VEG-850-ML-AC0C,"Aceite Coposa Vegetal, 850 ml ","Aceite Coposa Vegetal, 850 ml ",850.00,ML,,12,12,,,,310,7591058001024,
+678,GEN-ACE-COP-VEG-850-ML-AC0C,"Aceite Coposa Vegetal, 850 ml ","Aceite Coposa Vegetal, 850 ml ",850.00,ML,,12,12,"10,00",,COP,310,7591058001024,12
 679,HEI-VIN-500-ML-501B,"Vinagre Heinz, 500 ml","Vinagre Heinz, 500 ml",500.00,ML,,24,24,"27,03",,USD,311,7591112015059,76000
 680,GEN-ARV-VER-RIN-500-GR-95AE,"Arveja Verde Rincón, 500 gr","Arveja Verde Rincón, 500 gr",500.00,GR,,25,25,"45000,00",,COP,312,7709668923364,48000
 681,LAT-LEC-POL-1-KG-861B,"Leche en Polvo Latti Entera, 1 kg","Leche en Polvo Latti Entera, 1 kg",1.00,KG,,24,24,"523000,00",,COP,313,7700304160594,540000
