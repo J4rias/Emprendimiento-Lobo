@@ -216,18 +216,32 @@ class PriceListController {
                     for (const item of productsWithStock) {
                         const pkgCost = parseFloat(item.presentation.package_cost) || 0;
                         const unitCost = parseFloat(item.presentation.cost) || 0;
-                        const pkgPrice = pkgCost > 0 ? pkgCost * (1 + marginPct / 100) : 0;
-                        const unitPrice = unitCost > 0 ? unitCost * (1 + marginPct / 100) : 0;
-                        const margin = pkgCost > 0 ? ((pkgPrice - pkgCost) / pkgCost * 100) : 0;
+                        
+                        let usdPkgCost = pkgCost;
+                        let usdUnitCost = unitCost;
+
+                        if (item.presentation.purchase_currency && item.presentation.purchase_currency !== 'USD') {
+                            try {
+                                usdPkgCost = await ExchangeRate.convert(pkgCost, item.presentation.purchase_currency, 'USD');
+                                usdUnitCost = await ExchangeRate.convert(unitCost, item.presentation.purchase_currency, 'USD');
+                            } catch (e) {
+                                // Default back or ignore if no rate
+                                console.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
+                            }
+                        }
+
+                        const pkgPrice = usdPkgCost > 0 ? usdPkgCost * (1 + marginPct / 100) : 0;
+                        const unitPrice = usdUnitCost > 0 ? usdUnitCost * (1 + marginPct / 100) : 0;
+                        const margin = usdPkgCost > 0 ? ((pkgPrice - usdPkgCost) / usdPkgCost * 100) : 0;
 
                         autoDetails.push({
                             price_list_id: priceList.id,
                             product_id: item.product_id,
                             presentation_id: item.presentation.id,
-                            package_cost: Math.round(pkgCost * 100) / 100,
-                            unit_cost: Math.round(unitCost * 100) / 100,
-                            package_price: Math.round(pkgPrice * 100) / 100,
-                            unit_price: Math.round(unitPrice * 100) / 100,
+                            package_cost: Math.round(pkgCost * 100) / 100, // Kept in native currency
+                            unit_cost: Math.round(unitCost * 100) / 100, // Kept in native currency
+                            package_price: Math.round(pkgPrice * 100) / 100, // In USD
+                            unit_price: Math.round(unitPrice * 100) / 100, // In USD
                             margin_percentage: Math.round(margin * 10) / 10
                         });
                     }
@@ -469,12 +483,34 @@ class PriceListController {
             // Build CSV
             const headers = ['SKU', 'Producto', 'Presentación', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', `Costo/Paquete (${priceList.currency})`, `Costo/Paquete (COP)`, `Costo Unitario (${priceList.currency})`, `Costo Unitario (COP)`, `Precio/Paquete (${priceList.currency})`, `Precio/Paquete (COP)`, `Precio Unitario (${priceList.currency})`, `Precio Unitario (COP)`, 'Margen %'];
 
-            const rows = priceList.details.map(d => {
+            const rows = await Promise.all(priceList.details.map(async d => {
                 const unitsPerPackage = d.presentation?.units_per_package || 1;
                 const totalLooseUnits = inventoryByProduct[d.product?.id] || 0;
 
                 const stockPackages = Math.floor(totalLooseUnits / unitsPerPackage);
                 const stockRemainingUnits = totalLooseUnits % unitsPerPackage;
+
+                let nativeCost = parseFloat(d.package_cost) || 0;
+                let nativeUnitCost = parseFloat(d.unit_cost) || 0;
+                let nativeCurrency = d.presentation?.purchase_currency || 'USD';
+                
+                let costInListCurrency = nativeCost;
+                let costInCop = nativeCost;
+                let unitCostInListCurrency = nativeUnitCost;
+                let unitCostInCop = nativeUnitCost;
+                
+                if (nativeCurrency !== priceList.currency) {
+                    try {
+                        costInListCurrency = await ExchangeRate.convert(nativeCost, nativeCurrency, priceList.currency);
+                        unitCostInListCurrency = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, priceList.currency);
+                    } catch(e) { console.error(e.message); }
+                }
+                if (nativeCurrency !== 'COP') {
+                    try {
+                        costInCop = await ExchangeRate.convert(nativeCost, nativeCurrency, 'COP');
+                        unitCostInCop = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, 'COP');
+                    } catch(e) { console.error(e.message); }
+                }
 
                 return [
                     d.product?.sku || '',
@@ -483,17 +519,17 @@ class PriceListController {
                     stockPackages,
                     stockRemainingUnits,
                     unitsPerPackage,
-                    parseFloat(d.package_cost).toFixed(2),
-                    (parseFloat(d.package_cost) * rateToCop).toFixed(2),
-                    parseFloat(d.unit_cost).toFixed(2),
-                    (parseFloat(d.unit_cost) * rateToCop).toFixed(2),
+                    costInListCurrency.toFixed(2),
+                    costInCop.toFixed(2),
+                    unitCostInListCurrency.toFixed(2),
+                    unitCostInCop.toFixed(2),
                     parseFloat(d.package_price).toFixed(2),
                     (parseFloat(d.package_price) * rateToCop).toFixed(2),
                     parseFloat(d.unit_price).toFixed(2),
                     (parseFloat(d.unit_price) * rateToCop).toFixed(2),
                     parseFloat(d.margin_percentage).toFixed(1)
                 ].join(',');
-            });
+            }));
 
             const csv = [headers.join(','), ...rows].join('\n');
 
@@ -539,29 +575,13 @@ class PriceListController {
                 if (!seenPresentations.has(key)) {
                     seenPresentations.add(key);
 
-                    // Convert costs to USD if they are in COP or VES
-                    let usdPackageCost = p.package_cost;
-                    let usdUnitCost = p.cost;
-
-                    if (p.purchase_currency && p.purchase_currency !== 'USD') {
-                        try {
-                            usdPackageCost = await ExchangeRate.convert(p.package_cost, p.purchase_currency, 'USD');
-                            usdUnitCost = await ExchangeRate.convert(p.cost, p.purchase_currency, 'USD');
-                        } catch (error) {
-                            console.error(`Error converting costs for presentation ${p.id} from ${p.purchase_currency} to USD:`, error.message);
-                            // Optionally, you might want to handle this error more gracefully,
-                            // e.g., by setting costs to 0 or skipping the item.
-                            // For now, we'll just log and use the original cost.
-                        }
-                    }
-
                     results.push({
                         product_id: inv.product_id,
                         product: inv.product,
                         presentation: {
                             ...p.get(), // Get plain data from Sequelize instance
-                            package_cost: usdPackageCost,
-                            cost: usdUnitCost
+                            package_cost: p.package_cost,
+                            cost: p.cost
                         }
                     });
                 }
