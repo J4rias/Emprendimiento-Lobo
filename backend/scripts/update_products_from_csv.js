@@ -51,7 +51,10 @@ async function main() {
         // Replace comma with dot for decimals, and parse
         rawPackageCost = rawPackageCost.replace(/\./g, '').replace(',', '.');
         const packageCost = parseFloat(rawPackageCost);
-        const currency = record['Moneda'];
+        let currency = record['Moneda'];
+        if (!currency || currency.trim() === '') {
+          currency = 'USD'; // Default to USD if empty to avoid truncation/enum errors
+        }
         
         let rawPackagePrice = record['Precio de Venta'] || '0';
         rawPackagePrice = rawPackagePrice.replace(/\./g, '').replace(',', '.');
