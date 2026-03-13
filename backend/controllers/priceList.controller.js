@@ -204,7 +204,10 @@ class PriceListController {
                     unit_cost: d.unit_cost || 0,
                     package_price: d.package_price || 0,
                     unit_price: d.unit_price || 0,
-                    margin_percentage: d.margin_percentage || 0
+                    margin_percentage: d.margin_percentage || 0,
+                    is_frozen: d.is_frozen || false,
+                    frozen_price: d.frozen_price || null,
+                    frozen_currency: d.frozen_currency || 'USD'
                 }));
                 await PriceListDetail.bulkCreate(detailRecords, { transaction });
             } else {
@@ -321,7 +324,10 @@ class PriceListController {
                     unit_cost: d.unit_cost || 0,
                     package_price: d.package_price || 0,
                     unit_price: d.unit_price || 0,
-                    margin_percentage: d.margin_percentage || 0
+                    margin_percentage: d.margin_percentage || 0,
+                    is_frozen: d.is_frozen || false,
+                    frozen_price: d.frozen_price || null,
+                    frozen_currency: d.frozen_currency || 'USD'
                 }));
                 await PriceListDetail.bulkCreate(detailRecords, { transaction });
             }
@@ -388,7 +394,10 @@ class PriceListController {
                     unit_cost: d.unit_cost,
                     package_price: d.package_price,
                     unit_price: d.unit_price,
-                    margin_percentage: d.margin_percentage
+                    margin_percentage: d.margin_percentage,
+                    is_frozen: d.is_frozen,
+                    frozen_price: d.frozen_price,
+                    frozen_currency: d.frozen_currency
                 }));
                 await PriceListDetail.bulkCreate(copiedDetails, { transaction });
             }

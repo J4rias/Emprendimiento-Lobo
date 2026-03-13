@@ -7,7 +7,7 @@ import Modal from '../components/common/Modal';
 import {
     Tags, Plus, Search, Edit, Trash2, Copy, Download,
     CheckCircle, AlertCircle, Clock, X, Save, Percent,
-    Package, Printer, ChevronLeft, RefreshCw
+    Package, Printer, ChevronLeft, RefreshCw, Lock, Unlock
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -177,7 +177,10 @@ const PriceListsPage = () => {
                             unit_price: parseFloat(existing.unit_price) || 0,
                             margin_percentage: Math.round(margin * 10000) / 10000,
                             base_currency: 'USD',
-                            native_currency: item.presentation?.purchase_currency || 'USD'
+                            native_currency: item.presentation?.purchase_currency || 'USD',
+                            is_frozen: existing.is_frozen || false,
+                            frozen_price: existing.frozen_price ? parseFloat(existing.frozen_price) : null,
+                            frozen_currency: existing.frozen_currency || 'USD'
                         };
                     } else {
                         // New product with stock that wasn't in the list
@@ -216,7 +219,10 @@ const PriceListsPage = () => {
                             unit_price: parseFloat(d.unit_price) || 0,
                             margin_percentage: parseFloat(d.margin_percentage) || 0,
                             base_currency: 'USD',
-                            native_currency: d.presentation?.purchase_currency || 'USD'
+                            native_currency: d.presentation?.purchase_currency || 'USD',
+                            is_frozen: d.is_frozen || false,
+                            frozen_price: d.frozen_price ? parseFloat(d.frozen_price) : null,
+                            frozen_currency: d.frozen_currency || 'USD'
                         });
                     }
                 });
@@ -246,7 +252,10 @@ const PriceListsPage = () => {
                     unit_price: 0,
                     margin_percentage: 0,
                     base_currency: 'USD',
-                    native_currency: item.presentation?.purchase_currency || 'USD'
+                    native_currency: item.presentation?.purchase_currency || 'USD',
+                    is_frozen: false,
+                    frozen_price: null,
+                    frozen_currency: 'USD'
                 })));
             }
         } catch (err) {
@@ -257,6 +266,29 @@ const PriceListsPage = () => {
             setDetailSearch('');
             setEditorOpen(true);
         }
+    };
+
+    const toggleFreeze = (index) => {
+        setDetails(prev => {
+            const updated = [...prev];
+            const item = { ...updated[index] };
+            if (item.is_frozen) {
+                item.is_frozen = false;
+                item.frozen_price = null;
+                item.frozen_currency = 'USD';
+            } else {
+                item.is_frozen = true;
+                const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+                // Prefer COP for freezing as requested by user
+                const copPrice = Math.round(item.package_price * rate);
+                item.frozen_price = copPrice;
+                item.frozen_currency = 'COP';
+                // Update USD price to match the rounded frozen COP price
+                item.package_price = copPrice / rate;
+            }
+            updated[index] = item;
+            return updated;
+        });
     };
 
     const closeEditor = () => {
@@ -311,6 +343,14 @@ const PriceListsPage = () => {
                 item.margin_percentage = itemCostUsd > 0
                     ? Math.round(((usdVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
                     : 0;
+                
+                // Sync frozen_price if item is frozen
+                if (item.is_frozen && item.frozen_currency === 'COP') {
+                    item.frozen_price = numVal;
+                }
+                
+                // Debug log to identify rate discrepancy
+                console.log(`UpdateDetailPrice COP: val=${numVal}, rate=${rate}, usdResult=${usdVal}`);
             } else if (field === 'margin_percentage') {
                 item.margin_percentage = numVal;
                 item.package_price_cop_str = undefined;
@@ -344,7 +384,10 @@ const PriceListsPage = () => {
                     unit_cost: d.unit_cost,
                     package_price: d.package_price,
                     unit_price: d.unit_price,
-                    margin_percentage: d.margin_percentage
+                    margin_percentage: d.margin_percentage,
+                    is_frozen: d.is_frozen,
+                    frozen_price: d.frozen_price,
+                    frozen_currency: d.frozen_currency
                 }))
             };
 
@@ -657,23 +700,46 @@ const PriceListsPage = () => {
                                                             {d.base_currency === 'USD' ? (
                                                                 <>
                                                                     <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            onClick={() => toggleFreeze(realIdx)}
+                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                            title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
+                                                                        >
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                        </button>
                                                                         <span className="text-gray-500 font-medium text-xs">COP</span>
                                                                         <input
                                                                             type="number"
                                                                             step="100"
                                                                             min="0"
-                                                                            value={d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : '')}
+                                                                            value={
+                                                                                d.is_frozen && d.frozen_currency === 'COP' 
+                                                                                ? d.frozen_price 
+                                                                                : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
+                                                                            }
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
-                                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                     <div className="text-gray-500 font-medium text-[11px]">
-                                                                        USD ${(d.package_price || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                        USD {
+                                                                            d.is_frozen && d.frozen_currency === 'COP' && d.frozen_price
+                                                                            ? `$ ${(d.frozen_price / (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                                            : `$ ${(d.package_price || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                                        }
+                                                                        {d.is_frozen && d.frozen_currency === 'COP' && <span className="ml-1 text-[9px] text-blue-400 opacity-70">(est.)</span>}
                                                                     </div>
                                                                 </>
                                                             ) : (
                                                                 <>
                                                                     <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            onClick={() => toggleFreeze(realIdx)}
+                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                            title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
+                                                                        >
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                        </button>
                                                                         <span className="text-gray-500 font-medium text-xs">{d.base_currency}</span>
                                                                         <input
                                                                             type="number"
@@ -681,7 +747,7 @@ const PriceListsPage = () => {
                                                                             min="0"
                                                                             value={d.package_price || ''}
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                 </>
@@ -689,21 +755,42 @@ const PriceListsPage = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        {renderCostDisplay(d.unit_price, d.base_currency, true)}
+                                                        {d.is_frozen && d.frozen_currency === 'COP' && d.frozen_price
+                                                            ? (
+                                                                <div className="flex flex-col items-end leading-tight gap-0.5">
+                                                                    <div className="text-gray-900 font-bold">COP {Math.round(d.frozen_price / (d.units_per_package || 1)).toLocaleString('de-DE')}</div>
+                                                                    <div className="text-gray-500 font-medium text-[11px]">
+                                                                        USD ${((d.frozen_price / (d.units_per_package || 1)) / (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                            : renderCostDisplay(d.unit_price, d.base_currency, true)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="0.1"
-                                                                value={d.margin_percentage || ''}
-                                                                onChange={e => updateDetailPrice(realIdx, 'margin_percentage', e.target.value)}
-                                                                className={`w-20 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent ${d.margin_percentage < 0 ? 'border-red-300 bg-red-50 text-red-700' :
-                                                                    d.margin_percentage === 0 ? 'border-gray-300 text-gray-500' :
-                                                                        'border-green-300 bg-green-50 text-green-700'
-                                                                    }`}
-                                                            />
-                                                            <span className="text-gray-400 text-xs">%</span>
+                                                            {d.is_frozen && d.frozen_currency === 'COP' ? (
+                                                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                                                    {(() => {
+                                                                        const costCop = d.native_currency === 'COP' ? d.package_cost : (d.package_cost * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1));
+                                                                        const margin = costCop > 0 ? ((d.frozen_price - costCop) / costCop * 100) : 0;
+                                                                        return margin.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                                    })()}%
+                                                                </span>
+                                                            ) : (
+                                                                <>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.1"
+                                                                        value={d.margin_percentage || ''}
+                                                                        onChange={e => updateDetailPrice(realIdx, 'margin_percentage', e.target.value)}
+                                                                        className={`w-20 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent ${d.margin_percentage < 0 ? 'border-red-300 bg-red-50 text-red-700' :
+                                                                            d.margin_percentage === 0 ? 'border-gray-300 text-gray-500' :
+                                                                                'border-green-300 bg-green-50 text-green-700'
+                                                                            }`}
+                                                                    />
+                                                                    <span className="text-gray-400 text-xs text-nowrap">%</span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

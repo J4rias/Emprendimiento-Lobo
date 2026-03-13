@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ShoppingCart, Trash2, Plus, Minus, Search, User, CreditCard,
   Banknote, Smartphone, X, UserPlus, Package, Hash, Printer,
-  ChevronDown, ChevronUp, Clock, DollarSign, Repeat
+  ChevronDown, ChevronUp, Clock, DollarSign, Repeat, Lock
 } from 'lucide-react';
 import { productService } from '../services/api/productService';
 import { saleService } from '../services/api/saleService';
@@ -38,13 +38,27 @@ const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
 
   useEffect(() => {
     if (!isFocused) {
-      const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
-      // Always show the PACKAGE price in the editor, even if selling by unit
-      const basePrice = item.package_price;
-      const displayPrice = (basePrice || 0) * rate;
-      setLocalValue(displayCurrency === 'USD' && !basePrice ? '' : displayPrice.toFixed(2));
+      let displayPrice;
+      if (item.is_frozen) {
+        // If frozen, start from the frozen price base
+        const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
+        if (displayCurrency === item.frozen_currency) {
+          displayPrice = baseFrozen;
+        } else {
+          const rate = calculateEffectiveRate(item.frozen_currency, displayCurrency, exchangeRates) || 1;
+          displayPrice = baseFrozen * rate;
+        }
+      } else {
+        // Normal item, start from USD package_price
+        const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
+        const basePrice = item.package_price;
+        displayPrice = (basePrice || 0) * rate;
+      }
+      
+      const isCOP = displayCurrency === 'COP';
+      setLocalValue(displayPrice ? (isCOP ? Math.round(displayPrice).toString() : displayPrice.toFixed(2)) : '');
     }
-  }, [item.package_price, displayCurrency, exchangeRates, isFocused]);
+  }, [item.package_price, item.frozen_price, item.is_frozen, displayCurrency, exchangeRates, isFocused]);
 
   const handleChange = (e) => {
     setLocalValue(e.target.value);
@@ -61,17 +75,22 @@ const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
   };
 
   return (
-    <input
-      type="number"
-      step="0.01"
-      min="0"
-      value={localValue}
-      onChange={handleChange}
-      onFocus={() => setIsFocused(true)}
-      onBlur={handleBlur}
-      className="w-24 text-right bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-semibold text-blue-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
-      title="Editar precio unitario"
-    />
+    <div className="flex items-center gap-1">
+      {item.is_frozen && (
+        <Lock className="w-3 h-3 text-blue-500" title={`Precio congelado en ${item.frozen_currency}`} />
+      )}
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        value={localValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={handleBlur}
+        className={`w-24 text-right bg-white border rounded px-1 py-0.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm ${item.is_frozen ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-gray-700 border-blue-200'}`}
+        title="Editar precio unitario"
+      />
+    </div>
   );
 };
 
@@ -123,18 +142,29 @@ const POSPage = () => {
   }, [exchangeRates]);
 
   // Helper for currency formatting with thousands separator (masks to displayCurrency)
-  const formatMoney = (amount, forceCurrency = null) => {
+  const formatMoney = (amount, forceCurrency = null, item = null) => {
     const targetCurrency = forceCurrency || displayCurrency;
     const currencyDef = CURRENCIES.find(c => c.code === targetCurrency) || CURRENCIES[0];
 
     let displayAmount = parseFloat(amount || 0);
-    if (targetCurrency !== 'USD') {
+
+    if (item && item.is_frozen) {
+      const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
+      if (targetCurrency === item.frozen_currency) {
+        displayAmount = baseFrozen;
+      } else {
+        const rate = calculateEffectiveRate(item.frozen_currency, targetCurrency, exchangeRates);
+        displayAmount = rate !== null ? baseFrozen * rate : baseFrozen;
+      }
+    } else if (targetCurrency !== 'USD') {
       const rate = calculateEffectiveRate('USD', targetCurrency, exchangeRates);
       displayAmount = rate !== null ? displayAmount * rate : displayAmount;
     }
 
     // COP doesn't use decimals in practice, round to 0 to avoid jitter like .25
     const isCOP = targetCurrency === 'COP';
+    if (isCOP) displayAmount = Math.round(displayAmount);
+
     return `${currencyDef.symbol} ${displayAmount.toLocaleString('de-DE', {
       minimumFractionDigits: isCOP ? 0 : 2,
       maximumFractionDigits: isCOP ? 0 : 2
@@ -305,7 +335,13 @@ const POSPage = () => {
       }
     }
 
-    return { pkgPrice, unitPrice };
+    return {
+      pkgPrice,
+      unitPrice,
+      is_frozen: detail?.is_frozen || false,
+      frozen_price: detail?.frozen_price,
+      frozen_currency: detail?.frozen_currency
+    };
   };
 
   const addToCart = (product) => {
@@ -313,7 +349,8 @@ const POSPage = () => {
     if (!pres) { toast.error('Producto sin presentaciones configuradas'); return; }
 
     const { totalUnits, availablePackages, looseUnits, unitsPerPkg } = getProductStock(product, pres);
-    const { pkgPrice, unitPrice } = getPrice(product, pres);
+    const priceInfo = getPrice(product, pres);
+    const { pkgPrice, unitPrice } = priceInfo;
 
     const targetSellByUnit = availablePackages <= 0 && looseUnits > 0;
     const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id && i.sellByUnit === targetSellByUnit);
@@ -345,7 +382,10 @@ const POSPage = () => {
         unit_price_each: unitPrice || (pkgPrice / unitsPerPkg),
         current_price: targetSellByUnit ? (unitPrice || (pkgPrice / unitsPerPkg)) : pkgPrice,
         tax_percent: 0,
-        discount_percent: customer?.discountPercentage || 0
+        discount_percent: customer?.discountPercentage || 0,
+        is_frozen: priceInfo.is_frozen,
+        frozen_price: priceInfo.frozen_price,
+        frozen_currency: priceInfo.frozen_currency
       }]);
     }
   };
@@ -444,30 +484,50 @@ const POSPage = () => {
     ));
   };
 
-  const updatePrice = (pid, presId, sellByUnit, newDisplayPackagePrice) => {
-    let usdPackagePrice = parseFloat(newDisplayPackagePrice) || 0;
-
-    // 1. Normalize the PACKAGE price to USD with high precision (6 decimals)
-    if (displayCurrency !== 'USD') {
-      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
-      if (rate && rate > 0) {
-        usdPackagePrice = Math.round((usdPackagePrice / rate) * 1000000) / 1000000;
-      }
-    }
+  const updatePrice = (pid, presId, sellByUnit, newDisplayValue) => {
+    let rawVal = parseFloat(newDisplayValue) || 0;
 
     setCart(prev => prev.map(i => {
       if (i.product_id === pid && i.presentation_id === presId) {
-        // Calculate the unit price from the new package price
         const unitsPerPkg = i.units_per_package || 1;
-        const usdUnitPrice = Math.round((usdPackagePrice / unitsPerPkg) * 1000000) / 1000000;
+        let usdPackagePrice, usdUnitPrice, newFrozenPrice;
 
-        return {
-          ...i,
-          package_price: usdPackagePrice,
-          unit_price_each: usdUnitPrice,
-          // If selling by unit, current price is the unit price; otherwise it's the package price
-          current_price: i.sellByUnit ? usdUnitPrice : usdPackagePrice
-        };
+        if (i.is_frozen) {
+          // If editing a frozen item, we update the frozen_price in its frozen_currency (likely current displayCurrency)
+          newFrozenPrice = rawVal;
+          const currentFrozenCurrency = displayCurrency;
+          
+          // Also calculate the equivalent USD for internal consistency (totals/backend)
+          const toUSDRate = calculateEffectiveRate(currentFrozenCurrency, 'USD', exchangeRates) || 1;
+          usdPackagePrice = Math.round((newFrozenPrice * toUSDRate) * 1000000) / 1000000;
+          usdUnitPrice = Math.round((usdPackagePrice / unitsPerPkg) * 1000000) / 1000000;
+
+          return {
+            ...i,
+            frozen_price: newFrozenPrice,
+            frozen_currency: currentFrozenCurrency,
+            package_price: usdPackagePrice,
+            unit_price_each: usdUnitPrice,
+            current_price: i.sellByUnit ? usdUnitPrice : usdPackagePrice
+          };
+        } else {
+          // Normal item: normalize display value to USD first
+          let usdVal = rawVal;
+          if (displayCurrency !== 'USD') {
+            const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1;
+            usdVal = usdVal / rate;
+          }
+          
+          usdPackagePrice = Math.round(usdVal * 1000000) / 1000000;
+          usdUnitPrice = Math.round((usdPackagePrice / unitsPerPkg) * 1000000) / 1000000;
+
+          return {
+            ...i,
+            package_price: usdPackagePrice,
+            unit_price_each: usdUnitPrice,
+            current_price: i.sellByUnit ? usdUnitPrice : usdPackagePrice
+          };
+        }
       }
       return i;
     }));
@@ -501,8 +561,18 @@ const POSPage = () => {
   };
 
   // ──────────────────── TOTALS ────────────────────
+  const getEffectiveUSDPrice = (item) => {
+    if (item.is_frozen) {
+      const rate = calculateEffectiveRate(item.frozen_currency, 'USD', exchangeRates);
+      const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
+      return rate !== null ? baseFrozen * rate : item.current_price;
+    }
+    return item.current_price;
+  };
+
   const calculateItemSubtotal = (item) => {
-    const sub = item.quantity * item.current_price;
+    const usdPrice = getEffectiveUSDPrice(item);
+    const sub = item.quantity * usdPrice;
     const disc = sub * (item.discount_percent / 100);
     return sub - disc;
   };
@@ -510,7 +580,8 @@ const POSPage = () => {
   const calculateTotals = useCallback(() => {
     let subtotal = 0, totalDiscount = 0;
     cart.forEach(item => {
-      const sub = item.quantity * item.current_price;
+      const usdPrice = getEffectiveUSDPrice(item);
+      const sub = item.quantity * usdPrice;
       const disc = sub * (item.discount_percent / 100);
       subtotal += sub; totalDiscount += disc;
     });
@@ -581,7 +652,7 @@ const POSPage = () => {
           presentation_id: item.presentation_id,
           quantity: item.quantity,
           is_unit: item.sellByUnit,
-          unit_price: item.current_price,
+          unit_price: getEffectiveUSDPrice(item),
           discount_percent: item.discount_percent,
           tax_percent: item.tax_percent
         })),
@@ -717,7 +788,8 @@ const POSPage = () => {
                 {products.map(product => {
                   const pres = product.presentations?.[0];
                   const { availablePackages, looseUnits, totalUnits, unitsPerPkg } = getProductStock(product, pres);
-                  const { pkgPrice } = getPrice(product, pres);
+                  const priceInfo = getPrice(product, pres);
+                  const pkgPrice = priceInfo.pkgPrice;
                   const lowStock = totalUnits <= unitsPerPkg * 3;
 
                   return (
@@ -743,7 +815,7 @@ const POSPage = () => {
                           {looseUnits > 0 && <span className="text-[9px] text-gray-400">+{looseUnits} uds</span>}
                         </span>
                         <span className="text-sm font-bold text-blue-600">
-                          {formatMoney(pkgPrice)}
+                          {formatMoney(pkgPrice, null, priceInfo)}
                         </span>
                       </div>
                     </div>
@@ -882,7 +954,7 @@ const POSPage = () => {
                         <span className="text-[10px] text-gray-500 mb-1">{formatMoney(item.current_price)} c/u</span>
                       )}
                       <span className="w-32 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
-                        {formatMoney(calculateItemSubtotal(item))}
+                        {formatMoney(calculateItemSubtotal(item), null, item)}
                       </span>
                     </div>
                   </div>

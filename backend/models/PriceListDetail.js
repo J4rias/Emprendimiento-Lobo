@@ -61,6 +61,23 @@ const PriceListDetail = sequelize.define('PriceListDetail', {
         allowNull: false,
         defaultValue: 0,
         comment: 'Margen de ganancia con soporte a 4 decimales'
+    },
+    is_frozen: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: 'Indica si el precio está congelado (fijo)'
+    },
+    frozen_price: {
+        type: DataTypes.DECIMAL(18, 6),
+        allowNull: true,
+        comment: 'Precio congelado'
+    },
+    frozen_currency: {
+        type: DataTypes.STRING(3),
+        allowNull: true,
+        defaultValue: 'USD',
+        comment: 'Moneda en la que se congeló el precio'
     }
 }, {
     tableName: 'price_list_details',
