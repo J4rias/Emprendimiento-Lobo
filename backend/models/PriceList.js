@@ -29,7 +29,7 @@ const PriceList = sequelize.define('PriceList', {
     comment: 'Moneda de la lista de precios'
   },
   basePercentage: {
-    type: DataTypes.DECIMAL(5, 2),
+    type: DataTypes.DECIMAL(12, 4),
     allowNull: false,
     defaultValue: 0,
     comment: 'Porcentaje base de ajuste sobre el costo (+/-)'

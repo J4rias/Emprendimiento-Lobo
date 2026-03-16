@@ -57,7 +57,7 @@ const PriceListDetail = sequelize.define('PriceListDetail', {
         comment: 'Precio unitario (package_price / units_per_package)'
     },
     margin_percentage: {
-        type: DataTypes.DECIMAL(10, 4),
+        type: DataTypes.DECIMAL(12, 4),
         allowNull: false,
         defaultValue: 0,
         comment: 'Margen de ganancia con soporte a 4 decimales'
