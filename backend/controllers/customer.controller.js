@@ -406,23 +406,21 @@ class CustomerController {
         });
       }
 
-      const creditLimit = parseFloat(customer.creditLimit || 0);
       const creditUsed = parseFloat(customer.creditUsed || 0);
-      const availableCredit = Math.max(0, creditLimit - creditUsed);
       const requestedAmount = parseFloat(amount);
-      const hasCredit = customer.hasAvailableCredit(requestedAmount);
 
+      // Sin límite de crédito: siempre aprobado
       res.json({
         success: true,
         data: {
           customerId: id,
           customerName: customer.getFullName(),
-          creditLimit,
+          creditLimit: 0,
           currentBalance: creditUsed,
-          availableCredit,
+          availableCredit: Infinity,
           requestedAmount,
-          hasAvailableCredit: hasCredit,
-          creditStatus: hasCredit ? 'approved' : 'rejected'
+          hasAvailableCredit: true,
+          creditStatus: 'approved'
         }
       });
     } catch (error) {

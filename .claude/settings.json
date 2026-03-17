@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//c/Users/j4rias/Desktop/Emprendimiento/ Lobo/backend/scripts/migrations/**)",
-      "Read(//c/Users/j4rias/Desktop/Emprendimiento/ Lobo/frontend/src/pages/**)",
-      "Read(//c/Users/j4rias/Desktop/Emprendimiento/ Lobo/backend/models/**)"
-    ]
-  }
-}

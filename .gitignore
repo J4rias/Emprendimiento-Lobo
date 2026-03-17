@@ -54,5 +54,8 @@ temp_diff.txt
 # MCP
 .mcp.json
 
+# Claude Code
+.claude/
+
 # Markdown
 *.md

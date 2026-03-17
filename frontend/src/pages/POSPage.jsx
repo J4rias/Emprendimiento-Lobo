@@ -150,11 +150,12 @@ const POSPage = () => {
 
     if (item && item.is_frozen) {
       const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
+      const frozenTotal = baseFrozen * (item.quantity || 1);
       if (targetCurrency === item.frozen_currency) {
-        displayAmount = baseFrozen;
+        displayAmount = frozenTotal;
       } else {
         const rate = calculateEffectiveRate(item.frozen_currency, targetCurrency, exchangeRates);
-        displayAmount = rate !== null ? baseFrozen * rate : baseFrozen;
+        displayAmount = rate !== null ? frozenTotal * rate : frozenTotal;
       }
     } else if (targetCurrency !== 'USD') {
       const rate = calculateEffectiveRate('USD', targetCurrency, exchangeRates);

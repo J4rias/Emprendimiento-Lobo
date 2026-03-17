@@ -90,10 +90,10 @@ exports.createSale = async (req, res) => {
         }
       });
 
-      if (!inventory || inventory.available_quantity < item.quantity) {
+      if (!inventory) {
         await transaction.rollback();
         return res.status(400).json({
-          message: `Stock insuficiente para ${product.name}. Disponible: ${inventory?.available_quantity || 0}`
+          message: `No hay registro de inventario para ${product.name}`
         });
       }
 
@@ -112,10 +112,15 @@ exports.createSale = async (req, res) => {
       // If sold as package, multiply quantity by units_per_package
       const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
 
-      if (inventory.available_quantity < units_to_deduct) {
+      // Cash: check physical stock (quantity). Credit: check available (quantity - reserved).
+      const stockToCheck = sale_type === 'cash'
+        ? parseFloat(inventory.quantity)
+        : inventory.available_quantity;
+
+      if (stockToCheck < units_to_deduct) {
         await transaction.rollback();
         return res.status(400).json({
-          message: `Stock insuficiente para ${product.name}. Necesario: ${units_to_deduct}, Disponible: ${inventory.available_quantity}`
+          message: `Stock insuficiente para ${product.name}. Disponible: ${Math.floor(stockToCheck)}`
         });
       }
 
@@ -136,10 +141,17 @@ exports.createSale = async (req, res) => {
         notes: item.notes || null
       });
 
-      await inventory.update({
-        available_quantity: inventory.available_quantity - units_to_deduct,
-        reserved_quantity: inventory.reserved_quantity + units_to_deduct
-      }, { transaction });
+      if (sale_type === 'cash') {
+        // Cash sale is immediately completed: reduce physical stock
+        await inventory.update({
+          quantity: parseFloat(inventory.quantity) - units_to_deduct
+        }, { transaction });
+      } else {
+        // Credit sale: reserve until payment is collected
+        await inventory.update({
+          reserved_quantity: parseFloat(inventory.reserved_quantity) + units_to_deduct
+        }, { transaction });
+      }
     }
 
     const total = subtotal - discount_amount + tax_amount;
@@ -219,21 +231,6 @@ exports.createSale = async (req, res) => {
             }
           }
         }
-      }
-    }
-
-    if (sale_type === 'cash') {
-      for (const item of items) {
-        const inventory = await Inventory.findOne({
-          where: {
-            product_id: item.product_id,
-            warehouse_id: warehouse_id
-          }
-        });
-
-        await inventory.update({
-          reserved_quantity: inventory.reserved_quantity - item.quantity
-        }, { transaction });
       }
     }
 
@@ -522,13 +519,14 @@ exports.cancelSale = async (req, res) => {
         const units_to_return = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
 
         if (sale.status === 'completed') {
+          // Restore physical stock
           await inventory.update({
-            available_quantity: inventory.available_quantity + units_to_return
+            quantity: parseFloat(inventory.quantity) + units_to_return
           }, { transaction });
         } else if (sale.status === 'pending') {
+          // Release reservation (quantity was never deducted for credit sales)
           await inventory.update({
-            available_quantity: inventory.available_quantity + units_to_return,
-            reserved_quantity: inventory.reserved_quantity - units_to_return
+            reserved_quantity: parseFloat(inventory.reserved_quantity) - units_to_return
           }, { transaction });
         }
       }
@@ -638,7 +636,8 @@ exports.addPayment = async (req, res) => {
         if (inventory) {
           const units_to_unreserve = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
           await inventory.update({
-            reserved_quantity: inventory.reserved_quantity - units_to_unreserve
+            quantity: parseFloat(inventory.quantity) - units_to_unreserve,
+            reserved_quantity: parseFloat(inventory.reserved_quantity) - units_to_unreserve
           }, { transaction });
         }
       }

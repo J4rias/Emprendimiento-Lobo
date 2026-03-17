@@ -57,31 +57,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
     setError(null);
     setCreditValidation(null);
 
-    if (validateCredit && saleAmount > 0) {
-      try {
-        // Credits are managed in COP — convert the USD sale amount to COP
-        const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-        const saleAmountCOP = Math.round(saleAmount * copRate);
-
-        const validation = await customerService.validateCredit(customer.id, saleAmountCOP);
-        const creditData = validation.data || validation;
-        setCreditValidation(creditData);
-
-        if (!creditData.hasAvailableCredit) {
-          const available = Math.round(parseFloat(creditData.availableCredit || 0));
-          setError(
-            `El cliente no tiene crédito suficiente. ` +
-            `Disponible: COP ${available.toLocaleString('de-DE')}, ` +
-            `Requerido: COP ${saleAmountCOP.toLocaleString('de-DE')}`
-          );
-          return;
-        }
-      } catch (err) {
-        setError('Error al validar el crédito del cliente');
-        console.error('Error validating credit:', err);
-        return;
-      }
-    }
+    // Sin límite de crédito: todos los clientes pueden endeudarse sin restricción
 
     onSelect(customer);
     onClose();
