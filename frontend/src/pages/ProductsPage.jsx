@@ -424,6 +424,7 @@ const ProductsPage = () => {
             package_price: presentation.package_price || 0,
             package_cost: presentation.package_cost || 0,
             purchase_currency: presentation.purchase_currency || 'USD',
+            is_default: presentation.is_default || false,
             is_active: presentation.is_active !== undefined ? presentation.is_active : true
           });
 

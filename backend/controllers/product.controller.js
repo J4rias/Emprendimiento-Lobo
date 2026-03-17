@@ -483,13 +483,24 @@ class ProductController {
         if (defaultPresentation) {
           await defaultPresentation.update(presentationData);
         } else {
-          await ProductPresentation.create({
-            product_id: product.id,
-            name: `${product.name} - Presentación estándar`,
-            ...presentationData,
-            is_default: true,
-            is_active: true
+          // Solo crear si no existen presentaciones para este producto
+          const anyPresentation = await ProductPresentation.findOne({
+            where: { product_id: product.id },
+            order: [['id', 'ASC']]
           });
+          if (anyPresentation) {
+            // Ya existen presentaciones — marcar la primera como default en lugar de crear una nueva
+            await anyPresentation.update({ ...presentationData, is_default: true });
+          } else {
+            // Verdaderamente no hay ninguna presentación — crear la estándar
+            await ProductPresentation.create({
+              product_id: product.id,
+              name: `${product.name} - Presentación estándar`,
+              ...presentationData,
+              is_default: true,
+              is_active: true
+            });
+          }
         }
       }
 
@@ -813,6 +824,14 @@ class ProductController {
       // Update units_per_presentation if units_per_package is updated
       if (updateData.units_per_package !== undefined) {
         updateData.units_per_presentation = updateData.units_per_package;
+      }
+
+      // Si se está marcando como default, desmarcar las demás presentaciones del producto
+      if (updateData.is_default === true) {
+        await ProductPresentation.update(
+          { is_default: false },
+          { where: { product_id: presentation.product_id } }
+        );
       }
 
       // Recalcular costo unitario y precio base cuando cambian los valores del paquete
