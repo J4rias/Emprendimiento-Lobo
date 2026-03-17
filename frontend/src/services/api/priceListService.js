@@ -52,5 +52,10 @@ export const priceListService = {
     delete: async (id) => {
         const response = await api.delete(`/price-lists/${id}`);
         return response.data;
+    },
+
+    updateDetail: async (listId, data) => {
+        const response = await api.patch(`/price-lists/${listId}/detail`, data);
+        return response.data;
     }
 };

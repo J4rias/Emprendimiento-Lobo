@@ -17,6 +17,7 @@ class PriceListController {
         this.getById = this.getById.bind(this);
         this.create = this.create.bind(this);
         this.update = this.update.bind(this);
+        this.updateDetail = this.updateDetail.bind(this);
         this.duplicate = this.duplicate.bind(this);
         this.getActive = this.getActive.bind(this);
         this.getProductsWithStock = this.getProductsWithStock.bind(this);
@@ -545,6 +546,74 @@ class PriceListController {
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
             res.setHeader('Content-Disposition', `attachment; filename="lista-precios-${priceList.code}.csv"`);
             res.send('\uFEFF' + csv); // BOM for Excel UTF-8
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // PATCH /api/price-lists/:id/detail
+    async updateDetail(req, res, next) {
+        try {
+            const { id } = req.params;
+            const {
+                presentation_id,
+                product_id,
+                client_updated_at,
+                package_cost,
+                unit_cost,
+                package_price,
+                unit_price,
+                margin_percentage,
+                is_frozen,
+                frozen_price,
+                frozen_currency
+            } = req.body;
+
+            if (!presentation_id || !product_id) {
+                return res.status(400).json({ success: false, message: 'presentation_id y product_id son requeridos' });
+            }
+
+            // Verificar que la lista existe y no está eliminada
+            const priceList = await PriceList.findOne({ where: { id, isDeleted: false } });
+            if (!priceList) {
+                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+            }
+
+            // Buscar el detail existente para optimistic locking
+            const existing = await PriceListDetail.findOne({
+                where: { price_list_id: id, presentation_id }
+            });
+
+            // Optimistic locking: si el DB tiene un updated_at más reciente que el cliente → conflicto
+            if (existing && client_updated_at) {
+                const dbUpdatedAt = new Date(existing.updatedAt).getTime();
+                const clientUpdatedAt = new Date(client_updated_at).getTime();
+                if (dbUpdatedAt > clientUpdatedAt) {
+                    return res.status(409).json({
+                        success: false,
+                        conflict: true,
+                        message: 'Otro usuario modificó este precio. Recarga para ver los cambios.',
+                        current: existing
+                    });
+                }
+            }
+
+            // Upsert: actualiza si existe, inserta si no existe
+            const [detail] = await PriceListDetail.upsert({
+                price_list_id: parseInt(id),
+                presentation_id: parseInt(presentation_id),
+                product_id: parseInt(product_id),
+                package_cost: parseFloat(package_cost) || 0,
+                unit_cost: parseFloat(unit_cost) || 0,
+                package_price: parseFloat(package_price) || 0,
+                unit_price: parseFloat(unit_price) || 0,
+                margin_percentage: parseFloat(margin_percentage) || 0,
+                is_frozen: is_frozen || false,
+                frozen_price: frozen_price ? parseFloat(frozen_price) : null,
+                frozen_currency: frozen_currency || 'USD'
+            }, { returning: true });
+
+            res.json({ success: true, data: detail });
         } catch (error) {
             next(error);
         }

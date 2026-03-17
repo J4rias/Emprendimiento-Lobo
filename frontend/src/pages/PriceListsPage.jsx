@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { priceListService } from '../services/api/priceListService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { useAutoSave } from '../hooks/useAutoSave';
 import Modal from '../components/common/Modal';
 import {
     Tags, Plus, Search, Edit, Trash2, Copy, Download,
@@ -44,6 +45,22 @@ const PriceListsPage = () => {
     const [deletingId, setDeletingId] = useState(null);
 
     const printRef = useRef();
+    const editingListRef = useRef(null); // ref para acceder al valor actual en callbacks estables
+
+    // Auto-save: guarda un detail individual con debounce de 800ms
+    const autoSaveFn = useCallback(
+        (data) => priceListService.updateDetail(editingListRef.current?.id, data),
+        []
+    );
+    const autoSaveOnConflict = useCallback(() => {
+        if (editingListRef.current) openEditor(editingListRef.current); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const { save: autoSaveDetail, status: autoSaveStatus, errorKeys: autoSaveErrorKeys } = useAutoSave({
+        saveFn: autoSaveFn,
+        delay: 800,
+        onConflict: autoSaveOnConflict,
+    });
 
     useEffect(() => {
         fetchLists();
@@ -134,6 +151,7 @@ const PriceListsPage = () => {
                 const res = await priceListService.getById(list.id);
                 const data = res.data;
                 setEditingList(data);
+                editingListRef.current = data;
                 setFormData({
                     name: data.name,
                     description: data.description || '',
@@ -231,6 +249,7 @@ const PriceListsPage = () => {
             } else {
                 // New list logic: use all current stock products
                 setEditingList(null);
+                editingListRef.current = null;
                 setFormData({
                     name: '',
                     description: '',
@@ -269,26 +288,42 @@ const PriceListsPage = () => {
     };
 
     const toggleFreeze = (index) => {
+        const item = { ...details[index] };
+        if (item.is_frozen) {
+            item.is_frozen = false;
+            item.frozen_price = null;
+            item.frozen_currency = 'USD';
+        } else {
+            item.is_frozen = true;
+            const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+            const copPrice = Math.round(item.package_price * rate);
+            item.frozen_price = copPrice;
+            item.frozen_currency = 'COP';
+            item.package_price = copPrice / rate;
+        }
+
         setDetails(prev => {
             const updated = [...prev];
-            const item = { ...updated[index] };
-            if (item.is_frozen) {
-                item.is_frozen = false;
-                item.frozen_price = null;
-                item.frozen_currency = 'USD';
-            } else {
-                item.is_frozen = true;
-                const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-                // Prefer COP for freezing as requested by user
-                const copPrice = Math.round(item.package_price * rate);
-                item.frozen_price = copPrice;
-                item.frozen_currency = 'COP';
-                // Update USD price to match the rounded frozen COP price
-                item.package_price = copPrice / rate;
-            }
             updated[index] = item;
             return updated;
         });
+
+        if (editingListRef.current) {
+            const key = `${item.product_id}-${item.presentation_id}`;
+            autoSaveDetail(key, {
+                product_id: item.product_id,
+                presentation_id: item.presentation_id,
+                package_cost: item.package_cost,
+                unit_cost: item.unit_cost,
+                package_price: item.package_price,
+                unit_price: item.unit_price,
+                margin_percentage: item.margin_percentage,
+                is_frozen: item.is_frozen,
+                frozen_price: item.frozen_price || null,
+                frozen_currency: item.frozen_currency || 'USD',
+                client_updated_at: item.server_updated_at || null
+            });
+        }
     };
 
     const closeEditor = () => {
@@ -316,55 +351,67 @@ const PriceListsPage = () => {
     };
 
     const updateDetailPrice = (index, field, value) => {
+        const item = { ...details[index] };
+        const numVal = parseFloat(value) || 0;
+        const itemCostUsd = getCostInUSD(item.package_cost, item.native_currency);
+
+        if (field === 'package_price') {
+            item.package_price = numVal;
+            item.package_price_cop_str = undefined;
+            item.unit_price = item.units_per_package > 0
+                ? Math.round((numVal / item.units_per_package) * 1000000) / 1000000
+                : 0;
+            item.margin_percentage = itemCostUsd > 0
+                ? Math.round(((numVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
+                : 0;
+        } else if (field === 'package_price_cop') {
+            item.package_price_cop_str = value;
+            const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+            const usdVal = numVal / rate;
+            item.package_price = Math.round(usdVal * 1000000) / 1000000;
+            item.unit_price = item.units_per_package > 0
+                ? Math.round((usdVal / item.units_per_package) * 1000000) / 1000000
+                : 0;
+            item.margin_percentage = itemCostUsd > 0
+                ? Math.round(((usdVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
+                : 0;
+            if (item.is_frozen && item.frozen_currency === 'COP') {
+                item.frozen_price = numVal;
+            }
+        } else if (field === 'margin_percentage') {
+            item.margin_percentage = numVal;
+            item.package_price_cop_str = undefined;
+            item.package_price = itemCostUsd > 0
+                ? Math.round(itemCostUsd * (1 + numVal / 100) * 1000000) / 1000000
+                : 0;
+            item.unit_price = item.units_per_package > 0
+                ? Math.round((item.package_price / item.units_per_package) * 1000000) / 1000000
+                : 0;
+        }
+
         setDetails(prev => {
             const updated = [...prev];
-            const item = { ...updated[index] };
-            const numVal = parseFloat(value) || 0;
-
-            const itemCostUsd = getCostInUSD(item.package_cost, item.native_currency);
-
-            if (field === 'package_price') {
-                item.package_price = numVal;
-                item.package_price_cop_str = undefined;
-                item.unit_price = item.units_per_package > 0
-                    ? Math.round((numVal / item.units_per_package) * 1000000) / 1000000
-                    : 0;
-                item.margin_percentage = itemCostUsd > 0
-                    ? Math.round(((numVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
-                    : 0;
-            } else if (field === 'package_price_cop') {
-                item.package_price_cop_str = value;
-                const rate = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-                const usdVal = numVal / rate;
-                item.package_price = Math.round(usdVal * 1000000) / 1000000;
-                item.unit_price = item.units_per_package > 0
-                    ? Math.round((usdVal / item.units_per_package) * 1000000) / 1000000
-                    : 0;
-                item.margin_percentage = itemCostUsd > 0
-                    ? Math.round(((usdVal - itemCostUsd) / itemCostUsd * 100) * 10000) / 10000
-                    : 0;
-                
-                // Sync frozen_price if item is frozen
-                if (item.is_frozen && item.frozen_currency === 'COP') {
-                    item.frozen_price = numVal;
-                }
-                
-                // Debug log to identify rate discrepancy
-                console.log(`UpdateDetailPrice COP: val=${numVal}, rate=${rate}, usdResult=${usdVal}`);
-            } else if (field === 'margin_percentage') {
-                item.margin_percentage = numVal;
-                item.package_price_cop_str = undefined;
-                item.package_price = itemCostUsd > 0
-                    ? Math.round(itemCostUsd * (1 + numVal / 100) * 1000000) / 1000000
-                    : 0;
-                item.unit_price = item.units_per_package > 0
-                    ? Math.round((item.package_price / item.units_per_package) * 1000000) / 1000000
-                    : 0;
-            }
-
             updated[index] = item;
             return updated;
         });
+
+        // Auto-save solo cuando estamos editando una lista existente
+        if (editingListRef.current) {
+            const key = `${item.product_id}-${item.presentation_id}`;
+            autoSaveDetail(key, {
+                product_id: item.product_id,
+                presentation_id: item.presentation_id,
+                package_cost: item.package_cost,
+                unit_cost: item.unit_cost,
+                package_price: item.package_price,
+                unit_price: item.unit_price,
+                margin_percentage: item.margin_percentage,
+                is_frozen: item.is_frozen,
+                frozen_price: item.frozen_price || null,
+                frozen_currency: item.frozen_currency || 'USD',
+                client_updated_at: item.server_updated_at || null
+            });
+        }
     };
 
     const handleSave = async () => {
@@ -374,27 +421,30 @@ const PriceListsPage = () => {
         }
         try {
             setSaving(true);
-            const payload = {
-                ...formData,
-                renewValidity: true,
-                details: details.map(d => ({
-                    product_id: d.product_id,
-                    presentation_id: d.presentation_id,
-                    package_cost: d.package_cost,
-                    unit_cost: d.unit_cost,
-                    package_price: d.package_price,
-                    unit_price: d.unit_price,
-                    margin_percentage: d.margin_percentage,
-                    is_frozen: d.is_frozen,
-                    frozen_price: d.frozen_price,
-                    frozen_currency: d.frozen_currency
-                }))
-            };
 
             if (editingList) {
+                // Edición: solo guardar el header (los detalles se auto-guardan individualmente)
+                const payload = { ...formData, renewValidity: true };
                 await priceListService.update(editingList.id, payload);
                 toast.success('Lista actualizada exitosamente');
             } else {
+                // Creación: guardar header + todos los detalles en una sola operación
+                const payload = {
+                    ...formData,
+                    renewValidity: true,
+                    details: details.map(d => ({
+                        product_id: d.product_id,
+                        presentation_id: d.presentation_id,
+                        package_cost: d.package_cost,
+                        unit_cost: d.unit_cost,
+                        package_price: d.package_price,
+                        unit_price: d.unit_price,
+                        margin_percentage: d.margin_percentage,
+                        is_frozen: d.is_frozen,
+                        frozen_price: d.frozen_price,
+                        frozen_currency: d.frozen_currency
+                    }))
+                };
                 await priceListService.create(payload);
                 toast.success('Lista creada exitosamente');
             }
@@ -529,7 +579,28 @@ const PriceListsPage = () => {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                        {/* Indicador de auto-guardado (solo en edición) */}
+                        {editingList && (
+                            <div className="flex items-center gap-1.5 text-sm min-w-[110px]">
+                                {autoSaveStatus === 'saving' && (
+                                    <span className="text-blue-500 flex items-center gap-1">
+                                        <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                        Guardando...
+                                    </span>
+                                )}
+                                {autoSaveStatus === 'saved' && (
+                                    <span className="text-green-600 flex items-center gap-1">
+                                        <CheckCircle className="w-3.5 h-3.5" /> Guardado
+                                    </span>
+                                )}
+                                {autoSaveStatus === 'error' && (
+                                    <span className="text-red-600 flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5" /> Error al guardar
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         {editingList && (
                             <>
                                 <button onClick={handlePrint} className="btn-secondary flex items-center gap-2" title="Imprimir">
@@ -546,7 +617,7 @@ const PriceListsPage = () => {
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
                             <Save className="w-4 h-4" />
-                            {saving ? 'Guardando...' : 'Guardar'}
+                            {saving ? 'Guardando...' : editingList ? 'Guardar Info' : 'Guardar'}
                         </button>
                     </div>
                 </div>
@@ -642,9 +713,17 @@ const PriceListsPage = () => {
                                     type="text"
                                     value={detailSearch}
                                     onChange={e => setDetailSearch(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                                     placeholder="Buscar producto..."
                                 />
+                                {detailSearch && (
+                                    <button
+                                        onClick={() => setDetailSearch('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -680,8 +759,10 @@ const PriceListsPage = () => {
                                     ) : (
                                         filteredDetails.map((d, idx) => {
                                             const realIdx = details.findIndex(x => x.presentation_id === d.presentation_id && x.product_id === d.product_id);
+                                            const rowKey = `${d.product_id}-${d.presentation_id}`;
+                                            const hasError = autoSaveErrorKeys.has(rowKey);
                                             return (
-                                                <tr key={`${d.product_id}-${d.presentation_id}`} className="hover:bg-gray-50">
+                                                <tr key={rowKey} className={`hover:bg-gray-50 ${hasError ? 'bg-red-50 border-l-2 border-red-400' : ''}`}>
                                                     <td className="px-4 py-3">
                                                         <div>
                                                             <div className="font-medium text-gray-900">{d.product_name}</div>
@@ -713,8 +794,8 @@ const PriceListsPage = () => {
                                                                             step="100"
                                                                             min="0"
                                                                             value={
-                                                                                d.is_frozen && d.frozen_currency === 'COP' 
-                                                                                ? d.frozen_price 
+                                                                                d.is_frozen && d.frozen_currency === 'COP'
+                                                                                ? (d.frozen_price ?? '')
                                                                                 : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
                                                                             }
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
@@ -769,13 +850,21 @@ const PriceListsPage = () => {
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
                                                             {d.is_frozen && d.frozen_currency === 'COP' ? (
-                                                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                                                <>
                                                                     {(() => {
                                                                         const costCop = d.native_currency === 'COP' ? d.package_cost : (d.package_cost * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1));
                                                                         const margin = costCop > 0 ? ((d.frozen_price - costCop) / costCop * 100) : 0;
-                                                                        return margin.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                                    })()}%
-                                                                </span>
+                                                                        const marginText = margin.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                                        const bgColor = margin < 0 ? 'bg-red-50' : 'bg-blue-50';
+                                                                        const textColor = margin < 0 ? 'text-red-700' : 'text-blue-700';
+                                                                        return (
+                                                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${bgColor} ${textColor}`}>
+                                                                                {marginText}%
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </>
+
                                                             ) : (
                                                                 <>
                                                                     <input
@@ -788,7 +877,7 @@ const PriceListsPage = () => {
                                                                                 'border-green-300 bg-green-50 text-green-700'
                                                                             }`}
                                                                     />
-                                                                    <span className="text-gray-400 text-xs text-nowrap">%</span>
+                                                                    <span className={`text-xs text-nowrap ${d.margin_percentage < 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>%</span>
                                                                 </>
                                                             )}
                                                         </div>
@@ -805,6 +894,7 @@ const PriceListsPage = () => {
             </div>
         );
     }
+
 
     // ===================== LIST VIEW =====================
     return (

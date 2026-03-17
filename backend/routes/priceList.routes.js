@@ -52,6 +52,14 @@ router.put(
     priceListController.update
 );
 
+// Update a single detail (auto-save por fila con optimistic locking)
+router.patch(
+    '/:id/detail',
+    authenticate,
+    authorize('price_lists.update'),
+    priceListController.updateDetail
+);
+
 // Duplicate price list
 router.post(
     '/:id/duplicate',
