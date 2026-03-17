@@ -39,16 +39,18 @@ const Dashboard = () => {
       const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
       setCategoriesStats(categoriesData.data || []);
 
-      // Stats for TODAY
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isoToday = today.toISOString().split('T')[0];
-      const todayStats = await saleService.getSalesStats({ start_date: isoToday }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
+      // Stats for TODAY — use local date to avoid UTC timezone shift
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const todayStart = `${localDate}T00:00:00`;
+      const todayEnd = `${localDate}T23:59:59`;
+      const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
 
       // Stats for MONTH
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const isoMonth = firstDayOfMonth.toISOString().split('T')[0];
-      const monthStatsData = await saleService.getSalesStats({ start_date: isoMonth }).catch(() => ({ stats: { totalRevenue: 0 } }));
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
+      const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenue: 0 } }));
 
       // Pending sales
       const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));

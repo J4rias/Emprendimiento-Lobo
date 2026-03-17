@@ -688,13 +688,19 @@ exports.getSalesStats = async (req, res) => {
       where.sale_date = {
         [Op.between]: [new Date(start_date), new Date(end_date)]
       };
+    } else if (start_date) {
+      where.sale_date = {
+        [Op.gte]: new Date(start_date)
+      };
     }
 
     if (warehouse_id) {
       where.warehouse_id = warehouse_id;
     }
 
-    const totalSales = await Sale.count({ where });
+    const totalSales = await Sale.count({
+      where: { ...where, status: { [Op.in]: ['completed', 'pending'] } }
+    });
 
     const totalRevenue = await Sale.sum('total', {
       where: {
