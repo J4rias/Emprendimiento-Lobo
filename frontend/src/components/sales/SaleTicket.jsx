@@ -50,7 +50,8 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
   // Building ticket HTML
   const ticketHTML = `
     <div style="width: 100%; max-width: 100%; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000; overflow: hidden;">
-      <!-- Header -->
+      <!-- Header (comentado temporalmente) -->
+      ${false ? `
       <div style="text-align: center; margin-bottom: 8px;">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 2px;">${name.toUpperCase()}</div>
         ${ruc || companyInfo.tax_id ? `<div style="font-size: 14px; font-weight: bold;">RIF: ${ruc || companyInfo.tax_id}</div>` : ''}
@@ -59,11 +60,12 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
       </div>
 
       <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+      ` : ''}
 
       <!-- Sale Info -->
       <div style="margin-bottom: 8px; font-size: 13px;">
-        <div style="text-align: center; font-weight: bold; margin-bottom: 4px;">NOTA DE ENTREGA</div>
-        <div><strong>Nro:</strong> ${sale.sale_number || ''}</div>
+        <div style="text-align: center; font-weight: bold; margin-bottom: 4px;">PRESUPUESTO</div>
+        <div><strong>Nro:</strong> ${(sale.sale_number || '').replace(/^VEN/, 'PRE')}</div>
         <div><strong>Fecha:</strong> ${formatDate(sale.sale_date || new Date())}</div>
         
         ${sale.customer ? `
@@ -98,11 +100,10 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
                 <div style="font-weight: bold; line-height: 1.1; margin-bottom: 1px;">
                   ${detail.product?.name || 'Producto'}
                 </div>
-                ${detail.presentation?.name ? `<div style="font-size: 11px; color: #444;">${detail.presentation.name}</div>` : ''}
               </td>
               <td style="text-align: center; padding: 4px 0; vertical-align: top; width: 20%; font-size: 12px;">
                 <div>${Math.round(detail.quantity || 0)} ${unitLabel}</div>
-                <div style="font-size: 10px; color: #666;">x ${tFormat(detail.unit_price || 0)}</div>
+                <div style="font-size: 10px;">x ${tFormat(detail.unit_price || 0)}</div>
               </td>
               <td style="text-align: right; padding: 4px 0; vertical-align: top; width: 25%; font-weight: bold;">
                 <div style="margin-top: 2px;">${tFormat(detail.total || 0)}</div>
@@ -122,22 +123,9 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
         </div>
       </div>
 
-      ${sale.sale_type === 'cash' ? `
-        <div style="margin-bottom: 8px; font-size: 11px;">
-          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-            <span>Efectivo:</span>
-            <span>${tFormat(paid)}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-            <span>Cambio:</span>
-            <span>${tFormat(change)}</span>
-          </div>
-        </div>
-      ` : `
-        <div style="margin-bottom: 8px; text-align: center; font-weight: bold; font-size: 14px;">
-          *** VENTA A CRÉDITO ***
-        </div>
-      `}
+      <div style="margin-bottom: 8px; text-align: center; font-weight: bold; font-size: 14px;">
+        ${sale.sale_type === 'cash' ? '*** APROBADO ***' : '*** PENDIENTE ***'}
+      </div>
 
       ${sale.notes ? `
         <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
