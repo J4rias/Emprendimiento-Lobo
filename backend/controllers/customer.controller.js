@@ -690,9 +690,9 @@ class CustomerController {
           model: Sale,
           as: 'sale',
           where: { customer_id: id },
-          attributes: ['id', 'sale_number']
+          attributes: ['id', 'sale_number', 'exchange_rate']
         }],
-        attributes: ['id', 'payment_date', 'payment_method', 'amount', 'currency', 'reference']
+        attributes: ['id', 'payment_date', 'payment_method', 'amount', 'currency', 'exchange_rate', 'reference']
       });
 
       // 3. Fetch Credit Notes (Refunds/Assets)
@@ -761,7 +761,10 @@ class CustomerController {
       for (const pay of payments) {
         const payCurrency = pay.currency || 'USD';
         const amountOrig = parseFloat(pay.amount || 0);
-        const rate = parseFloat(pay.sale?.exchange_rate || 1);
+        // Use payment's own exchange_rate; if it's 1 (legacy USD records stored with rate=1), fall back to the sale's rate
+        const rate = parseFloat(
+          (pay.exchange_rate && parseFloat(pay.exchange_rate) !== 1) ? pay.exchange_rate : (pay.sale?.exchange_rate || 1)
+        );
 
         let amtUSD, amtCOP;
         if (payCurrency === 'USD') {

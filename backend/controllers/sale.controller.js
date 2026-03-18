@@ -285,7 +285,13 @@ exports.getSales = async (req, res) => {
     const where = {};
 
     if (search) {
-      where.sale_number = { [Op.like]: `%${search}%` };
+      where[Op.or] = [
+        { sale_number: { [Op.like]: `%${search}%` } },
+        { '$customer.first_name$': { [Op.like]: `%${search}%` } },
+        { '$customer.last_name$': { [Op.like]: `%${search}%` } },
+        { '$customer.business_name$': { [Op.like]: `%${search}%` } },
+        { '$customer.document_number$': { [Op.like]: `%${search}%` } }
+      ];
     }
 
     if (status) {
@@ -339,7 +345,8 @@ exports.getSales = async (req, res) => {
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['sale_date', 'DESC']]
+      order: [['sale_date', 'DESC']],
+      subQuery: false
     });
 
     res.json({

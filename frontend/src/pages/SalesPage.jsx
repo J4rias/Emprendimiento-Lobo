@@ -170,18 +170,16 @@ const SalesPage = () => {
       return;
     }
 
-    // Convert COP to USD for payload
     const rate = paymentSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-    const amountUSD = parseFloat(paymentData.amount_cop) / rate;
 
     setSubmittingPayment(true);
     try {
       await saleService.addPayment(paymentSale.id, {
         payment_lines: [{
-          amount: amountUSD,
+          amount: parseFloat(paymentData.amount_cop),
           method: paymentData.method,
-          currency: 'USD',
-          exchange_rate: 1, // Already converted to USD base
+          currency: 'COP',
+          exchange_rate: rate,
           reference: paymentData.reference
         }],
         notes: paymentData.notes
@@ -311,7 +309,7 @@ const SalesPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Buscar por número de venta..."
+                placeholder="Buscar por número de venta o cliente..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -371,7 +369,7 @@ const SalesPage = () => {
                   Tipo
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
+                  Total / Pendiente
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
@@ -422,9 +420,31 @@ const SalesPage = () => {
                       {getSaleTypeBadge(sale.sale_type)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-bold text-gray-900">
-                        {copFormat(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount), sale.exchange_rate)}
-                      </span>
+                      {(() => {
+                        const saleTotal = parseFloat(sale.total) || (parseFloat(sale.subtotal) - parseFloat(sale.discount_amount));
+                        if (sale.sale_type === 'credit') {
+                          const pending = saleTotal - parseFloat(sale.paid_amount || 0);
+                          if (pending > 0.01) {
+                            return (
+                              <div>
+                                <span className="text-sm font-bold text-red-600">
+                                  {copFormat(pending, sale.exchange_rate)}
+                                </span>
+                                {parseFloat(sale.paid_amount || 0) > 0 && (
+                                  <div className="text-[10px] text-gray-400">
+                                    de {copFormat(saleTotal, sale.exchange_rate)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                        }
+                        return (
+                          <span className="text-sm font-bold text-gray-900">
+                            {copFormat(saleTotal, sale.exchange_rate)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(sale.status)}

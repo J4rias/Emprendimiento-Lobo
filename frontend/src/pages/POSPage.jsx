@@ -49,9 +49,9 @@ const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
           displayPrice = baseFrozen * rate;
         }
       } else {
-        // Normal item, start from USD package_price
+        // Normal item: show unit price when in unit mode, package price otherwise
         const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
-        const basePrice = item.package_price;
+        const basePrice = item.sellByUnit ? (item.unit_price_each || item.package_price / item.units_per_package) : item.package_price;
         displayPrice = (basePrice || 0) * rate;
       }
       
@@ -406,9 +406,11 @@ const POSPage = () => {
     setCart(prev => {
       const existingOther = prev.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === targetByUnit);
 
-      // Convert quantity properly based on the new unit
+      // Convert quantity based on the new mode.
+      // package → unit: reset to 1 (user is switching to pick individual units)
+      // unit → package: convert units back to packages
       let convertedQty = targetByUnit
-        ? item.quantity * item.units_per_package
+        ? 1
         : Math.floor(item.quantity / item.units_per_package);
 
       if (!targetByUnit && convertedQty < 1) {
@@ -562,13 +564,25 @@ const POSPage = () => {
   };
 
   // ──────────────────── TOTALS ────────────────────
+
+  // +5% surcharge when selling individual units below half the package quantity.
+  // Rounds to the nearest 100 COP before converting back to USD.
+  const applyUnitSurcharge = (usdUnitPrice, item) => {
+    if (!item.sellByUnit || item.quantity >= item.units_per_package / 2) return usdUnitPrice;
+    const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
+    if (!copRate || copRate <= 0) return usdUnitPrice * 1.05;
+    const copRounded = Math.round(usdUnitPrice * copRate * 1.05 / 100) * 100;
+    return copRounded / copRate;
+  };
+
   const getEffectiveUSDPrice = (item) => {
     if (item.is_frozen) {
       const rate = calculateEffectiveRate(item.frozen_currency, 'USD', exchangeRates);
       const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
-      return rate !== null ? baseFrozen * rate : item.current_price;
+      const usdPrice = rate !== null ? baseFrozen * rate : item.current_price;
+      return applyUnitSurcharge(usdPrice, item);
     }
-    return item.current_price;
+    return applyUnitSurcharge(item.current_price, item);
   };
 
   const calculateItemSubtotal = (item) => {
@@ -594,7 +608,7 @@ const POSPage = () => {
       total: finalTotal,
       totalRaw: finalTotal
     };
-  }, [cart]);
+  }, [cart, exchangeRates]);
 
   const convertToOtherCurrency = (usdAmount, targetCurrency) => {
     const rate = getEffectiveRate('USD', targetCurrency);
@@ -899,18 +913,25 @@ const POSPage = () => {
 
                 {/* Row 2: mode toggle + qty + subtotal */}
                 <div className="flex items-center justify-between gap-2">
-                  {/* Package/Unit toggle */}
-                  <button
-                    onClick={() => toggleSellMode(item.product_id, item.presentation_id, item.sellByUnit)}
-                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition ${item.sellByUnit
-                      ? 'bg-violet-100 text-violet-700'
-                      : 'bg-blue-100 text-blue-700'
-                      }`}
-                    title={item.sellByUnit ? `Vendiendo por unidad` : `Vendiendo por paquete (${item.units_per_package} uds)`}
-                  >
-                    {item.sellByUnit ? <Hash className="w-3 h-3" /> : <Package className="w-3 h-3" />}
-                    {item.sellByUnit ? 'Und' : 'Paq'}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {/* Package/Unit toggle */}
+                    <button
+                      onClick={() => toggleSellMode(item.product_id, item.presentation_id, item.sellByUnit)}
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition ${item.sellByUnit
+                        ? 'bg-violet-100 text-violet-700'
+                        : 'bg-blue-100 text-blue-700'
+                        }`}
+                      title={item.sellByUnit ? `Vendiendo por unidad` : `Vendiendo por paquete (${item.units_per_package} uds)`}
+                    >
+                      {item.sellByUnit ? <Hash className="w-3 h-3" /> : <Package className="w-3 h-3" />}
+                      {item.sellByUnit ? 'Und' : 'Paq'}
+                    </button>
+                    {item.sellByUnit && item.quantity < item.units_per_package / 2 && (
+                      <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 py-0.5 leading-none" title={`Recargo del 5% por compra menor a ${Math.ceil(item.units_per_package / 2)} unidades`}>
+                        +5%
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {/* Qty Controls */}
@@ -955,7 +976,7 @@ const POSPage = () => {
                         <span className="text-[10px] text-gray-500 mb-1">{formatMoney(item.current_price)} c/u</span>
                       )}
                       <span className="w-32 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
-                        {formatMoney(calculateItemSubtotal(item), null, item)}
+                        {formatMoney(calculateItemSubtotal(item))}
                       </span>
                     </div>
                   </div>

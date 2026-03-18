@@ -138,8 +138,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
 
       <!-- Footer -->
       <div style="text-align: center; margin-top: 8px; font-size: 11px;">
-        <div style="font-weight: bold;">¡GRACIAS POR SU COMPRA!</div>
-        <div style="margin-top: 8px; font-size: 10px;">
+<div style="margin-top: 8px; font-size: 10px;">
           Fecha de impresión: ${formatDate(new Date())}
         </div>
       </div>
