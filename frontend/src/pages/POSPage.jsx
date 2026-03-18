@@ -305,11 +305,16 @@ const POSPage = () => {
   // ──────────────────── CART LOGIC ────────────────────
   const getProductStock = (product, presentation) => {
     const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity), 0);
+    const availableUnits = (product.inventories || []).reduce((s, i) => {
+      const avail = parseFloat(i.quantity) - parseFloat(i.reserved_quantity || 0);
+      return s + avail;
+    }, 0);
     const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
     return {
       totalUnits,
-      availablePackages: Math.floor(totalUnits / unitsPerPkg),
-      looseUnits: totalUnits % unitsPerPkg,
+      availableUnits,
+      availablePackages: Math.floor(availableUnits / unitsPerPkg),
+      looseUnits: availableUnits % unitsPerPkg,
       unitsPerPkg
     };
   };
@@ -349,11 +354,22 @@ const POSPage = () => {
     const pres = product.presentations?.[0];
     if (!pres) { toast.error('Producto sin presentaciones configuradas'); return; }
 
-    const { totalUnits, availablePackages, looseUnits, unitsPerPkg } = getProductStock(product, pres);
+    const { totalUnits, availableUnits, unitsPerPkg } = getProductStock(product, pres);
     const priceInfo = getPrice(product, pres);
     const { pkgPrice, unitPrice } = priceInfo;
 
-    const targetSellByUnit = availablePackages <= 0 && looseUnits > 0;
+    // For credit sales use available (physical - reserved); cash uses physical stock
+    const effectiveUnits = saleType === 'credit' ? availableUnits : totalUnits;
+    const effectivePkgs = Math.floor(effectiveUnits / unitsPerPkg);
+    const effectiveLoose = effectiveUnits % unitsPerPkg;
+
+    const targetSellByUnit = effectivePkgs <= 0 && effectiveLoose > 0;
+
+    if (effectiveUnits <= 0) {
+      toast.error(`Sin stock disponible para ${product.name}`);
+      return;
+    }
+
     const existing = cart.find(i => i.product_id === product.id && i.presentation_id === pres.id && i.sellByUnit === targetSellByUnit);
 
     const currentTotalUnitsInCart = cart.filter(i => i.product_id === product.id && i.presentation_id === pres.id)
@@ -361,8 +377,8 @@ const POSPage = () => {
 
     const unitsToAdd = targetSellByUnit ? 1 : unitsPerPkg;
 
-    if (currentTotalUnitsInCart + unitsToAdd > totalUnits) {
-      toast.error(`Stock global insuficiente. Disponibles: ${totalUnits} unidades totales`);
+    if (currentTotalUnitsInCart + unitsToAdd > effectiveUnits) {
+      toast.error(`Stock insuficiente para ${product.name}. Disponibles: ${Math.floor(effectiveUnits)} unidades`);
       return;
     }
 
@@ -376,8 +392,8 @@ const POSPage = () => {
         presentation_name: pres.name,
         units_per_package: unitsPerPkg,
         quantity: 1,
-        stock_units: totalUnits,
-        stock_packages: availablePackages,
+        stock_units: effectiveUnits,
+        stock_packages: effectivePkgs,
         sellByUnit: targetSellByUnit,
         package_price: pkgPrice,
         unit_price_each: unitPrice || (pkgPrice / unitsPerPkg),
