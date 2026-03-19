@@ -305,16 +305,12 @@ const POSPage = () => {
   // ──────────────────── CART LOGIC ────────────────────
   const getProductStock = (product, presentation) => {
     const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity), 0);
-    const availableUnits = (product.inventories || []).reduce((s, i) => {
-      const avail = parseFloat(i.quantity) - parseFloat(i.reserved_quantity || 0);
-      return s + avail;
-    }, 0);
     const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
     return {
       totalUnits,
-      availableUnits,
-      availablePackages: Math.floor(availableUnits / unitsPerPkg),
-      looseUnits: availableUnits % unitsPerPkg,
+      availableUnits: totalUnits,
+      availablePackages: Math.floor(totalUnits / unitsPerPkg),
+      looseUnits: totalUnits % unitsPerPkg,
       unitsPerPkg
     };
   };
@@ -392,7 +388,8 @@ const POSPage = () => {
         presentation_name: pres.name,
         units_per_package: unitsPerPkg,
         quantity: 1,
-        stock_units: effectiveUnits,
+        stock_units: totalUnits,
+        available_units: availableUnits,
         stock_packages: effectivePkgs,
         sellByUnit: targetSellByUnit,
         package_price: pkgPrice,
@@ -581,13 +578,13 @@ const POSPage = () => {
 
   // ──────────────────── TOTALS ────────────────────
 
-  // +5% surcharge when selling individual units below half the package quantity.
+  // +7% surcharge when selling individual units below half the package quantity.
   // Rounds to the nearest 100 COP before converting back to USD.
   const applyUnitSurcharge = (usdUnitPrice, item) => {
     if (!item.sellByUnit || item.quantity >= item.units_per_package / 2) return usdUnitPrice;
     const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
-    if (!copRate || copRate <= 0) return usdUnitPrice * 1.05;
-    const copRounded = Math.round(usdUnitPrice * copRate * 1.05 / 100) * 100;
+    if (!copRate || copRate <= 0) return usdUnitPrice * 1.07;
+    const copRounded = Math.round(usdUnitPrice * copRate * 1.07 / 100) * 100;
     return copRounded / copRate;
   };
 
@@ -665,6 +662,18 @@ const POSPage = () => {
     if (saleType === 'cash' && paidUSD < totalAmount - 0.01) {
       toast.error(`Monto insuficiente. Faltan: $ ${(totalAmount - paidUSD).toFixed(2)}`);
       return;
+    }
+
+    // Pre-submit stock check for credit sales (uses available = physical - reserved)
+    if (saleType === 'credit') {
+      for (const item of cart) {
+        const itemUnits = item.sellByUnit ? item.quantity : item.quantity * item.units_per_package;
+        const avail = item.available_units ?? item.stock_units;
+        if (avail < itemUnits) {
+          toast.error(`Sin stock disponible para ${item.product_name}. Disponible: ${Math.floor(avail)} unidades (hay reservas pendientes)`);
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -943,8 +952,8 @@ const POSPage = () => {
                       {item.sellByUnit ? 'Und' : 'Paq'}
                     </button>
                     {item.sellByUnit && item.quantity < item.units_per_package / 2 && (
-                      <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 py-0.5 leading-none" title={`Recargo del 5% por compra menor a ${Math.ceil(item.units_per_package / 2)} unidades`}>
-                        +5%
+                      <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 py-0.5 leading-none" title={`Recargo del 7% por compra menor a ${Math.ceil(item.units_per_package / 2)} unidades`}>
+                        +7%
                       </span>
                     )}
                   </div>

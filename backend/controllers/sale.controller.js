@@ -112,10 +112,8 @@ exports.createSale = async (req, res) => {
       // If sold as package, multiply quantity by units_per_package
       const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
 
-      // Cash: check physical stock (quantity). Credit: check available (quantity - reserved).
-      const stockToCheck = sale_type === 'cash'
-        ? parseFloat(inventory.quantity)
-        : inventory.available_quantity;
+      // Both cash and credit reduce physical stock immediately (goods leave warehouse)
+      const stockToCheck = parseFloat(inventory.quantity);
 
       if (stockToCheck < units_to_deduct) {
         await transaction.rollback();
@@ -141,17 +139,10 @@ exports.createSale = async (req, res) => {
         notes: item.notes || null
       });
 
-      if (sale_type === 'cash') {
-        // Cash sale is immediately completed: reduce physical stock
-        await inventory.update({
-          quantity: parseFloat(inventory.quantity) - units_to_deduct
-        }, { transaction });
-      } else {
-        // Credit sale: reserve until payment is collected
-        await inventory.update({
-          reserved_quantity: parseFloat(inventory.reserved_quantity) + units_to_deduct
-        }, { transaction });
-      }
+      // Both cash and credit reduce physical stock immediately (goods leave warehouse on sale)
+      await inventory.update({
+        quantity: parseFloat(inventory.quantity) - units_to_deduct
+      }, { transaction });
     }
 
     const total = subtotal - discount_amount + tax_amount;
@@ -525,15 +516,10 @@ exports.cancelSale = async (req, res) => {
       if (inventory) {
         const units_to_return = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
 
-        if (sale.status === 'completed') {
-          // Restore physical stock
+        if (sale.status === 'completed' || sale.status === 'pending' || sale.status === 'partial') {
+          // Restore physical stock (goods return to warehouse on cancellation)
           await inventory.update({
             quantity: parseFloat(inventory.quantity) + units_to_return
-          }, { transaction });
-        } else if (sale.status === 'pending') {
-          // Release reservation (quantity was never deducted for credit sales)
-          await inventory.update({
-            reserved_quantity: parseFloat(inventory.reserved_quantity) - units_to_return
           }, { transaction });
         }
       }
@@ -640,13 +626,8 @@ exports.addPayment = async (req, res) => {
           }
         });
 
-        if (inventory) {
-          const units_to_unreserve = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
-          await inventory.update({
-            quantity: parseFloat(inventory.quantity) - units_to_unreserve,
-            reserved_quantity: parseFloat(inventory.reserved_quantity) - units_to_unreserve
-          }, { transaction });
-        }
+        // No inventory change needed: stock was already reduced when the credit sale was created
+        void inventory;
       }
     }
 
