@@ -32,7 +32,7 @@ router.get(
 router.get(
     '/:id',
     authenticate,
-    authorize('price_lists.view'),
+    authorize('price_lists.view', 'sales.create'),
     priceListController.getById
 );
 
