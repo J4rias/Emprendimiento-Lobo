@@ -497,22 +497,32 @@ const POSPage = () => {
             </div>
 
             {/* Lista de precios */}
-            {selectedPriceList ? (
-              <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900">
-                {priceLists.find(l => l.id === selectedPriceList)?.name || 'Lista de precios'}
-              </div>
-            ) : (
-              <select
-                value={selectedPriceList || ''}
-                onChange={(e) => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Selecciona lista de precios</option>
-                {priceLists.map((list) => (
-                  <option key={list.id} value={list.id}>{list.name}</option>
-                ))}
-              </select>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedPriceList ? (
+                <>
+                  <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900">
+                    {priceLists.find(l => l.id === selectedPriceList)?.name || 'Lista de precios'}
+                  </div>
+                  <button
+                    onClick={() => selectPriceList(null)}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    Cambiar
+                  </button>
+                </>
+              ) : (
+                <select
+                  value={selectedPriceList || ''}
+                  onChange={(e) => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecciona lista de precios</option>
+                  {priceLists.map((list) => (
+                    <option key={list.id} value={list.id}>{list.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
         </div>
       </div>
