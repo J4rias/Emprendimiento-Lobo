@@ -513,10 +513,10 @@ const POSPage = () => {
               ) : (
                 <select
                   value={selectedPriceList || ''}
-                  onChange={(e) => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
+                  onChange={(e) => selectPriceList(parseInt(e.target.value))}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Selecciona lista de precios</option>
+                  <option value="" disabled>Selecciona lista de precios</option>
                   {priceLists.map((list) => (
                     <option key={list.id} value={list.id}>{list.name}</option>
                   ))}
