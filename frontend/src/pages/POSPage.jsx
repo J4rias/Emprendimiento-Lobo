@@ -497,16 +497,22 @@ const POSPage = () => {
             </div>
 
             {/* Lista de precios */}
-            <select
-              value={selectedPriceList || ''}
-              onChange={(e) => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Selecciona lista de precios</option>
-              {priceLists.map((list) => (
-                <option key={list.id} value={list.id}>{list.name}</option>
-              ))}
-            </select>
+            {selectedPriceList ? (
+              <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900">
+                {priceLists.find(l => l.id === selectedPriceList)?.name || 'Lista de precios'}
+              </div>
+            ) : (
+              <select
+                value={selectedPriceList || ''}
+                onChange={(e) => selectPriceList(e.target.value ? parseInt(e.target.value) : null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Selecciona lista de precios</option>
+                {priceLists.map((list) => (
+                  <option key={list.id} value={list.id}>{list.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </div>
