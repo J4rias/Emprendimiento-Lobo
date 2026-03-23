@@ -850,6 +850,14 @@ function CheckoutModal({
 
   if (!show) return null;
 
+  const getCustomerDisplayName = (c) => {
+    if (!c) return null;
+    if (c.type === 'natural') {
+      return `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Sin nombre';
+    }
+    return c.businessName || c.tradeName || 'Sin nombre';
+  };
+
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
@@ -926,7 +934,7 @@ function CheckoutModal({
             }`}
           >
             <User className="w-4 h-4" />
-            {customer ? `${customer.name || customer.full_name}` : 'Seleccionar cliente'}
+            {customer ? getCustomerDisplayName(customer) : 'Seleccionar cliente'}
           </button>
           {customer && (
             <button
@@ -1025,7 +1033,7 @@ function CheckoutModal({
         {saleType === 'credit' && (
           <div className={`rounded-lg p-3 text-sm border ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
             {customer
-              ? <p>Se cargará <strong>{displaySymbol} {fmt(totalDisplay)}</strong> al crédito de <strong>{customer.name || customer.full_name}</strong></p>
+              ? <p>Se cargará <strong>{displaySymbol} {fmt(totalDisplay)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
               : <p className="font-medium">Selecciona un cliente para ventas a crédito</p>
             }
           </div>
