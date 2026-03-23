@@ -173,7 +173,7 @@ const POSPage = () => {
       setLoadingProducts(true);
       const res = await productService.getAll({
         search: searchTerm,
-        limit: 50,
+        limit: 1000,
         is_active: true,
         price_list_id: selectedPriceList || undefined,
       });
