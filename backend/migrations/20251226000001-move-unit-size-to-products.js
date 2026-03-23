@@ -2,19 +2,25 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // 1. Add unit_size and unit_size_measure to products table
-    await queryInterface.addColumn('products', 'unit_size', {
-      type: Sequelize.DECIMAL(10, 2),
-      allowNull: true,
-      comment: 'Tamaño de la unidad individual (ej: 500 para 500ml)'
-    });
+    // 1. Add unit_size and unit_size_measure to products table (skip if already exist)
+    const table = await queryInterface.describeTable('products');
 
-    await queryInterface.addColumn('products', 'unit_size_measure', {
-      type: Sequelize.STRING(20),
-      allowNull: true,
-      defaultValue: 'UND',
-      comment: 'Medida del tamaño (UND, LT, ML, KG, GR, OZ, etc.)'
-    });
+    if (!table.unit_size) {
+      await queryInterface.addColumn('products', 'unit_size', {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: true,
+        comment: 'Tamaño de la unidad individual (ej: 500 para 500ml)'
+      });
+    }
+
+    if (!table.unit_size_measure) {
+      await queryInterface.addColumn('products', 'unit_size_measure', {
+        type: Sequelize.STRING(20),
+        allowNull: true,
+        defaultValue: 'UND',
+        comment: 'Medida del tamaño (UND, LT, ML, KG, GR, OZ, etc.)'
+      });
+    }
 
     // 2. Migrate data from product_presentations to products
     // Copy unit_size from the default presentation to the product
@@ -27,9 +33,15 @@ module.exports = {
       WHERE pp.unit_size IS NOT NULL
     `);
 
-    // 3. Remove unit_size and unit_size_measure from product_presentations table
-    await queryInterface.removeColumn('product_presentations', 'unit_size');
-    await queryInterface.removeColumn('product_presentations', 'unit_size_measure');
+    // 3. Remove unit_size and unit_size_measure from product_presentations table (skip if not exist)
+    const ppTable = await queryInterface.describeTable('product_presentations');
+
+    if (ppTable.unit_size) {
+      await queryInterface.removeColumn('product_presentations', 'unit_size');
+    }
+    if (ppTable.unit_size_measure) {
+      await queryInterface.removeColumn('product_presentations', 'unit_size_measure');
+    }
   },
 
   down: async (queryInterface, Sequelize) => {

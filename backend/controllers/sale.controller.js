@@ -1,4 +1,4 @@
-const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, sequelize } = require('../models');
+const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 const generateSaleNumber = async () => {
@@ -64,6 +64,10 @@ exports.createSale = async (req, res) => {
       return res.status(400).json({ message: 'Debe especificar el depósito' });
     }
 
+    // Extract POS session info once (used inside loop and after commit)
+    const session_id = req.body.session_id;
+    const tab_id = req.body.tab_id;
+
     const sale_number = await generateSaleNumber();
 
     let subtotal = 0;
@@ -87,7 +91,9 @@ exports.createSale = async (req, res) => {
         where: {
           product_id: item.product_id,
           warehouse_id: warehouse_id
-        }
+        },
+        lock: transaction.LOCK.UPDATE,  // SELECT FOR UPDATE (bloqueo de fila)
+        transaction                     // ← necesario para que el lock sea parte de la transacción
       });
 
       if (!inventory) {
@@ -112,13 +118,35 @@ exports.createSale = async (req, res) => {
       // If sold as package, multiply quantity by units_per_package
       const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
 
-      // Both cash and credit reduce physical stock immediately (goods leave warehouse)
-      const stockToCheck = parseFloat(inventory.quantity);
+      // Validar disponibilidad considerando reservas de OTROS tabs
+      // (las reservas de ESTA tab se liberarán al finalizar la venta)
+      // NOT (session_id = A AND tab_id = B)  ≡  (session_id != A  OR  tab_id != B)
+      let reserved_by_others = 0;
+      if (session_id && tab_id) {
+        reserved_by_others = await PosReservation.sum('units_reserved', {
+          where: {
+            product_id: item.product_id,
+            [Op.or]: [
+              { session_id: { [Op.ne]: session_id } },
+              { tab_id: { [Op.ne]: tab_id } }
+            ]
+          },
+          transaction
+        }) || 0;
+      }
 
-      if (stockToCheck < units_to_deduct) {
+      const available = parseFloat(inventory.quantity) - parseFloat(reserved_by_others);
+
+      if (available < units_to_deduct) {
         await transaction.rollback();
-        return res.status(400).json({
-          message: `Stock insuficiente para ${product.name}. Disponible: ${Math.floor(stockToCheck)}`
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          message: `Stock insuficiente para ${product.name}. Otro vendedor reservó parte del stock.`,
+          product_name: product.name,
+          available: Math.max(0, available),
+          requested: units_to_deduct,
+          reserved_by_others: parseFloat(reserved_by_others)
         });
       }
 
@@ -226,6 +254,40 @@ exports.createSale = async (req, res) => {
     }
 
     await transaction.commit();
+
+    // Release POS reservations for this tab (session_id and tab_id declared above the for loop)
+    const affected_product_ids = [];
+
+    if (session_id && tab_id) {
+      // Get all products affected by this tab's reservations
+      const reservations = await PosReservation.findAll({
+        where: { session_id, tab_id },
+        attributes: ['product_id']
+      });
+
+      affected_product_ids.push(...reservations.map(r => r.product_id));
+
+      // Delete all reservations for this tab
+      await PosReservation.destroy({
+        where: { session_id, tab_id }
+      });
+
+      // Emit Socket.io event to notify clients
+      const io = req.app.get('io');
+      if (io) {
+        for (const product_id of affected_product_ids) {
+          const totalReserved = await PosReservation.sum('units_reserved', {
+            where: { product_id }
+          }) || 0;
+
+          io.to('pos-room').emit('reservation:changed', {
+            product_id,
+            total_reserved: totalReserved,
+            action: 'sale_completed'
+          });
+        }
+      }
+    }
 
     const createdSale = await Sale.findByPk(sale.id, {
       include: [

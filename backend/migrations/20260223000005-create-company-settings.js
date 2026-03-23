@@ -2,51 +2,25 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('company_settings', {
-      id: {
-        type: Sequelize.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-        allowNull: false,
-      },
-      name: {
-        type: Sequelize.STRING(150),
-        allowNull: false,
-        defaultValue: 'Mi Empresa',
-      },
-      address: {
-        type: Sequelize.STRING(255),
-        allowNull: true,
-      },
-      phone: {
-        type: Sequelize.STRING(50),
-        allowNull: true,
-      },
-      email: {
-        type: Sequelize.STRING(100),
-        allowNull: true,
-      },
-      tax_id: {
-        type: Sequelize.STRING(50),
-        allowNull: true,
-      },
-      website: {
-        type: Sequelize.STRING(150),
-        allowNull: true,
-      },
-      created_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-      },
-      updated_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-      },
-    });
+    // Check if table already exists
+    const tableExists = await queryInterface.tableExists('company_settings');
+    if (tableExists) return;
 
-    // Insertar fila default
+    await queryInterface.sequelize.query(`
+      CREATE TABLE company_settings (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(150) NOT NULL DEFAULT 'Mi Empresa',
+        address VARCHAR(255),
+        phone VARCHAR(50),
+        email VARCHAR(100),
+        tax_id VARCHAR(50),
+        website VARCHAR(150),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Insert default row
     await queryInterface.bulkInsert('company_settings', [{
       id: 1,
       name: 'Mi Empresa',

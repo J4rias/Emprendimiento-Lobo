@@ -38,6 +38,7 @@ const CreditNoteDetail = require('./CreditNoteDetail');
 const Delivery = require('./Delivery');
 const DeliveryDetail = require('./DeliveryDetail');
 const CompanySettings = require('./CompanySettings');
+const PosReservation = require('./PosReservation');
 
 // Define associations
 
@@ -409,4 +410,5 @@ module.exports = {
   Delivery,
   DeliveryDetail,
   CompanySettings,
+  PosReservation,
 };
