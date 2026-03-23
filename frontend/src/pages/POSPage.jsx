@@ -872,6 +872,7 @@ function CheckoutModal({
   };
 
   return (
+    <>
     <Modal isOpen={show} onClose={onClose} title="Confirmar Venta">
       <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
 
@@ -1064,6 +1065,7 @@ function CheckoutModal({
         setShowCustomerSearch(false);
       }}
     />
+    </>
   );
 }
 
