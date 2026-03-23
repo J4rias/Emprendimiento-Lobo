@@ -241,7 +241,7 @@ const POSPage = () => {
   const loadProducts = async () => {
     try {
       const data = await productService.getAll({
-        search: searchTerm, limit: 50, is_active: true,
+        search: searchTerm, limit: 1000, is_active: true,
         price_list_id: selectedPriceList || undefined
       });
       const results = data.products || data.data || [];
