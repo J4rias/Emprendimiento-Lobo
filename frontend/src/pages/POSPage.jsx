@@ -961,23 +961,21 @@ const POSPage = () => {
                   </div>
                 </div>
 
-                {/* Row 3: discount (optional) */}
-                {(customer?.discountPercentage > 0 || item.discount_percent > 0) && (
-                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
-                    <span className="text-gray-500">Descuento:</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.discount_percent || 0}
-                        onChange={(e) => updateDiscount(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
-                        className="w-10 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-blue-500"
-                      />
-                      <span className="text-gray-400">%</span>
-                    </div>
+                {/* Row 3: discount */}
+                <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                  <span className="text-gray-500">Descuento:</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={item.discount_percent || 0}
+                      onChange={(e) => updateDiscount(item.product_id, item.presentation_id, item.sellByUnit, e.target.value)}
+                      className="w-10 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-400">%</span>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
