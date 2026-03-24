@@ -562,13 +562,24 @@ const POSPage = () => {
   };
 
   // ──────────────────── TOTALS ────────────────────
+  // +7% surcharge when selling individual units below half the package quantity.
+  // Rounds to the nearest 100 COP before converting back to USD.
+  const applyUnitSurcharge = (usdUnitPrice, item) => {
+    if (!item.sellByUnit || item.quantity >= item.units_per_package / 2) return usdUnitPrice;
+    const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
+    if (!copRate || copRate <= 0) return usdUnitPrice * 1.07;
+    const copRounded = Math.round(usdUnitPrice * copRate * 1.07 / 100) * 100;
+    return copRounded / copRate;
+  };
+
   const getEffectiveUSDPrice = (item) => {
     if (item.is_frozen) {
       const rate = calculateEffectiveRate(item.frozen_currency, 'USD', exchangeRates);
       const baseFrozen = item.sellByUnit ? (item.frozen_price / item.units_per_package) : item.frozen_price;
-      return rate !== null ? baseFrozen * rate : item.current_price;
+      const usdPrice = rate !== null ? baseFrozen * rate : item.current_price;
+      return applyUnitSurcharge(usdPrice, item);
     }
-    return item.current_price;
+    return applyUnitSurcharge(item.current_price, item);
   };
 
   const calculateItemSubtotal = (item) => {
