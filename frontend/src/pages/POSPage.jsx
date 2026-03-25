@@ -49,12 +49,12 @@ const PriceEditor = ({ item, displayCurrency, exchangeRates, updatePrice }) => {
           displayPrice = baseFrozen * rate;
         }
       } else {
-        // Normal item, start from USD package_price
+        // Normal item: show unit price when in unit mode, package price otherwise
         const rate = displayCurrency === 'USD' ? 1 : (calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
-        const basePrice = item.package_price;
+        const basePrice = item.sellByUnit ? (item.unit_price_each || item.package_price / item.units_per_package) : item.package_price;
         displayPrice = (basePrice || 0) * rate;
       }
-      
+
       const isCOP = displayCurrency === 'COP';
       setLocalValue(displayPrice ? (isCOP ? Math.round(displayPrice).toString() : displayPrice.toFixed(2)) : '');
     }
@@ -922,6 +922,11 @@ const POSPage = () => {
                     {item.sellByUnit ? <Hash className="w-3 h-3" /> : <Package className="w-3 h-3" />}
                     {item.sellByUnit ? 'Und' : 'Paq'}
                   </button>
+                  {item.sellByUnit && item.quantity < item.units_per_package / 2 && (
+                    <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 py-0.5 leading-none" title={`Recargo del 7% por compra menor a ${Math.ceil(item.units_per_package / 2)} unidades`}>
+                      +7%
+                    </span>
+                  )}
 
                   <div className="flex items-center gap-2">
                     {/* Qty Controls */}

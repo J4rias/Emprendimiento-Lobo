@@ -29,7 +29,8 @@ const io = new Server(httpServer, {
 app.set('io', io);
 
 // Load Socket.io handlers
-require('./socket/posSocket')(io);
+// NOTE: Disabled while legacy POS is active — re-enable when new POS is deployed
+// require('./socket/posSocket')(io);
 
 // Start server
 const startServer = async () => {
