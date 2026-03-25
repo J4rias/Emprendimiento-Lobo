@@ -27,8 +27,11 @@ const UsersPage = () => {
   const API_URL = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
-    fetchUsers();
-    fetchRoles();
+    const timer = setTimeout(() => {
+      fetchUsers();
+      fetchRoles();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [search, roleFilter]);
 
   const fetchUsers = async () => {

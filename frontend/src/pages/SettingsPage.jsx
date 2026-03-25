@@ -76,9 +76,12 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
-    fetchRoles();
-    fetchPermissions();
-    fetchUsers();
+    const timer = setTimeout(() => {
+      fetchRoles();
+      fetchPermissions();
+      fetchUsers();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [userSearch, userRoleFilter]);
 
   const fetchUsers = async () => {

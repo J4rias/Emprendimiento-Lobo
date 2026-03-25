@@ -14,6 +14,7 @@ const InventoryPage = () => {
   const { token } = useAuth();
   const [selectedWarehouse, setSelectedWarehouse] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     lowStock: false,
@@ -31,11 +32,18 @@ const InventoryPage = () => {
     { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
   ];
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const { data: inventoryData, isLoading } = useQuery({
-    queryKey: ['inventory', selectedWarehouse, searchTerm, filters],
+    queryKey: ['inventory', selectedWarehouse, debouncedSearchTerm, filters],
     queryFn: () =>
       inventoryService.getByWarehouse(selectedWarehouse, {
-        search: searchTerm,
+        search: debouncedSearchTerm,
         low_stock: filters.lowStock,
         expiring: filters.expiring,
         out_of_stock: filters.outOfStock,

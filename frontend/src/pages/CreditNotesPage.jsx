@@ -51,7 +51,10 @@ const CreditNotesPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [filters]);
 
   const handlePageChange = (newPage) => {

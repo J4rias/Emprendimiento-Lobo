@@ -31,7 +31,10 @@ const CategoriesPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchCategories();
+    const timer = setTimeout(() => {
+      fetchCategories();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [currentPage, search]);
 
   const fetchCategories = async () => {

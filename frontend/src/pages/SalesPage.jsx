@@ -55,9 +55,12 @@ const SalesPage = () => {
   };
 
   useEffect(() => {
-    loadSales();
-    loadStats();
-    loadExchangeRates();
+    const timer = setTimeout(() => {
+      loadSales();
+      loadStats();
+      loadExchangeRates();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [pagination.page, searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
 
   // Optionally reset to page 1 when search or filters change

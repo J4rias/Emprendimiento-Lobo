@@ -63,8 +63,11 @@ const PriceListsPage = () => {
     });
 
     useEffect(() => {
-        fetchLists();
-        loadExchangeRates();
+        const timer = setTimeout(() => {
+            fetchLists();
+            loadExchangeRates();
+        }, 300);
+        return () => clearTimeout(timer);
     }, [searchTerm, statusFilter, page]);
 
     const loadExchangeRates = async () => {

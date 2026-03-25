@@ -27,7 +27,10 @@ const QuotesPage = () => {
   };
 
   useEffect(() => {
-    fetchQuotes();
+    const timer = setTimeout(() => {
+      fetchQuotes();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [currentPage, search, statusFilter]);
 
   const fetchQuotes = async () => {
