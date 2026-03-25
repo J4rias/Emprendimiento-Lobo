@@ -406,9 +406,10 @@ const POSPage = () => {
     setCart(prev => {
       const existingOther = prev.find(i => i.product_id === productId && i.presentation_id === presentationId && i.sellByUnit === targetByUnit);
 
-      // Convert quantity properly based on the new unit
+      // When switching to unit mode reset to 1 (original behavior);
+      // when switching to package mode convert proportionally
       let convertedQty = targetByUnit
-        ? item.quantity * item.units_per_package
+        ? 1
         : Math.floor(item.quantity / item.units_per_package);
 
       if (!targetByUnit && convertedQty < 1) {
@@ -971,7 +972,7 @@ const POSPage = () => {
                         <span className="text-[10px] text-gray-500 mb-1">{formatMoney(item.current_price)} c/u</span>
                       )}
                       <span className="w-32 flex-shrink-0 whitespace-nowrap text-right font-bold text-sm text-gray-900 leading-none">
-                        {formatMoney(calculateItemSubtotal(item), null, item)}
+                        {formatMoney(calculateItemSubtotal(item))}
                       </span>
                     </div>
                   </div>
