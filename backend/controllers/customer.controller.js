@@ -684,12 +684,12 @@ class CustomerController {
         attributes: ['id', 'sale_number', 'sale_date', 'total', 'exchange_rate', 'sale_type', 'status']
       });
 
-      // 2. Fetch Payments (Credits/Assets)
+      // 2. Fetch Payments (Credits/Assets) — only for credit sales
       const payments = await SalePayment.findAll({
         include: [{
           model: Sale,
           as: 'sale',
-          where: { customer_id: id },
+          where: { customer_id: id, sale_type: 'credit' },
           attributes: ['id', 'sale_number', 'exchange_rate']
         }],
         attributes: ['id', 'payment_date', 'payment_method', 'amount', 'currency', 'exchange_rate', 'reference']
