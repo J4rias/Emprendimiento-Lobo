@@ -11,10 +11,11 @@ const sequelize = new Sequelize(
     dialect: 'mysql',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
-      max: 10,
-      min: 0,
+      max: 20,
+      min: 2,
       acquire: 30000,
-      idle: 10000
+      idle: 10000,
+      evict: 15000
     },
     define: {
       timestamps: true,
@@ -24,6 +25,18 @@ const sequelize = new Sequelize(
     }
   }
 );
+
+// Log pool exhaustion events to help diagnose crashes
+sequelize.connectionManager.pool.on('acquireRequest', () => {
+  const { size, available } = sequelize.connectionManager.pool;
+  if (available === 0) {
+    console.warn(`⚠️ DB pool saturado: ${size}/${sequelize.config.pool.max} conexiones en uso`);
+  }
+});
+
+sequelize.connectionManager.pool.on('createFail', (err) => {
+  console.error('❌ DB pool: fallo al crear conexión:', err.message);
+});
 
 // Test connection
 const testConnection = async () => {

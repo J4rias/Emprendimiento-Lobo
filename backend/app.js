@@ -34,6 +34,8 @@ const priceListRoutes = require('./routes/priceList.routes');
 const posRoutes = require('./routes/pos.routes');
 
 const app = express();
+// Trust nginx-proxy-manager (first proxy hop) so express-rate-limit can read real client IPs
+app.set('trust proxy', 1);
 // Security middleware con configuración para permitir imágenes
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
