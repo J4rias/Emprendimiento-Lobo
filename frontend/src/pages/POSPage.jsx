@@ -209,9 +209,11 @@ const POSPage = () => {
   }, [cart, searchTerm]);
 
   useEffect(() => {
-    if (selectedPriceList) {
+    if (!selectedPriceList) return;
+    const timer = setTimeout(() => {
       loadProducts();
-    }
+    }, 300);
+    return () => clearTimeout(timer);
   }, [searchTerm, selectedPriceList]);
   useEffect(() => { loadPriceLists(); }, []);
   useEffect(() => { loadExchangeRates(); }, []);
