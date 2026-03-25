@@ -1,5 +1,3 @@
-version: '3.9'
-
 # Stack de Empresa 2
 # Uso: docker compose -f docker-compose.empresa2.yml -p empresa2 up -d
 

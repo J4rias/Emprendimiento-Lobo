@@ -1,5 +1,3 @@
-version: '3.9'
-
 # Infraestructura compartida: NPM (proxy) + MySQL (base de datos)
 # Este compose se levanta primero: docker compose up -d
 
