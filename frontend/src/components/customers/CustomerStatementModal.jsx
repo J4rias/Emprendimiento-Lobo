@@ -8,8 +8,8 @@ const formatCurrency = (amount, currency) => {
     return new Intl.NumberFormat('es-CO', {
         style: 'currency',
         currency: currency || 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: currency === 'COP' ? 0 : 2,
+        maximumFractionDigits: currency === 'COP' ? 0 : 2
     }).format(value);
 };
 
@@ -138,20 +138,24 @@ const PaymentDetailExpanded = ({ transaction, currency }) => {
                     <span className="font-medium block text-gray-500 mb-0.5">{isLegacy ? 'Valor USD' : 'Monto recibido'}</span>
                     <span className="text-green-700 font-semibold">{formatCurrency(displayAmount, displayCurrency)}</span>
                 </div>
-                <div>
-                    <span className="font-medium block text-gray-500 mb-0.5">Equivalente COP</span>
-                    <span className="text-gray-800">{formatCurrency(copEquivalent, 'COP')}</span>
-                </div>
+                {storedCurrency !== 'COP' && (
+                    <div>
+                        <span className="font-medium block text-gray-500 mb-0.5">Equivalente COP</span>
+                        <span className="text-gray-800">{formatCurrency(copEquivalent, 'COP')}</span>
+                    </div>
+                )}
                 {currency === 'USD' && storedCurrency !== 'USD' && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Equivalente USD</span>
                         <span className="text-gray-800">{formatCurrency(usdEquivalent, 'USD')}</span>
                     </div>
                 )}
-                <div>
-                    <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
-                    <span className="text-gray-800">{effectiveRate.toLocaleString('es-CO')} COP/USD</span>
-                </div>
+                {storedCurrency !== 'COP' && (
+                    <div>
+                        <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
+                        <span className="text-gray-800">{effectiveRate.toLocaleString('es-CO')} COP/USD</span>
+                    </div>
+                )}
                 {pay.reference && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Referencia</span>
@@ -323,7 +327,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                 ArrowUpRight
                                             )}
                                             {renderSummaryCard(
-                                                'Saldo Pendiente por Cobrar',
+                                                'Saldo Pendiente',
                                                 Math.max(0, statementData.summary[selectedCurrency].balance),
                                                 selectedCurrency,
                                                 statementData.summary[selectedCurrency].balance > 0 ? 'bg-orange-50' : 'bg-gray-100',
@@ -331,7 +335,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                 ArrowDownRight
                                             )}
                                             {renderSummaryCard(
-                                                'Saldo a Favor Disp. (Monedero)',
+                                                'Saldo a Favor',
                                                 statementData.summary[selectedCurrency].available_credit,
                                                 selectedCurrency,
                                                 statementData.summary[selectedCurrency].available_credit > 0 ? 'bg-green-50' : 'bg-gray-50',
@@ -402,7 +406,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                                     }`}>
                                                                                     {t.type === 'charge' ? 'Nota de Débito (Venta)' :
                                                                                         t.type === 'credit' ? 'Nota de Crédito (Devolución)' :
-                                                                                            t.isInternal ? 'Uso de Monedero' : 'Pago Recibido'}
+                                                                                            t.isInternal ? 'Uso de Saldo a Favor' : 'Pago Recibido'}
                                                                                 </span>
                                                                                 <span className="text-xs text-gray-500">{t.description}</span>
                                                                                 {t.original_currency && t.original_currency !== selectedCurrency && (

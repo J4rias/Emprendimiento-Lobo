@@ -741,7 +741,7 @@ class CustomerController {
         });
 
         // Record in COP
-        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) * rate };
+        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
         if (sale.sale_type === 'credit') summary['COP'].total_invoiced += amtCOP;
         ledger.push({
           id: `sale_${sale.id}_cop`,
@@ -779,7 +779,7 @@ class CustomerController {
         }
 
         // Record in USD
-        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) };
+        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
         summary['USD'].total_paid += amtUSD;
         ledger.push({
           id: `pay_${pay.id}_usd`,
@@ -834,7 +834,36 @@ class CustomerController {
       // Calculate Final Balances
       for (const curr in summary) {
         summary[curr].balance = Math.max(0, summary[curr].total_invoiced - summary[curr].total_paid);
+        summary[curr].available_credit = 0;
       }
+
+      // Calculate saldo a favor: aggregate paid vs invoiced, only for sales with at least one payment
+      const paymentsBySale = {};
+      for (const pay of payments) {
+        const saleId = pay.sale?.id;
+        if (!saleId) continue;
+        if (!paymentsBySale[saleId]) paymentsBySale[saleId] = [];
+        paymentsBySale[saleId].push(pay);
+      }
+      let availableCreditCOP = 0;
+      let invoicedWithPaymentsCOP = 0;
+      let totalPaidCOP = 0;
+      for (const sale of sales) {
+        const saleRate = parseFloat(sale.exchange_rate || 1);
+        const salePays = paymentsBySale[sale.id] || [];
+        if (salePays.length === 0) continue; // skip untouched pending sales
+        const paidCOP = salePays.reduce((sum, p) => {
+          if (p.payment_method === 'credit_balance') return sum; // skip: already counted in source payment
+          if (p.currency === 'COP') return sum + parseFloat(p.amount);
+          const payRate = parseFloat(p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : saleRate);
+          return sum + parseFloat(p.amount) * payRate;
+        }, 0);
+        invoicedWithPaymentsCOP += parseFloat(sale.total) * saleRate;
+        totalPaidCOP += paidCOP;
+      }
+      availableCreditCOP = Math.max(0, totalPaidCOP - invoicedWithPaymentsCOP);
+      if (summary['COP']) summary['COP'].available_credit = Math.round(availableCreditCOP);
+      if (summary['USD']) summary['USD'].available_credit = 0;
 
       // Sort Ledger chronologically
       ledger.sort((a, b) => a.date - b.date);
@@ -854,6 +883,49 @@ class CustomerController {
         }
       });
 
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get customer credit balance (overpayment / saldo a favor)
+  // Calculated in original COP amounts to avoid exchange rate drift
+  async getCreditBalance(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const sales = await Sale.findAll({
+        where: { customer_id: id, sale_type: 'credit', status: { [Op.notIn]: ['cancelled'] } },
+        attributes: ['id', 'total', 'exchange_rate'],
+        include: [{ model: SalePayment, as: 'payments', attributes: ['amount', 'currency', 'exchange_rate', 'payment_method'] }]
+      });
+
+      // Aggregate approach: credit = total_paid - total_invoiced
+      // Only include sales that have at least one payment (exclude pure pending/untouched)
+      // Exclude credit_balance payments to avoid double-counting (they come from prior overpayments)
+      let totalInvoicedCOP = 0;
+      let totalPaidCOP = 0;
+      for (const s of sales) {
+        const saleRate = parseFloat(s.exchange_rate || 1);
+        const realPayments = (s.payments || []).filter(p => p.payment_method !== 'credit_balance');
+        const hasPaid = realPayments.length > 0;
+        const paidCOP = realPayments.reduce((pSum, p) => {
+          if (p.currency === 'COP') return pSum + parseFloat(p.amount);
+          return pSum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);
+        }, 0);
+        // Include in invoiced if: sale has payments OR is the one being checked (completed/partial)
+        if (hasPaid) {
+          totalInvoicedCOP += parseFloat(s.total) * saleRate;
+          totalPaidCOP += paidCOP;
+        }
+      }
+      const creditBalanceCOP = Math.max(0, totalPaidCOP - totalInvoicedCOP);
+
+      res.json({
+        success: true,
+        credit_balance_cop: Math.round(creditBalanceCOP),
+        credit_balance_usd: 0 // not used, kept for compatibility
+      });
     } catch (error) {
       next(error);
     }

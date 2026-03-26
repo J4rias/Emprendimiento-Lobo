@@ -68,6 +68,14 @@ router.get(
   customerController.getStatement
 );
 
+// Get customer credit balance (saldo a favor / overpayment)
+router.get(
+  '/:id/credit-balance',
+  authenticate,
+  authorize('customers.view'),
+  customerController.getCreditBalance
+);
+
 // Create customer
 router.post(
   '/',

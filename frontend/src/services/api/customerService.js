@@ -60,5 +60,11 @@ export const customerService = {
   getStatement: async (id) => {
     const response = await api.get(`/customers/${id}/statement`);
     return response.data;
+  },
+
+  // Get customer credit balance (saldo a favor)
+  getCreditBalance: async (id) => {
+    const response = await api.get(`/customers/${id}/credit-balance`);
+    return response.data;
   }
 };

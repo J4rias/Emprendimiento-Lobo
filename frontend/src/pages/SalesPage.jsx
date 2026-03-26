@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard, RefreshCcw } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
+import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from '../components/common/Modal';
@@ -41,6 +43,7 @@ const SalesPage = () => {
     notes: ''
   });
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [customerCreditBalance, setCustomerCreditBalance] = useState({ usd: 0, cop: 0 });
 
   // Return Modal State
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -125,7 +128,7 @@ const SalesPage = () => {
       setShowDetailModal(true);
     } catch (error) {
       console.error('Error loading sale detail:', error);
-      alert('Error al cargar el detalle de la venta');
+      toast.error('Error al cargar el detalle de la venta');
     }
   };
 
@@ -135,19 +138,37 @@ const SalesPage = () => {
 
     try {
       await saleService.cancelSale(saleId, reason);
-      alert('Venta cancelada exitosamente');
+      toast.success('Venta cancelada exitosamente');
       loadSales();
       loadStats();
     } catch (error) {
       console.error('Error cancelling sale:', error);
-      alert(error.response?.data?.message || 'Error al cancelar la venta');
+      toast.error(error.response?.data?.message || 'Error al cancelar la venta');
     }
   };
 
-  const handleOpenPaymentModal = (sale) => {
+  const handleOpenPaymentModal = async (sale) => {
     setPaymentSale(sale);
+    setCustomerCreditBalance({ usd: 0, cop: 0 });
+
+    // Calculate pending amount in COP for pre-fill
+    const pendingUSD = parseFloat(sale.total) - parseFloat(sale.paid_amount || 0);
+    const rate = parseFloat(sale.exchange_rate) || 1;
+    let pendingCOP = Math.round(pendingUSD * rate);
+
+    // Fetch credit balance if sale has a customer
+    if (sale.customer_id) {
+      try {
+        const data = await customerService.getCreditBalance(sale.customer_id);
+        if (data.success && data.credit_balance_cop > 0) {
+          setCustomerCreditBalance({ usd: data.credit_balance_usd, cop: data.credit_balance_cop });
+          pendingCOP = Math.max(0, pendingCOP - data.credit_balance_cop);
+        }
+      } catch (_) {}
+    }
+
     setPaymentData({
-      amount_cop: '',
+      amount_cop: pendingCOP > 0 ? String(pendingCOP) : '',
       method: 'cash',
       reference: '',
       notes: ''
@@ -162,14 +183,14 @@ const SalesPage = () => {
       setShowReturnModal(true);
     } catch (error) {
       console.error('Error loading sale detail for return:', error);
-      alert('Error al cargar el detalle de la venta para devolución');
+      toast.error('Error al cargar el detalle de la venta para devolución');
     }
   };
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     if (!paymentData.amount_cop || parseFloat(paymentData.amount_cop) <= 0) {
-      alert('Debe ingresar un monto válido mayor a 0');
+      toast.error('Debe ingresar un monto válido mayor a 0');
       return;
     }
 
@@ -177,24 +198,34 @@ const SalesPage = () => {
 
     setSubmittingPayment(true);
     try {
-      await saleService.addPayment(paymentSale.id, {
-        payment_lines: [{
-          amount: parseFloat(paymentData.amount_cop),
-          method: paymentData.method,
+      const payment_lines = [{
+        amount: parseFloat(paymentData.amount_cop),
+        method: paymentData.method,
+        currency: 'COP',
+        exchange_rate: rate,
+        reference: paymentData.reference
+      }];
+      if (customerCreditBalance.cop > 0) {
+        payment_lines.push({
+          amount: customerCreditBalance.cop,
+          method: 'credit_balance',
           currency: 'COP',
           exchange_rate: rate,
-          reference: paymentData.reference
-        }],
+          reference: 'Saldo a Favor Aplicado'
+        });
+      }
+      await saleService.addPayment(paymentSale.id, {
+        payment_lines,
         notes: paymentData.notes
       });
 
-      alert('Pago registrado exitosamente');
+      toast.success('Pago registrado exitosamente');
       setShowPaymentModal(false);
       loadSales();
       loadStats();
     } catch (error) {
       console.error('Error adding payment:', error);
-      alert(error.response?.data?.message || 'Error al registrar el pago');
+      toast.error(error.response?.data?.message || 'Error al registrar el pago');
     } finally {
       setSubmittingPayment(false);
     }
@@ -687,6 +718,21 @@ const SalesPage = () => {
                 </p>
               </div>
             </div>
+
+            {customerCreditBalance.cop > 0 && (
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-blue-800 font-semibold">Saldo a Favor del Cliente</p>
+                  <p className="text-lg font-bold text-blue-900">
+                    COP {customerCreditBalance.cop.toLocaleString('de-DE')}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-blue-700">
+                  <p>Descontado del</p>
+                  <p>monto a pagar</p>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
