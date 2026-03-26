@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { saleService } from '../services/api/saleService';
 import { productService } from '../services/api/productService';
@@ -20,50 +20,34 @@ import {
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    sales: null,
-    products: null,
-    inventory: null,
-    purchaseOrders: null,
-    deliveries: null
-  });
 
-  useEffect(() => {
-    fetchAllStats();
-  }, []);
+  const getDashboardData = async () => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
-  const fetchAllStats = async () => {
-    try {
-      setLoading(true);
+    const [salesStats, productsData, lowStockData, purchaseOrdersStats, deliveriesStats] = await Promise.all([
+      saleService.getStats({ start_date: startOfMonth, end_date: endOfMonth }).catch(() => null),
+      productService.getAll({ limit: 10 }).catch(() => ({ data: [] })),
+      inventoryService.getLowStock({ limit: 10 }).catch(() => ({ data: [] })),
+      purchaseOrderService.getStats().catch(() => null),
+      deliveryService.getStats().catch(() => null)
+    ]);
 
-      // Get date ranges
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
-
-      // Fetch all stats in parallel
-      const [salesStats, productsData, lowStockData, purchaseOrdersStats, deliveriesStats] = await Promise.all([
-        saleService.getStats({ start_date: startOfMonth, end_date: endOfMonth }).catch(() => null),
-        productService.getAll({ limit: 10 }).catch(() => ({ data: [] })),
-        inventoryService.getLowStock({ limit: 10 }).catch(() => ({ data: [] })),
-        purchaseOrderService.getStats().catch(() => null),
-        deliveryService.getStats().catch(() => null)
-      ]);
-
-      setStats({
-        sales: salesStats?.data || null,
-        products: productsData.data || [],
-        lowStock: lowStockData.data || [],
-        purchaseOrders: purchaseOrdersStats?.data || null,
-        deliveries: deliveriesStats?.data || null
-      });
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    } finally {
-      setLoading(false);
-    }
+    return {
+      sales: salesStats?.data || null,
+      products: productsData.data || [],
+      lowStock: lowStockData.data || [],
+      purchaseOrders: purchaseOrdersStats?.data || null,
+      deliveries: deliveriesStats?.data || null
+    };
   };
+
+  const { data: stats = {}, isLoading: loading } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: getDashboardData,
+    staleTime: 60_000,
+  });
 
   if (loading) {
     return (

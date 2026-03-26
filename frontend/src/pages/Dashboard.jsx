@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, TrendingUp, Calendar, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/api/productService';
@@ -6,70 +6,63 @@ import { inventoryService } from '../services/api/inventoryService';
 import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
-
 import { formatMoney } from '../utils/formatUtils';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    todaySales: 0,
-    todayRevenue: 0,
-    lowStock: 0,
-    inventoryValue: 0,
-    totalCustomers: 0,
-    pendingSales: 0,
-    monthRevenue: 0
-  });
-  const [categoriesStats, setCategoriesStats] = useState([]);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const getDashboardStats = async () => {
+    const productsData = await productService.getAll({ limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
+    const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
+    const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
+    const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      // Basic data
-      const productsData = await productService.getAll({ limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
-      const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
-      const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
-      const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
-      setCategoriesStats(categoriesData.data || []);
+    // Stats for TODAY
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const todayStart = `${localDate}T00:00:00`;
+    const todayEnd = `${localDate}T23:59:59`;
+    const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
 
-      // Stats for TODAY — use local date to avoid UTC timezone shift
-      const now = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      const todayStart = `${localDate}T00:00:00`;
-      const todayEnd = `${localDate}T23:59:59`;
-      const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
+    // Stats for MONTH
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
+    const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenue: 0 } }));
 
-      // Stats for MONTH
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
-      const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenue: 0 } }));
+    // Pending sales
+    const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
 
-      // Pending sales
-      const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
-
-      setStats({
-        totalProducts: productsData.pagination?.total || 0,
-        todaySales: todayStats.stats?.totalSales || 0,
-        todayRevenue: todayStats.stats?.totalRevenue || 0,
-        lowStock: lowStockData.data?.length || 0,
-        inventoryValue: valuationData.data?.totalValue || 0,
-        pendingSales: pendingData.pagination?.total || 0,
-        monthRevenue: monthStatsData.stats?.totalRevenue || 0
-      });
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
+    return {
+      totalProducts: productsData.pagination?.total || 0,
+      todaySales: todayStats.stats?.totalSales || 0,
+      todayRevenue: todayStats.stats?.totalRevenue || 0,
+      lowStock: lowStockData.data?.length || 0,
+      inventoryValue: valuationData.data?.totalValue || 0,
+      pendingSales: pendingData.pagination?.total || 0,
+      monthRevenue: monthStatsData.stats?.totalRevenue || 0,
+      categoriesStats: categoriesData.data || []
+    };
   };
+
+  const { data: dashboardData = {}, isLoading: loading } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: getDashboardStats,
+    staleTime: 60_000,
+  });
+
+  const stats = {
+    totalProducts: dashboardData.totalProducts || 0,
+    todaySales: dashboardData.todaySales || 0,
+    todayRevenue: dashboardData.todayRevenue || 0,
+    lowStock: dashboardData.lowStock || 0,
+    inventoryValue: dashboardData.inventoryValue || 0,
+    pendingSales: dashboardData.pendingSales || 0,
+    monthRevenue: dashboardData.monthRevenue || 0
+  };
+
+  const categoriesStats = dashboardData.categoriesStats || [];
 
   const statsCards = [
     {
