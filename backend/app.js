@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const errorHandler = require('./middleware/errorHandler');
+const { sequelize } = require('./config/database');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -107,12 +108,25 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let dbStatus = 'ok';
+  try { await sequelize.authenticate(); }
+  catch (_) { dbStatus = 'error'; }
+
+  const mem = process.memoryUsage();
   res.json({
-    success: true,
-    message: 'Server is running',
+    success: dbStatus === 'ok',
+    status: dbStatus === 'ok' ? 'ok' : 'degraded',
+    version: process.env.npm_package_version || '1.0.0',
+    uptime_seconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    database: dbStatus,
+    memory: {
+      rss_mb: Math.round(mem.rss / 1024 / 1024),
+      heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+      heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+    }
   });
 });
 

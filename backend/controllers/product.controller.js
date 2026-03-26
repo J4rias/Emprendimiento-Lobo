@@ -23,6 +23,7 @@ class ProductController {
 
       const offset = (page - 1) * limit;
       const where = {};
+      let posAttributes; // undefined = all fields (non-POS)
 
       const presentationInclude = {
         model: ProductPresentation,
@@ -84,6 +85,25 @@ class ProductController {
             quantity: { [Op.gt]: 0 }
           };
         }
+
+        // POS mode: slim down payload (~70% smaller — remove unused fields/associations)
+        const catIdx = include.findIndex(i => i.as === 'category');
+        if (catIdx > -1) include.splice(catIdx, 1);
+        const brandIdx = include.findIndex(i => i.as === 'brand');
+        if (brandIdx > -1) include.splice(brandIdx, 1);
+
+        presentationInclude.attributes = ['id', 'name', 'units_per_package', 'package_price', 'purchase_currency'];
+        presentationInclude.include = presentationInclude.include.filter(i => i.as === 'priceListDetails');
+
+        if (inventoryInclude) {
+          inventoryInclude.attributes = ['quantity', 'warehouse_id'];
+          delete inventoryInclude.include;
+        }
+
+        const barcodeInclude = include.find(i => i.as === 'barcodes');
+        if (barcodeInclude) barcodeInclude.attributes = ['barcode'];
+
+        posAttributes = ['id', 'name', 'sku', 'is_active'];
       }
 
       if (search) {
@@ -109,6 +129,7 @@ class ProductController {
       const { rows: products, count } = await Product.findAndCountAll({
         where,
         include,
+        attributes: posAttributes,
         distinct: true,
         subQuery: false,
         limit: parseInt(limit),

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingCart, Trash2, Plus, Minus, Search, User, CreditCard,
   Banknote, Smartphone, X, UserPlus, Package, Hash, Printer,
@@ -136,6 +137,8 @@ const POSPage = () => {
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
+  const queryClient = useQueryClient();
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const getEffectiveRate = useCallback((from, to) => {
     return calculateEffectiveRate(from, to, exchangeRates);
@@ -208,13 +211,36 @@ const POSPage = () => {
     }
   }, [cart, searchTerm]);
 
+  // Debounce searchTerm → debouncedSearch (300ms)
   useEffect(() => {
-    if (!selectedPriceList) return;
-    const timer = setTimeout(() => {
-      loadProducts();
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedPriceList]);
+  }, [searchTerm]);
+
+  // Fetch products with cache — staleTime 30s: repeated searches reuse cached data
+  const { data: productsQueryData } = useQuery({
+    queryKey: ['pos-products', debouncedSearch, selectedPriceList],
+    queryFn: () => productService.getAll({
+      search: debouncedSearch, limit: 1000, is_active: true,
+      price_list_id: selectedPriceList || undefined
+    }),
+    enabled: !!selectedPriceList,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  // Sync products state + barcode auto-add when query data changes
+  useEffect(() => {
+    const results = productsQueryData?.data || [];
+    setProducts(results);
+    const trimmed = searchTerm.trim();
+    if (trimmed && results.length === 1) {
+      const product = results[0];
+      const match = (product.barcodes || []).some(b => b.barcode === trimmed);
+      if (match) { addToCart(product); setSearchTerm(''); }
+    }
+  }, [productsQueryData]);
+
   useEffect(() => { loadPriceLists(); }, []);
   useEffect(() => { loadExchangeRates(); }, []);
 
@@ -240,24 +266,6 @@ const POSPage = () => {
   }, [cart]);
 
   // ──────────────────── LOADERS ────────────────────
-  const loadProducts = async () => {
-    try {
-      const data = await productService.getAll({
-        search: searchTerm, limit: 1000, is_active: true,
-        price_list_id: selectedPriceList || undefined
-      });
-      const results = data.products || data.data || [];
-      setProducts(results);
-
-      // Auto-add on exact barcode match
-      const trimmed = searchTerm.trim();
-      if (trimmed && results.length === 1) {
-        const product = results[0];
-        const match = (product.barcodes || []).some(b => b.barcode === trimmed);
-        if (match) { addToCart(product); setSearchTerm(''); }
-      }
-    } catch (e) { console.error('Error loading products:', e); }
-  };
 
   const loadPriceLists = async () => {
     try {
@@ -692,8 +700,8 @@ const POSPage = () => {
       setShowCheckoutModal(false);
       setShowResultModal(true);
 
-      // Real-time inventory refresh
-      loadProducts();
+      // Real-time inventory refresh (invalidate cache to force fresh data)
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] });
 
     } catch (error) {
       toast.error(error.response?.data?.message || 'Error al procesar la venta');

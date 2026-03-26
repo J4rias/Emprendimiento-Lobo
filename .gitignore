@@ -45,6 +45,9 @@ coverage/
 *.tmp
 *.temp
 
+# Local testing scripts (not for production)
+scripts/testing/
+
 # Database
 *.sql.backup
 *.db

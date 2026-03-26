@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList, Brand, CompanySettings } = require('../models');
 const fs = require('fs');
 const path = require('path');
+const addIndexes = require('./run-migration-add-indexes');
 require('dotenv').config();
 
 const initializeDatabase = async () => {
@@ -378,6 +379,9 @@ const initializeDatabase = async () => {
       defaults: { name: 'Mi Empresa' },
     });
     console.log('✅ Configuración de empresa creada\n');
+
+    // Add database indexes for performance
+    await addIndexes();
 
     console.log('');
     console.log('='.repeat(60));
