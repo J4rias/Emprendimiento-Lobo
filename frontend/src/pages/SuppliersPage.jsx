@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api/axios';
+import { supplierService } from '../services/api/supplierService';
 import { Plus, Edit, Trash2, Search, Building, User, Mail, Phone, Eye, Calendar, Clock, AlertCircle, X, Tag, BookText, Contact, FileText } from 'lucide-react';
 import SupplierContactManager from '../components/suppliers/SupplierContactManager';
 import SupplierStatementModal from '../components/suppliers/SupplierStatementModal';
 
 const SuppliersPage = () => {
   const { hasPermission } = useAuth();
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -33,39 +34,22 @@ const SuppliersPage = () => {
     contacts: []
   });
 
-  // Debounce search to avoid losing focus
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 300);
-
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    fetchSuppliers();
-  }, [currentPage, debouncedSearch]);
+  const { data: suppliersData, isLoading, error: fetchError } = useQuery({
+    queryKey: ['suppliers', currentPage, debouncedSearch],
+    queryFn: () => supplierService.getAll({ page: currentPage, limit: 20, search: debouncedSearch }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-  const fetchSuppliers = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/suppliers', {
-        params: {
-          page: currentPage,
-          limit: 20,
-          search: debouncedSearch
-        }
-      });
-      setSuppliers(response.data.data);
-      setTotalPages(response.data.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar los proveedores');
-      console.error('Error fetching suppliers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const suppliers = suppliersData?.data || [];
+  const totalPages = suppliersData?.pagination?.totalPages || 1;
+  const loading = isLoading;
+  const error = fetchError?.message || mutationError;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -75,10 +59,10 @@ const SuppliersPage = () => {
       } else {
         await api.post('/suppliers', formData);
       }
-      fetchSuppliers();
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       handleCloseModal();
     } catch (err) {
-      setError('Error al guardar el proveedor');
+      setMutationError('Error al guardar el proveedor');
       console.error('Error saving supplier:', err);
       if (err.response) {
         console.error('Error response:', err.response.data);
@@ -108,9 +92,9 @@ const SuppliersPage = () => {
     if (window.confirm('¿Está seguro de que desea eliminar este proveedor?')) {
       try {
         await api.delete(`/suppliers/${id}`);
-        fetchSuppliers();
+        queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       } catch (err) {
-        setError('Error al eliminar el proveedor');
+        setMutationError('Error al eliminar el proveedor');
         console.error('Error deleting supplier:', err);
       }
     }
@@ -127,7 +111,7 @@ const SuppliersPage = () => {
       is_active: true,
       contacts: []
     });
-    setError(null);
+    setMutationError(null);
   };
 
   const handleChange = (e) => {

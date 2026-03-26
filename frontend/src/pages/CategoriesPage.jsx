@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -14,12 +15,11 @@ import { categoryService } from '../services/api/categoryService';
 
 const CategoriesPage = () => {
   const { token, hasPermission } = useAuth();
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
@@ -31,30 +31,21 @@ const CategoriesPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchCategories();
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
-  }, [currentPage, search]);
+  }, [search]);
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    setError(null);
+  const { data: categoriesData, isLoading, error: fetchError } = useQuery({
+    queryKey: ['categories', currentPage, debouncedSearch],
+    queryFn: () => categoryService.getAll({ page: currentPage, search: debouncedSearch.trim() }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-    try {
-      const response = await categoryService.getAll({
-        page: currentPage,
-        search: search.trim()
-      });
-
-      setCategories(response.data || []);
-      setTotalPages(response.pagination?.totalPages || 1);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar categorías');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const categories = categoriesData?.data || [];
+  const totalPages = categoriesData?.pagination?.totalPages || 1;
+  const loading = isLoading;
+  const error = fetchError?.message || mutationError;
 
   const handleOpenModal = (category = null) => {
     setEditingCategory(category);
@@ -101,9 +92,9 @@ const CategoriesPage = () => {
       }
 
       handleCloseModal();
-      fetchCategories();
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al guardar categoría');
+      setMutationError(err.response?.data?.message || 'Error al guardar categoría');
     } finally {
       setSubmitting(false);
     }
@@ -116,9 +107,9 @@ const CategoriesPage = () => {
 
     try {
       await categoryService.delete(category.id);
-      fetchCategories();
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al eliminar categoría');
+      setMutationError(err.response?.data?.message || 'Error al eliminar categoría');
     }
   };
 
@@ -163,7 +154,7 @@ const CategoriesPage = () => {
             <p className="text-sm">{error}</p>
           </div>
           <button
-            onClick={() => setError(null)}
+            onClick={() => setMutationError(null)}
             className="ml-auto text-red-600 hover:text-red-800"
           >
             <X className="h-5 w-5" />

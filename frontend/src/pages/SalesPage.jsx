@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard, RefreshCcw } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
@@ -13,9 +14,7 @@ import SaleReturnModal from '../components/sales/SaleReturnModal';
 
 const SalesPage = () => {
   const { companySettings } = useCompany();
-  const [sales, setSales] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     status: '',
@@ -23,15 +22,9 @@ const SalesPage = () => {
     start_date: '',
     end_date: ''
   });
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [selectedSale, setSelectedSale] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [exchangeRates, setExchangeRates] = useState([]);
 
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -57,61 +50,42 @@ const SalesPage = () => {
     return `COP ${cop.toLocaleString('de-DE')}`;
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadSales();
-      loadStats();
-      loadExchangeRates();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [pagination.page, searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
-
-  // Optionally reset to page 1 when search or filters change
+  // Reset to page 1 when search or filters change
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }));
   }, [searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
 
-  const loadExchangeRates = async () => {
-    try {
-      const data = await exchangeRateService.getLatest();
-      setExchangeRates(data.data || []);
-    } catch (e) {
-      console.error('Error loading exchange rates:', e);
-    }
-  };
+  const salesQueryKey = ['sales', pagination.page, searchTerm, filters];
 
-  const loadSales = async () => {
-    setLoading(true);
-    try {
-      const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-        search: searchTerm,
-        ...filters
-      };
+  const { data: salesData, isLoading: loading } = useQuery({
+    queryKey: salesQueryKey,
+    queryFn: () => saleService.getSales({
+      page: pagination.page,
+      limit: pagination.limit,
+      search: searchTerm,
+      ...filters,
+    }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-      const data = await saleService.getSales(params);
-      setSales(data.sales || []);
-      setPagination(prev => ({
-        ...prev,
-        total: data.pagination?.total || 0,
-        totalPages: data.pagination?.totalPages || 0
-      }));
-    } catch (error) {
-      console.error('Error loading sales:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: statsData } = useQuery({
+    queryKey: ['sales-stats', filters],
+    queryFn: () => saleService.getSalesStats(filters),
+    staleTime: 30_000,
+  });
 
-  const loadStats = async () => {
-    try {
-      const data = await saleService.getSalesStats(filters);
-      setStats(data.stats);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
+  const { data: ratesData } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: () => exchangeRateService.getLatest(),
+    staleTime: 5 * 60_000,
+  });
+
+  const sales = salesData?.sales || [];
+  const stats = statsData?.stats || null;
+  const exchangeRates = ratesData?.data || [];
+  const paginationTotal = salesData?.pagination?.total || 0;
+  const paginationTotalPages = salesData?.pagination?.totalPages || 0;
 
   const getCustomerName = (customer) => {
     if (!customer) return 'Cliente General';
@@ -139,8 +113,8 @@ const SalesPage = () => {
     try {
       await saleService.cancelSale(saleId, reason);
       toast.success('Venta cancelada exitosamente');
-      loadSales();
-      loadStats();
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] });
     } catch (error) {
       console.error('Error cancelling sale:', error);
       toast.error(error.response?.data?.message || 'Error al cancelar la venta');
@@ -221,8 +195,8 @@ const SalesPage = () => {
 
       toast.success('Pago registrado exitosamente');
       setShowPaymentModal(false);
-      loadSales();
-      loadStats();
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] });
     } catch (error) {
       console.error('Error adding payment:', error);
       toast.error(error.response?.data?.message || 'Error al registrar el pago');
@@ -529,22 +503,22 @@ const SalesPage = () => {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
+        {paginationTotalPages > 1 && (
           <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} ventas
+              Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, paginationTotal)} de {paginationTotal} ventas
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                 disabled={pagination.page === 1}
                 className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Anterior
               </button>
               <button
-                onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-                disabled={pagination.page === pagination.totalPages}
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={pagination.page === paginationTotalPages}
                 className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Siguiente
@@ -836,8 +810,8 @@ const SalesPage = () => {
         sale={returnSale}
         onReturnSuccess={() => {
           setShowReturnModal(false);
-          loadSales();
-          loadStats();
+          queryClient.invalidateQueries({ queryKey: ['sales'] });
+          queryClient.invalidateQueries({ queryKey: ['sales-stats'] });
         }}
       />
     </div>

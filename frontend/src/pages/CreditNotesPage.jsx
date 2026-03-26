@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Plus,
   Search,
@@ -16,10 +17,6 @@ import {
 import { creditNoteService } from '../services/api/creditNoteService';
 
 const CreditNotesPage = () => {
-  const [creditNotes, setCreditNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState(null);
-
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -27,35 +24,23 @@ const CreditNotesPage = () => {
     page: 1,
     limit: 10
   });
-  const [pagination, setPagination] = useState({
-    total: 0,
-    totalPages: 0
+
+  const { data: notesData, isLoading: loading, refetch } = useQuery({
+    queryKey: ['credit-notes', filters],
+    queryFn: () => creditNoteService.getAll(filters),
+    keepPreviousData: true,
+    staleTime: 30_000,
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [notesRes, statsRes] = await Promise.all([
-        creditNoteService.getAll(filters),
-        creditNoteService.getStats()
-      ]);
+  const { data: statsData } = useQuery({
+    queryKey: ['credit-notes-stats'],
+    queryFn: () => creditNoteService.getStats(),
+    staleTime: 60_000,
+  });
 
-      setCreditNotes(notesRes.data || []);
-      setPagination(notesRes.pagination || { total: 0, totalPages: 0 });
-      setStats(statsRes.data || null);
-    } catch (error) {
-      console.error('Error fetching credit notes:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [filters]);
+  const creditNotes = notesData?.data || [];
+  const pagination = notesData?.pagination || { total: 0, totalPages: 0 };
+  const stats = statsData?.data || null;
 
   const handlePageChange = (newPage) => {
     setFilters(prev => ({ ...prev, page: newPage }));
@@ -153,7 +138,7 @@ const CreditNotesPage = () => {
             </div>
 
             <button
-              onClick={fetchData}
+              onClick={refetch}
               className="p-2 border border-gray-300 rounded-md hover:bg-gray-50"
               title="Actualizar"
             >

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatMoney } from '../utils/formatUtils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -30,16 +31,12 @@ import Modal from '../components/common/Modal';
 const PurchaseOrdersPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState(null);
-  const [suppliers, setSuppliers] = useState([]);
   const [supplierFilter, setSupplierFilter] = useState('');
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -48,44 +45,49 @@ const PurchaseOrdersPage = () => {
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [viewingOrder, setViewingOrder] = useState(null);
-  const [exchangeRates, setExchangeRates] = useState([]);
   const [statsPeriod, setStatsPeriod] = useState('this_week');
 
-  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    fetchOrders();
-    loadExchangeRates();
-  }, [currentPage, debouncedSearch, statusFilter, supplierFilter]);
+  const { data: ordersData, isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ['purchase-orders', currentPage, debouncedSearch, statusFilter, supplierFilter],
+    queryFn: () => purchaseOrderService.getAll({
+      page: currentPage, limit: 20,
+      search: debouncedSearch,
+      status: statusFilter || undefined,
+      supplier_id: supplierFilter || undefined,
+    }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    fetchStats();
-    fetchSuppliers();
-  }, [statsPeriod]);
+  const { data: statsData } = useQuery({
+    queryKey: ['purchase-orders-stats', statsPeriod],
+    queryFn: () => purchaseOrderService.getStats(getDateRangeForPeriod(statsPeriod)),
+    staleTime: 30_000,
+  });
 
-  const loadExchangeRates = async () => {
-    try {
-      const data = await exchangeRateService.getLatest();
-      setExchangeRates(data.data || []);
-    } catch (e) {
-      console.error('Error loading exchange rates:', e);
-    }
-  };
+  const { data: suppliersData } = useQuery({
+    queryKey: ['suppliers-active'],
+    queryFn: () => supplierService.getActive(),
+    staleTime: 5 * 60_000,
+  });
 
-  const fetchSuppliers = async () => {
-    try {
-      const resp = await supplierService.getActive();
-      setSuppliers(resp.data || []);
-    } catch (e) {
-      console.error('Error loading suppliers:', e);
-    }
-  };
+  const { data: ratesData } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: () => exchangeRateService.getLatest(),
+    staleTime: 5 * 60_000,
+  });
+
+  const orders = ordersData?.data || [];
+  const totalPages = ordersData?.pagination?.totalPages || 1;
+  const stats = statsData?.data || null;
+  const suppliers = suppliersData?.data || [];
+  const exchangeRates = ratesData?.data || [];
+  const error = fetchError?.message || mutationError;
 
   const copFormat = (amount, currency) => {
     const val = parseFloat(amount || 0);
@@ -155,36 +157,6 @@ const PurchaseOrdersPage = () => {
     return { date_from, date_to };
   };
 
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      const response = await purchaseOrderService.getAll({
-        page: currentPage,
-        limit: 20,
-        search: debouncedSearch,
-        status: statusFilter || undefined,
-        supplier_id: supplierFilter || undefined
-      });
-      setOrders(response.data);
-      setTotalPages(response.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar las órdenes de compra');
-      console.error('Error fetching purchase orders:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const dates = getDateRangeForPeriod(statsPeriod);
-      const response = await purchaseOrderService.getStats(dates);
-      setStats(response.data);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
-  };
 
   const handleView = async (order) => {
     try {
@@ -192,7 +164,7 @@ const PurchaseOrdersPage = () => {
       setViewingOrder(response.data);
       setShowViewModal(true);
     } catch (err) {
-      setError('Error al cargar el detalle de la orden');
+      setMutationError('Error al cargar el detalle de la orden');
       console.error('Error fetching order details:', err);
     }
   };
@@ -211,10 +183,10 @@ const PurchaseOrdersPage = () => {
       await purchaseOrderService.approve(approvingOrderId);
       setShowApproveModal(false);
       setApprovingOrderId(null);
-      fetchOrders();
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders-stats'] });
     } catch (err) {
-      setError('Error al aprobar la orden');
+      setMutationError('Error al aprobar la orden');
       console.error('Error approving order:', err);
     }
   };
@@ -236,10 +208,10 @@ const PurchaseOrdersPage = () => {
       setShowCancelModal(false);
       setCancelReason('');
       setCancellingOrderId(null);
-      fetchOrders();
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders-stats'] });
     } catch (err) {
-      setError('Error al cancelar la orden');
+      setMutationError('Error al cancelar la orden');
       console.error('Error canceling order:', err);
     }
   };
@@ -495,7 +467,7 @@ const PurchaseOrdersPage = () => {
           <div className="flex-1">
             <p className="text-sm text-red-800">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
+          <button onClick={() => setMutationError(null)} className="text-red-600 hover:text-red-800">
             <X className="w-4 h-4" />
           </button>
         </div>

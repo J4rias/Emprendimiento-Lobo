@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Eye, X, AlertCircle, User, Phone, MapPin, BadgeDollarSign, Receipt } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
@@ -43,16 +44,14 @@ const emptyForm = () => ({
 
 const CustomersPage = () => {
   const { hasPermission } = useAuth();
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [formError, setFormError] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -73,27 +72,22 @@ const CustomersPage = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { fetchCustomers(); }, [currentPage, debouncedSearch, typeFilter, statusFilter]);
+  const { data: customersData, isLoading, error: fetchError } = useQuery({
+    queryKey: ['customers', currentPage, debouncedSearch, typeFilter, statusFilter],
+    queryFn: () => customerService.getAll({
+      page: currentPage, limit: 20,
+      search: debouncedSearch,
+      type: typeFilter || undefined,
+      status: statusFilter || undefined,
+    }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const params = {
-        page: currentPage, limit: 20,
-        search: debouncedSearch,
-        type: typeFilter || undefined,
-        status: statusFilter || undefined
-      };
-      const response = await customerService.getAll(params);
-      setCustomers(response.data);
-      setTotalPages(response.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar los clientes');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const customers = customersData?.data || [];
+  const totalPages = customersData?.pagination?.totalPages || 1;
+  const loading = isLoading;
+  const error = fetchError?.message || mutationError;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -105,7 +99,7 @@ const CustomersPage = () => {
       } else {
         await customerService.create(formData);
       }
-      fetchCustomers();
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       handleCloseModal();
     } catch (err) {
       console.error('Save error:', err);
@@ -161,9 +155,9 @@ const CustomersPage = () => {
     if (window.confirm('¿Está seguro de que desea eliminar este cliente?')) {
       try {
         await customerService.delete(id);
-        fetchCustomers();
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
       } catch (err) {
-        setError(err.response?.data?.message || 'Error al eliminar el cliente');
+        setMutationError(err.response?.data?.message || 'Error al eliminar el cliente');
       }
     }
   };
@@ -241,7 +235,7 @@ const CustomersPage = () => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
           <p className="text-red-800 flex-1">{error}</p>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+          <button onClick={() => setMutationError(null)} className="text-red-500 hover:text-red-700">
             <X className="h-4 w-4" />
           </button>
         </div>

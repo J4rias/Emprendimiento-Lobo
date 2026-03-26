@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api/axios';
 import { Plus, Edit2, Trash2, Search, Building2, Globe, MapPin, Eye, X, AlertCircle } from 'lucide-react';
 import ImageUpload from '../components/common/ImageUpload';
 
 const BrandsPage = () => {
-  const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingBrand, setEditingBrand] = useState(null);
   const [viewingBrand, setViewingBrand] = useState(null);
@@ -25,39 +25,22 @@ const BrandsPage = () => {
     is_active: true
   });
 
-  // Debounce search to avoid losing focus
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 300);
-
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => {
-    fetchBrands();
-  }, [currentPage, debouncedSearch]);
+  const { data: brandsData, isLoading, error: fetchError } = useQuery({
+    queryKey: ['brands', currentPage, debouncedSearch],
+    queryFn: () => api.get('/brands', { params: { page: currentPage, limit: 20, search: debouncedSearch } }).then(r => r.data),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-  const fetchBrands = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/brands', {
-        params: {
-          page: currentPage,
-          limit: 20,
-          search: debouncedSearch
-        }
-      });
-      setBrands(response.data.data);
-      setTotalPages(response.data.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar las marcas');
-      console.error('Error fetching brands:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const brands = brandsData?.data || [];
+  const totalPages = brandsData?.pagination?.totalPages || 1;
+  const loading = isLoading;
+  const error = fetchError?.message || mutationError;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,10 +59,10 @@ const BrandsPage = () => {
       } else {
         await api.post('/brands', dataToSend);
       }
-      fetchBrands();
+      queryClient.invalidateQueries({ queryKey: ['brands'] });
       handleCloseModal();
     } catch (err) {
-      setError('Error al guardar la marca');
+      setMutationError('Error al guardar la marca');
       console.error('Error saving brand:', err);
       if (err.response) {
         console.error('Error response:', err.response.data);
@@ -110,9 +93,9 @@ const BrandsPage = () => {
     if (window.confirm('¿Está seguro de que desea eliminar esta marca?')) {
       try {
         await api.delete(`/brands/${id}`);
-        fetchBrands();
+        queryClient.invalidateQueries({ queryKey: ['brands'] });
       } catch (err) {
-        setError('Error al eliminar la marca');
+        setMutationError('Error al eliminar la marca');
         console.error('Error deleting brand:', err);
       }
     }
@@ -166,7 +149,7 @@ const BrandsPage = () => {
             <p className="text-sm">{error}</p>
           </div>
           <button
-            onClick={() => setError(null)}
+            onClick={() => setMutationError(null)}
             className="ml-auto text-red-600 hover:text-red-800"
           >
             <X className="h-5 w-5" />
