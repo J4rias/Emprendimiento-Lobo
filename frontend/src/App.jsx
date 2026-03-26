@@ -1,38 +1,50 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
 import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
-import LoginPage from './pages/LoginPage';
-import Dashboard from './pages/Dashboard';
-import InventoryPage from './pages/InventoryPage';
-import InventoryDetailPage from './pages/InventoryDetailPage';
-import InventoryAdjustPage from './pages/InventoryAdjustPage';
-import TransfersPage from './pages/TransfersPage';
-import InventoryMovementsPage from './pages/InventoryMovementsPage';
-import ProductsPage from './pages/ProductsPage';
-import QuotesPage from './pages/QuotesPage';
-import CustomersPage from './pages/CustomersPage';
-import UsersPage from './pages/UsersPage';
-import SettingsPage from './pages/SettingsPage';
-import POSPage from './pages/POSPage';
-import SalesPage from './pages/SalesPage';
-import StockReplenishmentPage from './pages/StockReplenishmentPage';
-import CategoriesPage from './pages/CategoriesPage';
-import SuppliersPage from './pages/SuppliersPage';
-import BrandsPage from './pages/BrandsPage';
-import ExchangeRatesPage from './pages/ExchangeRatesPage';
-import ReportsPage from './pages/ReportsPage';
-import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
-import PurchaseOrderCreatePage from './pages/PurchaseOrderCreatePage';
-import PurchaseOrderReceivePage from './pages/PurchaseOrderReceivePage';
-import CreditNotesPage from './pages/CreditNotesPage';
-import DeliveriesPage from './pages/DeliveriesPage';
-import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
-import PriceListsPage from './pages/PriceListsPage';
-import DailyReportPage from './pages/DailyReportPage';
+import ErrorBoundary from './components/common/ErrorBoundary';
+
+// Lazy-loaded pages — each page loads only when first visited
+const LoginPage               = lazy(() => import('./pages/LoginPage'));
+const Dashboard               = lazy(() => import('./pages/Dashboard'));
+const InventoryPage           = lazy(() => import('./pages/InventoryPage'));
+const InventoryDetailPage     = lazy(() => import('./pages/InventoryDetailPage'));
+const InventoryAdjustPage     = lazy(() => import('./pages/InventoryAdjustPage'));
+const TransfersPage           = lazy(() => import('./pages/TransfersPage'));
+const InventoryMovementsPage  = lazy(() => import('./pages/InventoryMovementsPage'));
+const ProductsPage            = lazy(() => import('./pages/ProductsPage'));
+const QuotesPage              = lazy(() => import('./pages/QuotesPage'));
+const CustomersPage           = lazy(() => import('./pages/CustomersPage'));
+const UsersPage               = lazy(() => import('./pages/UsersPage'));
+const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
+const POSPage                 = lazy(() => import('./pages/POSPage'));
+const SalesPage               = lazy(() => import('./pages/SalesPage'));
+const StockReplenishmentPage  = lazy(() => import('./pages/StockReplenishmentPage'));
+const CategoriesPage          = lazy(() => import('./pages/CategoriesPage'));
+const SuppliersPage           = lazy(() => import('./pages/SuppliersPage'));
+const BrandsPage              = lazy(() => import('./pages/BrandsPage'));
+const ExchangeRatesPage       = lazy(() => import('./pages/ExchangeRatesPage'));
+const ReportsPage             = lazy(() => import('./pages/ReportsPage'));
+const PurchaseOrdersPage      = lazy(() => import('./pages/PurchaseOrdersPage'));
+const PurchaseOrderCreatePage = lazy(() => import('./pages/PurchaseOrderCreatePage'));
+const PurchaseOrderReceivePage= lazy(() => import('./pages/PurchaseOrderReceivePage'));
+const CreditNotesPage         = lazy(() => import('./pages/CreditNotesPage'));
+const DeliveriesPage          = lazy(() => import('./pages/DeliveriesPage'));
+const SupplierPaymentsPage    = lazy(() => import('./pages/SupplierPaymentsPage'));
+const PriceListsPage          = lazy(() => import('./pages/PriceListsPage'));
+const DailyReportPage         = lazy(() => import('./pages/DailyReportPage'));
+
+const LoadingFallback = () => (
+  <div className="min-h-[400px] flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto"></div>
+      <p className="mt-3 text-sm text-gray-500">Cargando...</p>
+    </div>
+  </div>
+);
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -61,7 +73,7 @@ const AppLayout = ({ children }) => {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {children}
+            <ErrorBoundary>{children}</ErrorBoundary>
           </div>
         </main>
       </div>
@@ -73,6 +85,7 @@ function AppRoutes() {
   const { user } = useAuth();
 
   return (
+    <Suspense fallback={<LoadingFallback />}>
     <Routes>
       <Route
         path="/login"
@@ -162,7 +175,7 @@ function AppRoutes() {
         path="/pos"
         element={
           <PrivateRoute>
-            <POSPage />
+            <ErrorBoundary><POSPage /></ErrorBoundary>
           </PrivateRoute>
         }
       />
@@ -180,7 +193,7 @@ function AppRoutes() {
         path="/reponer-stock"
         element={
           <PrivateRoute>
-            <StockReplenishmentPage />
+            <ErrorBoundary><StockReplenishmentPage /></ErrorBoundary>
           </PrivateRoute>
         }
       />
@@ -347,40 +360,11 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/dashboard" />} />
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>
+    </Suspense>
   );
 }
 
 function App() {
-  useEffect(() => {
-    const handleAutofill = () => {
-      // Intentar deshabilitar autocompletado en todos los inputs y forms
-      const elements = document.querySelectorAll('input, form');
-      elements.forEach(el => {
-        if (!el.getAttribute('autocomplete')) {
-          el.setAttribute('autocomplete', 'off');
-          // Truco adicional para algunos navegadores: usar un valor aleatorio o 'new-password'
-          // si el navegador ignora 'off'
-        }
-      });
-    };
-
-    // Ejecutar al inicio
-    handleAutofill();
-
-    // Observar cambios en el DOM para manejar elementos dinámicos (modales, etc.)
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length > 0) {
-          handleAutofill();
-        }
-      });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <AuthProvider>
       <CompanyProvider>

@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const errorHandler = require('./middleware/errorHandler');
 const { sequelize } = require('./config/database');
+const logger = require('./config/logger');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -85,7 +86,7 @@ app.use('/uploads', express.static('public/uploads'));
 
 // Skip rate limiting during development
 if (process.env.NODE_ENV !== 'production') {
-  console.log('⚠️ Rate limiting deshabilitado en modo desarrollo');
+  logger.debug('Rate limiting deshabilitado en modo desarrollo');
   // Opcional: aplicar solo a endpoints no críticos
   // app.use('/api/products', limiter);
 } else {
@@ -100,12 +101,10 @@ app.use(express.urlencoded({ extended: true }));
 // Compression
 app.use(compression());
 
-// Logging
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+// HTTP Logging via Morgan → Winston
+app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined', {
+  stream: logger.stream,
+}));
 
 // Health check
 app.get('/health', async (req, res) => {

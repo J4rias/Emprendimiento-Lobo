@@ -1,5 +1,12 @@
+const logger = require('../config/logger');
+
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error(err.message || 'Unhandled error', {
+    name: err.name,
+    stack: err.stack,
+    method: req.method,
+    url: req.originalUrl,
+  });
 
   // Sequelize Validation Error
   if (err.name === 'SequelizeValidationError') {
