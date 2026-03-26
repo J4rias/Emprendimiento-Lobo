@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Lock, Unlock } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
+import { userService } from '../services/api/userService';
 
 const UsersPage = () => {
-  const { token, hasPermission } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { hasPermission } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -24,94 +25,60 @@ const UsersPage = () => {
     is_active: true,
   });
 
-  const API_URL = import.meta.env.VITE_API_URL || '/api';
+  const { data: usersData, isLoading: loading } = useQuery({
+    queryKey: ['users', search, roleFilter],
+    queryFn: () => userService.getAll({
+      ...(search && { search }),
+      ...(roleFilter && { roleId: roleFilter }),
+    }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchUsers();
-      fetchRoles();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search, roleFilter]);
+  const { data: rolesData } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => userService.getRoles(),
+    staleTime: Infinity,
+  });
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        ...(search && { search }),
-        ...(roleFilter && { roleId: roleFilter }),
-      });
+  const users = usersData?.data?.users || [];
+  const roles = rolesData?.data?.roles || [];
 
-      const response = await fetch(`${API_URL}/users?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
+  const saveMutation = useMutation({
+    mutationFn: (data) => {
+      if (editingUser) {
+        return userService.update(editingUser.id, data);
       }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return userService.create(data);
+    },
+    onSuccess: () => {
+      toast.success(editingUser ? 'Usuario actualizado' : 'Usuario creado');
+      setShowModal(false);
+      resetForm();
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Error al guardar el usuario');
+    },
+  });
 
-  const fetchRoles = async () => {
-    try {
-      const response = await fetch(`${API_URL}/roles`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setRoles(data.data.roles || []);
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-    }
-  };
+  const toggleMutation = useMutation({
+    mutationFn: (user) => userService.update(user.id, { is_active: !user.is_active }),
+    onSuccess: () => {
+      toast.success('Usuario actualizado');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Error al actualizar el usuario');
+    },
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    try {
-      const url = editingUser
-        ? `${API_URL}/users/${editingUser.id}`
-        : `${API_URL}/users`;
-
-      const method = editingUser ? 'PUT' : 'POST';
-
-      const payload = { ...formData };
-      if (editingUser && !payload.password) {
-        delete payload.password;
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setShowModal(false);
-        resetForm();
-        fetchUsers();
-      } else {
-        alert(data.message || 'Error al guardar el usuario');
-      }
-    } catch (error) {
-      console.error('Error saving user:', error);
-      alert('Error al guardar el usuario');
+    const payload = { ...formData };
+    if (editingUser && !payload.password) {
+      delete payload.password;
     }
+    saveMutation.mutate(payload);
   };
 
   const handleEdit = (user) => {
@@ -131,27 +98,7 @@ const UsersPage = () => {
 
   const handleToggleActive = async (user) => {
     if (!window.confirm(`¿Está seguro de ${user.is_active ? 'desactivar' : 'activar'} este usuario?`)) return;
-
-    try {
-      const response = await fetch(`${API_URL}/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ is_active: !user.is_active }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        fetchUsers();
-      } else {
-        alert(data.message || 'Error al actualizar el usuario');
-      }
-    } catch (error) {
-      console.error('Error updating user:', error);
-      alert('Error al actualizar el usuario');
-    }
+    toggleMutation.mutate(user);
   };
 
   const resetForm = () => {

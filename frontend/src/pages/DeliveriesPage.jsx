@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { deliveryService } from '../services/api/deliveryService';
 import { saleService } from '../services/api/saleService';
@@ -21,15 +22,12 @@ import Modal from '../components/common/Modal';
 
 const DeliveriesPage = () => {
   const { hasPermission } = useAuth();
-  const [deliveries, setDeliveries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingDelivery, setViewingDelivery] = useState(null);
@@ -56,49 +54,43 @@ const DeliveriesPage = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    fetchDeliveries();
-    fetchStats();
-  }, [currentPage, debouncedSearch, statusFilter]);
+  const { data: deliveriesData, isLoading: loading } = useQuery({
+    queryKey: ['deliveries', currentPage, debouncedSearch, statusFilter],
+    queryFn: () => deliveryService.getAll({
+      page: currentPage,
+      limit: 20,
+      search: debouncedSearch,
+      status: statusFilter || undefined
+    }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
+  const deliveries = deliveriesData?.data || [];
+  const totalPages = deliveriesData?.pagination?.totalPages || 1;
+  const error = mutationError;
 
-  const fetchDeliveries = async () => {
-    try {
-      setLoading(true);
-      const response = await deliveryService.getAll({
-        page: currentPage,
-        limit: 20,
-        search: debouncedSearch,
-        status: statusFilter || undefined
-      });
-      setDeliveries(response.data);
-      setTotalPages(response.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar las entregas');
-      console.error('Error fetching deliveries:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: statsData } = useQuery({
+    queryKey: ['deliveries-stats'],
+    queryFn: () => deliveryService.getStats(),
+    staleTime: 60_000,
+  });
+  const stats = statsData?.data || null;
 
-  const fetchStats = async () => {
-    try {
-      const response = await deliveryService.getStats();
-      setStats(response.data);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
+  const invalidateDeliveries = () => {
+    queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    queryClient.invalidateQueries({ queryKey: ['deliveries-stats'] });
   };
 
   const handleCreateDelivery = async (e) => {
     e.preventDefault();
+    setMutationError(null);
 
     try {
       // First, find the sale by sale_number
       const saleResponse = await saleService.getBySaleNumber(formData.sale_number);
 
       if (!saleResponse.data) {
-        setError('Venta no encontrada');
+        setMutationError('Venta no encontrada');
         return;
       }
 
@@ -120,12 +112,11 @@ const DeliveriesPage = () => {
 
       await deliveryService.create(data);
       setShowCreateModal(false);
-      fetchDeliveries();
-      fetchStats();
+      invalidateDeliveries();
       resetForm();
       alert('Entrega creada exitosamente');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear la entrega');
+      setMutationError(err.response?.data?.message || 'Error al crear la entrega');
     }
   };
 
@@ -143,8 +134,7 @@ const DeliveriesPage = () => {
     if (!window.confirm('¿Marcar esta entrega como en tránsito?')) return;
     try {
       await deliveryService.markAsInTransit(id);
-      fetchDeliveries();
-      fetchStats();
+      invalidateDeliveries();
       alert('Entrega marcada como en tránsito');
     } catch (err) {
       alert(err.response?.data?.message || 'Error al actualizar la entrega');
@@ -157,8 +147,7 @@ const DeliveriesPage = () => {
       await deliveryService.confirm(id, {
         delivery_date: new Date().toISOString().split('T')[0]
       });
-      fetchDeliveries();
-      fetchStats();
+      invalidateDeliveries();
       alert('Entrega confirmada exitosamente');
     } catch (err) {
       alert(err.response?.data?.message || 'Error al confirmar la entrega');
@@ -171,8 +160,7 @@ const DeliveriesPage = () => {
 
     try {
       await deliveryService.cancel(id, reason);
-      fetchDeliveries();
-      fetchStats();
+      invalidateDeliveries();
       alert('Entrega cancelada exitosamente');
     } catch (err) {
       alert(err.response?.data?.message || 'Error al cancelar la entrega');
@@ -339,7 +327,7 @@ const DeliveriesPage = () => {
           <div className="flex-1">
             <p className="text-sm text-red-800">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">
+          <button onClick={() => setMutationError(null)} className="text-red-600 hover:text-red-800">
             <X className="w-4 h-4" />
           </button>
         </div>

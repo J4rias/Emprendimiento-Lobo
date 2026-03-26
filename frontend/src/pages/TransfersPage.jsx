@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, Plus, Package, X, Check, Ban, Eye } from 'lucide-react';
 import { transferService } from '../services/api/transferService';
 import { warehouseService } from '../services/api/warehouseService';
@@ -8,9 +9,7 @@ import TransferFormModal from '../components/transfers/TransferFormModal';
 
 const TransfersPage = () => {
   const { hasPermission } = useAuth();
-  const [transfers, setTransfers] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedTransfer, setSelectedTransfer] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -20,33 +19,22 @@ const TransfersPage = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchWarehouses();
-    fetchTransfers();
-  }, [activeTab]);
+  const { data: warehousesData } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => warehouseService.getAll(),
+    staleTime: 5 * 60_000,
+  });
+  const warehouses = warehousesData?.data || [];
 
-  const fetchWarehouses = async () => {
-    try {
-      const response = await warehouseService.getAll();
-      setWarehouses(response.data || []);
-    } catch (error) {
-      console.error('Error fetching warehouses:', error);
-    }
-  };
-
-  const fetchTransfers = async () => {
-    try {
-      setLoading(true);
+  const { data: transfersData, isLoading: loading } = useQuery({
+    queryKey: ['transfers', activeTab],
+    queryFn: () => {
       const params = activeTab === 'all' ? {} : { status: activeTab };
-      const response = await transferService.getAll(params);
-      setTransfers(response.data?.transfers || []);
-    } catch (error) {
-      console.error('Error fetching transfers:', error);
-      toast.error('Error al cargar las transferencias');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return transferService.getAll(params);
+    },
+    staleTime: 30_000,
+  });
+  const transfers = transfersData?.data?.transfers || [];
 
   const handleViewDetails = async (transfer) => {
     try {
@@ -68,7 +56,7 @@ const TransfersPage = () => {
       toast.success('Transferencia recibida exitosamente');
       setShowReceiveModal(false);
       setSelectedTransfer(null);
-      fetchTransfers();
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
     } catch (error) {
       console.error('Error receiving transfer:', error);
       toast.error(error.response?.data?.message || 'Error al recibir la transferencia');
@@ -87,7 +75,7 @@ const TransfersPage = () => {
       setShowCancelModal(false);
       setSelectedTransfer(null);
       setCancelReason('');
-      fetchTransfers();
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
     } catch (error) {
       console.error('Error canceling transfer:', error);
       toast.error(error.response?.data?.message || 'Error al cancelar la transferencia');
@@ -107,7 +95,7 @@ const TransfersPage = () => {
         console.log('Inventory impact:', impact);
       }
 
-      fetchTransfers();
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
     } catch (error) {
       console.error('Error creating transfer:', error);
       toast.error(error.response?.data?.message || 'Error al crear la transferencia');

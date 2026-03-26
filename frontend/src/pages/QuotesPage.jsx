@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Eye, FileText } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
+import { quoteService } from '../services/api/quoteService';
 
 const QuotesPage = () => {
-  const { token, hasPermission } = useAuth();
-  const [quotes, setQuotes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { hasPermission } = useAuth();
+  const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState(null);
-
-  const API_URL = import.meta.env.VITE_API_URL || '/api';
 
   const statusLabels = {
     draft: { text: 'Borrador', class: 'bg-gray-100 text-gray-800' },
@@ -26,62 +25,35 @@ const QuotesPage = () => {
     expired: { text: 'Vencida', class: 'bg-orange-100 text-orange-800' },
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchQuotes();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [currentPage, search, statusFilter]);
+  const { data: quotesData, isLoading: loading } = useQuery({
+    queryKey: ['quotes', currentPage, search, statusFilter],
+    queryFn: () => quoteService.getAll({
+      page: currentPage,
+      limit: 20,
+      ...(search && { search }),
+      ...(statusFilter && { status: statusFilter }),
+    }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+  });
 
-  const fetchQuotes = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage,
-        limit: 20,
-        ...(search && { search }),
-        ...(statusFilter && { status: statusFilter }),
-      });
+  const quotes = quotesData?.data?.quotes || [];
+  const totalPages = quotesData?.data?.pagination?.pages || 1;
 
-      const response = await fetch(`${API_URL}/quotes?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setQuotes(data.data.quotes);
-        setTotalPages(data.data.pagination.pages);
-      }
-    } catch (error) {
-      console.error('Error fetching quotes:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: (id) => quoteService.delete(id),
+    onSuccess: () => {
+      toast.success('Cotización eliminada');
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Error al eliminar la cotización');
+    },
+  });
 
   const handleDelete = async (id) => {
     if (!window.confirm('¿Está seguro de eliminar esta cotización?')) return;
-
-    try {
-      const response = await fetch(`${API_URL}/quotes/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        fetchQuotes();
-      } else {
-        alert(data.message || 'Error al eliminar la cotización');
-      }
-    } catch (error) {
-      console.error('Error deleting quote:', error);
-      alert('Error al eliminar la cotización');
-    }
+    deleteMutation.mutate(id);
   };
 
   const handleView = (quote) => {

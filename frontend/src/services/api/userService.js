@@ -44,5 +44,11 @@ export const userService = {
     delete: async (id) => {
         const response = await api.delete(`/users/${id}`);
         return response.data;
+    },
+
+    // Get all roles
+    getRoles: async () => {
+        const response = await api.get('/roles');
+        return response.data;
     }
 };
