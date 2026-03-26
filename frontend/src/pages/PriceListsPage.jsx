@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { priceListService } from '../services/api/priceListService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
@@ -14,19 +15,16 @@ import { toast } from 'react-hot-toast';
 
 const PriceListsPage = () => {
     const { hasPermission } = useAuth();
+    const queryClient = useQueryClient();
 
-    // List state
-    const [lists, setLists] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // Search and pagination state
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [page, setPage] = useState(1);
-    const [pagination, setPagination] = useState({});
 
     // Editor state
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingList, setEditingList] = useState(null);
-    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -38,16 +36,45 @@ const PriceListsPage = () => {
     const [details, setDetails] = useState([]);
     const [detailSearch, setDetailSearch] = useState('');
     const [loadingProducts, setLoadingProducts] = useState(false);
-    const [exchangeRates, setExchangeRates] = useState([]);
 
     // Delete modal
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
 
     const printRef = useRef();
-    const editingListRef = useRef(null); // ref para acceder al valor actual en callbacks estables
+    const editingListRef = useRef(null);
 
-    // Auto-save: guarda un detail individual con debounce de 800ms
+    // Query: price lists with search, status filter, and pagination
+    const { data: listsData = {}, isLoading: loading } = useQuery({
+        queryKey: ['price-lists', searchTerm, statusFilter, page],
+        queryFn: async () => {
+            const res = await priceListService.getAll({
+                search: searchTerm,
+                status: statusFilter,
+                page,
+                limit: 20
+            });
+            return {
+                lists: res.data || [],
+                pagination: res.pagination || {}
+            };
+        }
+    });
+
+    const lists = listsData.lists || [];
+    const pagination = listsData.pagination || {};
+
+    // Query: exchange rates (static reference data)
+    const { data: exchangeRates = [] } = useQuery({
+        queryKey: ['exchange-rates'],
+        queryFn: async () => {
+            const res = await exchangeRateService.getLatest();
+            return res.data || [];
+        },
+        staleTime: Infinity
+    });
+
+    // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(
         (data) => priceListService.updateDetail(editingListRef.current?.id, data),
         []
@@ -61,41 +88,6 @@ const PriceListsPage = () => {
         delay: 800,
         onConflict: autoSaveOnConflict,
     });
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchLists();
-            loadExchangeRates();
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm, statusFilter, page]);
-
-    const loadExchangeRates = async () => {
-        try {
-            const res = await exchangeRateService.getLatest();
-            setExchangeRates(res.data || []);
-        } catch (err) {
-            console.error('Error loading rates:', err);
-        }
-    };
-
-    const fetchLists = async () => {
-        try {
-            setLoading(true);
-            const res = await priceListService.getAll({
-                search: searchTerm,
-                status: statusFilter,
-                page,
-                limit: 20
-            });
-            setLists(res.data || []);
-            setPagination(res.pagination || {});
-        } catch (err) {
-            toast.error('Error al cargar listas de precios');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     // ===================== STATUS HELPERS =====================
     const getCostInUSD = (cost, currency) => {
@@ -417,21 +409,13 @@ const PriceListsPage = () => {
         }
     };
 
-    const handleSave = async () => {
-        if (!formData.name.trim()) {
-            toast.error('El nombre de la lista es obligatorio');
-            return;
-        }
-        try {
-            setSaving(true);
-
+    // Mutation: save (create or update)
+    const saveMutation = useMutation({
+        mutationFn: async () => {
             if (editingList) {
-                // Edición: solo guardar el header (los detalles se auto-guardan individualmente)
                 const payload = { ...formData, renewValidity: true };
-                await priceListService.update(editingList.id, payload);
-                toast.success('Lista actualizada exitosamente');
+                return priceListService.update(editingList.id, payload);
             } else {
-                // Creación: guardar header + todos los detalles en una sola operación
                 const payload = {
                     ...formData,
                     renewValidity: true,
@@ -448,47 +432,74 @@ const PriceListsPage = () => {
                         frozen_currency: d.frozen_currency
                     }))
                 };
-                await priceListService.create(payload);
-                toast.success('Lista creada exitosamente');
+                return priceListService.create(payload);
             }
+        },
+        onSuccess: () => {
+            toast.success(editingList ? 'Lista actualizada exitosamente' : 'Lista creada exitosamente');
             closeEditor();
-            fetchLists();
-        } catch (err) {
+            queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+        },
+        onError: (err) => {
             toast.error(err.response?.data?.message || 'Error al guardar la lista');
-        } finally {
-            setSaving(false);
         }
+    });
+
+    const handleSave = async () => {
+        if (!formData.name.trim()) {
+            toast.error('El nombre de la lista es obligatorio');
+            return;
+        }
+        saveMutation.mutate();
     };
 
-    const handleDuplicate = async (list) => {
-        try {
-            await priceListService.duplicate(list.id, `${list.name} (Copia)`);
+    // Mutation: duplicate
+    const duplicateMutation = useMutation({
+        mutationFn: (list) => priceListService.duplicate(list.id, `${list.name} (Copia)`),
+        onSuccess: () => {
             toast.success('Lista duplicada exitosamente');
-            fetchLists();
-        } catch {
+            queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+        },
+        onError: () => {
             toast.error('Error al duplicar la lista');
         }
+    });
+
+    const handleDuplicate = (list) => {
+        duplicateMutation.mutate(list);
     };
 
-    const handleDelete = async () => {
-        try {
-            await priceListService.delete(deletingId);
+    // Mutation: delete
+    const deleteMutation = useMutation({
+        mutationFn: (id) => priceListService.delete(id),
+        onSuccess: () => {
             toast.success('Lista eliminada');
             setShowDeleteModal(false);
             setDeletingId(null);
-            fetchLists();
-        } catch {
+            queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+        },
+        onError: () => {
             toast.error('Error al eliminar la lista');
         }
+    });
+
+    const handleDelete = () => {
+        deleteMutation.mutate(deletingId);
     };
 
-    const handleExportCSV = async (id) => {
-        try {
-            await priceListService.exportCSV(id);
+    // Mutation: export CSV
+    const exportMutation = useMutation({
+        mutationFn: (id) => priceListService.exportCSV(id),
+        onSuccess: () => {
             toast.success('CSV exportado');
-        } catch {
+        },
+        onError: () => {
             toast.error('Error al exportar');
         }
+    });
+
+    const handleExportCSV = (id) => {
+        exportMutation.mutate(id);
     };
 
     const handlePrint = () => {
@@ -616,11 +627,11 @@ const PriceListsPage = () => {
                         )}
                         <button
                             onClick={handleSave}
-                            disabled={saving}
+                            disabled={saveMutation.isPending}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
                             <Save className="w-4 h-4" />
-                            {saving ? 'Guardando...' : editingList ? 'Guardar Info' : 'Guardar'}
+                            {saveMutation.isPending ? 'Guardando...' : editingList ? 'Guardar Info' : 'Guardar'}
                         </button>
                     </div>
                 </div>

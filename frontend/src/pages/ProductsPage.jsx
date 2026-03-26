@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
@@ -38,19 +39,12 @@ const API_BASE_URL = API_URL.replace(/\/api$/, '');
 
 const ProductsPage = () => {
   const { token, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [packagingTypes, setPackagingTypes] = useState([]);
-  const [presentationTypes, setPresentationTypes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [viewMode, setViewMode] = useState(false);
@@ -61,20 +55,140 @@ const ProductsPage = () => {
   const [barcodeError, setBarcodeError] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [presentations, setPresentations] = useState([]);
-  const [exchangeRates, setExchangeRates] = useState([]);
 
-  // Fetch exchange rates on load
-  useEffect(() => {
-    const fetchRates = async () => {
-      try {
-        const data = await exchangeRateService.getLatest();
-        setExchangeRates(data.data || []);
-      } catch (err) {
-        console.error('Error fetching rates:', err);
-      }
-    };
-    fetchRates();
-  }, []);
+  // Query: products list
+  const { data: productsData = {}, isLoading: loading } = useQuery({
+    queryKey: ['products', currentPage, debouncedSearch, categoryFilter],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/products?page=${currentPage}&search=${debouncedSearch}&category_id=${categoryFilter}&limit=20`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar productos');
+      const data = await response.json();
+      return { products: data.data || [], totalPages: data.pagination?.totalPages || 1 };
+    }
+  });
+
+  const products = productsData.products || [];
+  const totalPages = productsData.totalPages || 1;
+
+  // Query: categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/categories`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar categorías');
+      const data = await response.json();
+      return data.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: brands
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/brands`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar marcas');
+      const data = await response.json();
+      return data.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: packaging types
+  const { data: packagingTypes = [] } = useQuery({
+    queryKey: ['packaging-types'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/packaging-types`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar tipos de empaque');
+      const data = await response.json();
+      return data.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: presentation types
+  const { data: presentationTypes = [] } = useQuery({
+    queryKey: ['presentation-types'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/presentation-types`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar tipos de presentación');
+      const data = await response.json();
+      return data.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: exchange rates
+  const { data: exchangeRates = [] } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: async () => {
+      const data = await exchangeRateService.getLatest();
+      return data.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Form and error state
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category_id: '',
+    barcode: '',
+    brand_id: '',
+    unit_size: '',
+    unit_size_measure: 'UND',
+    is_perishable: false,
+    has_batch_control: false,
+    min_stock: 0,
+    max_stock: 0,
+    reorder_point: 0,
+    is_active: true
+  });
+
+  // Debounce search
+  const handleSearchChange = (value) => {
+    setSearch(value);
+  };
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Handle URL parameter for new product
+  React.useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new') {
+      setShowModal(true);
+      setEditingProduct(null);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('action');
+      setSearchParams(newParams);
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Auto-hide error after 3 seconds
+  React.useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const getEffectiveRate = (from, to) => {
     if (!exchangeRates || exchangeRates.length === 0 || from === to) return 1;
@@ -126,50 +240,6 @@ const ProductsPage = () => {
 
     return { bultos, unidades, totalValueCOP, unitsPerPackage };
   };
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    category_id: '',
-    barcode: '',
-    brand_id: '',
-    unit_size: '',
-    unit_size_measure: 'UND',
-    is_perishable: false,
-    has_batch_control: false,
-    min_stock: 0,
-    max_stock: 0,
-    reorder_point: 0,
-    is_active: true
-  });
-
-  // Debounce search to avoid losing focus
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    fetchBrands();
-    fetchPackagingTypes();
-    fetchPresentationTypes();
-  }, [currentPage, debouncedSearch, categoryFilter]);
-
-  // Check if action=new parameter is present
-  useEffect(() => {
-    const action = searchParams.get('action');
-    if (action === 'new') {
-      setShowModal(true);
-      setEditingProduct(null);
-      // Remove the action parameter from URL
-      searchParams.delete('action');
-      setSearchParams(searchParams);
-    }
-  }, [searchParams]);
 
   const fetchCategories = async () => {
     try {
@@ -472,26 +542,27 @@ const ProductsPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Está seguro de eliminar este producto?')) return;
-
-    try {
-      const response = await fetch(`${API_URL}/products/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar producto');
-      }
-
-      await fetchProducts();
-    } catch (err) {
-      setError(err.message);
+  // Mutation: delete product
+  const deleteMutation = useMutation({
+    mutationFn: (id) => fetch(`${API_URL}/products/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => {
+      if (!r.ok) return r.json().then(d => { throw new Error(d.message || 'Error al eliminar producto'); });
+      return r.json();
+    }),
+    onSuccess: () => {
+      toast.success('Producto eliminado exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Error al eliminar producto');
     }
+  });
+
+  const handleDelete = (id) => {
+    if (!confirm('¿Está seguro de eliminar este producto?')) return;
+    deleteMutation.mutate(id);
   };
 
   const handleCloseModal = () => {

@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { saleService } from '../services/api/saleService';
 import { inventoryService } from '../services/api/inventoryService';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { productService } from '../services/api/productService';
+import { toast } from 'react-hot-toast';
 import {
   FileText,
   Download,
@@ -20,9 +22,6 @@ const ReportsPage = () => {
     start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0]
   });
-  const [reportData, setReportData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
 
   const reportTypes = [
     { value: 'sales', label: 'Reporte de Ventas', icon: DollarSign },
@@ -32,145 +31,111 @@ const ReportsPage = () => {
     { value: 'low_stock', label: 'Productos con Bajo Stock', icon: Package }
   ];
 
-  const generateReport = async () => {
-    try {
-      setLoading(true);
-      setReportData(null);
-      setStats(null);
-
-      switch (reportType) {
-        case 'sales':
-          await generateSalesReport();
-          break;
-        case 'inventory':
-          await generateInventoryReport();
-          break;
-        case 'purchases':
-          await generatePurchasesReport();
-          break;
-        case 'top_products':
-          await generateTopProductsReport();
-          break;
-        case 'low_stock':
-          await generateLowStockReport();
-          break;
-        default:
-          break;
-      }
-    } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Error al generar el reporte');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateSalesReport = async () => {
-    const [salesStats, salesList] = await Promise.all([
-      saleService.getSalesStats(dateRange),
-      saleService.getSales({ ...dateRange, limit: 1000 })
-    ]);
-
-    setStats({
-      total_sales: salesStats.data?.total_sales || 0,
-      total_amount: salesStats.data?.total_amount || 0,
-      average_ticket: salesStats.data?.average_ticket || 0,
-      sales_by_type: salesStats.data?.sales_by_type || []
-    });
-
-    setReportData(salesList.data || []);
-  };
-
-  const generateInventoryReport = async () => {
-    const inventoryData = await inventoryService.getAll({ limit: 1000 });
-
-    let totalValue = 0;
-    const processedData = (inventoryData.data || []).map(item => {
-      const value = (item.quantity || 0) * (item.product?.cost || 0);
-      totalValue += value;
-      return {
-        ...item,
-        value
-      };
-    });
-
-    setStats({
-      total_items: processedData.length,
-      total_value: totalValue,
-      total_quantity: processedData.reduce((sum, item) => sum + (item.quantity || 0), 0)
-    });
-
-    setReportData(processedData);
-  };
-
-  const generatePurchasesReport = async () => {
-    const purchaseOrders = await purchaseOrderService.getAll({
-      ...dateRange,
-      limit: 1000
-    });
-
-    const totalAmount = (purchaseOrders.data || []).reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
-
-    setStats({
-      total_orders: purchaseOrders.data?.length || 0,
-      total_amount: totalAmount,
-      average_order: purchaseOrders.data?.length > 0 ? totalAmount / purchaseOrders.data.length : 0
-    });
-
-    setReportData(purchaseOrders.data || []);
-  };
-
-  const generateTopProductsReport = async () => {
-    const salesData = await saleService.getAll({
-      ...dateRange,
-      limit: 1000
-    });
-
-    // Aggregate product sales
-    const productMap = {};
-    (salesData.data || []).forEach(sale => {
-      (sale.details || []).forEach(detail => {
-        const productId = detail.product_id;
-        if (!productMap[productId]) {
-          productMap[productId] = {
-            product: detail.product,
-            total_quantity: 0,
-            total_amount: 0,
-            sales_count: 0
+  const generateReportMutation = useMutation({
+    mutationFn: async ({ type, dateRange: range }) => {
+      switch (type) {
+        case 'sales': {
+          const [salesStats, salesList] = await Promise.all([
+            saleService.getSalesStats(range),
+            saleService.getSales({ ...range, limit: 1000 })
+          ]);
+          return {
+            stats: {
+              total_sales: salesStats.data?.total_sales || 0,
+              total_amount: salesStats.data?.total_amount || 0,
+              average_ticket: salesStats.data?.average_ticket || 0,
+              sales_by_type: salesStats.data?.sales_by_type || []
+            },
+            data: salesList.data || []
           };
         }
-        productMap[productId].total_quantity += (detail.package_quantity || 0) * (detail.product?.presentation?.units_per_package || 1) + (detail.loose_units || 0);
-        productMap[productId].total_amount += parseFloat(detail.line_total || 0);
-        productMap[productId].sales_count += 1;
-      });
-    });
+        case 'inventory': {
+          const inventoryData = await inventoryService.getAll({ limit: 1000 });
+          let totalValue = 0;
+          const processedData = (inventoryData.data || []).map(item => {
+            const value = (item.quantity || 0) * (item.product?.cost || 0);
+            totalValue += value;
+            return { ...item, value };
+          });
+          return {
+            stats: {
+              total_items: processedData.length,
+              total_value: totalValue,
+              total_quantity: processedData.reduce((sum, item) => sum + (item.quantity || 0), 0)
+            },
+            data: processedData
+          };
+        }
+        case 'purchases': {
+          const purchaseOrders = await purchaseOrderService.getAll({ ...range, limit: 1000 });
+          const totalAmount = (purchaseOrders.data || []).reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
+          return {
+            stats: {
+              total_orders: purchaseOrders.data?.length || 0,
+              total_amount: totalAmount,
+              average_order: purchaseOrders.data?.length > 0 ? totalAmount / purchaseOrders.data.length : 0
+            },
+            data: purchaseOrders.data || []
+          };
+        }
+        case 'top_products': {
+          const salesData = await saleService.getAll({ ...range, limit: 1000 });
+          const productMap = {};
+          (salesData.data || []).forEach(sale => {
+            (sale.details || []).forEach(detail => {
+              const productId = detail.product_id;
+              if (!productMap[productId]) {
+                productMap[productId] = {
+                  product: detail.product,
+                  total_quantity: 0,
+                  total_amount: 0,
+                  sales_count: 0
+                };
+              }
+              productMap[productId].total_quantity += (detail.package_quantity || 0) * (detail.product?.presentation?.units_per_package || 1) + (detail.loose_units || 0);
+              productMap[productId].total_amount += parseFloat(detail.line_total || 0);
+              productMap[productId].sales_count += 1;
+            });
+          });
+          const topProducts = Object.values(productMap)
+            .sort((a, b) => b.total_amount - a.total_amount)
+            .slice(0, 50);
+          return {
+            stats: {
+              total_products: topProducts.length,
+              total_revenue: topProducts.reduce((sum, p) => sum + p.total_amount, 0),
+              total_units_sold: topProducts.reduce((sum, p) => sum + p.total_quantity, 0)
+            },
+            data: topProducts
+          };
+        }
+        case 'low_stock': {
+          const lowStockData = await inventoryService.getLowStock({ limit: 1000 });
+          return {
+            stats: {
+              critical_items: lowStockData.data?.length || 0
+            },
+            data: lowStockData.data || []
+          };
+        }
+        default:
+          return { stats: null, data: [] };
+      }
+    },
+    onError: (error) => {
+      toast.error('Error al generar el reporte');
+      console.error('Error generating report:', error);
+    }
+  });
 
-    const topProducts = Object.values(productMap)
-      .sort((a, b) => b.total_amount - a.total_amount)
-      .slice(0, 50);
-
-    setStats({
-      total_products: topProducts.length,
-      total_revenue: topProducts.reduce((sum, p) => sum + p.total_amount, 0),
-      total_units_sold: topProducts.reduce((sum, p) => sum + p.total_quantity, 0)
-    });
-
-    setReportData(topProducts);
-  };
-
-  const generateLowStockReport = async () => {
-    const lowStockData = await inventoryService.getLowStock({ limit: 1000 });
-
-    setStats({
-      critical_items: lowStockData.data?.length || 0
-    });
-
-    setReportData(lowStockData.data || []);
-  };
+  const reportResult = generateReportMutation.data;
+  const stats = reportResult?.stats ?? null;
+  const reportData = reportResult?.data ?? null;
+  const loading = generateReportMutation.isPending;
 
   const exportToCSV = () => {
     if (!reportData || reportData.length === 0) {
-      alert('No hay datos para exportar');
+      toast.error('No hay datos para exportar');
       return;
     }
 
@@ -202,7 +167,6 @@ const ReportsPage = () => {
         return;
     }
 
-    // Create and download
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -224,11 +188,9 @@ const ReportsPage = () => {
       const presentations = item.product?.presentations || [];
       const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
       const unitsPerPackage = defaultPresentation?.units_per_package || 1;
-
       const totalUnits = item.quantity || 0;
       const stockPackages = Math.floor(totalUnits / unitsPerPackage);
       const stockRemainingUnits = totalUnits % unitsPerPackage;
-
       csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.cost || 0},${item.value || 0}\n`;
     });
     return csv;
@@ -256,11 +218,9 @@ const ReportsPage = () => {
       const presentations = item.product?.presentations || [];
       const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
       const unitsPerPackage = defaultPresentation?.units_per_package || 1;
-
       const totalUnits = item.quantity || 0;
       const stockPackages = Math.floor(totalUnits / unitsPerPackage);
       const stockRemainingUnits = totalUnits % unitsPerPackage;
-
       csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.minimum_stock || 0},"Crítico"\n`;
     });
     return csv;
@@ -268,7 +228,6 @@ const ReportsPage = () => {
 
   const renderStatsCards = () => {
     if (!stats) return null;
-
     switch (reportType) {
       case 'sales':
         return (
@@ -378,16 +337,10 @@ const ReportsPage = () => {
               {reportData.map((sale, index) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.sale_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(sale.sale_date).toLocaleDateString()}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(sale.sale_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sale.customer?.name || 'Cliente General'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    $ {parseFloat(sale.total || 0).toFixed(2)}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(sale.total || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -413,12 +366,8 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                    $ {parseFloat(item.product?.cost || 0).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    $ {parseFloat(item.value || 0).toFixed(2)}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">$ {parseFloat(item.product?.cost || 0).toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.value || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -440,14 +389,10 @@ const ReportsPage = () => {
               {reportData.map((po, index) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{po.order_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(po.order_date).toLocaleDateString()}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(po.order_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.supplier?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.status}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    {po.currency} {parseFloat(po.total || 0).toFixed(2)}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{po.currency} {parseFloat(po.total || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -471,9 +416,7 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    $ {parseFloat(item.total_amount || 0).toFixed(2)}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_amount || 0).toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{item.sales_count}</td>
                 </tr>
               ))}
@@ -518,16 +461,13 @@ const ReportsPage = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
         <p className="text-gray-600 mt-1">Genera y exporta reportes del sistema</p>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Report Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Filter className="w-4 h-4 inline mr-1" />
@@ -535,7 +475,10 @@ const ReportsPage = () => {
             </label>
             <select
               value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
+              onChange={(e) => {
+                setReportType(e.target.value);
+                generateReportMutation.reset();
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {reportTypes.map(type => (
@@ -546,7 +489,6 @@ const ReportsPage = () => {
             </select>
           </div>
 
-          {/* Date Range (only for date-dependent reports) */}
           {['sales', 'purchases', 'top_products'].includes(reportType) && (
             <>
               <div>
@@ -578,10 +520,9 @@ const ReportsPage = () => {
           )}
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-3 mt-6">
           <button
-            onClick={generateReport}
+            onClick={() => generateReportMutation.mutate({ type: reportType, dateRange })}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
@@ -601,10 +542,8 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       {renderStatsCards()}
 
-      {/* Report Table */}
       {reportData && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">

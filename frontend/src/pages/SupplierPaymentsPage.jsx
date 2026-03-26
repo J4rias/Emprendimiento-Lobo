@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supplierPaymentService } from '../services/api/supplierPaymentService';
@@ -47,26 +48,74 @@ const parseNum = (val) => {
 
 const SupplierPaymentsPage = () => {
   const { hasPermission } = useAuth();
-  const [payments, setPayments] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const location = useLocation();
+
+  // Search, filters, pagination state
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState(null);
-  const [payableBalanceSummary, setPayableBalanceSummary] = useState(null);
-  const [creditBalances, setCreditBalances] = useState(null);
+
+  // UI state (forms, modals, viewing)
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [viewingPayment, setViewingPayment] = useState(null);
   const [editingPayment, setEditingPayment] = useState(null);
-  const location = useLocation();
+  const [error, setError] = useState(null);
+
+  // Query: supplier payments
+  const { data: paymentsData = {}, isLoading: loading } = useQuery({
+    queryKey: ['supplier-payments', currentPage, debouncedSearch, supplierFilter, paymentMethodFilter],
+    queryFn: async () => {
+      const response = await supplierPaymentService.getPayments({
+        page: currentPage,
+        search: debouncedSearch,
+        supplier_id: supplierFilter,
+        payment_method: paymentMethodFilter,
+        limit: 20
+      });
+      return {
+        payments: response.data || [],
+        totalPages: response.pagination?.totalPages || 1
+      };
+    }
+  });
+
+  const payments = paymentsData.payments || [];
+  const totalPages = paymentsData.totalPages || 1;
+
+  // Query: suppliers
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const response = await supplierService.getAll({ limit: 1000 });
+      return response.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: exchange rates
+  const { data: exchangeRates = [] } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: async () => {
+      const response = await exchangeRateService.getLatest();
+      return response.data || [];
+    },
+    staleTime: Infinity
+  });
+
+  // Query: stats
+  const { data: stats = null } = useQuery({
+    queryKey: ['supplier-payment-stats', supplierFilter],
+    queryFn: async () => {
+      if (!supplierFilter) return null;
+      const response = await supplierPaymentService.getStats(supplierFilter);
+      return response.data || null;
+    }
+  });
 
   useEffect(() => {
     if (location.state?.prefillOrder) {
@@ -148,18 +197,12 @@ const SupplierPaymentsPage = () => {
   const [userEditedAmount, setUserEditedAmount] = useState(false); // Track if user manually changed the amount
 
   // Debounce search
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  useEffect(() => {
-    fetchPayments();
-    fetchStats();
-    fetchSuppliers();
-  }, [currentPage, debouncedSearch, supplierFilter, paymentMethodFilter]);
 
   // Auto-allocate when the user types an amount and there's exactly 1 allocation (useful for prefilled POs)
   useEffect(() => {
@@ -380,16 +423,22 @@ const SupplierPaymentsPage = () => {
     }
   };
 
-  const handleDeletePayment = async (id) => {
-    if (!window.confirm('¿Anular este pago? El registro se conservará con estado "Cancelado" para auditoría. Esta acción no se puede deshacer.')) return;
-    try {
-      await supplierPaymentService.delete(id);
-      fetchPayments();
-      fetchStats();
+  // Mutation: delete payment
+  const deletePaymentMutation = useMutation({
+    mutationFn: (id) => supplierPaymentService.delete(id),
+    onSuccess: () => {
       alert('Pago anulado exitosamente');
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ['supplier-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-payment-stats'] });
+    },
+    onError: (err) => {
       alert(err.response?.data?.message || 'Error al anular el pago');
     }
+  });
+
+  const handleDeletePayment = (id) => {
+    if (!window.confirm('¿Anular este pago? El registro se conservará con estado "Cancelado" para auditoría. Esta acción no se puede deshacer.')) return;
+    deletePaymentMutation.mutate(id);
   };
 
   const handleViewPayment = async (payment) => {
