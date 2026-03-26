@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -104,7 +104,7 @@ const ProductsPage = () => {
   const { data: packagingTypes = [] } = useQuery({
     queryKey: ['packaging-types'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/packaging-types`, {
+      const response = await fetch(`${API_URL}/packaging-types/active`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar tipos de empaque');
@@ -118,7 +118,7 @@ const ProductsPage = () => {
   const { data: presentationTypes = [] } = useQuery({
     queryKey: ['presentation-types'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/presentation-types`, {
+      const response = await fetch(`${API_URL}/presentation-types/active`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar tipos de presentación');
@@ -161,7 +161,7 @@ const ProductsPage = () => {
     setSearch(value);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
@@ -169,7 +169,7 @@ const ProductsPage = () => {
   }, [search]);
 
   // Handle URL parameter for new product
-  React.useEffect(() => {
+  useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'new') {
       setShowModal(true);
@@ -181,7 +181,7 @@ const ProductsPage = () => {
   }, [searchParams, setSearchParams]);
 
   // Auto-hide error after 3 seconds
-  React.useEffect(() => {
+  useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
         setError(null);

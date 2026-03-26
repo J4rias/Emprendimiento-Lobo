@@ -663,6 +663,16 @@ exports.addPayment = async (req, res) => {
       }, { transaction });
 
       createdPayments.push(payment);
+
+      // If payment is via credit_balance, deduct it from Customer
+      if (payLine.method === 'credit_balance' && sale.customer_id) {
+        const customer = await Customer.findByPk(sale.customer_id, { transaction });
+        if (customer) {
+          const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
+          const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - amountUSD);
+          await customer.update({ creditBalance: newBalance }, { transaction });
+        }
+      }
     }
 
     const newPaidAmount = parseFloat(sale.paid_amount) + newlyPaidUSD;

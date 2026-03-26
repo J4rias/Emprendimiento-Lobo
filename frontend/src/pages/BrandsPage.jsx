@@ -14,7 +14,6 @@ const BrandsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const [formData, setFormData] = useState({
     name: '',

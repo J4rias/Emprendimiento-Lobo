@@ -837,31 +837,50 @@ class CustomerController {
         summary[curr].available_credit = 0;
       }
 
-      // Calculate saldo a favor: aggregate paid vs invoiced, only for sales with at least one payment
-      const paymentsBySale = {};
+      // Calculate saldo a favor (two-step approach):
+      // Step 1: Compute overpayment from credit sales with REAL (non-credit_balance) payments
+      const realPaymentsBySale = {};
       for (const pay of payments) {
+        if (pay.payment_method === 'credit_balance') continue;
         const saleId = pay.sale?.id;
         if (!saleId) continue;
-        if (!paymentsBySale[saleId]) paymentsBySale[saleId] = [];
-        paymentsBySale[saleId].push(pay);
+        if (!realPaymentsBySale[saleId]) realPaymentsBySale[saleId] = [];
+        realPaymentsBySale[saleId].push(pay);
       }
-      let availableCreditCOP = 0;
-      let invoicedWithPaymentsCOP = 0;
-      let totalPaidCOP = 0;
+      let totalRealPaidCOP = 0;
+      let totalInvoicedForReallyPaidCOP = 0;
       for (const sale of sales) {
         const saleRate = parseFloat(sale.exchange_rate || 1);
-        const salePays = paymentsBySale[sale.id] || [];
-        if (salePays.length === 0) continue; // skip untouched pending sales
-        const paidCOP = salePays.reduce((sum, p) => {
-          if (p.payment_method === 'credit_balance') return sum; // skip: already counted in source payment
+        const saleRealPays = realPaymentsBySale[sale.id] || [];
+        if (saleRealPays.length === 0) continue;
+        const paidCOP = saleRealPays.reduce((sum, p) => {
           if (p.currency === 'COP') return sum + parseFloat(p.amount);
           const payRate = parseFloat(p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : saleRate);
           return sum + parseFloat(p.amount) * payRate;
         }, 0);
-        invoicedWithPaymentsCOP += parseFloat(sale.total) * saleRate;
-        totalPaidCOP += paidCOP;
+        totalInvoicedForReallyPaidCOP += parseFloat(sale.total) * saleRate;
+        totalRealPaidCOP += paidCOP;
       }
-      availableCreditCOP = Math.max(0, totalPaidCOP - invoicedWithPaymentsCOP);
+      const overpaymentCOP = Math.max(0, totalRealPaidCOP - totalInvoicedForReallyPaidCOP);
+
+      // Step 2: Subtract ALL credit_balance payments already used (any sale type)
+      const allCBPayments = await SalePayment.findAll({
+        include: [{
+          model: Sale,
+          as: 'sale',
+          where: { customer_id: id },
+          attributes: ['id', 'exchange_rate']
+        }],
+        where: { payment_method: 'credit_balance' },
+        attributes: ['amount', 'currency', 'exchange_rate']
+      });
+      let creditBalanceUsedCOP = 0;
+      for (const p of allCBPayments) {
+        const rate = parseFloat((p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : p.sale?.exchange_rate) || 1);
+        creditBalanceUsedCOP += p.currency === 'COP' ? parseFloat(p.amount) : parseFloat(p.amount) * rate;
+      }
+      const availableCreditCOP = Math.max(0, overpaymentCOP - creditBalanceUsedCOP);
+
       if (summary['COP']) summary['COP'].available_credit = Math.round(availableCreditCOP);
       if (summary['USD']) summary['USD'].available_credit = 0;
 
@@ -908,7 +927,7 @@ class CustomerController {
       for (const s of sales) {
         const saleRate = parseFloat(s.exchange_rate || 1);
         const realPayments = (s.payments || []).filter(p => p.payment_method !== 'credit_balance');
-        const hasPaid = realPayments.length > 0;
+        const hasPaid = (s.payments || []).length > 0; // include sales paid via credit_balance
         const paidCOP = realPayments.reduce((pSum, p) => {
           if (p.currency === 'COP') return pSum + parseFloat(p.amount);
           return pSum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);

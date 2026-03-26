@@ -600,7 +600,7 @@ const POSPage = () => {
     return sub - disc;
   };
 
-  const calculateTotals = useCallback(() => {
+  const calculateTotals = () => {
     let subtotal = 0, totalDiscount = 0;
     cart.forEach(item => {
       const usdPrice = getEffectiveUSDPrice(item);
@@ -616,7 +616,7 @@ const POSPage = () => {
       total: finalTotal,
       totalRaw: finalTotal
     };
-  }, [cart]);
+  };
 
   const convertToOtherCurrency = (usdAmount, targetCurrency) => {
     const rate = getEffectiveRate('USD', targetCurrency);
