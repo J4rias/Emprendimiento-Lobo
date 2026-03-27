@@ -129,15 +129,12 @@ const ProductsPage = () => {
   });
 
   // Query: exchange rates
-  const { data: exchangeRates = [] } = useQuery({
+  const { data: ratesData } = useQuery({
     queryKey: ['exchange-rates'],
-    queryFn: async () => {
-      const data = await exchangeRateService.getLatest();
-      const rates = data.data;
-      return Array.isArray(rates) ? rates : [];
-    },
+    queryFn: () => exchangeRateService.getLatest(),
     staleTime: Infinity
   });
+  const exchangeRates = ratesData?.data || [];
 
   // Form and error state
   const [error, setError] = useState(null);

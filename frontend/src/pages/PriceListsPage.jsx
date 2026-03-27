@@ -65,14 +65,12 @@ const PriceListsPage = () => {
     const pagination = listsData.pagination || {};
 
     // Query: exchange rates (static reference data)
-    const { data: exchangeRates = [] } = useQuery({
+    const { data: ratesData } = useQuery({
         queryKey: ['exchange-rates'],
-        queryFn: async () => {
-            const res = await exchangeRateService.getLatest();
-            return res.data || [];
-        },
+        queryFn: () => exchangeRateService.getLatest(),
         staleTime: Infinity
     });
+    const exchangeRates = ratesData?.data || [];
 
     // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(

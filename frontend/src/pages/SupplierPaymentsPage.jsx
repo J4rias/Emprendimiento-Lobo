@@ -98,14 +98,12 @@ const SupplierPaymentsPage = () => {
   });
 
   // Query: exchange rates
-  const { data: exchangeRates = [] } = useQuery({
+  const { data: ratesData } = useQuery({
     queryKey: ['exchange-rates'],
-    queryFn: async () => {
-      const response = await exchangeRateService.getLatest();
-      return response.data || [];
-    },
+    queryFn: () => exchangeRateService.getLatest(),
     staleTime: Infinity
   });
+  const exchangeRates = ratesData?.data || [];
 
   // Query: stats
   const { data: stats = null } = useQuery({
