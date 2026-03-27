@@ -289,6 +289,15 @@ exports.createCreditNote = async (req, res) => {
       });
     }
 
+    // Validate refund method vs customer type
+    if (refund_method === 'credit_balance' && !sale.customer_id) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'El Consumidor Final no tiene monedero. Seleccione otro método de reembolso.'
+      });
+    }
+
     // Generate credit note number
     const credit_note_number = await generateCreditNoteNumber();
 
@@ -364,7 +373,7 @@ exports.createCreditNote = async (req, res) => {
       tax_amount,
       total,
       refund_method: refund_method || 'none',
-      refund_amount: refund_amount || 0,
+      refund_amount: refund_amount || (refund_method === 'credit_balance' ? total : 0),
       refund_reference: refund_reference || null,
       notes: notes || null,
       created_by: req.user.id
@@ -525,10 +534,10 @@ exports.approveCreditNote = async (req, res) => {
           presentation_id: detail.presentation_id,
           batch_id: detail.batch_id || null,
           type: 'ingreso',
-          movement_type: 'return',
+          movement_type: 'ingreso',
           package_quantity: detail.package_quantity_returned,
           loose_units: detail.loose_units_returned,
-          total_units: totalUnits,
+          quantity: totalUnits,
           unit_cost: detail.unit_price,
           reference_type: 'credit_note',
           reference_id: creditNote.id,

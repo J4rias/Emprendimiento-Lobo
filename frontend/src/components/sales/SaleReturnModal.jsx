@@ -21,7 +21,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
             setReturnItems(items);
             setReason('return');
             setReasonDescription('');
-            setRefundMethod('credit_balance');
+            setRefundMethod(sale.customer_id ? 'credit_balance' : 'cash');
         }
     }, [isOpen, sale]);
 
@@ -73,7 +73,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
     const COP_RATE = sale?.exchange_rate || 1; // Simplification, normally fetched from effective rate
 
     const formatCurrency = (val) => {
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(val * COP_RATE);
+        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.round(val * COP_RATE));
     };
 
     const handleSubmit = async (e) => {
@@ -86,8 +86,10 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
             return;
         }
 
-        if (!sale?.customer_id) {
-            alert('Esta venta no tiene un cliente asociado. No se puede emitir Nota de Crédito/Saldo a favor.');
+        const isConsumidorFinal = !sale?.customer_id;
+
+        if (isConsumidorFinal && refundMethod === 'credit_balance') {
+            alert('El Consumidor Final no tiene monedero. Seleccione otro método de reembolso.');
             return;
         }
 
@@ -95,19 +97,19 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
         try {
             const payload = {
                 sale_id: sale.id,
-                customer_id: sale.customer_id,
-                warehouse_id: sale.warehouse_id,
                 reason,
                 reason_description: reasonDescription,
                 type: totals.isFullReturn ? 'full' : 'partial',
-                refund_method: refundMethod,
-                details: itemsToReturn.map(item => ({
-                    product_id: item.product_id,
-                    presentation_id: item.presentation_id,
-                    quantity: item.returnQuantity,
-                    unit_price: item.unit_price,
-                    subtotal: item.returnQuantity * parseFloat(item.unit_price)
-                }))
+                refund_method: isConsumidorFinal ? (refundMethod === 'credit_balance' ? 'none' : refundMethod) : refundMethod,
+                items: itemsToReturn.map(item => {
+                    const unitsPerPackage = item.presentation?.units_per_package || 1;
+                    return {
+                        sale_detail_id: item.id,
+                        package_quantity_returned: Math.floor(item.returnQuantity / unitsPerPackage),
+                        loose_units_returned: item.returnQuantity % unitsPerPackage,
+                        return_to_stock: true
+                    };
+                })
             };
 
             const result = await creditNoteService.create(payload);
@@ -145,7 +147,11 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Cliente</p>
-                        <p className="text-sm font-medium text-gray-900">{sale.customer?.name || 'Consumidor Final'}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                            {sale.customer
+                                ? (sale.customer.businessName || `${sale.customer.firstName || ''} ${sale.customer.lastName || ''}`.trim() || 'Consumidor Final')
+                                : 'Consumidor Final'}
+                        </p>
                     </div>
                     <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Total Venta</p>
@@ -238,10 +244,9 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Observaciones Requeridas
+                                Observaciones
                             </label>
                             <textarea
-                                required
                                 rows="2"
                                 value={reasonDescription}
                                 onChange={(e) => setReasonDescription(e.target.value)}
@@ -262,7 +267,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                 onChange={(e) => setRefundMethod(e.target.value)}
                                 className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-medium text-blue-900 bg-blue-50"
                             >
-                                <option value="credit_balance">💰 Monedero (Saldo a Favor del Cliente)</option>
+                                <option value="credit_balance" disabled={!sale?.customer_id}>💰 Monedero (Saldo a Favor del Cliente){!sale?.customer_id ? ' — N/A Consumidor Final' : ''}</option>
                                 <option value="cash">💵 Entregar Efectivo Físico</option>
                                 <option value="transfer">🏦 Pago Móvil / Transferencia</option>
                                 <option value="none">❌ Nada (Solo cuadre de inventario/error)</option>

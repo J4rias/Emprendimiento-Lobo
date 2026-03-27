@@ -672,7 +672,7 @@ class CustomerController {
           status: { [Op.notIn]: ['cancelled'] },
           sale_type: 'credit' // Usually we only care about credit sales for statements, or all sales? Let's include all to be thorough, but distinguish cash vs credit.
         },
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'exchange_rate', 'sale_type', 'status']
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status']
       });
 
       const cashSales = await Sale.findAll({
@@ -681,7 +681,7 @@ class CustomerController {
           status: { [Op.notIn]: ['cancelled'] },
           sale_type: 'cash'
         },
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'exchange_rate', 'sale_type', 'status']
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status']
       });
 
       // 2. Fetch Payments (Credits/Assets) — only for credit sales

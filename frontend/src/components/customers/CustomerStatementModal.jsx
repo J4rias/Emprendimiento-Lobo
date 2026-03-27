@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Receipt, ArrowDownRight, ArrowUpRight, Loader, Info, Repeat, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Receipt, ArrowDownRight, ArrowUpRight, Loader, Info, Repeat, ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
 import { customerService } from '../../services/api/customerService';
 import { saleService } from '../../services/api/saleService';
+import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 const formatCurrency = (amount, currency) => {
     const value = parseFloat(amount) || 0;
@@ -174,11 +176,23 @@ const PaymentDetailExpanded = ({ transaction, currency }) => {
 };
 
 const CustomerStatementModal = ({ customer, onClose }) => {
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [statementData, setStatementData] = useState(null);
     const [selectedCurrency, setSelectedCurrency] = useState('COP');
     const [expandedId, setExpandedId] = useState(null);
+
+    // Payment Modal State
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [paymentData, setPaymentData] = useState({
+        amount: '',
+        method: 'cash',
+        reference: '',
+        notes: ''
+    });
+    const [submittingPayment, setSubmittingPayment] = useState(false);
 
     useEffect(() => {
         if (customer?.id) {
@@ -198,6 +212,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                 if (availableCurrencies.length > 0 && !availableCurrencies.includes('USD')) {
                     setSelectedCurrency(availableCurrencies[0]);
                 }
+                return data.data;
             }
         } catch (err) {
             setError('Error al cargar el estado de cuenta. Por favor, intente nuevamente.');
@@ -214,6 +229,88 @@ const CustomerStatementModal = ({ customer, onClose }) => {
 
     const handleToggleExpand = (id) => {
         setExpandedId(prev => prev === id ? null : id);
+    };
+
+    const getPendingInCurrency = (transaction) => {
+        const rate = parseFloat(transaction.original_data?.exchange_rate || 1);
+        const paidUSD = parseFloat(transaction.original_data?.paid_amount || 0);
+        const paidInCurrency = selectedCurrency === 'USD' ? paidUSD : paidUSD * rate;
+        return Math.max(0, transaction.amount - paidInCurrency);
+    };
+
+    const handleOpenPaymentModal = (transaction) => {
+        setSelectedTransaction(transaction);
+        const credit = statementData?.summary?.[selectedCurrency]?.available_credit || 0;
+        const pending = getPendingInCurrency(transaction);
+        const cashAmount = Math.max(0, pending - credit);
+        setPaymentData({
+            amount: cashAmount > 0 ? cashAmount.toFixed(2) : '',
+            method: 'cash',
+            reference: '',
+            notes: ''
+        });
+        setShowPaymentModal(true);
+    };
+
+    const handlePaymentSubmit = async (e) => {
+        e.preventDefault();
+        const credit = statementData?.summary?.[selectedCurrency]?.available_credit || 0;
+        const pending = getPendingInCurrency(selectedTransaction);
+        const creditToApply = Math.min(credit, pending);
+        const cashAmount = parseFloat(paymentData.amount) || 0;
+
+        if (cashAmount <= 0 && creditToApply <= 0) {
+            toast.error('Debe ingresar un monto válido mayor a 0');
+            return;
+        }
+
+        setSubmittingPayment(true);
+        try {
+            const saleId = selectedTransaction.original_data.id;
+            const rate = parseFloat(selectedTransaction.original_data.exchange_rate) || 1;
+
+            const payment_lines = [];
+            if (creditToApply > 0) {
+                payment_lines.push({
+                    amount: creditToApply,
+                    method: 'credit_balance',
+                    currency: selectedCurrency,
+                    exchange_rate: rate,
+                    reference: ''
+                });
+            }
+            if (cashAmount > 0) {
+                payment_lines.push({
+                    amount: cashAmount,
+                    method: paymentData.method,
+                    currency: selectedCurrency,
+                    exchange_rate: rate,
+                    reference: paymentData.reference
+                });
+            }
+
+            await saleService.addPayment(saleId, {
+                payment_lines,
+                notes: paymentData.notes
+            });
+
+            toast.success('Pago registrado exitosamente');
+
+            // Refresh the statement data before closing modal
+            setLoading(true);
+            await fetchStatement();
+            setLoading(false);
+
+            setShowPaymentModal(false);
+            setSelectedTransaction(null);
+
+            queryClient.invalidateQueries({ queryKey: ['sales'] });
+        } catch (error) {
+            console.error('Error adding payment:', error);
+            toast.error(error.response?.data?.message || 'Error al registrar el pago');
+        } finally {
+            setSubmittingPayment(false);
+        }
     };
 
     const renderSummaryCard = (title, amount, currency, bgColor, textColor, Icon) => (
@@ -386,17 +483,29 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                             {new Date(t.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: '2-digit' })}
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                                            <button
-                                                                                onClick={() => handleToggleExpand(t.id)}
-                                                                                className="flex items-center gap-1.5 text-teal-700 hover:text-teal-900 hover:underline font-semibold transition-colors"
-                                                                                title="Ver detalle"
-                                                                            >
-                                                                                {isExpanded
-                                                                                    ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
-                                                                                    : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-                                                                                }
-                                                                                {t.reference || '-'}
-                                                                            </button>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => handleToggleExpand(t.id)}
+                                                                                    className="flex items-center gap-1.5 text-teal-700 hover:text-teal-900 hover:underline font-semibold transition-colors"
+                                                                                    title="Ver detalle"
+                                                                                >
+                                                                                    {isExpanded
+                                                                                        ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                        : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                    }
+                                                                                    {t.reference || '-'}
+                                                                                </button>
+                                                                                {isCharge && t.original_data?.status !== 'completed' && (parseFloat(t.original_data?.total || 0) - parseFloat(t.original_data?.paid_amount || 0)) > 0.01 && (
+                                                                                    <button
+                                                                                        onClick={() => handleOpenPaymentModal(t)}
+                                                                                        className="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors font-medium flex items-center gap-1"
+                                                                                        title="Registrar abono para esta factura"
+                                                                                    >
+                                                                                        <CreditCard className="w-3.5 h-3.5" />
+                                                                                        Pagar
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                                             <div className="flex flex-col">
@@ -459,6 +568,154 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Payment Modal */}
+            {showPaymentModal && selectedTransaction && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity" onClick={() => !submittingPayment && setShowPaymentModal(false)}>
+                            <div className="absolute inset-0 bg-gray-900 opacity-75 backdrop-blur-sm"></div>
+                        </div>
+
+                        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle w-full max-w-md">
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-emerald-700 to-emerald-900 px-6 py-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <CreditCard className="h-6 w-6 text-emerald-200" />
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white leading-tight">Registrar Abono</h3>
+                                            <p className="text-emerald-200 text-sm font-medium">{selectedTransaction.reference}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => !submittingPayment && setShowPaymentModal(false)}
+                                        className="text-white hover:text-red-300 hover:bg-white/10 p-2 rounded-full transition-colors"
+                                        title="Cerrar"
+                                    >
+                                        <X className="h-6 w-6" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handlePaymentSubmit} className="p-6 space-y-4">
+                                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                                    <p className="text-xs text-emerald-800 font-semibold">Monto Facturado</p>
+                                    <p className="text-lg font-bold text-emerald-900">
+                                        {formatCurrency(selectedTransaction.amount, selectedCurrency)}
+                                    </p>
+                                </div>
+
+                                {statementData?.summary?.[selectedCurrency]?.available_credit > 0 && (
+                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center justify-between gap-2">
+                                        <div>
+                                            <p className="text-xs text-blue-800 font-semibold">Saldo a Favor del Cliente</p>
+                                            <p className="text-base font-bold text-blue-700">
+                                                {formatCurrency(Math.min(statementData.summary[selectedCurrency].available_credit, getPendingInCurrency(selectedTransaction)), selectedCurrency)}
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-blue-600 font-medium text-right">Descontado del<br/>monto a pagar</p>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Monto a Abonar ({selectedCurrency})
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                                            {selectedCurrency === 'COP' ? '$' : selectedCurrency}
+                                        </span>
+                                        <input
+                                            type="number"
+                                            required
+                                            min="0.01"
+                                            step="0.01"
+                                            value={paymentData.amount}
+                                            onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                                            className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-lg"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Método de Pago
+                                        </label>
+                                        <select
+                                            required
+                                            value={paymentData.method}
+                                            onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        >
+                                            <option value="cash">Efectivo</option>
+                                            <option value="card">Tarjeta / Punto</option>
+                                            <option value="transfer">Transferencia</option>
+                                            <option value="check">Cheque</option>
+                                            <option value="credit_balance">Saldo a Favor</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Referencia
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={paymentData.reference}
+                                            onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                            placeholder="Ej. #12345"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Notas adicionales
+                                    </label>
+                                    <textarea
+                                        value={paymentData.notes}
+                                        onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        rows="2"
+                                        placeholder="Observaciones sobre el pago..."
+                                    ></textarea>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => !submittingPayment && setShowPaymentModal(false)}
+                                        disabled={submittingPayment}
+                                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={submittingPayment}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+                                    >
+                                        {submittingPayment ? (
+                                            <>
+                                                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                                                Procesando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CreditCard className="w-4 h-4" />
+                                                Registrar Abono
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

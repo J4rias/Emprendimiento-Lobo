@@ -133,7 +133,8 @@ const ProductsPage = () => {
     queryKey: ['exchange-rates'],
     queryFn: async () => {
       const data = await exchangeRateService.getLatest();
-      return data.data || [];
+      const rates = data.data;
+      return Array.isArray(rates) ? rates : [];
     },
     staleTime: Infinity
   });
@@ -191,7 +192,7 @@ const ProductsPage = () => {
   }, [error]);
 
   const getEffectiveRate = (from, to) => {
-    if (!exchangeRates || exchangeRates.length === 0 || from === to) return 1;
+    if (!exchangeRates || !Array.isArray(exchangeRates) || exchangeRates.length === 0 || from === to) return 1;
 
     // 1. Try Direct
     const direct = exchangeRates.find(r => r.from_currency === from && r.to_currency === to);

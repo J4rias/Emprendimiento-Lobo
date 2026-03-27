@@ -24,7 +24,7 @@ const CreditNote = sequelize.define('CreditNote', {
   },
   customer_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'customers',
       key: 'id'
