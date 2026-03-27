@@ -704,10 +704,36 @@ class CustomerController {
               customer_id: id,
               status: { [Op.in]: ['approved', 'applied'] }
             },
-            attributes: ['id', 'credit_note_number', 'credit_note_date', 'total', 'refund_method', 'type']
+            attributes: ['id', 'credit_note_number', 'credit_note_date', 'total', 'refund_method', 'type', 'exchange_rate', 'sale_id'],
+            include: [{
+              model: Sale,
+              as: 'sale',
+              attributes: ['exchange_rate'],
+              required: false
+            }]
           });
         }
       } catch (e) { /* ignore if CreditNote is not fully migrated visually yet */ }
+
+      // Build credit-note totals per sale_id so sale rows can show net debt
+      const cnBySaleId = {};
+      for (const note of creditNotes) {
+        const saleId = note.sale_id;
+        if (!saleId) continue;
+        const noteUSD = parseFloat(note.total || 0);
+        const noteRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
+        if (!cnBySaleId[saleId]) cnBySaleId[saleId] = { usd: 0, cop: 0, notes: [] };
+        cnBySaleId[saleId].usd += noteUSD;
+        cnBySaleId[saleId].cop += Math.round(noteUSD * noteRate);
+        cnBySaleId[saleId].notes.push({
+          id: note.id,
+          number: note.credit_note_number,
+          date: note.credit_note_date,
+          total_usd: noteUSD,
+          total_cop: Math.round(noteUSD * noteRate),
+          refund_method: note.refund_method
+        });
+      }
 
       // Unify data into Ledger
       const ledger = [];
@@ -724,6 +750,15 @@ class CustomerController {
         const amtUSD = amountOrig; // If total is USD
         const amtCOP = amountOrig * rate;
 
+        const cnData = cnBySaleId[sale.id] || { usd: 0, cop: 0, notes: [] };
+        const saleJson = sale.toJSON ? sale.toJSON() : sale;
+        const enrichedSale = {
+          ...saleJson,
+          cn_amount_usd: cnData.usd,
+          cn_amount_cop: cnData.cop,
+          applied_credit_notes: cnData.notes
+        };
+
         // Record in USD
         if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) };
         if (sale.sale_type === 'credit') summary['USD'].total_invoiced += amtUSD;
@@ -737,7 +772,7 @@ class CustomerController {
           description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
           original_amount: amountOrig,
           original_currency: saleCurrency,
-          original_data: sale
+          original_data: enrichedSale
         });
 
         // Record in COP
@@ -753,7 +788,7 @@ class CustomerController {
           description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
           original_amount: amountOrig,
           original_currency: saleCurrency,
-          original_data: sale
+          original_data: enrichedSale
         });
       }
 
@@ -816,7 +851,8 @@ class CustomerController {
       // Process Credit Notes (Credits)
       for (const note of creditNotes) {
         const amountUSD = parseFloat(note.total || 0);
-        const rate = 1; // Credit notes usually stored in USD values too
+        const rate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
+        const amountCOP = Math.round(amountUSD * rate);
 
         ledger.push({
           id: `cn_${note.id}_usd`,
@@ -825,6 +861,18 @@ class CustomerController {
           reference: note.credit_note_number,
           amount: amountUSD,
           currency: 'USD',
+          description: `Nota de Crédito (${note.refund_method})`,
+          isInternal: false,
+          original_data: note
+        });
+
+        ledger.push({
+          id: `cn_${note.id}_cop`,
+          type: 'credit',
+          date: new Date(note.credit_note_date),
+          reference: note.credit_note_number,
+          amount: amountCOP,
+          currency: 'COP',
           description: `Nota de Crédito (${note.refund_method})`,
           isInternal: false,
           original_data: note
@@ -879,7 +927,18 @@ class CustomerController {
         const rate = parseFloat((p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : p.sale?.exchange_rate) || 1);
         creditBalanceUsedCOP += p.currency === 'COP' ? parseFloat(p.amount) : parseFloat(p.amount) * rate;
       }
-      const availableCreditCOP = Math.max(0, overpaymentCOP - creditBalanceUsedCOP);
+      // Step 3: Add credit notes with credit_balance refund method (devolutions credited to wallet)
+      let creditNotesCreditBalanceCOP = 0;
+      for (const note of creditNotes) {
+        if (note.refund_method === 'credit_balance') {
+          const noteUSD = parseFloat(note.total || 0);
+          // Prefer exchange_rate stored on the note (precise); fall back to sale's rate
+          const noteRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
+          creditNotesCreditBalanceCOP += Math.round(noteUSD * noteRate);
+        }
+      }
+
+      const availableCreditCOP = Math.max(0, overpaymentCOP + creditNotesCreditBalanceCOP - creditBalanceUsedCOP);
 
       if (summary['COP']) summary['COP'].available_credit = Math.round(availableCreditCOP);
       if (summary['USD']) summary['USD'].available_credit = 0;

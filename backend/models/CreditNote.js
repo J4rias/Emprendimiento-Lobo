@@ -68,23 +68,29 @@ const CreditNote = sequelize.define('CreditNote', {
     defaultValue: 'draft',
     comment: 'Estado de la nota de crédito'
   },
+  exchange_rate: {
+    type: DataTypes.DECIMAL(15, 6),
+    allowNull: false,
+    defaultValue: 1.000000,
+    comment: 'Tasa de cambio USD→COP al momento de la devolución (copiada de la venta)'
+  },
   subtotal: {
-    type: DataTypes.DECIMAL(12, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
-    comment: 'Subtotal de la nota de crédito'
+    comment: 'Subtotal de la nota de crédito en USD'
   },
   tax_amount: {
-    type: DataTypes.DECIMAL(12, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Monto de impuestos'
   },
   total: {
-    type: DataTypes.DECIMAL(12, 2),
+    type: DataTypes.DECIMAL(18, 6),
     allowNull: false,
     defaultValue: 0.00,
-    comment: 'Total de la nota de crédito'
+    comment: 'Total de la nota de crédito en USD (alta precisión para conversión exacta a COP)'
   },
   refund_method: {
     type: DataTypes.ENUM('cash', 'transfer', 'credit_balance', 'none'),

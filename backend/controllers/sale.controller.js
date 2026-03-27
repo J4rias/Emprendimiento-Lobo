@@ -402,8 +402,33 @@ exports.getSales = async (req, res) => {
       subQuery: false
     });
 
+    // Fetch credit-note aggregates for the returned sale IDs in a single query
+    const saleIds = rows.map(r => r.id);
+    let cnAggMap = {};
+    if (saleIds.length > 0) {
+      const cnAgg = await sequelize.query(
+        `SELECT sale_id,
+                COUNT(*) AS cn_count,
+                COALESCE(SUM(total * exchange_rate), 0) AS cn_total_cop
+         FROM credit_notes
+         WHERE sale_id IN (:saleIds)
+           AND status IN ('approved', 'applied')
+         GROUP BY sale_id`,
+        { replacements: { saleIds }, type: sequelize.QueryTypes.SELECT }
+      );
+      for (const row of cnAgg) {
+        cnAggMap[row.sale_id] = { cn_count: parseInt(row.cn_count), cn_total_cop: parseFloat(row.cn_total_cop) };
+      }
+    }
+
+    const salesWithCN = rows.map(r => ({
+      ...r.toJSON(),
+      cn_count: cnAggMap[r.id]?.cn_count || 0,
+      cn_total_cop: cnAggMap[r.id]?.cn_total_cop || 0
+    }));
+
     res.json({
-      sales: rows,
+      sales: salesWithCN,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -769,6 +794,14 @@ exports.getSalesStats = async (req, res) => {
       }
     });
 
+    // COP total: each sale's total multiplied by its own historical exchange_rate
+    const copResult = await Sale.findAll({
+      where: { ...where, status: { [Op.in]: ['completed', 'pending'] } },
+      attributes: [[sequelize.fn('SUM', sequelize.literal('total * exchange_rate')), 'total_cop']],
+      raw: true
+    });
+    const totalRevenueCOP = Math.round(parseFloat(copResult[0]?.total_cop || 0));
+
     const salesByType = await Sale.findAll({
       where,
       attributes: [
@@ -818,6 +851,7 @@ exports.getSalesStats = async (req, res) => {
       stats: {
         totalSales,
         totalRevenue: totalRevenue || 0,
+        totalRevenueCOP,
         salesByType,
         salesByStatus,
         topProducts

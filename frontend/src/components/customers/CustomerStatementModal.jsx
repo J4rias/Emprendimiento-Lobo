@@ -43,6 +43,8 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
 
     const rate = parseFloat(detail.exchange_rate || 1);
 
+    const appliedCNs = transaction.original_data?.applied_credit_notes || [];
+
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap gap-4 text-xs text-gray-600">
@@ -90,6 +92,75 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
                     </tfoot>
                 </table>
             )}
+            {appliedCNs.length > 0 && (
+                <div className="mt-2 border border-blue-200 rounded-lg overflow-hidden">
+                    <div className="bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Devoluciones Aplicadas</div>
+                    <table className="w-full text-xs">
+                        <tbody>
+                            {appliedCNs.map((cn) => (
+                                <tr key={cn.id} className="border-t border-blue-100">
+                                    <td className="px-3 py-1.5 text-blue-700 font-medium">{cn.number}</td>
+                                    <td className="px-3 py-1.5 text-gray-500">{new Date(cn.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: '2-digit' })}</td>
+                                    <td className="px-3 py-1.5 text-right font-bold text-blue-700">
+                                        -{formatCurrency(currency === 'COP' ? cn.total_cop : cn.total_usd, currency)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr className="border-t-2 border-blue-200 bg-blue-50">
+                                <td colSpan="2" className="px-3 py-1.5 text-right font-semibold text-blue-800">Neto a pagar</td>
+                                <td className="px-3 py-1.5 text-right font-bold text-orange-700">
+                                    {formatCurrency(
+                                        (currency === 'COP'
+                                            ? parseFloat(detail.total || 0) * rate - appliedCNs.reduce((s, cn) => s + cn.total_cop, 0)
+                                            : parseFloat(detail.total || 0) - appliedCNs.reduce((s, cn) => s + cn.total_usd, 0)),
+                                        currency
+                                    )}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const CreditNoteDetailExpanded = ({ transaction }) => {
+    const note = transaction.original_data;
+    const exchangeRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
+    const totalUSD = parseFloat(note.total || 0);
+    const totalCOP = Math.round(totalUSD * exchangeRate);
+
+    const refundLabels = {
+        credit_balance: 'Monedero (Saldo a Favor)',
+        cash: 'Efectivo',
+        transfer: 'Transferencia',
+        none: 'Sin reembolso'
+    };
+    const typeLabels = { full: 'Devolución Total', partial: 'Devolución Parcial' };
+
+    return (
+        <div className="flex flex-wrap gap-6 text-xs text-gray-600">
+            <div>
+                <span className="font-medium block text-gray-500 mb-0.5">Tipo</span>
+                <span className="text-gray-800">{typeLabels[note.type] || note.type}</span>
+            </div>
+            <div>
+                <span className="font-medium block text-gray-500 mb-0.5">Método de reembolso</span>
+                <span className="text-gray-800">{refundLabels[note.refund_method] || note.refund_method}</span>
+            </div>
+            <div>
+                <span className="font-medium block text-gray-500 mb-0.5">Monto devuelto</span>
+                <span className="text-blue-700 font-semibold">
+                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(totalCOP)}
+                </span>
+            </div>
+            <div>
+                <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
+                <span className="text-gray-800">{exchangeRate.toLocaleString('es-CO')} COP/USD</span>
+            </div>
         </div>
     );
 };
@@ -235,7 +306,10 @@ const CustomerStatementModal = ({ customer, onClose }) => {
         const rate = parseFloat(transaction.original_data?.exchange_rate || 1);
         const paidUSD = parseFloat(transaction.original_data?.paid_amount || 0);
         const paidInCurrency = selectedCurrency === 'USD' ? paidUSD : paidUSD * rate;
-        return Math.max(0, transaction.amount - paidInCurrency);
+        const cnAmount = selectedCurrency === 'USD'
+            ? parseFloat(transaction.original_data?.cn_amount_usd || 0)
+            : parseFloat(transaction.original_data?.cn_amount_cop || 0);
+        return Math.max(0, transaction.amount - paidInCurrency - cnAmount);
     };
 
     const handleOpenPaymentModal = (transaction) => {
@@ -526,9 +600,21 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                             </div>
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                                                                            {t.type === 'charge' ? (
-                                                                                <span className="text-orange-600">{formatCurrency(t.amount, t.currency)}</span>
-                                                                            ) : (
+                                                                            {t.type === 'charge' ? (() => {
+                                                                                const cnAmt = selectedCurrency === 'USD'
+                                                                                    ? parseFloat(t.original_data?.cn_amount_usd || 0)
+                                                                                    : parseFloat(t.original_data?.cn_amount_cop || 0);
+                                                                                const netAmt = t.amount - cnAmt;
+                                                                                return cnAmt > 0 ? (
+                                                                                    <div className="flex flex-col items-end">
+                                                                                        <span className="text-orange-300 line-through text-xs">{formatCurrency(t.amount, t.currency)}</span>
+                                                                                        <span className="text-orange-600 font-bold">{formatCurrency(netAmt, t.currency)}</span>
+                                                                                        <span className="text-blue-500 text-[10px]">NC: -{formatCurrency(cnAmt, t.currency)}</span>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <span className="text-orange-600">{formatCurrency(t.amount, t.currency)}</span>
+                                                                                );
+                                                                            })() : (
                                                                                 <span className="text-gray-300">-</span>
                                                                             )}
                                                                         </td>
@@ -548,6 +634,8 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                             <td colSpan="5" className={`px-8 py-4 border-t ${expandBorder}`}>
                                                                                 {t.type === 'charge' ? (
                                                                                     <SaleDetailExpanded transaction={t} currency={selectedCurrency} />
+                                                                                ) : t.type === 'credit' ? (
+                                                                                    <CreditNoteDetailExpanded transaction={t} />
                                                                                 ) : (
                                                                                     <PaymentDetailExpanded transaction={t} currency={selectedCurrency} />
                                                                                 )}

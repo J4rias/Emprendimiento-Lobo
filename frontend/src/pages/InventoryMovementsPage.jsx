@@ -4,6 +4,7 @@ import { inventoryService } from '../services/api/inventoryService';
 import { Package, TrendingUp, TrendingDown, Filter, FileText } from 'lucide-react';
 
 const InventoryMovementsPage = () => {
+  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
     movement_type: '',
     start_date: '',
@@ -11,9 +12,17 @@ const InventoryMovementsPage = () => {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['inventory-movements', filters],
-    queryFn: () => inventoryService.getMovements(filters)
+    queryKey: ['inventory-movements', filters, page],
+    queryFn: () => inventoryService.getMovements({ ...filters, page })
   });
+
+  const pagination = data?.pagination || {};
+  const totalPages = pagination.pages || 1;
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    setPage(1);
+  };
 
   const getMovementIcon = (type) => {
     switch (type) {
@@ -52,6 +61,12 @@ const InventoryMovementsPage = () => {
     return labels[type] || type;
   };
 
+  const getUserName = (user) => {
+    if (!user) return '-';
+    if (user.first_name) return `${user.first_name} ${user.last_name || ''}`.trim();
+    return user.username || '-';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -83,7 +98,7 @@ const InventoryMovementsPage = () => {
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               value={filters.movement_type}
-              onChange={(e) => setFilters({ ...filters, movement_type: e.target.value })}
+              onChange={(e) => handleFilterChange({ ...filters, movement_type: e.target.value })}
             >
               <option value="">Todos</option>
               <option value="ingreso">Ingreso</option>
@@ -95,26 +110,22 @@ const InventoryMovementsPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Desde
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Desde</label>
             <input
               type="date"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               value={filters.start_date}
-              onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+              onChange={(e) => handleFilterChange({ ...filters, start_date: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hasta
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Hasta</label>
             <input
               type="date"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               value={filters.end_date}
-              onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+              onChange={(e) => handleFilterChange({ ...filters, end_date: e.target.value })}
             />
           </div>
         </div>
@@ -128,6 +139,7 @@ const InventoryMovementsPage = () => {
               <tr>
                 <th>Fecha</th>
                 <th>Producto</th>
+                <th>Almacén</th>
                 <th>Tipo</th>
                 <th>Presentación</th>
                 <th className="text-center">Paquetes</th>
@@ -135,12 +147,13 @@ const InventoryMovementsPage = () => {
                 <th className="text-center">Total</th>
                 <th>Usuario</th>
                 <th>Documento</th>
+                <th>Motivo</th>
               </tr>
             </thead>
             <tbody>
               {data?.data?.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-8 text-gray-500">
+                  <td colSpan="11" className="text-center py-8 text-gray-500">
                     <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p>No se encontraron movimientos</p>
                   </td>
@@ -163,6 +176,9 @@ const InventoryMovementsPage = () => {
                         <p className="font-medium">{movement.product?.name}</p>
                         <p className="text-xs text-gray-500">{movement.product?.sku}</p>
                       </div>
+                    </td>
+                    <td>
+                      <span className="text-sm text-gray-600">{movement.warehouse?.name || '-'}</span>
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
@@ -197,7 +213,7 @@ const InventoryMovementsPage = () => {
                       </span>
                     </td>
                     <td>
-                      <span className="text-sm">{movement.user?.name}</span>
+                      <span className="text-sm">{getUserName(movement.user)}</span>
                     </td>
                     <td>
                       {movement.document_number ? (
@@ -208,27 +224,48 @@ const InventoryMovementsPage = () => {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
+                    <td>
+                      <span className="text-sm text-gray-600">
+                        {movement.reason
+                          ? (movement.reason.length > 50 ? movement.reason.slice(0, 50) + '…' : movement.reason)
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </span>
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Pagination info */}
-      {data?.pagination && (
-        <div className="card">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <p>
-              Mostrando {data.data.length} de {data.pagination.total} movimientos
+        {/* Pagination */}
+        {pagination.total > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Mostrando página {pagination.page} de {totalPages} ({pagination.total} movimientos)
             </p>
-            <p>
-              Página {data.pagination.page} de {data.pagination.pages}
-            </p>
+            {totalPages > 1 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 text-sm"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 text-sm"
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

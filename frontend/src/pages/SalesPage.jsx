@@ -42,6 +42,12 @@ const SalesPage = () => {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnSale, setReturnSale] = useState(null);
 
+  // Cancel Modal State
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelSaleId, setCancelSaleId] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [submittingCancel, setSubmittingCancel] = useState(false);
+
   // COP formatter: convert USD amount to COP using sale's specific rate if available, otherwise current rate
   const copFormat = (usdAmount, saleExchangeRate = null) => {
     const val = parseFloat(usdAmount || 0);
@@ -89,10 +95,11 @@ const SalesPage = () => {
 
   const getCustomerName = (customer) => {
     if (!customer) return 'Cliente General';
+    const words2 = (str) => (str || '').trim().split(/\s+/).slice(0, 2).join(' ');
     if (customer.type === 'juridical') {
       return customer.businessName || customer.tradeName || 'Empresa Sin Nombre';
     }
-    return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Cliente Sin Nombre';
+    return `${words2(customer.firstName)} ${words2(customer.lastName)}`.trim() || 'Cliente Sin Nombre';
   };
 
   const handleViewDetail = async (saleId) => {
@@ -106,18 +113,26 @@ const SalesPage = () => {
     }
   };
 
-  const handleCancelSale = async (saleId) => {
-    const reason = prompt('Ingrese el motivo de la cancelación:');
-    if (!reason) return;
+  const handleCancelSale = (saleId) => {
+    setCancelSaleId(saleId);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
 
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim()) return;
+    setSubmittingCancel(true);
     try {
-      await saleService.cancelSale(saleId, reason);
+      await saleService.cancelSale(cancelSaleId, cancelReason.trim());
       toast.success('Venta cancelada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] });
+      setShowCancelModal(false);
     } catch (error) {
       console.error('Error cancelling sale:', error);
       toast.error(error.response?.data?.message || 'Error al cancelar la venta');
+    } finally {
+      setSubmittingCancel(false);
     }
   };
 
@@ -214,7 +229,19 @@ const SalesPage = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, cnCount = 0, saleTotal = 0, cnTotalCOP = 0) => {
+    const cnQty = parseInt(cnCount || 0);
+    const saleNet = parseFloat(saleTotal || 0) - parseFloat(cnTotalCOP || 0);
+
+    if (status === 'completed' && cnQty > 0) {
+      const isFullReturn = saleNet <= 0.01;
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${isFullReturn ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>
+          {isFullReturn ? 'Dev. Total' : 'Dev. Parcial'}
+        </span>
+      );
+    }
+
     const statusConfig = {
       pending: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
       completed: { label: 'Completada', className: 'bg-green-100 text-green-800' },
@@ -270,7 +297,9 @@ const SalesPage = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Ingresos Totales</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {copFormat(stats.totalRevenue || 0)}
+                  {stats.totalRevenueCOP != null
+                    ? `COP ${Math.round(stats.totalRevenueCOP).toLocaleString('de-DE')}`
+                    : copFormat(stats.totalRevenue || 0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -419,8 +448,8 @@ const SalesPage = () => {
                         })}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-medium">
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <span className="text-sm text-gray-900 font-medium block truncate" title={getCustomerName(sale.customer)}>
                         {getCustomerName(sale.customer)}
                       </span>
                     </td>
@@ -430,6 +459,12 @@ const SalesPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {(() => {
                         const saleTotal = parseFloat(sale.total) || (parseFloat(sale.subtotal) - parseFloat(sale.discount_amount));
+                        const cnCount = parseInt(sale.cn_count || 0);
+                        const cnTotalCOP = parseFloat(sale.cn_total_cop || 0);
+                        const rate = parseFloat(sale.exchange_rate || 1);
+                        const saleTotalCOP = Math.round(saleTotal * rate);
+                        const netCOP = saleTotalCOP - Math.round(cnTotalCOP);
+
                         if (sale.sale_type === 'credit') {
                           const pending = saleTotal - parseFloat(sale.paid_amount || 0);
                           if (pending > 0.01) {
@@ -443,19 +478,32 @@ const SalesPage = () => {
                                     de {copFormat(saleTotal, sale.exchange_rate)}
                                   </div>
                                 )}
+                                {cnCount > 0 && (
+                                  <div className="text-[10px] text-blue-500">
+                                    Dev: -COP {Math.round(cnTotalCOP).toLocaleString('de-DE')}
+                                  </div>
+                                )}
                               </div>
                             );
                           }
                         }
+
                         return (
-                          <span className="text-sm font-bold text-gray-900">
-                            {copFormat(saleTotal, sale.exchange_rate)}
-                          </span>
+                          <div>
+                            <span className="text-sm font-bold text-gray-900">
+                              {copFormat(saleTotal, sale.exchange_rate)}
+                            </span>
+                            {cnCount > 0 && (
+                              <div className="text-[10px] text-blue-500">
+                                Neto: COP {netCOP.toLocaleString('de-DE')} ({cnCount} dev.)
+                              </div>
+                            )}
+                          </div>
                         );
                       })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(sale.status)}
+                      {getStatusBadge(sale.status, sale.cn_count, parseFloat(sale.total || 0) * parseFloat(sale.exchange_rate || 1), sale.cn_total_cop)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center gap-2">
@@ -801,6 +849,56 @@ const SalesPage = () => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Cancel Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => !submittingCancel && setShowCancelModal(false)}
+        title={
+          <div className="flex items-center gap-2 text-red-600">
+            <XCircle className="w-5 h-5" />
+            <span>Cancelar Venta</span>
+          </div>
+        }
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Esta acción no se puede deshacer. Ingrese el motivo de la cancelación.</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo <span className="text-red-500">*</span></label>
+            <textarea
+              rows="3"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Ej: Error en el pedido, cliente canceló..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setShowCancelModal(false)}
+              disabled={submittingCancel}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmCancel}
+              disabled={submittingCancel || !cancelReason.trim()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 font-medium"
+            >
+              {submittingCancel ? (
+                <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Procesando...</>
+              ) : (
+                <><XCircle className="w-4 h-4" />Confirmar Cancelación</>
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Return Modal */}

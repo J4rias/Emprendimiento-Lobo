@@ -57,6 +57,7 @@ exports.getAllCreditNotes = async (req, res) => {
       limit = 20,
       search = '',
       customer_id,
+      sale_id,
       status,
       start_date,
       end_date
@@ -75,6 +76,11 @@ exports.getAllCreditNotes = async (req, res) => {
     // Filter by customer
     if (customer_id) {
       where.customer_id = customer_id;
+    }
+
+    // Filter by sale
+    if (sale_id) {
+      where.sale_id = sale_id;
     }
 
     // Filter by status
@@ -122,11 +128,24 @@ exports.getAllCreditNotes = async (req, res) => {
           as: 'approver',
           attributes: ['id', 'username', 'first_name', 'last_name'],
           required: false
+        },
+        {
+          model: CreditNoteDetail,
+          as: 'details',
+          required: false,
+          include: [
+            {
+              model: ProductPresentation,
+              as: 'presentation',
+              attributes: ['id', 'units_per_package']
+            }
+          ]
         }
       ],
       order: [['credit_note_date', 'DESC'], ['created_at', 'DESC']],
       limit: parseInt(limit),
-      offset
+      offset,
+      distinct: true
     });
 
     res.json({
@@ -317,25 +336,50 @@ exports.createCreditNote = async (req, res) => {
         });
       }
 
-      // Calculate total units returned
-      const unitsReturned = (item.package_quantity_returned * saleDetail.presentation.units_per_package) + item.loose_units_returned;
+      // Effective uph: 1 when sold by individual unit, actual uph when sold by package
+      const uph = parseFloat(saleDetail.presentation.units_per_package) || 1;
+      const effectiveUph = saleDetail.is_unit ? 1 : uph;
 
-      // Calculate total units sold
-      const unitsSold = (saleDetail.package_quantity * saleDetail.presentation.units_per_package) + saleDetail.loose_units;
+      // Total units returned in base units (for inventory and validation)
+      const unitsReturned = (item.package_quantity_returned * effectiveUph) + item.loose_units_returned;
 
-      // Validate that returned quantity doesn't exceed sold quantity
-      if (unitsReturned > unitsSold) {
+      // Total units sold in base units
+      const unitsSold = saleDetail.is_unit
+        ? parseFloat(saleDetail.quantity)
+        : parseFloat(saleDetail.quantity) * uph;
+
+      // Check how many units were already returned for this sale detail in applied credit notes
+      const returnedRows = await sequelize.query(
+        `SELECT COALESCE(SUM(cnd.package_quantity_returned * :uph + cnd.loose_units_returned), 0) AS already_returned
+         FROM credit_note_details cnd
+         INNER JOIN credit_notes cn ON cn.id = cnd.credit_note_id
+         WHERE cnd.sale_detail_id = :sale_detail_id AND cn.status = 'applied'`,
+        {
+          replacements: {
+            sale_detail_id: item.sale_detail_id,
+            uph: effectiveUph
+          },
+          type: sequelize.QueryTypes.SELECT,
+          transaction
+        }
+      );
+      const alreadyReturned = parseFloat(returnedRows[0]?.already_returned || 0);
+      const availableToReturn = unitsSold - alreadyReturned;
+
+      // Validate that returned quantity doesn't exceed available quantity
+      if (unitsReturned > availableToReturn) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message: `No puede devolver más unidades de las vendidas para ${saleDetail.product.name}`
+          message: `Solo quedan ${availableToReturn / effectiveUph} unidades disponibles para devolver de "${saleDetail.product.name}" (ya se devolvieron ${alreadyReturned / effectiveUph})`
         });
       }
 
-      // Calculate line total
-      const line_subtotal = saleDetail.unit_price * unitsReturned;
-      const line_discount = line_subtotal * (saleDetail.discount_percent / 100);
-      const line_tax = (line_subtotal - line_discount) * (saleDetail.tax_percent / 100);
+      // Calculate line total using presentation units (unit_price is per presentation unit)
+      const presentationUnitsReturned = item.package_quantity_returned + (item.loose_units_returned / effectiveUph);
+      const line_subtotal = parseFloat(saleDetail.unit_price) * presentationUnitsReturned;
+      const line_discount = line_subtotal * (parseFloat(saleDetail.discount_percent) / 100);
+      const line_tax = (line_subtotal - line_discount) * (parseFloat(saleDetail.tax_percent) / 100);
       const line_total = line_subtotal - line_discount + line_tax;
 
       subtotal += line_subtotal - line_discount;
@@ -369,6 +413,7 @@ exports.createCreditNote = async (req, res) => {
       reason_description: reason_description || null,
       type,
       status: 'draft',
+      exchange_rate: parseFloat(sale.exchange_rate || 1),
       subtotal,
       tax_amount,
       total,

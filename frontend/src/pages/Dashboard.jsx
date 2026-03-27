@@ -24,12 +24,12 @@ const Dashboard = () => {
     const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     const todayStart = `${localDate}T00:00:00`;
     const todayEnd = `${localDate}T23:59:59`;
-    const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenue: 0 } }));
+    const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenueCOP: 0 } }));
 
     // Stats for MONTH
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
-    const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenue: 0 } }));
+    const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenueCOP: 0 } }));
 
     // Pending sales
     const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
@@ -37,11 +37,11 @@ const Dashboard = () => {
     return {
       totalProducts: productsData.pagination?.total || 0,
       todaySales: todayStats.stats?.totalSales || 0,
-      todayRevenue: todayStats.stats?.totalRevenue || 0,
+      todayRevenueCOP: todayStats.stats?.totalRevenueCOP || 0,
       lowStock: lowStockData.data?.length || 0,
       inventoryValue: valuationData.data?.totalValue || 0,
       pendingSales: pendingData.pagination?.total || 0,
-      monthRevenue: monthStatsData.stats?.totalRevenue || 0,
+      monthRevenueCOP: monthStatsData.stats?.totalRevenueCOP || 0,
       categoriesStats: categoriesData.data || []
     };
   };
@@ -55,11 +55,11 @@ const Dashboard = () => {
   const stats = {
     totalProducts: dashboardData.totalProducts || 0,
     todaySales: dashboardData.todaySales || 0,
-    todayRevenue: dashboardData.todayRevenue || 0,
+    todayRevenueCOP: dashboardData.todayRevenueCOP || 0,
     lowStock: dashboardData.lowStock || 0,
     inventoryValue: dashboardData.inventoryValue || 0,
     pendingSales: dashboardData.pendingSales || 0,
-    monthRevenue: dashboardData.monthRevenue || 0
+    monthRevenueCOP: dashboardData.monthRevenueCOP || 0
   };
 
   const categoriesStats = dashboardData.categoriesStats || [];
@@ -75,7 +75,7 @@ const Dashboard = () => {
     {
       name: 'Ventas del Día',
       value: stats.todaySales,
-      subtitle: formatMoney(stats.todayRevenue),
+      subtitle: `COP ${Math.round(stats.todayRevenueCOP).toLocaleString('de-DE')}`,
       icon: ShoppingCart,
       color: 'bg-green-500',
       link: '/ventas'
@@ -103,7 +103,7 @@ const Dashboard = () => {
     },
     {
       name: 'Ingresos del Mes',
-      value: formatMoney(stats.monthRevenue),
+      value: `COP ${Math.round(stats.monthRevenueCOP).toLocaleString('de-DE')}`,
       icon: TrendingUp,
       color: 'bg-indigo-500',
       link: '/ventas'

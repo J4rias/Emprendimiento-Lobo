@@ -46,6 +46,14 @@ const startServer = async () => {
     }
 
     // Start listening
+    httpServer.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} already in use. Kill the process and retry.`);
+        process.exit(1);
+      } else {
+        throw err;
+      }
+    });
     httpServer.listen(PORT, () => {
       console.log('');
       console.log('='.repeat(60));

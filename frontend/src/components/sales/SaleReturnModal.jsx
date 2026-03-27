@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, RefreshCcw, DollarSign, FileX } from 'lucide-react';
+import { ShoppingBag, RefreshCcw, FileX } from 'lucide-react';
 import { creditNoteService } from '../../services/api/creditNoteService';
 import Modal from '../common/Modal';
+import toast from 'react-hot-toast';
 
 const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
     const [returnItems, setReturnItems] = useState([]);
@@ -9,20 +10,46 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
     const [reasonDescription, setReasonDescription] = useState('');
     const [refundMethod, setRefundMethod] = useState('credit_balance');
     const [submitting, setSubmitting] = useState(false);
+    const [serverError, setServerError] = useState(null);
 
-    // Initialize return items when modal opens with a sale
+    // Initialize return items — subtract already returned quantities
     useEffect(() => {
-        if (isOpen && sale && sale.details) {
-            const items = sale.details.map(detail => ({
-                ...detail,
-                returnQuantity: 0, // Starts at 0
-                maxQuantity: parseFloat(detail.quantity)
-            }));
+        if (!isOpen || !sale || !sale.details) return;
+
+        const initItems = async () => {
+            // Build map of already returned units per sale_detail_id
+            const returnedMap = {};
+            try {
+                const cn = await creditNoteService.getAll({ sale_id: sale.id, status: 'applied', limit: 100 });
+                for (const note of cn.data || []) {
+                    for (const d of note.details || []) {
+                        const uph = d.presentation?.units_per_package || 1;
+                        // package_quantity_returned is in presentation units; loose_units_returned is in base units
+                        const units = d.package_quantity_returned + ((d.loose_units_returned || 0) / uph);
+                        returnedMap[d.sale_detail_id] = (returnedMap[d.sale_detail_id] || 0) + units;
+                    }
+                }
+            } catch (_) { /* ignore, fallback to original qty */ }
+
+            const items = sale.details.map(detail => {
+                const originalQty = parseFloat(detail.quantity);
+                const alreadyReturned = returnedMap[detail.id] || 0;
+                const available = Math.max(0, originalQty - alreadyReturned);
+                return {
+                    ...detail,
+                    returnQuantity: 0,
+                    maxQuantity: available,
+                    originalQuantity: originalQty,
+                    alreadyReturned
+                };
+            });
             setReturnItems(items);
             setReason('return');
             setReasonDescription('');
             setRefundMethod(sale.customer_id ? 'credit_balance' : 'cash');
-        }
+        };
+
+        initItems();
     }, [isOpen, sale]);
 
     const handleQuantityChange = (id, value) => {
@@ -82,17 +109,18 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
         const itemsToReturn = returnItems.filter(item => item.returnQuantity > 0);
 
         if (itemsToReturn.length === 0) {
-            alert('Debe especificar al menos un producto a devolver');
+            toast.error('Debe especificar al menos un producto a devolver');
             return;
         }
 
         const isConsumidorFinal = !sale?.customer_id;
 
         if (isConsumidorFinal && refundMethod === 'credit_balance') {
-            alert('El Consumidor Final no tiene monedero. Seleccione otro método de reembolso.');
+            toast.error('El Consumidor Final no tiene monedero. Seleccione otro método de reembolso.');
             return;
         }
 
+        setServerError(null);
         setSubmitting(true);
         try {
             const payload = {
@@ -117,11 +145,13 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
             // Auto-approve to make it instant for the user (standard POS workflow)
             await creditNoteService.approve(result.data.id);
 
-            alert('Nota de Crédito generada y aprobada exitosamente');
+            toast.success('Devolución procesada exitosamente');
             onReturnSuccess();
         } catch (error) {
             console.error('Error creating credit note:', error);
-            alert(error.response?.data?.message || 'Error al emitir la devolución');
+            const serverMsg = error.response?.data?.error || error.response?.data?.message || error.message;
+            setServerError(serverMsg);
+            toast.error(`Error: ${serverMsg}`, { duration: 8000 });
         } finally {
             setSubmitting(false);
         }
@@ -187,7 +217,10 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                             <div className="text-xs text-gray-500">{item.presentation?.name || 'Unidad'} - {formatCurrency(parseFloat(item.unit_price))} / c.u.</div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-sm text-gray-600 font-medium">
-                                            {item.maxQuantity}
+                                            {item.originalQuantity ?? item.maxQuantity}
+                                            {item.alreadyReturned > 0 && (
+                                                <div className="text-xs text-orange-500">({item.alreadyReturned} devueltos)</div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 bg-blue-50/20 text-center">
                                             <div className="flex items-center justify-center gap-2">
@@ -285,6 +318,13 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                         </div>
                     </div>
                 </div>
+
+                {/* Server error display */}
+                {serverError && (
+                    <div className="p-3 bg-red-50 border border-red-300 rounded-md text-sm text-red-800 font-mono break-all">
+                        <strong>Error del servidor:</strong> {serverError}
+                    </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
