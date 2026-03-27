@@ -90,7 +90,7 @@ const ProductsPage = () => {
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/brands`, {
+      const response = await fetch(`${API_URL}/brands/active`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar marcas');
@@ -137,6 +137,7 @@ const ProductsPage = () => {
   const exchangeRates = ratesData?.data || [];
 
   // Form and error state
+  const [submitting, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -266,39 +267,6 @@ const ProductsPage = () => {
     }
   }, [error]);
 
-  const fetchBrands = async () => {
-    try {
-      const response = await fetch(`${API_URL}/brands/active`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Error al cargar marcas');
-
-      const data = await response.json();
-      setBrands(data.data || []);
-    } catch (err) {
-      console.error('Error fetching brands:', err);
-    }
-  };
-
-  const fetchPackagingTypes = async () => {
-    try {
-      const response = await fetch(`${API_URL}/packaging-types/active`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Error al cargar tipos de empaque');
-
-      const data = await response.json();
-      setPackagingTypes(data.data || []);
-    } catch (err) {
-      console.error('Error fetching packaging types:', err);
-    }
-  };
 
   const fetchPresentationTypes = async () => {
     try {
@@ -441,7 +409,7 @@ const ProductsPage = () => {
         await savePresentations(editingProduct.id);
       }
 
-      await fetchProducts();
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       handleCloseModal();
       toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado');
     } catch (err) {
@@ -521,7 +489,7 @@ const ProductsPage = () => {
       description: product.description || '',
       category_id: product.category_id || '',
       barcode: product.barcodes?.[0]?.barcode || '',
-      brand_id: product.brand_id || '',
+      brand_id: product.brand_id ? String(product.brand_id) : '',
       unit_size: product.unit_size || '',
       unit_size_measure: product.unit_size_measure || 'UND',
       is_perishable: product.is_perishable || false,
@@ -1231,7 +1199,7 @@ const ProductsPage = () => {
                           >
                             <option value="">Seleccione una marca</option>
                             {brands.map((brand) => (
-                              <option key={brand.id} value={brand.id}>
+                              <option key={brand.id} value={String(brand.id)}>
                                 {brand.name}
                               </option>
                             ))}

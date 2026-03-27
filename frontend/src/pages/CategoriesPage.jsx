@@ -56,7 +56,7 @@ const CategoriesPage = () => {
       color: category?.color || '#6B7280'
     });
     setShowModal(true);
-    setError(null);
+    setMutationError(null);
   };
 
   const handleCloseModal = () => {
@@ -68,7 +68,7 @@ const CategoriesPage = () => {
       description: '',
       color: '#6B7280'
     });
-    setError(null);
+    setMutationError(null);
   };
 
   const handleChange = (e) => {
@@ -82,7 +82,7 @@ const CategoriesPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setError(null);
+    setMutationError(null);
 
     try {
       if (editingCategory) {

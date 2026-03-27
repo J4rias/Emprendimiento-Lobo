@@ -111,7 +111,7 @@ const BrandsPage = () => {
       notes: '',
       is_active: true
     });
-    setError(null);
+    setMutationError(null);
   };
 
   const handleChange = (e) => {
