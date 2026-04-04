@@ -675,15 +675,6 @@ class CustomerController {
         attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status']
       });
 
-      const cashSales = await Sale.findAll({
-        where: {
-          customer_id: id,
-          status: { [Op.notIn]: ['cancelled'] },
-          sale_type: 'cash'
-        },
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status']
-      });
-
       // 2. Fetch Payments (Credits/Assets) — only for credit sales
       const payments = await SalePayment.findAll({
         include: [{
@@ -739,7 +730,7 @@ class CustomerController {
       const ledger = [];
       const summary = {};
 
-      const allSales = [...sales, ...cashSales];
+      const allSales = sales; // solo ventas a crédito generan cuentas por cobrar
 
       // Process Sales (Charges)
       for (const sale of allSales) {
@@ -879,11 +870,21 @@ class CustomerController {
         });
       }
 
-      // Calculate Final Balances
-      for (const curr in summary) {
-        summary[curr].balance = Math.max(0, summary[curr].total_invoiced - summary[curr].total_paid);
-        summary[curr].available_credit = 0;
+      // Calculate Final Balances — per-sale para evitar double-counting con available_credit
+      // balance = suma de pendientes reales por venta (total - paid_amount - CN aplicadas)
+      let truePendingUSD = 0;
+      let truePendingCOP = 0;
+      for (const sale of sales) {
+        const totalUSD = parseFloat(sale.total || 0);
+        const paidUSD = parseFloat(sale.paid_amount || 0);
+        const cnUSD = cnBySaleId[sale.id]?.usd || 0;
+        const rate = parseFloat(sale.exchange_rate || 1);
+        const pendingUSD = Math.max(0, totalUSD - paidUSD - cnUSD);
+        truePendingUSD += pendingUSD;
+        truePendingCOP += pendingUSD * rate;
       }
+      if (summary['USD']) summary['USD'].balance = truePendingUSD;
+      if (summary['COP']) summary['COP'].balance = Math.round(truePendingCOP);
 
       // Calculate saldo a favor (two-step approach):
       // Step 1: Compute overpayment from credit sales with REAL (non-credit_balance) payments

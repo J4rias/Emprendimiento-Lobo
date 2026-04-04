@@ -295,7 +295,15 @@ const CustomerStatementModal = ({ customer, onClose }) => {
 
     const getFilteredLedger = () => {
         if (!statementData?.ledger) return [];
-        return statementData.ledger.filter(t => t.currency === selectedCurrency);
+        let runningBalance = 0;
+        return statementData.ledger
+            .filter(t => t.currency === selectedCurrency)
+            .map(t => {
+                runningBalance = t.type === 'charge'
+                    ? runningBalance + t.amount  // venta: suma deuda
+                    : runningBalance - t.amount; // pagos, CN, y uso de saldo a favor: reducen deuda
+                return { ...t, runningBalance };
+            });
     };
 
     const handleToggleExpand = (id) => {
@@ -534,12 +542,13 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
                                                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cargos (Deuda)</th>
                                                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Abonos (Pagos)</th>
+                                                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Saldo</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200">
                                                     {getFilteredLedger().length === 0 ? (
                                                         <tr>
-                                                            <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                                                            <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
                                                                 No se encontraron transacciones en {selectedCurrency}
                                                             </td>
                                                         </tr>
@@ -587,9 +596,10 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                                     t.type === 'credit' ? 'text-blue-600' :
                                                                                         t.isInternal ? 'text-purple-600' : 'text-green-600'
                                                                                     }`}>
-                                                                                    {t.type === 'charge' ? 'Nota de Débito (Venta)' :
-                                                                                        t.type === 'credit' ? 'Nota de Crédito (Devolución)' :
-                                                                                            t.isInternal ? 'Uso de Saldo a Favor' : 'Pago Recibido'}
+                                                                                    {t.type === 'charge'
+                                                                                        ? (t.original_data?.sale_type === 'cash' ? 'Venta Contado' : 'Nota de Débito (Venta)')
+                                                                                        : t.type === 'credit' ? 'Nota de Crédito (Devolución)'
+                                                                                            : t.isInternal ? 'Uso de Saldo a Favor' : 'Pago Recibido'}
                                                                                 </span>
                                                                                 <span className="text-xs text-gray-500">{t.description}</span>
                                                                                 {t.original_currency && t.original_currency !== selectedCurrency && (
@@ -627,11 +637,25 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                                 <span className="text-gray-300">-</span>
                                                                             )}
                                                                         </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold">
+                                                                            <span className={
+                                                                                t.runningBalance > 0.009
+                                                                                    ? 'text-red-600'
+                                                                                    : t.runningBalance < -0.009
+                                                                                        ? 'text-green-600'
+                                                                                        : 'text-gray-400'
+                                                                            }>
+                                                                                {formatCurrency(Math.abs(t.runningBalance), t.currency)}
+                                                                                {t.runningBalance < -0.009 && (
+                                                                                    <span className="block text-[10px] font-normal">a favor</span>
+                                                                                )}
+                                                                            </span>
+                                                                        </td>
                                                                     </tr>
 
                                                                     {isExpanded && (
                                                                         <tr className={expandBg}>
-                                                                            <td colSpan="5" className={`px-8 py-4 border-t ${expandBorder}`}>
+                                                                            <td colSpan="6" className={`px-8 py-4 border-t ${expandBorder}`}>
                                                                                 {t.type === 'charge' ? (
                                                                                     <SaleDetailExpanded transaction={t} currency={selectedCurrency} />
                                                                                 ) : t.type === 'credit' ? (
