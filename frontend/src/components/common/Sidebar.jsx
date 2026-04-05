@@ -23,6 +23,7 @@ import {
   FileX,
   Receipt,
   Calculator,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -32,10 +33,12 @@ const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const [productsOpen, setProductsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [arOpen, setArOpen] = useState(false);
 
   // Rutas de los subitems de cada acordeón
   const productsRoutes = ['/productos', '/categorias', '/proveedores', '/marcas'];
   const configRoutes = ['/usuarios', '/roles', '/configuracion', '/tasas-cambio'];
+  const arRoutes = ['/cuentas-por-cobrar', '/cuentas-por-cobrar/clientes'];
 
   // Efecto para controlar el estado de los acordeones basado en la ruta actual
   useEffect(() => {
@@ -44,10 +47,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     // Verificar si la ruta actual pertenece a algún acordeón
     const isInProducts = productsRoutes.some(route => currentPath === route);
     const isInConfig = configRoutes.some(route => currentPath === route);
+    const isInAR = arRoutes.some(route => currentPath.startsWith(route));
 
     // Actualizar estados
     setProductsOpen(isInProducts);
     setConfigOpen(isInConfig);
+    setArOpen(isInAR);
   }, [location.pathname]);
 
   const menuItems = [
@@ -159,6 +164,24 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'supplier_payments.view',
     },
     {
+      name: 'Cuentas por Cobrar',
+      icon: BookOpen,
+      permission: 'ar.view',
+      isAccordion: true,
+      items: [
+        {
+          name: 'General',
+          path: '/cuentas-por-cobrar',
+          permission: 'ar.view',
+        },
+        {
+          name: 'Por Cliente',
+          path: '/cuentas-por-cobrar/clientes',
+          permission: 'ar.view',
+        },
+      ],
+    },
+    {
       name: 'Reportes',
       icon: BarChart3,
       path: '/reportes',
@@ -205,8 +228,13 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       // Determinar qué acordeón es y su estado
       const isProductsAccordion = item.name === 'Productos';
-      const isOpen = isProductsAccordion ? productsOpen : configOpen;
-      const toggleOpen = isProductsAccordion ? () => setProductsOpen(!productsOpen) : () => setConfigOpen(!configOpen);
+      const isARAccordion = item.name === 'Cuentas por Cobrar';
+      const isOpen = isProductsAccordion ? productsOpen : isARAccordion ? arOpen : configOpen;
+      const toggleOpen = isProductsAccordion
+        ? () => setProductsOpen(!productsOpen)
+        : isARAccordion
+          ? () => setArOpen(!arOpen)
+          : () => setConfigOpen(!configOpen);
 
       return (
         <div key={`${item.name.toLowerCase()}-accordion`} className="space-y-1">
@@ -234,6 +262,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <NavLink
                   key={subItem.path}
                   to={subItem.path}
+                  end={true}
                   onClick={() => onClose()}
                   className={({ isActive }) =>
                     `flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${isActive

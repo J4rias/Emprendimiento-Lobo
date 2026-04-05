@@ -35,7 +35,9 @@ const CreditNotesPage         = lazy(() => import('./pages/CreditNotesPage'));
 const DeliveriesPage          = lazy(() => import('./pages/DeliveriesPage'));
 const SupplierPaymentsPage    = lazy(() => import('./pages/SupplierPaymentsPage'));
 const PriceListsPage          = lazy(() => import('./pages/PriceListsPage'));
-const DailyReportPage         = lazy(() => import('./pages/DailyReportPage'));
+const DailyReportPage              = lazy(() => import('./pages/DailyReportPage'));
+const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivablePage'));
+const ARCustomerDetailPage         = lazy(() => import('./pages/ARCustomerDetailPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-[400px] flex items-center justify-center">
@@ -353,6 +355,36 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <ReportsPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/cuentas-por-cobrar"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <AccountsReceivablePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/cuentas-por-cobrar/clientes"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <AccountsReceivablePage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/cuentas-por-cobrar/cliente/:id"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <ARCustomerDetailPage />
             </AppLayout>
           </PrivateRoute>
         }
