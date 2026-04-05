@@ -62,10 +62,17 @@ function canReverseEntry(entry, copLedger) {
   if (payTime >= thirtyMinsAgo) return true;
 
   // Si fue hace más de 30 min, solo puede revertir si NO hay pagos posteriores
-  const thisId = entry.original_data?.id;
+  // Extraer payment ID del entry.id (formato: "pay_{id}_{currency}")
+  const payIdMatch = entry.id?.match(/^pay_(\d+)_/);
+  const thisPaymentId = payIdMatch ? parseInt(payIdMatch[1]) : entry.original_data?.id;
+
   const hasSubsequentPayment = copLedger.some(
     e => (e.type === 'payment' || e.type === 'internal_transfer') &&
-      e.original_data?.id !== thisId &&
+      (() => {
+        const otherPayIdMatch = e.id?.match(/^pay_(\d+)_/);
+        const otherId = otherPayIdMatch ? parseInt(otherPayIdMatch[1]) : e.original_data?.id;
+        return otherId !== thisPaymentId;
+      })() &&
       new Date(e.created_at || e.original_data?.created_at) > payTime
   );
 

@@ -354,7 +354,11 @@ async function reversePayment(req, res, next) {
     }
 
     // 1. Validar PIN del admin (con lockout)
-    const admin = await User.findByPk(adminId, { transaction: t });
+    const [adminRows] = await sequelize.query(
+      `SELECT id, credit_pin, credit_pin_attempts, credit_pin_locked_until FROM users WHERE id = ?`,
+      { replacements: [adminId], transaction: t }
+    );
+    const admin = adminRows[0];
     if (!admin?.credit_pin) {
       await t.rollback();
       return res.status(400).json({ success: false, message: 'No tienes un PIN de crédito configurado' });
@@ -369,14 +373,20 @@ async function reversePayment(req, res, next) {
     if (!pinOk) {
       const attempts = (admin.credit_pin_attempts || 0) + 1;
       const lockedUntil = attempts >= 3 ? new Date(Date.now() + 15 * 60 * 1000) : null;
-      await admin.update({ credit_pin_attempts: attempts, credit_pin_locked_until: lockedUntil }, { transaction: t });
+      await sequelize.query(
+        `UPDATE users SET credit_pin_attempts = ?, credit_pin_locked_until = ? WHERE id = ?`,
+        { replacements: [attempts, lockedUntil, adminId], transaction: t }
+      );
       await t.commit();
       if (lockedUntil) return res.status(403).json({ success: false, message: 'PIN incorrecto. Bloqueado por 15 minutos (3 intentos fallidos)' });
       return res.status(403).json({ success: false, message: `PIN incorrecto. Intentos restantes: ${3 - attempts}` });
     }
 
     // Reset intentos
-    await admin.update({ credit_pin_attempts: 0, credit_pin_locked_until: null }, { transaction: t });
+    await sequelize.query(
+      `UPDATE users SET credit_pin_attempts = 0, credit_pin_locked_until = NULL WHERE id = ?`,
+      { replacements: [adminId], transaction: t }
+    );
 
     // 2. Obtener el pago (SELECT FOR UPDATE)
     const [payRows] = await sequelize.query(
@@ -456,14 +466,21 @@ async function reversePayment(req, res, next) {
 async function setAdminPin(req, res, next) {
   try {
     const { pin } = req.body;
+
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+    }
+
     if (!pin || !/^\d{4,6}$/.test(String(pin))) {
       return res.status(400).json({ success: false, message: 'El PIN debe ser numérico de 4 a 6 dígitos' });
     }
+
     const hashed = await bcrypt.hash(String(pin), 10);
-    await User.update(
-      { credit_pin: hashed, credit_pin_attempts: 0, credit_pin_locked_until: null },
-      { where: { id: req.user.id } }
+    await sequelize.query(
+      `UPDATE users SET credit_pin = ?, credit_pin_attempts = 0, credit_pin_locked_until = NULL WHERE id = ?`,
+      { replacements: [hashed, req.user.id] }
     );
+
     res.json({ success: true, message: 'PIN de crédito configurado exitosamente' });
   } catch (error) {
     next(error);
