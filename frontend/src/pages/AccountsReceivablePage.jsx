@@ -636,15 +636,6 @@ export default function AccountsReceivablePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {hasPermission('ar.view') && (
-            <button
-              onClick={() => setShowPinSetup(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <Shield className="w-4 h-4" />
-              Configurar PIN
-            </button>
-          )}
           <button
             onClick={() => activeTab === 'general' ? arService.exportInvoicesCSV({ bucket: activeBucket !== 'all' ? activeBucket : undefined, search: debouncedSearch || undefined }) : arService.exportCustomersCSV({ search: debouncedSearch || undefined })}
             className="flex items-center gap-2 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"

@@ -48,35 +48,9 @@ const METHOD_LABELS = {
  *  - Dentro de 30 min → siempre puede
  *  - Fuera de 30 min Y hay pagos posteriores del cliente → NO puede
  */
-function canReverseEntry(entry, copLedger) {
+function canReverseEntry(entry) {
   if (entry.type !== 'payment' && entry.type !== 'internal_transfer') return false;
-
-  // Usar created_at del entry (timestamp de cuándo se creó el pago)
-  const payCreatedAt = entry.created_at || entry.original_data?.created_at;
-  if (!payCreatedAt) return false; // Sin timestamp, no se puede revertir
-
-  const payTime = new Date(payCreatedAt);
-  const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-
-  // Si fue en los últimos 30 minutos, siempre puede revertir
-  if (payTime >= thirtyMinsAgo) return true;
-
-  // Si fue hace más de 30 min, solo puede revertir si NO hay pagos posteriores
-  // Extraer payment ID del entry.id (formato: "pay_{id}_{currency}")
-  const payIdMatch = entry.id?.match(/^pay_(\d+)_/);
-  const thisPaymentId = payIdMatch ? parseInt(payIdMatch[1]) : entry.original_data?.id;
-
-  const hasSubsequentPayment = copLedger.some(
-    e => (e.type === 'payment' || e.type === 'internal_transfer') &&
-      (() => {
-        const otherPayIdMatch = e.id?.match(/^pay_(\d+)_/);
-        const otherId = otherPayIdMatch ? parseInt(otherPayIdMatch[1]) : e.original_data?.id;
-        return otherId !== thisPaymentId;
-      })() &&
-      new Date(e.created_at || e.original_data?.created_at) > payTime
-  );
-
-  return !hasSubsequentPayment;
+  return entry.can_reverse === true;
 }
 
 // ─── Detalle expandible: Venta ─────────────────────────────────────────────────
@@ -543,7 +517,7 @@ const ARCustomerDetailPage = () => {
     const isCredit = entry.type === 'credit';
     const isPayment = entry.type === 'payment' || entry.type === 'internal_transfer';
     const isExpanded = expandedId === entry.id;
-    const canReverse = isAdmin && canReverseEntry(entry, copLedger);
+    const canReverse = isAdmin && canReverseEntry(entry);
     const aging = entry.original_data?.aging_bucket;
 
     let typeLabel = '';

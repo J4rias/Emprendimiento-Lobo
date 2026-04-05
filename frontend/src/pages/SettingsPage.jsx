@@ -52,6 +52,12 @@ const SettingsPage = () => {
   });
   const [usersLoading, setUsersLoading] = useState(false);
 
+  // PIN state
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+
   const API_URL = import.meta.env.VITE_API_URL || '/api';
 
   const moduleNames = {
@@ -570,6 +576,18 @@ const SettingsPage = () => {
               Usuarios
             </button>
           )}
+          {hasPermission('settings.manage') && (
+            <button
+              onClick={() => setActiveTab('seguridad')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'seguridad'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+              <Lock className="inline-block h-5 w-5 mr-2" />
+              Seguridad
+            </button>
+          )}
         </nav>
       </div>
 
@@ -817,6 +835,72 @@ const SettingsPage = () => {
           </div>
         )
       }
+
+      {/* Seguridad Tab - PIN */}
+      {activeTab === 'seguridad' && hasPermission('settings.manage') && (
+        <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Configurar PIN de Crédito</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Este PIN se usará para autorizar reversiones de abonos en el módulo de Cuentas por Cobrar.
+          </p>
+
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!/^\d{4,6}$/.test(pin)) return toast.error('El PIN debe ser de 4 a 6 dígitos numéricos');
+            if (pin !== confirmPin) return toast.error('Los PINs no coinciden');
+            try {
+              setPinLoading(true);
+              const res = await fetch(`${API_URL}/ar/admin-pin`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin })
+              });
+              if (res.ok) {
+                toast.success('PIN configurado exitosamente');
+                setPin('');
+                setConfirmPin('');
+              } else {
+                toast.error((await res.json()).message || 'Error al guardar el PIN');
+              }
+            } catch (e) {
+              toast.error(e.message || 'Error al guardar el PIN');
+            } finally {
+              setPinLoading(false);
+            }
+          }} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nuevo PIN (4-6 dígitos)</label>
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="1234"
+                  className="input w-full"
+                  maxLength="6"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar PIN</label>
+                <input
+                  type="password"
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value)}
+                  placeholder="1234"
+                  className="input w-full"
+                  maxLength="6"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button type="submit" disabled={pinLoading} className="btn-primary w-full md:w-auto">
+                {pinLoading ? 'Guardando...' : 'Guardar PIN'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Create/Edit Role Modal */}
       {showModal && (

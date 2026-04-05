@@ -150,6 +150,19 @@ async function buildCustomerStatement(customerId) {
     });
   }
 
+  // Calcular can_reverse para cada pago en memoria
+  const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const canReverseMap = {};
+  for (const pay of payments) {
+    if (!pay.created_at) { canReverseMap[pay.id] = false; continue; }
+    const payTime = new Date(pay.created_at);
+    if (payTime >= thirtyMinsAgo) { canReverseMap[pay.id] = true; continue; }
+    const hasSubsequent = payments.some(
+      other => other.id !== pay.id && new Date(other.created_at) > payTime
+    );
+    canReverseMap[pay.id] = !hasSubsequent;
+  }
+
   // Procesar pagos
   for (const pay of payments) {
     const payCurrency = pay.currency || 'USD';
@@ -169,6 +182,7 @@ async function buildCustomerStatement(customerId) {
 
     const isInternal = pay.payment_method === 'credit_balance';
     const type = isInternal ? 'internal_transfer' : 'payment';
+    const can_reverse = canReverseMap[pay.id] ?? false;
 
     ledger.push({
       id: `pay_${pay.id}_usd`, type, date: new Date(pay.payment_date),
@@ -176,7 +190,7 @@ async function buildCustomerStatement(customerId) {
       description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
       isInternal, original_amount: amtOrig, original_currency: payCurrency,
       original_data: { ...pay, sale: pay.sale },
-      created_at: pay.created_at
+      created_at: pay.created_at, can_reverse
     });
     ledger.push({
       id: `pay_${pay.id}_cop`, type, date: new Date(pay.payment_date),
@@ -184,7 +198,7 @@ async function buildCustomerStatement(customerId) {
       description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
       isInternal, original_amount: amtOrig, original_currency: payCurrency,
       original_data: { ...pay, sale: pay.sale },
-      created_at: pay.created_at
+      created_at: pay.created_at, can_reverse
     });
   }
 

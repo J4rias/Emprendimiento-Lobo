@@ -408,11 +408,14 @@ async function reversePayment(req, res, next) {
     const withinWindow = payCreatedAt >= thirtyMinsAgo;
 
     if (!withinWindow) {
+      // Comparar created_at directamente en SQL para evitar problemas de timezone
       const [laterPayments] = await sequelize.query(
         `SELECT COUNT(*) as cnt FROM sale_payments sp
          JOIN sales s ON s.id = sp.sale_id
-         WHERE s.customer_id = ? AND sp.created_at > ? AND sp.reversed_at IS NULL AND sp.id != ?`,
-        { replacements: [pay.customer_id, pay.created_at, paymentId], transaction: t }
+         WHERE s.customer_id = ? AND s.sale_type = 'credit' AND s.status NOT IN ('cancelled')
+           AND sp.created_at > (SELECT created_at FROM sale_payments WHERE id = ?)
+           AND sp.reversed_at IS NULL AND sp.id != ?`,
+        { replacements: [pay.customer_id, paymentId, paymentId], transaction: t }
       );
       if (parseInt(laterPayments[0].cnt) > 0) {
         await t.rollback();
@@ -449,8 +452,8 @@ async function reversePayment(req, res, next) {
     const newStatus = newPaidUSD <= 0 ? 'pending' : newPaidUSD < saleTotal - 0.001 ? 'partial' : 'completed';
 
     await sequelize.query(
-      `UPDATE sales SET paid_amount = ?, payment_status = ?, updated_at = NOW() WHERE id = ?`,
-      { replacements: [newPaidUSD, newStatus, pay.sale_id], transaction: t }
+      `UPDATE sales SET paid_amount = ?, updated_at = NOW() WHERE id = ?`,
+      { replacements: [newPaidUSD, pay.sale_id], transaction: t }
     );
 
     await t.commit();
