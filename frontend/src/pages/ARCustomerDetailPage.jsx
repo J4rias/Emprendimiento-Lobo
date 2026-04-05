@@ -450,7 +450,7 @@ const ARCustomerDetailPage = () => {
   const [data, setData] = useState(null);       // { customer, summary, ledger, credit_block }
   const [expandedId, setExpandedId] = useState(null);
   const [reversalPayment, setReversalPayment] = useState(null);
-  const [sortField, setSortField] = useState('created_at');
+  const [sortField, setSortField] = useState('date');
   const [sortDir, setSortDir] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
@@ -775,8 +775,8 @@ const ARCustomerDetailPage = () => {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     <th className="px-3 py-3 w-8" />
-                    <th className="px-2 py-3 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('created_at')}>
-                      <div className="flex items-center gap-1">Fecha <SortIcon field="created_at" /></div>
+                    <th className="px-2 py-3 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1">Fecha <SortIcon field="date" /></div>
                     </th>
                     <th className="px-2 py-3 text-left cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('reference')}>
                       <div className="flex items-center gap-1">Referencia <SortIcon field="reference" /></div>
