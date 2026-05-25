@@ -16,6 +16,11 @@ export const saleService = {
     return response.data;
   },
 
+  getBySaleNumber: async (saleNumber) => {
+    const response = await api.get(`/sales/by-number/${saleNumber}`);
+    return response.data;
+  },
+
   updateSale: async (id, data) => {
     const response = await api.put(`/sales/${id}`, data);
     return response.data;

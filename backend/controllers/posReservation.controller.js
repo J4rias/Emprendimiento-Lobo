@@ -1,4 +1,4 @@
-const { PosReservation, Inventory, Product, ProductPresentation, sequelize } = require('../models');
+const { PosReservation, Inventory, Product, ProductPresentation, Warehouse, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -47,9 +47,15 @@ exports.reserve = async (req, res, next) => {
       });
     }
 
-    // Obtener stock disponible (asumimos warehouse_id = 1 por ahora)
+    // Obtener el warehouse activo
+    const warehouse = await Warehouse.findOne({ where: { is_active: true }, transaction });
+    if (!warehouse) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: 'No hay almacén configurado' });
+    }
+
     const inventory = await Inventory.findOne({
-      where: { product_id, warehouse_id: 1 },
+      where: { product_id, warehouse_id: warehouse.id },
       lock: transaction.LOCK.UPDATE,
       transaction
     });

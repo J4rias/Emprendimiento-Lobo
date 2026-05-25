@@ -16,13 +16,16 @@ const generateUUID = () => {
   });
 };
 
-/**
- * POS Store - Zustand
- * Manages:
- * - Multiple sales tabs
- * - Cart items within each tab
- * - Real-time reservations from other sessions (updated via WebSocket)
- */
+const updateTab = (state, tabId, fn) => {
+  if (!tabId) return state;
+  return { tabs: state.tabs.map(tab => tab.id === tabId ? fn(tab) : tab) };
+};
+
+const matchItem = (item, productId, presentationId, sellByUnit) =>
+  item.product_id === productId &&
+  item.presentation_id === presentationId &&
+  (item.sellByUnit || false) === (sellByUnit || false);
+
 export const usePOSStore = create(
   persist(
     (set, get) => ({
@@ -87,140 +90,139 @@ export const usePOSStore = create(
         set({ activeTabId: tabId });
       },
 
-      /**
-       * Get active tab
-       */
-      getActiveTab: () => {
-        const state = get();
-        return state.tabs.find(t => t.id === state.activeTabId);
-      },
-
       // ============= CART ACTIONS =============
 
       /**
        * Add item to cart (or update if already exists)
+       * Items are keyed by product_id + presentation_id + sellByUnit
        */
       addToCart: (tabId, item) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              // Check if item already exists (same product and presentation)
-              const existingIndex = tab.cart.findIndex(
-                (i) => i.product_id === item.product_id && i.presentation_id === item.presentation_id
-              );
+        set((state) => updateTab(state, tabId, (tab) => {
+          const existingIndex = tab.cart.findIndex(
+            (i) => matchItem(i, item.product_id, item.presentation_id, item.sellByUnit)
+          );
 
-              if (existingIndex >= 0) {
-                // Update quantity
-                const updated = [...tab.cart];
-                updated[existingIndex] = {
-                  ...updated[existingIndex],
-                  quantity: updated[existingIndex].quantity + (item.quantity || 1)
-                };
-                return { ...tab, cart: updated };
-              } else {
-                // Add new item
-                return { ...tab, cart: [...tab.cart, item] };
-              }
-            }
-            return tab;
-          });
-
-          return { tabs };
-        });
+          if (existingIndex >= 0) {
+            const updated = [...tab.cart];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: updated[existingIndex].quantity + (item.quantity || 1)
+            };
+            return { ...tab, cart: updated };
+          }
+          return { ...tab, cart: [...tab.cart, item] };
+        }));
       },
 
       /**
        * Update item unit price in cart (in USD)
        */
-      updateCartItemPrice: (tabId, presentationId, newPriceUSD) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              const cart = tab.cart.map((item) => {
-                if (item.presentation_id === presentationId) {
-                  return { ...item, unit_price: newPriceUSD, is_frozen: false };
-                }
-                return item;
-              });
-              return { ...tab, cart };
-            }
-            return tab;
-          });
-          return { tabs };
-        });
+      updateCartItemPrice: (tabId, productId, presentationId, sellByUnit, newPriceUSD, frozenUpdate) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.map((item) =>
+            matchItem(item, productId, presentationId, sellByUnit)
+              ? { ...item, unit_price: newPriceUSD, ...(frozenUpdate || { is_frozen: false }) }
+              : item
+          ),
+        })));
       },
 
       /**
        * Update item quantity in cart
        */
-      updateQuantity: (tabId, presentationId, quantity) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              const cart = tab.cart.map((item) => {
-                if (item.presentation_id === presentationId) {
-                  return { ...item, quantity: Math.max(0, quantity) };
-                }
-                return item;
-              });
-              return { ...tab, cart };
-            }
-            return tab;
-          });
+      updateQuantity: (tabId, productId, presentationId, sellByUnit, quantity) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.map((item) =>
+            matchItem(item, productId, presentationId, sellByUnit)
+              ? { ...item, quantity: Math.max(0, quantity) }
+              : item
+          ),
+        })));
+      },
 
-          return { tabs };
+      /**
+       * Update discount percent for a cart item
+       */
+      updateCartItemDiscount: (tabId, productId, presentationId, sellByUnit, discountPercent) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.map((item) =>
+            matchItem(item, productId, presentationId, sellByUnit)
+              ? { ...item, discount_percent: discountPercent }
+              : item
+          ),
+        })));
+      },
+
+      /**
+       * Apply discount to all items in a tab's cart
+       */
+      applyDiscountToAll: (tabId, discountPercent) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.map((item) => ({ ...item, discount_percent: discountPercent })),
+        })));
+      },
+
+      /**
+       * Toggle sell mode between package and unit for a cart item
+       */
+      toggleSellMode: (tabId, productId, presentationId, currentSellByUnit) => {
+        set((state) => {
+          const tab = state.tabs.find(t => t.id === tabId);
+          if (!tab) return state;
+
+          const item = tab.cart.find(i => matchItem(i, productId, presentationId, currentSellByUnit));
+          if (!item) return state;
+
+          const targetByUnit = !currentSellByUnit;
+          const unitsPerPkg = item.units_per_package || 1;
+          const existingOther = tab.cart.find(i => matchItem(i, productId, presentationId, targetByUnit));
+
+          let convertedQty = targetByUnit
+            ? 1
+            : Math.max(1, Math.floor(item.quantity / unitsPerPkg));
+          if (existingOther) convertedQty += existingOther.quantity;
+
+          const newPrice = targetByUnit
+            ? (item.unit_price_each || item.unit_price / unitsPerPkg)
+            : (item.package_price || item.unit_price * unitsPerPkg);
+
+          return updateTab(state, tabId, (t) => {
+            let newCart;
+            if (existingOther) {
+              newCart = t.cart
+                .filter(i => !matchItem(i, productId, presentationId, currentSellByUnit))
+                .map(i => matchItem(i, productId, presentationId, targetByUnit)
+                  ? { ...i, quantity: convertedQty }
+                  : i
+                );
+            } else {
+              newCart = t.cart.map(i =>
+                matchItem(i, productId, presentationId, currentSellByUnit)
+                  ? { ...i, sellByUnit: targetByUnit, quantity: convertedQty, unit_price: newPrice }
+                  : i
+              );
+            }
+            return { ...t, cart: newCart };
+          });
         });
       },
 
       /**
        * Remove item from cart
        */
-      removeFromCart: (tabId, presentationId) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              return {
-                ...tab,
-                cart: tab.cart.filter((item) => item.presentation_id !== presentationId)
-              };
-            }
-            return tab;
-          });
-
-          return { tabs };
-        });
+      removeFromCart: (tabId, productId, presentationId, sellByUnit) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.filter((item) => !matchItem(item, productId, presentationId, sellByUnit)),
+        })));
       },
 
-      /**
-       * Clear entire cart for a tab
-       */
-      clearCart: (tabId) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              return { ...tab, cart: [] };
-            }
-            return tab;
-          });
-
-          return { tabs };
-        });
-      },
-
-      /**
-       * Update customer for a tab
-       */
       setTabCustomer: (tabId, customer) => {
-        set((state) => {
-          const tabs = state.tabs.map((tab) => {
-            if (tab.id === tabId) {
-              return { ...tab, customer };
-            }
-            return tab;
-          });
-
-          return { tabs };
-        });
+        set((state) => updateTab(state, tabId, (tab) => ({ ...tab, customer })));
       },
 
       // ============= RESERVATION ACTIONS =============

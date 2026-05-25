@@ -1,12 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { usePOSStore, usePOSSessionId } from '../stores/posStore';
-import { usePOSSocket } from '../hooks/usePOSSocket';
-import { priceListService } from '../services/api/priceListService';
-import { productService } from '../services/api/productService';
-import { saleService } from '../services/api/saleService';
-import { posReservationService } from '../services/api/posReservationService';
-import { exchangeRateService } from '../services/api/exchangeRateService';
+import { useState } from 'react';
+import { usePOS, CURRENCIES, PAYMENT_METHODS } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import POSTabs from '../components/pos/POSTabs';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
@@ -14,450 +7,19 @@ import CustomerSearch from '../components/CustomerSearch';
 import Modal from '../components/common/Modal';
 import {
   Plus, Search, X, AlertCircle, CheckCircle, User,
-  Package, Lock, Banknote, CreditCard, Smartphone
+  Package, Lock, Banknote, CreditCard, Smartphone,
+  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// ============= CONSTANTS =============
-const CURRENCIES = [
-  { code: 'USD', symbol: '$',    name: 'USD' },
-  { code: 'COP', symbol: 'COP$', name: 'COP' },
-  { code: 'VES', symbol: 'Bs',   name: 'VES' },
-];
-
-const PAYMENT_METHODS = [
-  { id: 'cash',     label: 'Efectivo',       icon: Banknote },
-  { id: 'card',     label: 'Tarjeta',        icon: CreditCard },
-  { id: 'transfer', label: 'Transferencia',  icon: Smartphone },
-];
+// Icon map for payment methods
+const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone };
 
 // ============= MAIN COMPONENT =============
 const POSPage = () => {
-  const { hasPermission, user } = useAuth();
-  const sessionId = usePOSSessionId();
+  const pos = usePOS();
 
-  // ============= STORE =============
-  const {
-    tabs,
-    activeTabId,
-    otherReservations,
-    getAvailableUnits,
-    addToCart,
-    updateQuantity,
-    updateCartItemPrice,
-    removeFromCart,
-    setTabCustomer,
-    closeTab,
-  } = usePOSStore();
-
-  const activeTab = tabs.find((t) => t.id === activeTabId);
-  const cart = activeTab?.cart || [];
-  const customer = activeTab?.customer || null;
-
-  // ============= LOCAL STATE =============
-  const [products, setProducts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [priceLists, setPriceLists] = useState([]);
-  const [selectedPriceList, setSelectedPriceList] = useState(null);
-  const [priceListDetails, setPriceListDetails] = useState({});
-  const [exchangeRates, setExchangeRates] = useState([]);
-  const [displayCurrency, setDisplayCurrency] = useState('COP');
-  const [loadingProducts, setLoadingProducts] = useState(false);
-
-  // ============= MODAL STATES =============
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [showResultModal, setShowResultModal] = useState(false);
-  const [showConflictAlert, setShowConflictAlert] = useState(false);
-  const [conflictData, setConflictData] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  // ============= CHECKOUT STATE =============
-  const [saleType, setSaleType] = useState('cash');
-  const [paymentLines, setPaymentLines] = useState([]);
-  const [discountPercent, setDiscountPercent] = useState(0);
-  const [notes, setNotes] = useState('');
-  const [saleResult, setSaleResult] = useState(null);
-
-  // ============= REFS =============
-  const searchInputRef = useRef();
-
-  // ============= CURRENCY HELPERS =============
-  const displaySymbol = CURRENCIES.find((c) => c.code === displayCurrency)?.symbol || '$';
-
-  const toDisplay = useCallback(
-    (amountUSD) => {
-      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
-      return parseFloat(amountUSD || 0) * (rate || 1);
-    },
-    [displayCurrency, exchangeRates]
-  );
-
-  const fromDisplay = useCallback(
-    (amountDisplay) => {
-      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
-      return parseFloat(amountDisplay || 0) / (rate || 1);
-    },
-    [displayCurrency, exchangeRates]
-  );
-
-  /** Formatea un número ya convertido a la moneda de display */
-  const fmt = useCallback(
-    (amount) => {
-      const n = parseFloat(amount) || 0;
-      if (displayCurrency === 'COP') {
-        return Math.round(n).toLocaleString('es-CO');
-      }
-      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    },
-    [displayCurrency]
-  );
-
-  // ============= WEBSOCKET =============
-  usePOSSocket({
-    sessionId,
-    tabId: activeTabId,
-    token: localStorage.getItem('token'),
-    isEnabled: true,
-  });
-
-  // ============= EFFECTS =============
-  useEffect(() => {
-    loadPriceLists();
-    loadExchangeRates();
-  }, []);
-
-  useEffect(() => {
-    if (selectedPriceList) loadProducts();
-  }, [searchTerm, selectedPriceList]);
-
-  useEffect(() => {
-    if (searchInputRef.current) searchInputRef.current.focus();
-  }, [activeTabId]);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
-      if (e.key === 'F8') {
-        e.preventDefault();
-        if (cart.length > 0) setShowCheckoutModal(true);
-        else toast.error('Agrega productos antes de cobrar');
-      }
-      if (e.key === 'Escape') {
-        setShowCheckoutModal(false);
-        setShowResultModal(false);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [cart]);
-
-  // ============= LOADERS =============
-  const loadPriceLists = async () => {
-    try {
-      const res = await priceListService.getActive();
-      const lists = res.data || [];
-      setPriceLists(lists);
-      const saved = localStorage.getItem('lastPriceListId');
-      const exists = lists.some((l) => l.id === parseInt(saved));
-      const def = lists.find((l) => l.isDefault) || lists[0];
-      if (saved && exists) selectPriceList(parseInt(saved));
-      else if (def) selectPriceList(def.id);
-    } catch (e) {
-      console.error('Error loading price lists:', e);
-      toast.error('Error al cargar listas de precios');
-    }
-  };
-
-  const loadProducts = async () => {
-    try {
-      setLoadingProducts(true);
-      const res = await productService.getAll({
-        search: searchTerm,
-        limit: 1000,
-        is_active: true,
-        price_list_id: selectedPriceList || undefined,
-      });
-      const results = res.products || res.data || [];
-      setProducts(results);
-
-      // Auto-add on exact barcode match
-      const trimmed = searchTerm.trim();
-      if (trimmed && results.length === 1) {
-        const product = results[0];
-        const match = (product.barcodes || []).some((b) => b.barcode === trimmed);
-        if (match) {
-          handleAddProduct(product, product.presentations?.[0], 1);
-          setSearchTerm('');
-        }
-      }
-    } catch (e) {
-      console.error('Error loading products:', e);
-      toast.error('Error al cargar productos');
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  const loadExchangeRates = async () => {
-    try {
-      const res = await exchangeRateService.getLatest();
-      setExchangeRates(res.data || []);
-    } catch (e) {
-      console.error('Error loading exchange rates:', e);
-    }
-  };
-
-  const selectPriceList = async (listId) => {
-    if (!listId) {
-      setSelectedPriceList(null);
-      setPriceListDetails({});
-      localStorage.removeItem('lastPriceListId');
-      return;
-    }
-    try {
-      const res = await priceListService.getById(listId);
-      const map = {};
-      (res.data?.details || []).forEach((d) => {
-        map[`${d.product_id}-${d.presentation_id}`] = d;
-      });
-      setPriceListDetails(map);
-      setSelectedPriceList(listId);
-      localStorage.setItem('lastPriceListId', listId.toString());
-    } catch (e) {
-      console.error(e);
-      toast.error('Error al cargar detalles de la lista de precios');
-    }
-  };
-
-  // ============= HELPERS =============
-  const getProductStock = useCallback((product) => {
-    if (!product.inventories) return 0;
-    return product.inventories.reduce((sum, inv) => sum + parseFloat(inv.quantity || 0), 0);
-  }, []);
-
-  /**
-   * Effective unit price in USD.
-   * Respects frozen_price with currency conversion.
-   */
-  const getEffectivePriceUSD = useCallback(
-    (presentation, priceListItem) => {
-      if (priceListItem?.is_frozen && priceListItem.frozen_price) {
-        const frozenCurrency = priceListItem.frozen_currency || 'USD';
-        const rate = calculateEffectiveRate(frozenCurrency, 'USD', exchangeRates);
-        return parseFloat(priceListItem.frozen_price) * (rate || 1);
-      }
-      return parseFloat(priceListItem?.unit_price || presentation.base_price || 0);
-    },
-    [exchangeRates]
-  );
-
-  // ============= CART HANDLERS =============
-  const handleAddProduct = async (product, presentation, qty = 1) => {
-    if (!presentation) { toast.error('Selecciona una presentación'); return; }
-    if (!activeTabId) { toast.error('Abre una pestaña de venta primero'); return; }
-
-    const unitsPerPackage = presentation.units_per_package || 1;
-    const units = qty * unitsPerPackage;
-
-    const totalStock = getProductStock(product);
-    const available = getAvailableUnits(product.id, totalStock);
-
-    if (available < units) {
-      setConflictData({ productName: product.name, requested: units, available, reservedByOthers: totalStock - available });
-      setShowConflictAlert(true);
-      return;
-    }
-
-    try {
-      await posReservationService.reserve({
-        session_id: sessionId,
-        tab_id: activeTabId,
-        user_id: user.id,
-        product_id: product.id,
-        presentation_id: presentation.id,
-        units_requested: units,
-      });
-
-      const priceListItem = priceListDetails[`${product.id}-${presentation.id}`];
-      const priceUSD = getEffectivePriceUSD(presentation, priceListItem);
-
-      addToCart(activeTabId, {
-        product_id: product.id,
-        presentation_id: presentation.id,
-        product_name: product.name,
-        product_sku: product.sku,
-        presentation_name: presentation.name,
-        units_per_package: unitsPerPackage,
-        quantity: qty,
-        unit_price: priceUSD,
-        discount_percent: customer?.discountPercentage || 0,
-        tax_percent: 0,
-        is_frozen: priceListItem?.is_frozen || false,
-        frozen_price: priceListItem?.frozen_price || null,
-        frozen_currency: priceListItem?.frozen_currency || null,
-      });
-
-      setSearchTerm('');
-    } catch (err) {
-      if (err.response?.status === 409) {
-        setConflictData({
-          productName: product.name,
-          requested: units,
-          available: err.response.data.available || 0,
-          reservedByOthers: err.response.data.reserved_by_others || 0,
-        });
-        setShowConflictAlert(true);
-      } else {
-        toast.error('Error al reservar producto');
-      }
-    }
-  };
-
-  const handleRemoveItem = async (presentationId) => {
-    const item = cart.find((i) => i.presentation_id === presentationId);
-    if (!item) return;
-    try {
-      await posReservationService.releaseItem({
-        session_id: sessionId,
-        tab_id: activeTabId,
-        presentation_id: presentationId,
-        units_to_release: item.quantity * item.units_per_package,
-      });
-    } catch (err) {
-      // 404 = reservation doesn't exist server-side (e.g. after page refresh), safe to remove
-      if (err.response?.status !== 404) {
-        console.error('Error removing item:', err);
-        toast.error('Error al remover producto');
-        return;
-      }
-    }
-    removeFromCart(activeTabId, presentationId);
-  };
-
-  const handleQuantityChange = async (presentationId, newQty) => {
-    if (newQty < 1) return;
-
-    const item = cart.find((i) => i.presentation_id === presentationId);
-    if (!item) return;
-
-    const newUnits = newQty * item.units_per_package;
-
-    try {
-      await posReservationService.reserve({
-        session_id: sessionId,
-        tab_id: activeTabId,
-        user_id: user.id,
-        product_id: item.product_id,
-        presentation_id: presentationId,
-        units_requested: newUnits,
-      });
-      updateQuantity(activeTabId, presentationId, newQty);
-    } catch (err) {
-      if (err.response?.status === 409) {
-        setConflictData({
-          productName: item.product_name,
-          requested: newUnits,
-          available: err.response.data.available || 0,
-          reservedByOthers: err.response.data.reserved_by_others || 0,
-        });
-        setShowConflictAlert(true);
-      } else {
-        toast.error('Error al actualizar cantidad');
-      }
-    }
-  };
-
-  const handlePriceChange = (presentationId, newPriceDisplay) => {
-    const newPriceUSD = fromDisplay(parseFloat(newPriceDisplay) || 0);
-    updateCartItemPrice(activeTabId, presentationId, newPriceUSD);
-  };
-
-  // ============= TOTALS =============
-  const calculateTotals = useCallback(() => {
-    let subtotal = 0;
-    let tax = 0;
-
-    cart.forEach((item) => {
-      const itemSubtotal = item.unit_price * item.quantity;
-      const itemDiscount = itemSubtotal * ((item.discount_percent || 0) / 100);
-      const taxable = itemSubtotal - itemDiscount;
-      const itemTax = taxable * ((item.tax_percent || 0) / 100);
-      subtotal += itemSubtotal;
-      tax += itemTax;
-    });
-
-    const discount = subtotal * (discountPercent / 100);
-    const total = subtotal - discount + tax;
-
-    return { subtotal, discount, tax, total };
-  }, [cart, discountPercent]);
-
-  const { subtotal, discount, tax, total } = calculateTotals();
-
-  // ============= CHECKOUT =============
-  const handleCompleteSale = async () => {
-    if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
-    if (saleType === 'cash' && paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
-    if (saleType === 'credit' && !customer) { toast.error('Selecciona un cliente para ventas a crédito'); return; }
-
-    setSaving(true);
-    try {
-      const result = await saleService.createSale({
-        customer_id: customer?.id || null,
-        warehouse_id: 1,
-        sale_type: saleType,
-        session_id: sessionId,
-        tab_id: activeTabId,
-        exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
-        payment_lines: saleType === 'cash' ? paymentLines : [],
-        items: cart.map((item) => ({
-          product_id: item.product_id,
-          presentation_id: item.presentation_id,
-          quantity: item.quantity,
-          is_unit: false,
-          unit_price: item.unit_price,
-          discount_percent: item.discount_percent,
-          tax_percent: item.tax_percent,
-        })),
-        discount_amount: discount,
-        notes,
-      });
-
-      setSaleResult(result.sale);
-      setShowCheckoutModal(false);
-      setShowResultModal(true);
-
-      closeTab(activeTabId);
-      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
-
-      setSaleType('cash');
-      setPaymentLines([]);
-      setDiscountPercent(0);
-      setNotes('');
-
-      toast.remove();
-      toast.success('¡Venta completada!');
-    } catch (err) {
-      if (err.response?.status === 409) {
-        toast.error(`Stock insuficiente: ${err.response.data.product_name}. Disponible: ${err.response.data.available}`);
-      } else {
-        toast.error(err.response?.data?.message || 'Error al crear la venta');
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleTabClose = async (tabId) => {
-    try {
-      await posReservationService.releaseTab({ session_id: sessionId, tab_id: tabId });
-    } catch (err) {
-      console.error('Error releasing tab reservations:', err);
-    }
-  };
-
-  // ============= RENDER =============
-  if (!hasPermission('sales.create')) {
+  if (!pos.hasPermission('sales.create')) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
@@ -476,7 +38,7 @@ const POSPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Punto de Venta</h1>
-            <p className="text-sm text-gray-600">Usuario: {user?.first_name || user?.username}</p>
+            <p className="text-sm text-gray-600">Usuario: {pos.user?.first_name || pos.user?.username}</p>
           </div>
           <div className="flex items-center gap-3">
             {/* Selector de moneda */}
@@ -484,9 +46,9 @@ const POSPage = () => {
               {CURRENCIES.map((c) => (
                 <button
                   key={c.code}
-                  onClick={() => setDisplayCurrency(c.code)}
+                  onClick={() => pos.setDisplayCurrency(c.code)}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${
-                    displayCurrency === c.code
+                    pos.displayCurrency === c.code
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
@@ -498,13 +60,13 @@ const POSPage = () => {
 
             {/* Lista de precios */}
             <div className="flex items-center gap-2">
-              {selectedPriceList ? (
+              {pos.selectedPriceList ? (
                 <>
                   <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900">
-                    {priceLists.find(l => l.id === selectedPriceList)?.name || 'Lista de precios'}
+                    {pos.priceLists.find(l => l.id === pos.selectedPriceList)?.name || 'Lista de precios'}
                   </div>
                   <button
-                    onClick={() => selectPriceList(null)}
+                    onClick={() => pos.selectPriceList(null)}
                     className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
                   >
                     Cambiar
@@ -512,23 +74,35 @@ const POSPage = () => {
                 </>
               ) : (
                 <select
-                  value={selectedPriceList || ''}
-                  onChange={(e) => selectPriceList(parseInt(e.target.value))}
+                  value={pos.selectedPriceList || ''}
+                  onChange={(e) => pos.selectPriceList(parseInt(e.target.value))}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="" disabled>Selecciona lista de precios</option>
-                  {priceLists.map((list) => (
+                  {pos.priceLists.map((list) => (
                     <option key={list.id} value={list.id}>{list.name}</option>
                   ))}
                 </select>
               )}
+            </div>
+
+            {/* Clock */}
+            <div className="flex items-center gap-1 text-gray-400 text-sm">
+              <Clock className="w-4 h-4" />
+              {pos.currentTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+
+            {/* Shortcuts hint */}
+            <div className="hidden lg:flex items-center gap-1.5 text-xs text-gray-400">
+              <kbd className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 text-[10px]">F2</kbd><span>Buscar</span>
+              <kbd className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 text-[10px] ml-2">F8</kbd><span>Cobrar</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <POSTabs onTabClose={handleTabClose} />
+      <POSTabs onTabClose={pos.handleTabClose} />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden gap-4 p-4">
@@ -539,42 +113,42 @@ const POSPage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <input
-                ref={searchInputRef}
+                ref={pos.searchInputRef}
                 type="text"
                 placeholder="Busca por nombre, SKU o código de barras... (F2)"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={pos.searchTerm}
+                onChange={(e) => pos.setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
-            {loadingProducts ? (
+            {pos.loadingProducts ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">Cargando productos...</p>
               </div>
-            ) : products.length > 0 ? (
+            ) : pos.products.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {products.map((product) => (
+                {pos.products.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
-                    priceListDetails={priceListDetails}
-                    otherReservations={otherReservations}
-                    onAdd={handleAddProduct}
-                    toDisplay={toDisplay}
-                    displaySymbol={displaySymbol}
-                    exchangeRates={exchangeRates}
-                    getEffectivePriceUSD={getEffectivePriceUSD}
-                    fmt={fmt}
+                    priceListDetails={pos.priceListDetails}
+                    otherReservations={pos.otherReservations}
+                    onAdd={pos.handleAddProduct}
+                    toDisplay={pos.toDisplay}
+                    displaySymbol={pos.displaySymbol}
+                    exchangeRates={pos.exchangeRates}
+                    getEffectivePriceUSD={pos.getEffectivePriceUSD}
+                    fmt={pos.fmt}
                   />
                 ))}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">
-                  {selectedPriceList ? 'No hay productos' : 'Selecciona una lista de precios'}
+                  {pos.selectedPriceList ? 'No hay productos' : 'Selecciona una lista de precios'}
                 </p>
               </div>
             )}
@@ -582,29 +156,69 @@ const POSPage = () => {
         </div>
 
         {/* Cart Sidebar */}
-        <div className="w-80 bg-white rounded-lg shadow flex flex-col overflow-hidden">
+        <div className="w-96 bg-white rounded-lg shadow flex flex-col overflow-hidden">
           <div className="flex items-center gap-2 bg-blue-50 px-4 py-3 border-b border-gray-200">
             <Package className="w-5 h-5 text-blue-600" />
             <h2 className="font-bold text-gray-900">Carrito</h2>
-            {cart.length > 0 && (
+            {pos.cart.length > 0 && (
               <span className="ml-auto bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
-                {cart.length}
+                {pos.cart.length}
               </span>
             )}
           </div>
 
+          {/* Customer strip */}
+          <div className="px-4 py-2 border-b border-gray-100">
+            {pos.customer ? (
+              <div className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <User className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-blue-900 truncate">
+                      {pos.customer.type === 'natural'
+                        ? `${pos.customer.firstName || ''} ${pos.customer.lastName || ''}`.trim()
+                        : pos.customer.businessName || pos.customer.tradeName || ''}
+                    </p>
+                    <p className="text-[10px] text-blue-600 truncate">
+                      {pos.customer.documentType}-{pos.customer.documentNumber}
+                      {pos.customer.discountPercentage > 0 && <span className="text-green-600 ml-1"> • {pos.customer.discountPercentage}% desc</span>}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={pos.handleClearCustomer}
+                  className="text-blue-400 hover:text-blue-700 ml-2 flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => pos.setShowCustomerSearch(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition text-xs"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Cliente
+              </button>
+            )}
+          </div>
+
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {cart.length > 0 ? (
-              cart.map((item) => (
+            {pos.cart.length > 0 ? (
+              pos.cart.map((item) => (
                 <CartItem
-                  key={item.presentation_id}
+                  key={`${item.product_id}-${item.presentation_id}-${item.sellByUnit || false}`}
                   item={item}
-                  onQuantityChange={handleQuantityChange}
-                  onRemove={handleRemoveItem}
-                  onPriceChange={handlePriceChange}
-                  toDisplay={toDisplay}
-                  displaySymbol={displaySymbol}
-                  fmt={fmt}
+                  onQuantityChange={pos.handleQuantityChange}
+                  onRemove={pos.handleRemoveItem}
+                  onPriceChange={pos.handlePriceChange}
+                  onToggleSellMode={pos.handleToggleSellMode}
+                  onDiscountChange={pos.handleDiscountChange}
+                  toDisplay={pos.toDisplay}
+                  displaySymbol={pos.displaySymbol}
+                  fmt={pos.fmt}
+                  getEffectiveUSDPrice={pos.getEffectiveUSDPrice}
+                  hasEditPricePermission={pos.hasPermission('sales.edit_price')}
+                  customer={pos.customer}
                 />
               ))
             ) : (
@@ -614,31 +228,65 @@ const POSPage = () => {
             )}
           </div>
 
-          {cart.length > 0 && (
+          {pos.cart.length > 0 && (
             <div className="border-t border-gray-200 p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">{displaySymbol} {fmt(toDisplay(subtotal))}</span>
+                <span className="font-semibold">{pos.displaySymbol} {pos.fmt(pos.toDisplay(pos.subtotal))}</span>
               </div>
-              {discount > 0 && (
+              {pos.discount > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Descuento:</span>
-                  <span className="font-semibold text-red-600">-{displaySymbol} {fmt(toDisplay(discount))}</span>
+                  <span className="font-semibold text-red-600">-{pos.displaySymbol} {pos.fmt(pos.toDisplay(pos.discount))}</span>
                 </div>
               )}
-              {tax > 0 && (
+              {pos.tax > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Impuesto:</span>
-                  <span className="font-semibold">{displaySymbol} {fmt(toDisplay(tax))}</span>
+                  <span className="font-semibold">{pos.displaySymbol} {pos.fmt(pos.toDisplay(pos.tax))}</span>
                 </div>
               )}
               <div className="border-t pt-2 flex justify-between text-base font-bold">
                 <span>Total:</span>
-                <span className="text-green-600">{displaySymbol} {fmt(toDisplay(total))}</span>
+                <span className="text-green-600">{pos.displaySymbol} {pos.fmt(pos.toDisplay(pos.total))}</span>
               </div>
 
+              {/* Currency toggle */}
+              {pos.exchangeRates.length > 0 && pos.total > 0 && (
+                <button
+                  onClick={() => pos.setShowCurrencyTotals(!pos.showCurrencyTotals)}
+                  className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-blue-600 mt-1 transition"
+                >
+                  <Repeat className="w-3 h-3" />
+                  {pos.showCurrencyTotals ? 'Ocultar divisas' : 'Ver en divisas'}
+                  {pos.showCurrencyTotals ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
+
+              {pos.showCurrencyTotals && (
+                <div className="mt-1.5 bg-slate-50 rounded p-2 space-y-1">
+                  {CURRENCIES.filter(c => c.code !== 'USD').map(cur => {
+                    const rate = calculateEffectiveRate('USD', cur.code, pos.exchangeRates);
+                    const converted = rate !== null ? pos.total * rate : null;
+                    return (
+                      <div key={cur.code} className="flex justify-between text-xs">
+                        <span className="text-gray-500">{cur.name} ({cur.code})</span>
+                        <span className="font-medium text-gray-700">
+                          {converted !== null
+                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.round(converted).toLocaleString('es-CO') : converted.toFixed(2)}`
+                            : 'Sin tasa'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[9px] text-gray-400 pt-1 border-t border-gray-200">
+                    Tasas del {pos.exchangeRates[0]?.effective_date || 'día'}
+                  </p>
+                </div>
+              )}
+
               <button
-                onClick={() => setShowCheckoutModal(true)}
+                onClick={() => pos.setShowCheckoutModal(true)}
                 className="w-full mt-2 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
               >
                 <CheckCircle className="w-5 h-5" />
@@ -651,47 +299,59 @@ const POSPage = () => {
 
       {/* MODALS */}
       <CheckoutModal
-        show={showCheckoutModal}
-        onClose={() => setShowCheckoutModal(false)}
-        customer={customer}
-        onCustomerSelect={(c) => setTabCustomer(activeTabId, c)}
-        saleType={saleType}
-        setSaleType={setSaleType}
-        paymentLines={paymentLines}
-        setPaymentLines={setPaymentLines}
-        discountPercent={discountPercent}
-        setDiscountPercent={setDiscountPercent}
-        notes={notes}
-        setNotes={setNotes}
-        subtotal={subtotal}
-        discount={discount}
-        tax={tax}
-        total={total}
-        onComplete={handleCompleteSale}
-        saving={saving}
-        exchangeRates={exchangeRates}
-        displayCurrency={displayCurrency}
-        toDisplay={toDisplay}
-        displaySymbol={displaySymbol}
-        fmt={fmt}
+        show={pos.showCheckoutModal}
+        onClose={() => pos.setShowCheckoutModal(false)}
+        customer={pos.customer}
+        onCustomerSelect={pos.handleSetCustomer}
+        saleType={pos.saleType}
+        setSaleType={pos.setSaleType}
+        paymentLines={pos.paymentLines}
+        setPaymentLines={pos.setPaymentLines}
+        notes={pos.notes}
+        setNotes={pos.setNotes}
+        subtotal={pos.subtotal}
+        discount={pos.discount}
+        tax={pos.tax}
+        total={pos.total}
+        onComplete={pos.handleCompleteSale}
+        saving={pos.saving}
+        exchangeRates={pos.exchangeRates}
+        displayCurrency={pos.displayCurrency}
+        toDisplay={pos.toDisplay}
+        displaySymbol={pos.displaySymbol}
+        fmt={pos.fmt}
       />
 
       <StockConflictAlert
-        show={showConflictAlert}
-        productName={conflictData?.productName}
-        requested={conflictData?.requested}
-        available={conflictData?.available}
-        reservedByOthers={conflictData?.reservedByOthers}
-        onDismiss={() => setShowConflictAlert(false)}
+        show={pos.showConflictAlert}
+        productName={pos.conflictData?.productName}
+        requested={pos.conflictData?.requested}
+        available={pos.conflictData?.available}
+        reservedByOthers={pos.conflictData?.reservedByOthers}
+        onDismiss={() => pos.setShowConflictAlert(false)}
       />
 
       <SaleResultModal
-        show={showResultModal}
-        onClose={() => setShowResultModal(false)}
-        sale={saleResult}
-        toDisplay={toDisplay}
-        displaySymbol={displaySymbol}
-        fmt={fmt}
+        show={pos.showResultModal}
+        onClose={() => pos.setShowResultModal(false)}
+        sale={pos.saleResult}
+        toDisplay={pos.toDisplay}
+        displaySymbol={pos.displaySymbol}
+        fmt={pos.fmt}
+        onPrint={pos.handlePrint}
+      />
+
+      {/* Customer search from sidebar */}
+      <CustomerSearch
+        isOpen={pos.showCustomerSearch}
+        onClose={() => pos.setShowCustomerSearch(false)}
+        onSelect={(c) => {
+          pos.handleSetCustomer(c);
+          pos.setShowCustomerSearch(false);
+        }}
+        validateCredit={pos.saleType === 'credit'}
+        saleAmount={parseFloat(pos.total)}
+        exchangeRates={pos.exchangeRates}
       />
     </div>
   );
@@ -706,21 +366,39 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
   if (!selectedPresentation) return null;
 
   const totalStock = product.inventories?.reduce((s, i) => s + parseFloat(i.quantity || 0), 0) || 0;
+  const unitsPerPkg = parseFloat(selectedPresentation.units_per_package) || 1;
   const reservedByOthers = otherReservations[product.id] || 0;
   const available = totalStock - reservedByOthers;
+  const availablePackages = Math.floor(available / unitsPerPkg);
+  const looseUnits = Math.round(available % unitsPerPkg);
+  const lowStock = available <= unitsPerPkg * 3;
 
   const priceListItem = priceListDetails[`${product.id}-${selectedPresentation.id}`];
   const isFrozen = !!priceListItem?.is_frozen;
   const priceUSD = getEffectivePriceUSD(selectedPresentation, priceListItem);
 
   return (
-    <div className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow flex flex-col">
+    <div className={`border rounded-lg p-3 hover:shadow-md transition-shadow flex flex-col cursor-pointer ${
+      lowStock ? 'border-amber-300' : 'border-gray-200'
+    }`}
+      onClick={() => { onAdd(product, selectedPresentation, quantity); setQuantity(1); }}
+    >
+      {/* Category dot */}
+      {product.category && (
+        <div
+          className="w-2 h-2 rounded-full mb-1"
+          style={{ backgroundColor: product.category.color || '#9CA3AF' }}
+          title={product.category.name}
+        />
+      )}
+
       <h3 className="font-semibold text-sm text-gray-900 truncate">{product.name}</h3>
 
       {/* Presentation selector */}
       {product.presentations?.length > 1 ? (
         <select
           value={selectedPresentation.id}
+          onClick={(e) => e.stopPropagation()}
           onChange={(e) => {
             const p = product.presentations.find((p) => p.id === parseInt(e.target.value));
             if (p) setSelectedPresentation(p);
@@ -738,10 +416,11 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
       {/* Stock */}
       <div className="text-xs mb-2">
         {available > 0 ? (
-          <span className="text-green-600">
-            {available.toFixed(0)} disp.
+          <span className={`font-medium ${lowStock ? 'text-amber-600' : 'text-green-600'}`}>
+            {availablePackages} disp.
+            {looseUnits > 0 && <span className="text-gray-400 text-[10px]"> +{looseUnits} uds</span>}
             {reservedByOthers > 0 && (
-              <span className="text-amber-600"> ({reservedByOthers.toFixed(0)} reserv.)</span>
+              <span className="text-amber-600 text-[10px]"> ({reservedByOthers.toFixed(0)} reserv.)</span>
             )}
           </span>
         ) : (
@@ -750,42 +429,25 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
       </div>
 
       {/* Price */}
-      <div className="flex items-center gap-1 mb-3">
+      <div className="flex items-center gap-1">
         {isFrozen && <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" title="Precio congelado" />}
-        <p className={`font-bold text-base ${isFrozen ? 'text-amber-700' : 'text-gray-900'}`}>
+        <p className={`font-bold text-base ${isFrozen ? 'text-amber-700' : 'text-blue-600'}`}>
           {displaySymbol} {fmt(toDisplay(priceUSD))}
         </p>
       </div>
-
-      {/* Qty */}
-      <div className="flex items-center gap-1 mb-3">
-        <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="h-9 px-2 bg-gray-200 rounded text-sm flex-shrink-0 flex items-center justify-center">−</button>
-        <input
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-          className="flex-1 min-w-0 h-9 text-center border border-gray-300 rounded text-sm"
-        />
-        <button onClick={() => setQuantity(quantity + 1)} className="h-9 px-2 bg-gray-200 rounded text-sm flex-shrink-0 flex items-center justify-center">+</button>
-      </div>
-
-      <button
-        onClick={() => onAdd(product, selectedPresentation, quantity)}
-        disabled={available <= 0}
-        className="w-full bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-300 transition-colors flex items-center justify-center gap-1"
-      >
-        <Plus className="w-4 h-4" /> Agregar
-      </button>
     </div>
   );
 }
 
-function CartItem({ item, onQuantityChange, onRemove, onPriceChange, toDisplay, displaySymbol, fmt }) {
+function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSellMode, onDiscountChange,
+  toDisplay, displaySymbol, fmt, getEffectiveUSDPrice, hasEditPricePermission, customer }) {
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState('');
 
+  const effectiveUSD = getEffectiveUSDPrice(item);
   const displayPrice = toDisplay(item.unit_price);
-  const displayTotal = toDisplay(item.unit_price * item.quantity);
+  const displayTotal = toDisplay(effectiveUSD * item.quantity * (1 - (item.discount_percent || 0) / 100));
+  const hasSurcharge = item.sellByUnit && item.quantity < (item.units_per_package || 1) / 2;
 
   const startEdit = () => {
     setPriceInput(Math.round(displayPrice * 100) / 100);
@@ -794,68 +456,118 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, toDisplay, 
 
   const commitEdit = () => {
     const val = parseFloat(priceInput);
-    if (!isNaN(val) && val >= 0) onPriceChange(item.presentation_id, val);
+    if (!isNaN(val) && val >= 0) onPriceChange(item.product_id, item.presentation_id, item.sellByUnit || false, val);
     setEditingPrice(false);
   };
 
   return (
     <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+      {/* Row 1: name + remove */}
       <div className="flex justify-between items-start gap-2">
         <div className="min-w-0">
           <p className="font-semibold text-sm text-gray-900 truncate">{item.product_name}</p>
           <p className="text-xs text-gray-500">{item.presentation_name}</p>
         </div>
-        <button onClick={() => onRemove(item.presentation_id)} className="p-1 hover:bg-red-100 rounded flex-shrink-0">
+        <button onClick={() => onRemove(item.product_id, item.presentation_id, item.sellByUnit || false)} className="p-1 hover:bg-red-100 rounded flex-shrink-0">
           <X className="w-4 h-4 text-red-500" />
         </button>
       </div>
 
-      <div className="flex items-center gap-1">
-        <button onClick={() => onQuantityChange(item.presentation_id, item.quantity - 1)} className="h-9 px-2 bg-white border border-gray-300 rounded text-sm flex items-center justify-center">−</button>
-        <input
-          type="number"
-          value={item.quantity}
-          onChange={(e) => onQuantityChange(item.presentation_id, parseInt(e.target.value) || 1)}
-          className="w-12 h-9 text-center border border-gray-300 rounded text-sm"
-        />
-        <button onClick={() => onQuantityChange(item.presentation_id, item.quantity + 1)} className="h-9 px-2 bg-white border border-gray-300 rounded text-sm flex items-center justify-center">+</button>
+      {/* Row 2: sell mode toggle + quantity */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onToggleSellMode(item.product_id, item.presentation_id, item.sellByUnit || false)}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+            item.sellByUnit
+              ? 'bg-violet-100 text-violet-700'
+              : 'bg-blue-100 text-blue-700'
+          }`}
+          title={item.sellByUnit ? 'Vendiendo por unidad' : `Vendiendo por paquete (${item.units_per_package} uds)`}
+        >
+          {item.sellByUnit ? <Package className="w-3 h-3" /> : <Package className="w-3 h-3" />}
+          {item.sellByUnit ? 'Und' : 'Paq'}
+        </button>
+
+        {hasSurcharge && (
+          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 py-0.5 leading-none"
+            title={`Recargo del 7% por compra menor a ${Math.ceil((item.units_per_package || 1) / 2)} unidades`}>
+            +7%
+          </span>
+        )}
+
+        <div className="flex items-center gap-1 ml-auto">
+          <button onClick={() => onQuantityChange(item.product_id, item.presentation_id, item.sellByUnit || false, item.quantity - 1)}
+            className="h-7 px-2 bg-white border border-gray-300 rounded text-sm flex items-center justify-center"
+            disabled={item.quantity <= 1}>−</button>
+          <input
+            type="number"
+            value={item.quantity}
+            onChange={(e) => onQuantityChange(item.product_id, item.presentation_id, item.sellByUnit || false, parseInt(e.target.value) || 1)}
+            className="w-10 h-7 text-center border border-gray-300 rounded text-sm"
+          />
+          <button onClick={() => onQuantityChange(item.product_id, item.presentation_id, item.sellByUnit || false, item.quantity + 1)}
+            className="h-7 px-2 bg-white border border-gray-300 rounded text-sm flex items-center justify-center">+</button>
+        </div>
       </div>
 
+      {/* Row 3: price + subtotal */}
       <div className="flex justify-between items-center text-sm">
         <div className="flex items-center gap-1">
           {item.is_frozen && <Lock className="w-3 h-3 text-amber-500" title="Precio congelado" />}
-          {editingPrice ? (
-            <input
-              type="number"
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitEdit();
-                if (e.key === 'Escape') setEditingPrice(false);
-              }}
-              className="w-20 border border-blue-400 rounded px-1 text-right text-sm"
-              autoFocus
-            />
+          {hasEditPricePermission ? (
+            editingPrice ? (
+              <input
+                type="number"
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEdit();
+                  if (e.key === 'Escape') setEditingPrice(false);
+                }}
+                className="w-20 border border-blue-400 rounded px-1 text-right text-sm"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={startEdit}
+                className="font-medium text-gray-700 hover:text-blue-600 hover:underline"
+                title="Clic para editar precio"
+              >
+                {displaySymbol} {fmt(displayPrice)}
+              </button>
+            )
           ) : (
-            <button
-              onClick={startEdit}
-              className="font-medium text-gray-700 hover:text-blue-600 hover:underline"
-              title="Clic para editar precio"
-            >
-              {displaySymbol} {fmt(displayPrice)}
-            </button>
+            <span className="text-xs text-gray-500">{displaySymbol} {fmt(displayPrice)} c/u</span>
           )}
         </div>
         <span className="font-semibold">{displaySymbol} {fmt(displayTotal)}</span>
       </div>
+
+      {/* Row 4: discount (if customer has discount or item has discount) */}
+      {(customer?.discountPercentage > 0 || item.discount_percent > 0) && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500">Descuento:</span>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={item.discount_percent || 0}
+              onChange={(e) => onDiscountChange(item.product_id, item.presentation_id, item.sellByUnit || false, parseFloat(e.target.value) || 0)}
+              className="w-12 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-blue-500"
+            />
+            <span className="text-gray-400">%</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function CheckoutModal({
   show, onClose, customer, onCustomerSelect, saleType, setSaleType, paymentLines, setPaymentLines,
-  discountPercent, setDiscountPercent, notes, setNotes,
+  notes, setNotes,
   subtotal, discount, tax, total, onComplete, saving,
   exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt,
 }) {
@@ -888,7 +600,6 @@ function CheckoutModal({
   const paidDisplay = toDisplay(paidUSD);
   const changeDisplay = toDisplay(Math.abs(changeUSD));
 
-  // Formatea un monto en su propia moneda (para líneas de pago)
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
     if (currency === 'COP') return Math.round(n).toLocaleString('es-CO');
@@ -909,17 +620,6 @@ function CheckoutModal({
             <span>Total:</span>
             <span className="text-green-600">{displaySymbol} {fmt(totalDisplay)}</span>
           </div>
-        </div>
-
-        {/* Descuento global */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-1">Descuento global (%)</label>
-          <input
-            type="number" min="0" max="100" value={discountPercent}
-            onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="0"
-          />
         </div>
 
         {/* Tipo de venta */}
@@ -970,7 +670,7 @@ function CheckoutModal({
             {paymentLines.length > 0 && (
               <div className="space-y-1">
                 {paymentLines.map((line, i) => {
-                  const MethodIcon = PAYMENT_METHODS.find((m) => m.id === line.method)?.icon || Banknote;
+                  const MethodIcon = PAYMENT_ICONS[line.method] || Banknote;
                   return (
                     <div key={i} className="flex items-center justify-between bg-green-50 rounded px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
@@ -1088,28 +788,53 @@ function CheckoutModal({
         onCustomerSelect(c);
         setShowCustomerSearch(false);
       }}
+      validateCredit={saleType === 'credit'}
+      saleAmount={total}
+      exchangeRates={exchangeRates}
     />
     </>
   );
 }
 
-function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt }) {
+function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }) {
   if (!show || !sale) return null;
 
   return (
     <Modal isOpen={show} onClose={onClose} title="Venta Completada">
       <div className="space-y-4">
         <div className="flex items-center justify-center">
-          <CheckCircle className="w-16 h-16 text-green-600" />
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
         </div>
-        <p className="text-center text-lg font-semibold text-gray-900">¡Venta exitosa!</p>
+        <div className="text-center">
+          <p className="text-lg font-bold text-gray-800">{sale.sale_number}</p>
+          <p className="text-sm text-gray-500">Venta registrada exitosamente</p>
+        </div>
         <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-          <p><strong>Número:</strong> {sale.sale_number}</p>
-          <p><strong>Total:</strong> {displaySymbol} {fmt(toDisplay(parseFloat(sale.total || 0)))}</p>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Total:</span>
+            <span className="font-bold">{displaySymbol} {fmt(toDisplay(parseFloat(sale.total || 0)))}</span>
+          </div>
+          {sale.changeAmount && parseFloat(sale.changeAmount) > 0 && (
+            <div className="flex justify-between text-green-700">
+              <span>Cambio:</span>
+              <span className="font-bold">{displaySymbol} {fmt(toDisplay(parseFloat(sale.changeAmount)))}</span>
+            </div>
+          )}
         </div>
-        <button onClick={onClose} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-          Cerrar
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onPrint}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir
+          </button>
+          <button onClick={onClose} className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+            Nueva Venta
+          </button>
+        </div>
       </div>
     </Modal>
   );

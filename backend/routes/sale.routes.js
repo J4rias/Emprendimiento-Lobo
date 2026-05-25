@@ -28,6 +28,12 @@ router.get('/daily-closure',
   saleController.getDailyClosure
 );
 
+router.get('/by-number/:saleNumber',
+  auth,
+  authorize('sales.view'),
+  saleController.getSaleBySaleNumber
+);
+
 router.get('/:id',
   auth,
   authorize('sales.view'),

@@ -582,11 +582,11 @@ async function exportInvoicesCSV(req, res, next) {
 
     // Aplicar filtros opcionales
     if (filterBucket && filterBucket !== 'all') {
-      invoices.filter(i => i.aging_bucket === filterBucket);
+      invoices = invoices.filter(i => i.aging_bucket === filterBucket);
     }
     if (search) {
       const q = search.toLowerCase();
-      invoices.filter(i => i.customer_name.toLowerCase().includes(q) || (i.sale_number || '').includes(q));
+      invoices = invoices.filter(i => i.customer_name.toLowerCase().includes(q) || (i.sale_number || '').includes(q));
     }
 
     const headers = ['Factura', 'Fecha', 'Cliente', 'Monto', 'Pagado', 'Pendiente', 'Vencimiento', 'Días Vencida', 'Estado'];

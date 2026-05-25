@@ -21,6 +21,8 @@ const CustomersPage           = lazy(() => import('./pages/CustomersPage'));
 const UsersPage               = lazy(() => import('./pages/UsersPage'));
 const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
 const POSPage                 = lazy(() => import('./pages/POSPage'));
+const POSPageNew              = lazy(() => import('./pages/POSPageNew'));
+const POSPageTablet           = lazy(() => import('./pages/POSPageTablet'));
 const SalesPage               = lazy(() => import('./pages/SalesPage'));
 const StockReplenishmentPage  = lazy(() => import('./pages/StockReplenishmentPage'));
 const CategoriesPage          = lazy(() => import('./pages/CategoriesPage'));
@@ -178,6 +180,22 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <ErrorBoundary><POSPage /></ErrorBoundary>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/pos/new"
+        element={
+          <PrivateRoute>
+            <ErrorBoundary><POSPageNew /></ErrorBoundary>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/pos/tablet"
+        element={
+          <PrivateRoute>
+            <ErrorBoundary><POSPageTablet /></ErrorBoundary>
           </PrivateRoute>
         }
       />

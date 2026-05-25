@@ -515,6 +515,45 @@ exports.getSaleById = async (req, res) => {
   }
 };
 
+exports.getSaleBySaleNumber = async (req, res) => {
+  try {
+    const { saleNumber } = req.params;
+
+    const sale = await Sale.findOne({
+      where: { sale_number: saleNumber },
+      include: [
+        {
+          model: SaleDetail,
+          as: 'details',
+          include: [
+            { model: Product, as: 'product', attributes: ['id', 'name', 'sku'] },
+            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name'] },
+            { model: Batch, as: 'batch', attributes: ['id', 'batch_number', 'expiration_date'] }
+          ]
+        },
+        { model: Customer, as: 'customer' },
+        { model: Warehouse, as: 'warehouse' },
+        { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'] },
+        {
+          model: SalePayment,
+          as: 'payments',
+          include: [{ model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] }]
+        }
+      ]
+    });
+
+    if (!sale) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    res.json({ data: sale });
+
+  } catch (error) {
+    console.error('Error fetching sale by number:', error);
+    res.status(500).json({ message: 'Error al obtener la venta', error: error.message });
+  }
+};
+
 exports.updateSale = async (req, res) => {
   const transaction = await sequelize.transaction();
 

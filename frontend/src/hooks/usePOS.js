@@ -1,0 +1,761 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
+import { printSaleTicket } from '../components/sales/SaleTicket';
+import { useShallow } from 'zustand/react/shallow';
+import { usePOSStore, usePOSSessionId } from '../stores/posStore';
+import { usePOSSocket } from './usePOSSocket';
+import { priceListService } from '../services/api/priceListService';
+import { productService } from '../services/api/productService';
+import { saleService } from '../services/api/saleService';
+import { posReservationService } from '../services/api/posReservationService';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { toast } from 'react-hot-toast';
+
+// ============= CONSTANTS =============
+export const CURRENCIES = [
+  { code: 'USD', symbol: '$',    name: 'USD' },
+  { code: 'COP', symbol: 'COP$', name: 'COP' },
+  { code: 'VES', symbol: 'Bs',   name: 'VES' },
+];
+
+export const PAYMENT_METHODS = [
+  { id: 'cash',     label: 'Efectivo' },
+  { id: 'card',     label: 'Tarjeta' },
+  { id: 'transfer', label: 'Transferencia' },
+];
+
+// ============= HOOK =============
+export function usePOS() {
+  const { hasPermission, user } = useAuth();
+  const { companySettings } = useCompany();
+  const sessionId = usePOSSessionId();
+
+  // ============= STORE =============
+  const {
+    tabs, activeTabId, otherReservations, getAvailableUnits,
+    addToCart, updateQuantity, updateCartItemPrice, updateCartItemDiscount,
+    applyDiscountToAll, toggleSellMode, removeFromCart,
+    setTabCustomer, closeTab,
+  } = usePOSStore(useShallow(s => ({
+    tabs: s.tabs, activeTabId: s.activeTabId,
+    otherReservations: s.otherReservations, getAvailableUnits: s.getAvailableUnits,
+    addToCart: s.addToCart, updateQuantity: s.updateQuantity,
+    updateCartItemPrice: s.updateCartItemPrice, updateCartItemDiscount: s.updateCartItemDiscount,
+    applyDiscountToAll: s.applyDiscountToAll, toggleSellMode: s.toggleSellMode,
+    removeFromCart: s.removeFromCart, setTabCustomer: s.setTabCustomer, closeTab: s.closeTab,
+  })));
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const cart = activeTab?.cart || [];
+  const customer = activeTab?.customer || null;
+
+  // ============= LOCAL STATE =============
+  const [products, setProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [priceLists, setPriceLists] = useState([]);
+  const [selectedPriceList, setSelectedPriceList] = useState(null);
+  const [selectedPriceListCurrency, setSelectedPriceListCurrency] = useState('USD');
+  const [priceListDetails, setPriceListDetails] = useState({});
+  const [exchangeRates, setExchangeRates] = useState([]);
+  const [displayCurrency, setDisplayCurrency] = useState('COP');
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // ============= MODAL STATES =============
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [showConflictAlert, setShowConflictAlert] = useState(false);
+  const [showCurrencyTotals, setShowCurrencyTotals] = useState(false);
+  const [conflictData, setConflictData] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // ============= CHECKOUT STATE =============
+  const [saleType, setSaleType] = useState('cash');
+  const [paymentLines, setPaymentLines] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [saleResult, setSaleResult] = useState(null);
+
+  // ============= CLOCK =============
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // ============= REFS =============
+  const searchInputRef = useRef();
+
+  // ============= CURRENCY HELPERS =============
+  const displaySymbol = CURRENCIES.find((c) => c.code === displayCurrency)?.symbol || '$';
+
+  const toDisplay = useCallback(
+    (amountUSD) => {
+      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
+      return parseFloat(amountUSD || 0) * (rate || 1);
+    },
+    [displayCurrency, exchangeRates]
+  );
+
+  const fromDisplay = useCallback(
+    (amountDisplay) => {
+      const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
+      return parseFloat(amountDisplay || 0) / (rate || 1);
+    },
+    [displayCurrency, exchangeRates]
+  );
+
+  const fmt = useCallback(
+    (amount) => {
+      const n = parseFloat(amount) || 0;
+      if (displayCurrency === 'COP') {
+        return Math.round(n).toLocaleString('es-CO');
+      }
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    [displayCurrency]
+  );
+
+  // ============= WEBSOCKET =============
+  usePOSSocket({
+    sessionId,
+    tabId: activeTabId,
+    token: localStorage.getItem('token'),
+    isEnabled: true,
+  });
+
+  // ============= EFFECTS =============
+  useEffect(() => {
+    loadPriceLists();
+    loadExchangeRates();
+  }, []);
+
+  // Clock timer
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Debounce search term (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (selectedPriceList) loadProducts();
+  }, [debouncedSearch, selectedPriceList]);
+
+  useEffect(() => {
+    if (searchInputRef.current) searchInputRef.current.focus();
+  }, [activeTabId]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
+      if (e.key === 'F8') {
+        e.preventDefault();
+        if (cart.length > 0) setShowCheckoutModal(true);
+        else toast.error('Agrega productos antes de cobrar');
+      }
+      if (e.key === 'Escape') {
+        setShowCheckoutModal(false);
+        setShowResultModal(false);
+        setShowCustomerSearch(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [cart]);
+
+  // ============= LOADERS =============
+  const loadPriceLists = async () => {
+    try {
+      const res = await priceListService.getActive();
+      const lists = res.data || [];
+      setPriceLists(lists);
+      const saved = localStorage.getItem('lastPriceListId');
+      const exists = lists.some((l) => l.id === parseInt(saved));
+      const def = lists.find((l) => l.isDefault) || lists[0];
+      if (saved && exists) selectPriceList(parseInt(saved));
+      else if (def) selectPriceList(def.id);
+    } catch (e) {
+      console.error('Error loading price lists:', e);
+      toast.error('Error al cargar listas de precios');
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const res = await productService.getAll({
+        search: debouncedSearch,
+        limit: 1000,
+        is_active: true,
+        price_list_id: selectedPriceList || undefined,
+      });
+      const results = res.products || res.data || [];
+      setProducts(results);
+
+      // Auto-add on exact barcode match
+      const trimmed = debouncedSearch.trim();
+      if (trimmed && results.length === 1) {
+        const product = results[0];
+        const match = (product.barcodes || []).some((b) => b.barcode === trimmed);
+        if (match) {
+          handleAddProduct(product, product.presentations?.[0], 1);
+          setSearchTerm('');
+        }
+      }
+    } catch (e) {
+      console.error('Error loading products:', e);
+      toast.error('Error al cargar productos');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const loadExchangeRates = async () => {
+    try {
+      const res = await exchangeRateService.getLatest();
+      setExchangeRates(res.data || []);
+    } catch (e) {
+      console.error('Error loading exchange rates:', e);
+    }
+  };
+
+  const selectPriceList = async (listId) => {
+    if (!listId) {
+      setSelectedPriceList(null);
+      setPriceListDetails({});
+      localStorage.removeItem('lastPriceListId');
+      return;
+    }
+    try {
+      const res = await priceListService.getById(listId);
+      const data = res.data;
+      const map = {};
+      (data?.details || []).forEach((d) => {
+        map[`${d.product_id}-${d.presentation_id}`] = d;
+      });
+      setPriceListDetails(map);
+      setSelectedPriceListCurrency(data?.currency || 'USD');
+      setSelectedPriceList(listId);
+      localStorage.setItem('lastPriceListId', listId.toString());
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al cargar detalles de la lista de precios');
+    }
+  };
+
+  // ============= PRICE HELPERS =============
+  const getProductStock = useCallback((product) => {
+    if (!product.inventories) return 0;
+    return product.inventories.reduce((sum, inv) => sum + parseFloat(inv.quantity || 0), 0);
+  }, []);
+
+  const getPrice = useCallback(
+    (product, presentation) => {
+      if (!presentation) return { pkgPrice: 0, unitPrice: 0 };
+
+      const key = `${product.id}-${presentation.id}`;
+      const detail = priceListDetails[key];
+
+      let pkgPrice = detail && parseFloat(detail.package_price) > 0
+        ? parseFloat(detail.package_price)
+        : (parseFloat(presentation.package_price) || 0);
+      let unitPrice = detail && parseFloat(detail.unit_price) > 0
+        ? parseFloat(detail.unit_price)
+        : 0;
+
+      const sourceCurrency = detail ? selectedPriceListCurrency : (presentation.purchase_currency || 'USD');
+
+      if (sourceCurrency !== 'USD') {
+        const rate = calculateEffectiveRate('USD', sourceCurrency, exchangeRates);
+        if (rate && rate > 0) {
+          pkgPrice = Math.round((pkgPrice / rate) * 1000000) / 1000000;
+          unitPrice = Math.round((unitPrice / rate) * 1000000) / 1000000;
+        }
+      }
+
+      return {
+        pkgPrice,
+        unitPrice,
+        is_frozen: detail?.is_frozen || false,
+        frozen_price: detail?.frozen_price,
+        frozen_currency: detail?.frozen_currency
+      };
+    },
+    [priceListDetails, selectedPriceListCurrency, exchangeRates]
+  );
+
+  const getEffectivePriceUSD = useCallback(
+    (presentation, priceListItem) => {
+      if (priceListItem?.is_frozen && priceListItem.frozen_price) {
+        const frozenCurrency = priceListItem.frozen_currency || 'USD';
+        const rate = calculateEffectiveRate(frozenCurrency, 'USD', exchangeRates);
+        return parseFloat(priceListItem.frozen_price) * (rate || 1);
+      }
+
+      let price = parseFloat(priceListItem?.package_price || priceListItem?.unit_price || presentation.base_price || 0);
+      const sourceCurrency = priceListItem ? selectedPriceListCurrency : (presentation.purchase_currency || 'USD');
+      if (sourceCurrency !== 'USD') {
+        const rate = calculateEffectiveRate('USD', sourceCurrency, exchangeRates);
+        if (rate && rate > 0) {
+          price = Math.round((price / rate) * 1000000) / 1000000;
+        }
+      }
+      return price;
+    },
+    [exchangeRates, selectedPriceListCurrency]
+  );
+
+  // ============= STOCK HELPERS =============
+  const getProductStockDetails = useCallback((product, presentation) => {
+    const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity || 0), 0);
+    const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
+    return {
+      totalUnits,
+      availablePackages: Math.floor(totalUnits / unitsPerPkg),
+      looseUnits: totalUnits % unitsPerPkg,
+      unitsPerPkg
+    };
+  }, []);
+
+  // ============= CART HANDLERS =============
+  const handleAddProduct = async (product, presentation, qty = 1, forceSellByUnit = null) => {
+    if (!presentation) { toast.error('Selecciona una presentación'); return; }
+    if (!activeTabId) { toast.error('Abre una pestaña de venta primero'); return; }
+
+    const unitsPerPackage = presentation.units_per_package || 1;
+    const totalStock = getProductStock(product);
+    const available = getAvailableUnits(product.id, totalStock);
+    const { availablePackages, looseUnits } = getProductStockDetails(product, presentation);
+
+    const sellByUnit = forceSellByUnit !== null
+      ? forceSellByUnit
+      : (availablePackages <= 0 && looseUnits > 0);
+
+    const units = sellByUnit ? qty : qty * unitsPerPackage;
+
+    const currentUnitsInCart = cart
+      .filter(i => i.product_id === product.id && i.presentation_id === presentation.id)
+      .reduce((sum, i) => sum + (i.sellByUnit ? i.quantity : i.quantity * i.units_per_package), 0);
+
+    if (currentUnitsInCart + units > available) {
+      setConflictData({ productName: product.name, requested: units, available: available - currentUnitsInCart, reservedByOthers: totalStock - available });
+      setShowConflictAlert(true);
+      return;
+    }
+
+    try {
+      await posReservationService.reserve({
+        session_id: sessionId,
+        tab_id: activeTabId,
+        user_id: user.id,
+        product_id: product.id,
+        presentation_id: presentation.id,
+        units_requested: currentUnitsInCart + units,
+      });
+
+      const priceInfo = getPrice(product, presentation);
+      const { pkgPrice, unitPrice: unitPriceFromList } = priceInfo;
+      const unitPriceEach = unitPriceFromList || (pkgPrice / unitsPerPackage);
+
+      addToCart(activeTabId, {
+        product_id: product.id,
+        presentation_id: presentation.id,
+        product_name: product.name,
+        product_sku: product.sku,
+        presentation_name: presentation.name,
+        units_per_package: unitsPerPackage,
+        quantity: qty,
+        sellByUnit,
+        package_price: pkgPrice,
+        unit_price_each: unitPriceEach,
+        unit_price: sellByUnit ? unitPriceEach : pkgPrice,
+        stock_units: totalStock,
+        discount_percent: customer?.discountPercentage || 0,
+        tax_percent: 0,
+        is_frozen: priceInfo.is_frozen,
+        frozen_price: priceInfo.frozen_price || null,
+        frozen_currency: priceInfo.frozen_currency || null,
+      });
+
+      setSearchTerm('');
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setConflictData({
+          productName: product.name,
+          requested: units,
+          available: err.response.data.available || 0,
+          reservedByOthers: err.response.data.reserved_by_others || 0,
+        });
+        setShowConflictAlert(true);
+      } else {
+        toast.error('Error al reservar producto');
+      }
+    }
+  };
+
+  const handleRemoveItem = async (productId, presentationId, sellByUnit) => {
+    const item = cart.find((i) =>
+      i.product_id === productId &&
+      i.presentation_id === presentationId &&
+      (i.sellByUnit || false) === (sellByUnit || false)
+    );
+    if (!item) return;
+
+    const unitsToRelease = sellByUnit ? item.quantity : item.quantity * item.units_per_package;
+
+    const otherUnits = cart
+      .filter(i => i.product_id === productId && i.presentation_id === presentationId &&
+        !((i.sellByUnit || false) === (sellByUnit || false)))
+      .reduce((sum, i) => sum + (i.sellByUnit ? i.quantity : i.quantity * i.units_per_package), 0);
+
+    try {
+      if (otherUnits > 0) {
+        await posReservationService.reserve({
+          session_id: sessionId,
+          tab_id: activeTabId,
+          user_id: user.id,
+          product_id: productId,
+          presentation_id: presentationId,
+          units_requested: otherUnits,
+        });
+      } else {
+        await posReservationService.releaseItem({
+          session_id: sessionId,
+          tab_id: activeTabId,
+          presentation_id: presentationId,
+          units_to_release: unitsToRelease,
+        });
+      }
+    } catch (err) {
+      if (err.response?.status !== 404) {
+        console.error('Error removing item:', err);
+        toast.error('Error al remover producto');
+        return;
+      }
+    }
+    removeFromCart(activeTabId, productId, presentationId, sellByUnit);
+  };
+
+  const handleQuantityChange = async (productId, presentationId, sellByUnit, newQty) => {
+    if (newQty < 1) return;
+
+    const item = cart.find((i) =>
+      i.product_id === productId &&
+      i.presentation_id === presentationId &&
+      (i.sellByUnit || false) === (sellByUnit || false)
+    );
+    if (!item) return;
+
+    const newUnitsForThis = sellByUnit ? newQty : newQty * item.units_per_package;
+
+    const otherUnits = cart
+      .filter(i => i.product_id === productId && i.presentation_id === presentationId &&
+        !((i.sellByUnit || false) === (sellByUnit || false)))
+      .reduce((sum, i) => sum + (i.sellByUnit ? i.quantity : i.quantity * i.units_per_package), 0);
+
+    const totalUnitsRequested = newUnitsForThis + otherUnits;
+
+    try {
+      await posReservationService.reserve({
+        session_id: sessionId,
+        tab_id: activeTabId,
+        user_id: user.id,
+        product_id: productId,
+        presentation_id: presentationId,
+        units_requested: totalUnitsRequested,
+      });
+      updateQuantity(activeTabId, productId, presentationId, sellByUnit, newQty);
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setConflictData({
+          productName: item.product_name,
+          requested: newUnitsForThis,
+          available: err.response.data.available || 0,
+          reservedByOthers: err.response.data.reserved_by_others || 0,
+        });
+        setShowConflictAlert(true);
+      } else {
+        toast.error('Error al actualizar cantidad');
+      }
+    }
+  };
+
+  const handleToggleSellMode = async (productId, presentationId, currentSellByUnit) => {
+    const item = cart.find(i =>
+      i.product_id === productId &&
+      i.presentation_id === presentationId &&
+      (i.sellByUnit || false) === currentSellByUnit
+    );
+    if (!item) return;
+
+    const targetByUnit = !currentSellByUnit;
+    if (!targetByUnit && (item.stock_units || 0) < item.units_per_package) {
+      toast.error('No hay paquetes completos disponibles');
+      return;
+    }
+
+    toggleSellMode(activeTabId, productId, presentationId, currentSellByUnit);
+  };
+
+  const handlePriceChange = (productId, presentationId, sellByUnit, newPriceDisplay) => {
+    const rawVal = parseFloat(newPriceDisplay) || 0;
+
+    const item = cart.find(i =>
+      i.product_id === productId &&
+      i.presentation_id === presentationId &&
+      (i.sellByUnit || false) === (sellByUnit || false)
+    );
+
+    if (item?.is_frozen) {
+      const toUSDRate = calculateEffectiveRate(displayCurrency, 'USD', exchangeRates) || 1;
+      const usdPrice = rawVal * toUSDRate;
+      updateCartItemPrice(activeTabId, productId, presentationId, sellByUnit, usdPrice, {
+        is_frozen: true,
+        frozen_price: rawVal,
+        frozen_currency: displayCurrency,
+      });
+    } else {
+      const newPriceUSD = fromDisplay(rawVal);
+      updateCartItemPrice(activeTabId, productId, presentationId, sellByUnit, newPriceUSD);
+    }
+  };
+
+  const handleDiscountChange = (productId, presentationId, sellByUnit, val) => {
+    updateCartItemDiscount(activeTabId, productId, presentationId, sellByUnit, val);
+  };
+
+  const handleSetCustomer = (c) => {
+    setTabCustomer(activeTabId, c);
+    if (c && c.discountPercentage > 0) {
+      applyDiscountToAll(activeTabId, c.discountPercentage);
+    }
+  };
+
+  const handleClearCustomer = () => {
+    setTabCustomer(activeTabId, null);
+    applyDiscountToAll(activeTabId, 0);
+  };
+
+  // ============= SURCHARGE & EFFECTIVE PRICE =============
+  const applyUnitSurcharge = useCallback((usdUnitPrice, item) => {
+    if (!item.sellByUnit || item.quantity >= (item.units_per_package || 1) / 2) return usdUnitPrice;
+    const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
+    if (!copRate || copRate <= 0) return usdUnitPrice * 1.07;
+    const copRounded = Math.round(usdUnitPrice * copRate * 1.07 / 100) * 100;
+    return copRounded / copRate;
+  }, [exchangeRates]);
+
+  const getEffectiveUSDPrice = useCallback((item) => {
+    if (item.is_frozen && item.frozen_price) {
+      const rate = calculateEffectiveRate(item.frozen_currency || 'USD', 'USD', exchangeRates);
+      const baseFrozen = item.sellByUnit
+        ? (parseFloat(item.frozen_price) / (item.units_per_package || 1))
+        : parseFloat(item.frozen_price);
+      const usdPrice = rate !== null ? baseFrozen * rate : item.unit_price;
+      return applyUnitSurcharge(usdPrice, item);
+    }
+    return applyUnitSurcharge(item.unit_price, item);
+  }, [exchangeRates, applyUnitSurcharge]);
+
+  // ============= TOTALS =============
+  const calculateTotals = useCallback(() => {
+    let subtotal = 0;
+    let totalDiscount = 0;
+    let tax = 0;
+
+    cart.forEach((item) => {
+      const usdPrice = getEffectiveUSDPrice(item);
+      const itemSubtotal = usdPrice * item.quantity;
+      const itemDiscount = itemSubtotal * ((item.discount_percent || 0) / 100);
+      const taxable = itemSubtotal - itemDiscount;
+      const itemTax = taxable * ((item.tax_percent || 0) / 100);
+      subtotal += itemSubtotal;
+      totalDiscount += itemDiscount;
+      tax += itemTax;
+    });
+
+    const total = subtotal - totalDiscount + tax;
+
+    return { subtotal, discount: totalDiscount, tax, total };
+  }, [cart, getEffectiveUSDPrice]);
+
+  const { subtotal, discount, tax, total } = calculateTotals();
+
+  // ============= CHECKOUT =============
+  const handleCompleteSale = async () => {
+    if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
+    if (saleType === 'cash' && paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
+    if (saleType === 'credit' && !customer) { toast.error('Selecciona un cliente para ventas a crédito'); return; }
+
+    if (saleType === 'cash') {
+      const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+      if (paidUSD < total - 0.01) {
+        toast.error(`Monto insuficiente. Faltan: $ ${(total - paidUSD).toFixed(2)}`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const result = await saleService.createSale({
+        customer_id: customer?.id || null,
+        warehouse_id: 1,
+        sale_type: saleType,
+        session_id: sessionId,
+        tab_id: activeTabId,
+        exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
+        payment_lines: saleType === 'cash' ? paymentLines : [],
+        items: cart.map((item) => ({
+          product_id: item.product_id,
+          presentation_id: item.presentation_id,
+          quantity: item.quantity,
+          is_unit: item.sellByUnit || false,
+          unit_price: getEffectiveUSDPrice(item),
+          discount_percent: item.discount_percent,
+          tax_percent: item.tax_percent,
+        })),
+        notes,
+      });
+
+      const paidUSD = saleType === 'cash'
+        ? paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0)
+        : 0;
+      const changeAmount = saleType === 'cash' ? Math.max(0, paidUSD - total).toFixed(2) : '0';
+
+      setSaleResult({ ...result.sale, totals: { subtotal, discount, tax, total }, changeAmount });
+      setShowCheckoutModal(false);
+      setShowResultModal(true);
+
+      closeTab(activeTabId);
+      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
+
+      setSaleType('cash');
+      setPaymentLines([]);
+      setNotes('');
+
+      toast.remove();
+      toast.success('¡Venta completada!');
+    } catch (err) {
+      if (err.response?.status === 409) {
+        toast.error(`Stock insuficiente: ${err.response.data.product_name}. Disponible: ${err.response.data.available}`);
+      } else {
+        toast.error(err.response?.data?.message || 'Error al crear la venta');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTabClose = async (tabId) => {
+    try {
+      await posReservationService.releaseTab({ session_id: sessionId, tab_id: tabId });
+    } catch (err) {
+      console.error('Error releasing tab reservations:', err);
+    }
+  };
+
+  const handlePrint = () => {
+    if (saleResult) {
+      printSaleTicket(saleResult, companySettings, {
+        displayCurrency,
+        currencySymbol: displaySymbol,
+        exchangeRate: calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1
+      });
+    }
+  };
+
+  // ============= RETURN =============
+  return {
+    // Auth & permissions
+    user,
+    hasPermission,
+    companySettings,
+
+    // Products
+    products,
+    loadingProducts,
+    searchTerm,
+    setSearchTerm,
+    searchInputRef,
+
+    // Price lists
+    priceLists,
+    selectedPriceList,
+    selectPriceList,
+    priceListDetails,
+
+    // Currency
+    displayCurrency,
+    setDisplayCurrency,
+    displaySymbol,
+    exchangeRates,
+    toDisplay,
+    fromDisplay,
+    fmt,
+
+    // Tabs & cart
+    tabs,
+    activeTabId,
+    activeTab,
+    cart,
+    customer,
+
+    // Other reservations (for ProductCard)
+    otherReservations,
+
+    // Cart handlers
+    handleAddProduct,
+    handleRemoveItem,
+    handleQuantityChange,
+    handleToggleSellMode,
+    handlePriceChange,
+    handleDiscountChange,
+    handleSetCustomer,
+    handleClearCustomer,
+
+    // Price helpers (for ProductCard / CartItem)
+    getEffectivePriceUSD,
+    getEffectiveUSDPrice,
+
+    // Checkout
+    saleType,
+    setSaleType,
+    paymentLines,
+    setPaymentLines,
+    notes,
+    setNotes,
+    subtotal,
+    discount,
+    tax,
+    total,
+    handleCompleteSale,
+    saving,
+
+    // Sale result
+    saleResult,
+    handlePrint,
+
+    // Tab management
+    handleTabClose,
+
+    // Modal states
+    showCheckoutModal,
+    setShowCheckoutModal,
+    showResultModal,
+    setShowResultModal,
+    showCustomerSearch,
+    setShowCustomerSearch,
+    showConflictAlert,
+    setShowConflictAlert,
+    showCurrencyTotals,
+    setShowCurrencyTotals,
+    conflictData,
+
+    // Clock
+    currentTime,
+  };
+}

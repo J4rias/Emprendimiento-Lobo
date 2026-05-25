@@ -1,17 +1,13 @@
-import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePOSStore } from '../../stores/posStore';
 import { Plus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 /**
- * POS Tabs Component
- * Allows multiple concurrent sales with tab interface
- * - Max 5 tabs per session
- * - Each tab has its own cart
- * - Confirmation when closing tab with items
+ * POS Tabs - Tablet version
+ * Bigger touch targets (min 48px), clearer active state
  */
-export default function POSTabs({ onTabClose = null }) {
+export default function POSTabsTablet({ onTabClose = null }) {
   const { tabs, activeTabId, addTab, closeTab, setActiveTab } = usePOSStore(
     useShallow(s => ({
       tabs: s.tabs, activeTabId: s.activeTabId,
@@ -24,7 +20,7 @@ export default function POSTabs({ onTabClose = null }) {
   const handleAddTab = () => {
     if (tabs.length >= MAX_TABS) {
       toast.remove();
-      toast.error(`Máximo ${MAX_TABS} pestañas abiertas simultáneamente`);
+      toast.error(`Máximo ${MAX_TABS} pestañas`);
       return;
     }
     addTab();
@@ -35,7 +31,6 @@ export default function POSTabs({ onTabClose = null }) {
   const handleCloseTab = (tabId) => {
     const tab = tabs.find(t => t.id === tabId);
 
-    // If tab has items, ask for confirmation
     if (tab && tab.cart && tab.cart.length > 0) {
       const confirmed = window.confirm(
         `¿Descartar la venta "${tab.name}"? Tiene ${tab.cart.length} producto(s).`
@@ -43,54 +38,43 @@ export default function POSTabs({ onTabClose = null }) {
       if (!confirmed) return;
     }
 
-    // Call cleanup callback if provided (to release reservations)
-    if (onTabClose) {
-      onTabClose(tabId);
-    }
-
+    if (onTabClose) onTabClose(tabId);
     closeTab(tabId);
     toast.remove();
     toast.success('Venta cerrada');
   };
 
   return (
-    <div className="flex items-center gap-2 bg-white border-b border-gray-200 px-4 py-3 overflow-x-auto">
-      {/* Tab buttons */}
-      <div className="flex gap-1 flex-1 min-w-0">
+    <div className="flex items-center gap-2 bg-white border-b border-gray-200 px-3 py-2 overflow-x-auto shrink-0">
+      <div className="flex gap-2 flex-1 min-w-0">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`
-              flex items-center gap-2 px-3 py-2 rounded text-sm font-medium
+              flex items-center gap-2 px-4 min-h-[44px] rounded-lg text-sm font-semibold
               whitespace-nowrap transition-all
-              ${
-                activeTabId === tab.id
-                  ? 'bg-blue-500 text-white shadow'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ${activeTabId === tab.id
+                ? 'bg-blue-500 text-white shadow'
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
               }
             `}
           >
             <span>{tab.name}</span>
 
-            {/* Badge: number of items in cart */}
             {tab.cart?.length > 0 && (
-              <span className="ml-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                 {tab.cart.length}
               </span>
             )}
 
-            {/* Close button */}
             <div
               role="button"
               tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCloseTab(tab.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCloseTab(tab.id); } }}
-              className="ml-1 p-0.5 rounded hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
-              title="Cerrar pestaña"
+              className="p-1.5 rounded-lg hover:bg-red-500 hover:text-white active:bg-red-600 transition-colors cursor-pointer"
+              title="Cerrar"
             >
               <X className="w-4 h-4" />
             </div>
@@ -98,27 +82,23 @@ export default function POSTabs({ onTabClose = null }) {
         ))}
       </div>
 
-      {/* Add new tab button */}
       <button
         onClick={handleAddTab}
         disabled={tabs.length >= MAX_TABS}
         className={`
-          flex items-center gap-1 px-3 py-2 rounded text-sm font-medium
-          transition-all
-          ${
-            tabs.length >= MAX_TABS
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
+          flex items-center gap-1 px-4 min-h-[44px] rounded-lg text-sm font-semibold
+          ${tabs.length >= MAX_TABS
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-green-100 text-green-700 active:bg-green-200'
           }
         `}
-        title={tabs.length >= MAX_TABS ? `Máximo ${MAX_TABS} pestañas` : 'Nueva venta'}
+        title={tabs.length >= MAX_TABS ? `Máximo ${MAX_TABS}` : 'Nueva venta'}
       >
-        <Plus className="w-4 h-4" />
+        <Plus className="w-5 h-5" />
         <span>Nuevo</span>
       </button>
 
-      {/* Info: number of active tabs */}
-      <div className="text-xs text-gray-500 font-medium whitespace-nowrap">
+      <div className="text-sm text-gray-500 font-medium whitespace-nowrap">
         {tabs.length}/{MAX_TABS}
       </div>
     </div>

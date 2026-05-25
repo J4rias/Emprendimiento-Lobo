@@ -32,11 +32,13 @@ const Sidebar = ({ isOpen, onClose }) => {
   const { hasPermission } = useAuth();
   const location = useLocation();
   const [productsOpen, setProductsOpen] = useState(false);
+  const [posOpen, setPosOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [arOpen, setArOpen] = useState(false);
 
   // Rutas de los subitems de cada acordeón
   const productsRoutes = ['/productos', '/categorias', '/proveedores', '/marcas'];
+  const posRoutes = ['/pos', '/pos/new', '/pos/tablet'];
   const configRoutes = ['/usuarios', '/roles', '/configuracion', '/tasas-cambio'];
   const arRoutes = ['/cuentas-por-cobrar', '/cuentas-por-cobrar/clientes'];
 
@@ -46,11 +48,13 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     // Verificar si la ruta actual pertenece a algún acordeón
     const isInProducts = productsRoutes.some(route => currentPath === route);
+    const isInPOS = posRoutes.some(route => currentPath === route);
     const isInConfig = configRoutes.some(route => currentPath === route);
     const isInAR = arRoutes.some(route => currentPath.startsWith(route));
 
     // Actualizar estados
     setProductsOpen(isInProducts);
+    setPosOpen(isInPOS);
     setConfigOpen(isInConfig);
     setArOpen(isInAR);
   }, [location.pathname]);
@@ -130,8 +134,25 @@ const Sidebar = ({ isOpen, onClose }) => {
     {
       name: 'Punto de Venta',
       icon: CreditCard,
-      path: '/pos',
       permission: 'sales.create',
+      isAccordion: true,
+      items: [
+        {
+          name: 'POS Clásico',
+          path: '/pos',
+          permission: 'sales.create',
+        },
+        {
+          name: 'POS Desktop',
+          path: '/pos/new',
+          permission: 'sales.create',
+        },
+        {
+          name: 'POS Tablet',
+          path: '/pos/tablet',
+          permission: 'sales.create',
+        },
+      ],
     },
     {
       name: 'Ventas',
@@ -228,13 +249,19 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       // Determinar qué acordeón es y su estado
       const isProductsAccordion = item.name === 'Productos';
+      const isPOSAccordion = item.name === 'Punto de Venta';
       const isARAccordion = item.name === 'Cuentas por Cobrar';
-      const isOpen = isProductsAccordion ? productsOpen : isARAccordion ? arOpen : configOpen;
+      const isOpen = isProductsAccordion ? productsOpen
+        : isPOSAccordion ? posOpen
+        : isARAccordion ? arOpen
+        : configOpen;
       const toggleOpen = isProductsAccordion
         ? () => setProductsOpen(!productsOpen)
-        : isARAccordion
-          ? () => setArOpen(!arOpen)
-          : () => setConfigOpen(!configOpen);
+        : isPOSAccordion
+          ? () => setPosOpen(!posOpen)
+          : isARAccordion
+            ? () => setArOpen(!arOpen)
+            : () => setConfigOpen(!configOpen);
 
       return (
         <div key={`${item.name.toLowerCase()}-accordion`} className="space-y-1">
