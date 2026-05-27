@@ -44,6 +44,11 @@ export const saleService = {
   getDailyClosure: async (params = {}) => {
     const response = await api.get('/sales/daily-closure', { params });
     return response.data;
+  },
+
+  validateCreditPin: async (pin) => {
+    const response = await api.post('/sales/validate-credit-pin', { pin });
+    return response.data;
   }
 };
 

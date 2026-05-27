@@ -4,6 +4,12 @@ const saleController = require('../controllers/sale.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
+router.post('/validate-credit-pin',
+  auth,
+  authorize('sales.create'),
+  saleController.validateCreditPin
+);
+
 router.post('/',
   auth,
   authorize('sales.create'),

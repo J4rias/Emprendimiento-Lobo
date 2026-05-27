@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { usePOS, CURRENCIES, PAYMENT_METHODS } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { saleService } from '../services/api/saleService';
 import POSTabs from '../components/pos/POSTabs';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
@@ -8,7 +9,7 @@ import Modal from '../components/common/Modal';
 import {
   Plus, Search, X, AlertCircle, CheckCircle, User,
   Package, Lock, Banknote, CreditCard, Smartphone,
-  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus
+  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -118,33 +119,52 @@ const POSPage = () => {
                 placeholder="Busca por nombre, SKU o código de barras... (F2)"
                 value={pos.searchTerm}
                 onChange={(e) => pos.setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {pos.searchTerm && (
+                <button
+                  onClick={() => pos.setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div
+            className="flex-1 overflow-y-auto p-4"
+            onScroll={(e) => {
+              const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+              if (scrollHeight - scrollTop - clientHeight < 200) pos.loadMoreProducts();
+            }}
+          >
             {pos.loadingProducts ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">Cargando productos...</p>
               </div>
             ) : pos.products.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {pos.products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    priceListDetails={pos.priceListDetails}
-                    otherReservations={pos.otherReservations}
-                    onAdd={pos.handleAddProduct}
-                    toDisplay={pos.toDisplay}
-                    displaySymbol={pos.displaySymbol}
-                    exchangeRates={pos.exchangeRates}
-                    getEffectivePriceUSD={pos.getEffectivePriceUSD}
-                    fmt={pos.fmt}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {pos.products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      priceListDetails={pos.priceListDetails}
+                      otherReservations={pos.otherReservations}
+                      onAdd={pos.handleAddProduct}
+                      toDisplay={pos.toDisplay}
+                      displaySymbol={pos.displaySymbol}
+                      exchangeRates={pos.exchangeRates}
+                      getEffectivePriceUSD={pos.getEffectivePriceUSD}
+                      fmt={pos.fmt}
+                    />
+                  ))}
+                </div>
+                {pos.loadingMore && (
+                  <p className="text-center text-gray-400 text-sm py-3">Cargando más productos...</p>
+                )}
+              </>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">
@@ -331,6 +351,13 @@ const POSPage = () => {
         onDismiss={() => pos.setShowConflictAlert(false)}
       />
 
+      {pos.showCreditPinModal && (
+        <CreditPinModal
+          onClose={() => pos.setShowCreditPinModal(false)}
+          onValidated={pos.handleCreditPinValidated}
+        />
+      )}
+
       <SaleResultModal
         show={pos.showResultModal}
         onClose={() => pos.setShowResultModal(false)}
@@ -445,7 +472,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
   const [priceInput, setPriceInput] = useState('');
 
   const effectiveUSD = getEffectiveUSDPrice(item);
-  const displayPrice = toDisplay(item.unit_price);
+  const displayPrice = toDisplay(effectiveUSD);
   const displayTotal = toDisplay(effectiveUSD * item.quantity * (1 - (item.discount_percent || 0) / 100));
   const hasSurcharge = item.sellByUnit && item.quantity < (item.units_per_package || 1) / 2;
 
@@ -837,6 +864,119 @@ function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, o
         </div>
       </div>
     </Modal>
+  );
+}
+
+function CreditPinModal({ onClose, onValidated }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [shaking, setShaking] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleSubmit = async () => {
+    if (pin.length < 4) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await saleService.validateCreditPin(pin);
+      if (res.success) {
+        onValidated(res.admin_id);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Error al validar PIN';
+      setError(msg);
+      setShaking(true);
+      setTimeout(() => setShaking(false), 400);
+      setPin('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-center mb-3">
+          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+            <Lock className="w-6 h-6 text-blue-600" />
+          </div>
+        </div>
+
+        <h3 className="text-lg font-bold text-center text-gray-900 mb-1">Autorización Requerida</h3>
+        <p className="text-sm text-gray-600 mb-5 text-center">
+          Un administrador debe ingresar su PIN para autorizar esta venta a crédito.
+        </p>
+
+        {/* PIN dots */}
+        <div className="flex justify-center gap-3 mb-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-3 h-3 rounded-full border-2 transition-all ${
+                i < pin.length ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Hidden input */}
+        <div className={`relative ${shaking ? 'animate-shake' : ''}`}>
+          <input
+            ref={inputRef}
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 6) setPin(v); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+            maxLength={6}
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="••••"
+            disabled={loading}
+            autoFocus
+          />
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-lg">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={pin.length < 4 || loading}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Autorizar'}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-6px); }
+          40%, 80% { transform: translateX(6px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
+    </div>
   );
 }
 

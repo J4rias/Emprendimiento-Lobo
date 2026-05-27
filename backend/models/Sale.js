@@ -127,6 +127,15 @@ const Sale = sequelize.define('Sale', {
       key: 'id'
     }
   },
+  authorized_by: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    comment: 'Admin que autorizó la venta a crédito'
+  },
   updated_by: {
     type: DataTypes.INTEGER,
     allowNull: true,

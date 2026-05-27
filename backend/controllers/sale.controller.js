@@ -1,5 +1,6 @@
-const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, sequelize } = require('../models');
+const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 
 const generateSaleNumber = async () => {
   const today = new Date();
@@ -40,8 +41,21 @@ exports.createSale = async (req, res) => {
       discount_amount = 0,
       notes,
       quote_id,
-      exchange_rate = 1
+      exchange_rate = 1,
+      authorized_by
     } = req.body;
+
+    // Credit sales: non-admin users require admin authorization
+    if (sale_type === 'credit') {
+      const isAdmin = req.user.role?.name === 'Administrador';
+      if (!isAdmin && !authorized_by) {
+        await transaction.rollback();
+        return res.status(403).json({
+          success: false,
+          message: 'Venta a crédito requiere autorización de un administrador'
+        });
+      }
+    }
 
     // Calculate total paid USD early
     let paid_amount = 0;
@@ -214,7 +228,10 @@ exports.createSale = async (req, res) => {
       status: sale_type === 'cash' ? 'completed' : 'pending',
       notes,
       quote_id: quote_id || null,
-      created_by: req.user.id
+      created_by: req.user.id,
+      authorized_by: sale_type === 'credit'
+        ? (req.user.role?.name === 'Administrador' ? req.user.id : authorized_by)
+        : null
     }, { transaction });
 
     for (const detail of saleDetails) {
@@ -985,5 +1002,90 @@ exports.getDailyClosure = async (req, res) => {
       message: 'Error al generar el cierre de caja',
       error: error.message
     });
+  }
+};
+
+// Validate credit PIN against admin users
+exports.validateCreditPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin || !/^\d{4,6}$/.test(pin)) {
+      return res.status(400).json({ success: false, message: 'PIN debe ser de 4 a 6 dígitos' });
+    }
+
+    // Find admin users with a credit_pin set (raw SQL because credit_pin is not in User model)
+    const admins = await sequelize.query(
+      `SELECT u.id, u.first_name, u.last_name, u.credit_pin, u.credit_pin_attempts, u.credit_pin_locked_until
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE r.name = 'Administrador'
+         AND u.credit_pin IS NOT NULL
+         AND u.is_active = 1`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+
+    if (!admins || admins.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No hay administradores con PIN configurado'
+      });
+    }
+
+    for (const admin of admins) {
+      // Check lockout
+      if (admin.credit_pin_locked_until && new Date(admin.credit_pin_locked_until) > new Date()) {
+        continue;
+      }
+
+      const match = await bcrypt.compare(pin, admin.credit_pin);
+
+      if (match) {
+        await sequelize.query(
+          'UPDATE users SET credit_pin_attempts = 0, credit_pin_locked_until = NULL WHERE id = ?',
+          { replacements: [admin.id] }
+        );
+        return res.json({
+          success: true,
+          admin_id: admin.id,
+          admin_name: `${admin.first_name} ${admin.last_name}`
+        });
+      }
+    }
+
+    // No match — increment attempts for all non-locked admins
+    for (const admin of admins) {
+      if (admin.credit_pin_locked_until && new Date(admin.credit_pin_locked_until) > new Date()) continue;
+
+      const attempts = (admin.credit_pin_attempts || 0) + 1;
+      if (attempts >= 3) {
+        const lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+        await sequelize.query(
+          'UPDATE users SET credit_pin_attempts = ?, credit_pin_locked_until = ? WHERE id = ?',
+          { replacements: [attempts, lockUntil, admin.id] }
+        );
+      } else {
+        await sequelize.query(
+          'UPDATE users SET credit_pin_attempts = ? WHERE id = ?',
+          { replacements: [attempts, admin.id] }
+        );
+      }
+    }
+
+    // Check if all admins are now locked
+    const allLocked = admins.every(a => {
+      const attempts = (a.credit_pin_attempts || 0) + 1;
+      return attempts >= 3 || (a.credit_pin_locked_until && new Date(a.credit_pin_locked_until) > new Date());
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: allLocked
+        ? 'PIN bloqueado por demasiados intentos. Intente en 15 minutos.'
+        : 'PIN incorrecto'
+    });
+  } catch (error) {
+    console.error('Error validating credit PIN:', error);
+    res.status(500).json({ success: false, message: 'Error al validar PIN' });
   }
 };

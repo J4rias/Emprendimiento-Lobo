@@ -55,6 +55,9 @@ export function usePOS() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [productPage, setProductPage] = useState(1);
+  const [hasMoreProducts, setHasMoreProducts] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [priceLists, setPriceLists] = useState([]);
   const [selectedPriceList, setSelectedPriceList] = useState(null);
   const [selectedPriceListCurrency, setSelectedPriceListCurrency] = useState('USD');
@@ -69,6 +72,9 @@ export function usePOS() {
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [showConflictAlert, setShowConflictAlert] = useState(false);
   const [showCurrencyTotals, setShowCurrencyTotals] = useState(false);
+  const [showCreditPinModal, setShowCreditPinModal] = useState(false);
+
+  const isAdmin = hasPermission('settings.manage');
   const [conflictData, setConflictData] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -184,17 +190,22 @@ export function usePOS() {
     }
   };
 
+  const PRODUCTS_PER_PAGE = 20;
+
   const loadProducts = async () => {
     try {
       setLoadingProducts(true);
+      setProductPage(1);
       const res = await productService.getAll({
         search: debouncedSearch,
-        limit: 1000,
+        page: 1,
+        limit: PRODUCTS_PER_PAGE,
         is_active: true,
         price_list_id: selectedPriceList || undefined,
       });
       const results = res.products || res.data || [];
       setProducts(results);
+      setHasMoreProducts(res.pagination ? res.pagination.page < res.pagination.totalPages : false);
 
       // Auto-add on exact barcode match
       const trimmed = debouncedSearch.trim();
@@ -211,6 +222,29 @@ export function usePOS() {
       toast.error('Error al cargar productos');
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  const loadMoreProducts = async () => {
+    if (loadingMore || !hasMoreProducts) return;
+    try {
+      setLoadingMore(true);
+      const nextPage = productPage + 1;
+      const res = await productService.getAll({
+        search: debouncedSearch,
+        page: nextPage,
+        limit: PRODUCTS_PER_PAGE,
+        is_active: true,
+        price_list_id: selectedPriceList || undefined,
+      });
+      const results = res.products || res.data || [];
+      setProducts((prev) => [...prev, ...results]);
+      setProductPage(nextPage);
+      setHasMoreProducts(res.pagination ? res.pagination.page < res.pagination.totalPages : false);
+    } catch (e) {
+      console.error('Error loading more products:', e);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -380,8 +414,6 @@ export function usePOS() {
         frozen_price: priceInfo.frozen_price || null,
         frozen_currency: priceInfo.frozen_currency || null,
       });
-
-      setSearchTerm('');
     } catch (err) {
       if (err.response?.status === 409) {
         setConflictData({
@@ -586,19 +618,7 @@ export function usePOS() {
   const { subtotal, discount, tax, total } = calculateTotals();
 
   // ============= CHECKOUT =============
-  const handleCompleteSale = async () => {
-    if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
-    if (saleType === 'cash' && paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
-    if (saleType === 'credit' && !customer) { toast.error('Selecciona un cliente para ventas a crédito'); return; }
-
-    if (saleType === 'cash') {
-      const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-      if (paidUSD < total - 0.01) {
-        toast.error(`Monto insuficiente. Faltan: $ ${(total - paidUSD).toFixed(2)}`);
-        return;
-      }
-    }
-
+  const performSale = async (authorizedBy) => {
     setSaving(true);
     try {
       const result = await saleService.createSale({
@@ -609,6 +629,7 @@ export function usePOS() {
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
         payment_lines: saleType === 'cash' ? paymentLines : [],
+        authorized_by: saleType === 'credit' ? authorizedBy : null,
         items: cart.map((item) => ({
           product_id: item.product_id,
           presentation_id: item.presentation_id,
@@ -650,6 +671,34 @@ export function usePOS() {
     }
   };
 
+  const handleCompleteSale = async () => {
+    if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
+    if (saleType === 'cash' && paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
+    if (saleType === 'credit' && !customer) { toast.error('Selecciona un cliente para ventas a crédito'); return; }
+
+    if (saleType === 'cash') {
+      const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+      if (paidUSD < total - 0.01) {
+        toast.error(`Monto insuficiente. Faltan: $ ${(total - paidUSD).toFixed(2)}`);
+        return;
+      }
+    }
+
+    // Credit sales: non-admin users need PIN authorization
+    if (saleType === 'credit' && !isAdmin) {
+      setShowCreditPinModal(true);
+      return;
+    }
+
+    // Admin or cash sale — proceed directly
+    await performSale(isAdmin ? user.id : null);
+  };
+
+  const handleCreditPinValidated = async (adminId) => {
+    setShowCreditPinModal(false);
+    await performSale(adminId);
+  };
+
   const handleTabClose = async (tabId) => {
     try {
       await posReservationService.releaseTab({ session_id: sessionId, tab_id: tabId });
@@ -678,6 +727,9 @@ export function usePOS() {
     // Products
     products,
     loadingProducts,
+    loadingMore,
+    hasMoreProducts,
+    loadMoreProducts,
     searchTerm,
     setSearchTerm,
     searchInputRef,
@@ -753,6 +805,9 @@ export function usePOS() {
     setShowConflictAlert,
     showCurrencyTotals,
     setShowCurrencyTotals,
+    showCreditPinModal,
+    setShowCreditPinModal,
+    handleCreditPinValidated,
     conflictData,
 
     // Clock

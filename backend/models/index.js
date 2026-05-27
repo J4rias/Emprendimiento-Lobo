@@ -199,6 +199,7 @@ User.hasMany(Sale, { foreignKey: 'user_id', as: 'sales' });
 // Sale - User (Created/Updated by)
 Sale.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 Sale.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+Sale.belongsTo(User, { foreignKey: 'authorized_by', as: 'authorizer' });
 
 // Sale - Quote (Many to One)
 Sale.belongsTo(Quote, { foreignKey: 'quote_id', as: 'quote' });
