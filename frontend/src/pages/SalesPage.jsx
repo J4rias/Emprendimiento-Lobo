@@ -258,6 +258,13 @@ const SalesPage = () => {
   };
 
   const getSaleTypeBadge = (type) => {
+    if (type === 'mixed') {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+          Mixta
+        </span>
+      );
+    }
     return type === 'cash' ? (
       <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
         Contado
@@ -373,6 +380,7 @@ const SalesPage = () => {
             <option value="">Todos los tipos</option>
             <option value="cash">Contado</option>
             <option value="credit">Crédito</option>
+            <option value="mixed">Mixta</option>
           </select>
 
           <button
@@ -465,7 +473,7 @@ const SalesPage = () => {
                         const saleTotalCOP = Math.round(saleTotal * rate);
                         const netCOP = saleTotalCOP - Math.round(cnTotalCOP);
 
-                        if (sale.sale_type === 'credit') {
+                        if (sale.sale_type === 'credit' || sale.sale_type === 'mixed') {
                           const pending = saleTotal - parseFloat(sale.paid_amount || 0);
                           if (pending > 0.01) {
                             return (
@@ -514,7 +522,7 @@ const SalesPage = () => {
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        {sale.sale_type === 'credit' && sale.status === 'pending' && (
+                        {(sale.sale_type === 'credit' || sale.sale_type === 'mixed') && sale.status === 'pending' && (
                           <button
                             onClick={() => handleOpenPaymentModal(sale)}
                             className="text-emerald-600 hover:text-emerald-800"
@@ -673,12 +681,21 @@ const SalesPage = () => {
                         const amountUSD = parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1);
                         amountCOP = amountUSD * parseFloat(selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
                       }
+                      const showRate = p.currency && p.currency !== 'USD';
+                      const equivUSD = showRate ? (parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1)) : null;
 
                       return (
-                        <div key={idx} className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded">
-                          <span className="text-gray-500">{formatDate(p.payment_date)}</span>
-                          <span className="font-semibold text-slate-700 capitalize">{p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
-                          <span className="font-bold text-emerald-600">COP {Math.round(amountCOP).toLocaleString('de-DE')}</span>
+                        <div key={idx} className="bg-slate-50 p-2 rounded space-y-0.5">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">{formatDate(p.payment_date)}</span>
+                            <span className="font-semibold text-slate-700 capitalize">{p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
+                            <span className="font-bold text-emerald-600">COP {Math.round(amountCOP).toLocaleString('de-DE')}</span>
+                          </div>
+                          {showRate && (
+                            <div className="text-[10px] text-gray-400 pl-1">
+                              {p.currency} {parseFloat(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} @ {parseFloat(p.exchange_rate).toFixed(2)} | Equiv: $ {equivUSD.toFixed(2)}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

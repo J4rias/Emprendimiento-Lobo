@@ -16,6 +16,18 @@ import {
   DollarSign
 } from 'lucide-react';
 
+const getCustomerName = (customer) => {
+  if (!customer) return 'Cliente General';
+  if (customer.type === 'natural') return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Sin nombre';
+  return customer.businessName || customer.tradeName || 'Sin nombre';
+};
+
+const getSaleTypeLabel = (type) => {
+  if (type === 'mixed') return 'Mixta';
+  if (type === 'credit') return 'Crédito';
+  return 'Contado';
+};
+
 const ReportsPage = () => {
   const [reportType, setReportType] = useState('sales');
   const [dateRange, setDateRange] = useState({
@@ -39,21 +51,24 @@ const ReportsPage = () => {
             saleService.getSalesStats(range),
             saleService.getSales({ ...range, limit: 1000 })
           ]);
+          const totalSales = salesStats.stats?.totalSales || 0;
+          const totalRevenue = salesStats.stats?.totalRevenue || 0;
           return {
             stats: {
-              total_sales: salesStats.data?.total_sales || 0,
-              total_amount: salesStats.data?.total_amount || 0,
-              average_ticket: salesStats.data?.average_ticket || 0,
-              sales_by_type: salesStats.data?.sales_by_type || []
+              total_sales: totalSales,
+              total_amount: totalRevenue,
+              average_ticket: totalSales > 0 ? totalRevenue / totalSales : 0,
+              sales_by_type: salesStats.stats?.salesByType || []
             },
-            data: salesList.data || []
+            data: salesList.sales || []
           };
         }
         case 'inventory': {
           const inventoryData = await inventoryService.getAll({ limit: 1000 });
+          const items = inventoryData.data || inventoryData.inventory || [];
           let totalValue = 0;
-          const processedData = (inventoryData.data || []).map(item => {
-            const value = (item.quantity || 0) * (item.product?.cost || 0);
+          const processedData = items.map(item => {
+            const value = (item.quantity || 0) * parseFloat(item.product?.cost || 0);
             totalValue += value;
             return { ...item, value };
           });
@@ -68,38 +83,24 @@ const ReportsPage = () => {
         }
         case 'purchases': {
           const purchaseOrders = await purchaseOrderService.getAll({ ...range, limit: 1000 });
-          const totalAmount = (purchaseOrders.data || []).reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
+          const poList = purchaseOrders.data || purchaseOrders.purchaseOrders || [];
+          const totalAmount = poList.reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
           return {
             stats: {
-              total_orders: purchaseOrders.data?.length || 0,
+              total_orders: poList.length,
               total_amount: totalAmount,
-              average_order: purchaseOrders.data?.length > 0 ? totalAmount / purchaseOrders.data.length : 0
+              average_order: poList.length > 0 ? totalAmount / poList.length : 0
             },
-            data: purchaseOrders.data || []
+            data: poList
           };
         }
         case 'top_products': {
-          const salesData = await saleService.getAll({ ...range, limit: 1000 });
-          const productMap = {};
-          (salesData.data || []).forEach(sale => {
-            (sale.details || []).forEach(detail => {
-              const productId = detail.product_id;
-              if (!productMap[productId]) {
-                productMap[productId] = {
-                  product: detail.product,
-                  total_quantity: 0,
-                  total_amount: 0,
-                  sales_count: 0
-                };
-              }
-              productMap[productId].total_quantity += (detail.package_quantity || 0) * (detail.product?.presentation?.units_per_package || 1) + (detail.loose_units || 0);
-              productMap[productId].total_amount += parseFloat(detail.line_total || 0);
-              productMap[productId].sales_count += 1;
-            });
-          });
-          const topProducts = Object.values(productMap)
-            .sort((a, b) => b.total_amount - a.total_amount)
-            .slice(0, 50);
+          const statsData = await saleService.getSalesStats({ ...range, top_limit: 50 });
+          const topProducts = (statsData.stats?.topProducts || []).map(tp => ({
+            product: tp.product,
+            total_quantity: parseFloat(tp.dataValues?.total_quantity || tp.total_quantity || 0),
+            total_amount: parseFloat(tp.dataValues?.total_amount || tp.total_amount || 0)
+          }));
           return {
             stats: {
               total_products: topProducts.length,
@@ -111,11 +112,12 @@ const ReportsPage = () => {
         }
         case 'low_stock': {
           const lowStockData = await inventoryService.getLowStock({ limit: 1000 });
+          const items = lowStockData.data || lowStockData.inventory || [];
           return {
             stats: {
-              critical_items: lowStockData.data?.length || 0
+              critical_items: items.length
             },
-            data: lowStockData.data || []
+            data: items
           };
         }
         default:
@@ -177,7 +179,7 @@ const ReportsPage = () => {
   const generateSalesCSV = () => {
     let csv = 'Número,Fecha,Cliente,Tipo,Estado,Subtotal,Descuento,Impuesto,Total\n';
     reportData.forEach(sale => {
-      csv += `"${sale.sale_number}","${new Date(sale.sale_date).toLocaleDateString()}","${sale.customer?.name || 'Cliente General'}","${sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}","${sale.status}",${sale.subtotal},${sale.discount_amount},${sale.tax_amount},${sale.total}\n`;
+      csv += `"${sale.sale_number}","${new Date(sale.sale_date).toLocaleDateString()}","${getCustomerName(sale.customer)}","${getSaleTypeLabel(sale.sale_type)}","${sale.status}",${sale.subtotal},${sale.discount_amount},${sale.tax_amount},${sale.total}\n`;
     });
     return csv;
   };
@@ -205,9 +207,9 @@ const ReportsPage = () => {
   };
 
   const generateTopProductsCSV = () => {
-    let csv = 'SKU,Producto,Cantidad Vendida,Monto Total,Número de Ventas\n';
+    let csv = 'SKU,Producto,Cantidad Vendida,Monto Total\n';
     reportData.forEach(item => {
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.total_amount},${item.sales_count}\n`;
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.total_amount}\n`;
     });
     return csv;
   };
@@ -338,8 +340,8 @@ const ReportsPage = () => {
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.sale_number}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(sale.sale_date).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sale.customer?.name || 'Cliente General'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sale.sale_type === 'cash' ? 'Contado' : 'Crédito'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCustomerName(sale.customer)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getSaleTypeLabel(sale.sale_type)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(sale.total || 0).toFixed(2)}</td>
                 </tr>
               ))}
@@ -407,7 +409,6 @@ const ReportsPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cant. Vendida</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto Total</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">N° Ventas</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -417,7 +418,6 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_amount || 0).toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{item.sales_count}</td>
                 </tr>
               ))}
             </tbody>

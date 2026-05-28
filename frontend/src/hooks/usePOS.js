@@ -24,6 +24,7 @@ export const PAYMENT_METHODS = [
   { id: 'cash',     label: 'Efectivo' },
   { id: 'card',     label: 'Tarjeta' },
   { id: 'transfer', label: 'Transferencia' },
+  { id: 'credit',   label: 'Crédito' },
 ];
 
 // ============= HOOK =============
@@ -79,10 +80,14 @@ export function usePOS() {
   const [saving, setSaving] = useState(false);
 
   // ============= CHECKOUT STATE =============
-  const [saleType, setSaleType] = useState('cash');
   const [paymentLines, setPaymentLines] = useState([]);
   const [notes, setNotes] = useState('');
   const [saleResult, setSaleResult] = useState(null);
+
+  // Derive saleType from payment lines
+  const hasCreditLine = paymentLines.some(l => l.method === 'credit');
+  const hasCashLines = paymentLines.some(l => l.method !== 'credit');
+  const saleType = hasCreditLine && hasCashLines ? 'mixed' : hasCreditLine ? 'credit' : 'cash';
 
   // ============= CLOCK =============
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -628,8 +633,8 @@ export function usePOS() {
         session_id: sessionId,
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
-        payment_lines: saleType === 'cash' ? paymentLines : [],
-        authorized_by: saleType === 'credit' ? authorizedBy : null,
+        payment_lines: paymentLines,
+        authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
         items: cart.map((item) => ({
           product_id: item.product_id,
           presentation_id: item.presentation_id,
@@ -642,9 +647,8 @@ export function usePOS() {
         notes,
       });
 
-      const paidUSD = saleType === 'cash'
-        ? paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0)
-        : 0;
+      const cashLines = paymentLines.filter(l => l.method !== 'credit');
+      const paidUSD = cashLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
       const changeAmount = saleType === 'cash' ? Math.max(0, paidUSD - total).toFixed(2) : '0';
 
       setSaleResult({ ...result.sale, totals: { subtotal, discount, tax, total }, changeAmount });
@@ -654,7 +658,6 @@ export function usePOS() {
       closeTab(activeTabId);
       await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
 
-      setSaleType('cash');
       setPaymentLines([]);
       setNotes('');
 
@@ -673,19 +676,32 @@ export function usePOS() {
 
   const handleCompleteSale = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
-    if (saleType === 'cash' && paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
-    if (saleType === 'credit' && !customer) { toast.error('Selecciona un cliente para ventas a crédito'); return; }
+    if (paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
+    if ((saleType === 'credit' || saleType === 'mixed') && !customer) {
+      toast.error('Selecciona un cliente para ventas a crédito');
+      return;
+    }
 
-    if (saleType === 'cash') {
-      const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-      if (paidUSD < total - 0.01) {
-        toast.error(`Monto insuficiente. Faltan: $ ${(total - paidUSD).toFixed(2)}`);
+    if (saleType === 'cash' || saleType === 'mixed') {
+      const cashPaidUSD = paymentLines
+        .filter(l => l.method !== 'credit')
+        .reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+      const creditUSD = paymentLines
+        .filter(l => l.method === 'credit')
+        .reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+      const expectedCash = total - creditUSD;
+      if (saleType === 'cash' && cashPaidUSD < total - 0.01) {
+        toast.error(`Monto insuficiente. Faltan: $ ${(total - cashPaidUSD).toFixed(2)}`);
+        return;
+      }
+      if (saleType === 'mixed' && cashPaidUSD < expectedCash - 0.01) {
+        toast.error(`Monto en efectivo insuficiente. Faltan: $ ${(expectedCash - cashPaidUSD).toFixed(2)}`);
         return;
       }
     }
 
-    // Credit sales: non-admin users need PIN authorization
-    if (saleType === 'credit' && !isAdmin) {
+    // Credit/mixed sales: non-admin users need PIN authorization
+    if ((saleType === 'credit' || saleType === 'mixed') && !isAdmin) {
       setShowCreditPinModal(true);
       return;
     }
@@ -775,7 +791,7 @@ export function usePOS() {
 
     // Checkout
     saleType,
-    setSaleType,
+    isAdmin,
     paymentLines,
     setPaymentLines,
     notes,

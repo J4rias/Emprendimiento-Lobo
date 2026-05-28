@@ -45,8 +45,8 @@ exports.createSale = async (req, res) => {
       authorized_by
     } = req.body;
 
-    // Credit sales: non-admin users require admin authorization
-    if (sale_type === 'credit') {
+    // Credit/mixed sales: non-admin users require admin authorization
+    if (sale_type === 'credit' || sale_type === 'mixed') {
       const isAdmin = req.user.role?.name === 'Administrador';
       if (!isAdmin && !authorized_by) {
         await transaction.rollback();
@@ -57,13 +57,26 @@ exports.createSale = async (req, res) => {
       }
     }
 
-    // Calculate total paid USD early
+    // Separate credit lines from cash/card/transfer lines
+    const cashLines = payment_lines.filter(l => l.method !== 'credit');
+    const creditLines = payment_lines.filter(l => l.method === 'credit');
+
+    // Calculate total paid USD (excluding credit lines)
     let paid_amount = 0;
-    if (sale_type === 'cash' && payment_lines.length > 0) {
-      paid_amount = payment_lines.reduce((sum, line) => {
+    if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
+      paid_amount = cashLines.reduce((sum, line) => {
         const amount = parseFloat(line.amount) || 0;
         const rate = parseFloat(line.exchange_rate) || 1;
-        // In POS the sum of (amount / rate) forms the USD equivalent
+        return sum + (amount / rate);
+      }, 0);
+    }
+
+    // Calculate credit amount (USD equivalent of credit lines)
+    let credit_amount = 0;
+    if ((sale_type === 'credit' || sale_type === 'mixed') && creditLines.length > 0) {
+      credit_amount = creditLines.reduce((sum, line) => {
+        const amount = parseFloat(line.amount) || 0;
+        const rate = parseFloat(line.exchange_rate) || 1;
         return sum + (amount / rate);
       }, 0);
     }
@@ -190,9 +203,13 @@ exports.createSale = async (req, res) => {
     const total = subtotal - discount_amount + tax_amount;
     const change_amount = sale_type === 'cash' ? Math.max(0, paid_amount - total) : 0;
 
-    // For credit sales, update the customer's credit_used
-    // Credit validation (in COP) is already handled by the frontend before reaching here
-    if (sale_type === 'credit' && customer_id) {
+    // For credit/mixed sales: credit_amount is either the full total (credit) or the credit lines (mixed)
+    if (sale_type === 'credit') {
+      credit_amount = total;
+    }
+
+    // Update customer's credit_used for sales with credit component
+    if ((sale_type === 'credit' || sale_type === 'mixed') && customer_id && credit_amount > 0) {
       const customer = await Customer.findByPk(customer_id, { transaction });
 
       if (!customer) {
@@ -203,10 +220,9 @@ exports.createSale = async (req, res) => {
         });
       }
 
-      // Accumulate the sale total (USD) to credit_used
       const currentCreditUsed = parseFloat(customer.credit_used || 0);
       await customer.update({
-        credit_used: currentCreditUsed + total
+        credit_used: currentCreditUsed + credit_amount
       }, { transaction });
     }
 
@@ -218,18 +234,19 @@ exports.createSale = async (req, res) => {
       sale_date: new Date(),
       sale_type,
       exchange_rate,
-      payment_method: sale_type === 'cash' && payment_lines.length > 0 ? payment_lines[0].method : null,
+      payment_method: sale_type === 'cash' && cashLines.length > 0 ? cashLines[0].method : null,
       subtotal,
       tax_amount,
       discount_amount,
       total,
-      paid_amount: sale_type === 'cash' ? paid_amount : 0,
+      credit_amount,
+      paid_amount: (sale_type === 'cash' || sale_type === 'mixed') ? paid_amount : 0,
       change_amount,
       status: sale_type === 'cash' ? 'completed' : 'pending',
       notes,
       quote_id: quote_id || null,
       created_by: req.user.id,
-      authorized_by: sale_type === 'credit'
+      authorized_by: (sale_type === 'credit' || sale_type === 'mixed')
         ? (req.user.role?.name === 'Administrador' ? req.user.id : authorized_by)
         : null
     }, { transaction });
@@ -241,8 +258,8 @@ exports.createSale = async (req, res) => {
       }, { transaction });
     }
 
-    if (sale_type === 'cash' && payment_lines.length > 0) {
-      for (const payLine of payment_lines) {
+    if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
+      for (const payLine of cashLines) {
         if (parseFloat(payLine.amount) > 0) {
           await SalePayment.create({
             sale_id: sale.id,
@@ -668,6 +685,20 @@ exports.cancelSale = async (req, res) => {
       }
     }
 
+    // Revert customer credit_used for credit/mixed sales
+    if ((sale.sale_type === 'credit' || sale.sale_type === 'mixed') && sale.customer_id) {
+      const customer = await Customer.findByPk(sale.customer_id, { transaction });
+      if (customer) {
+        const currentCreditUsed = parseFloat(customer.credit_used || 0);
+        const creditToRevert = sale.sale_type === 'credit'
+          ? parseFloat(sale.total)
+          : parseFloat(sale.credit_amount || 0);
+        await customer.update({
+          credit_used: Math.max(0, currentCreditUsed - creditToRevert)
+        }, { transaction });
+      }
+    }
+
     await sale.update({
       status: 'cancelled',
       notes: `${sale.notes || ''}\nCANCELADA: ${reason || 'Sin razón especificada'}`,
@@ -705,10 +736,10 @@ exports.addPayment = async (req, res) => {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    if (sale.sale_type !== 'credit') {
+    if (!['credit', 'mixed'].includes(sale.sale_type)) {
       await transaction.rollback();
       return res.status(400).json({
-        message: 'Solo se pueden agregar pagos a ventas a crédito'
+        message: 'Solo se pueden agregar pagos a ventas a crédito o mixtas'
       });
     }
 
@@ -899,7 +930,7 @@ exports.getSalesStats = async (req, res) => {
       ],
       group: ['SaleDetail.product_id', 'product.id', 'product.name', 'product.sku'],
       order: [[sequelize.fn('SUM', sequelize.col('SaleDetail.quantity')), 'DESC']],
-      limit: 10,
+      limit: parseInt(req.query.top_limit) || 10,
       raw: false
     });
 
@@ -969,17 +1000,17 @@ exports.getDailyClosure = async (req, res) => {
         where: { sale_id: { [Op.in]: saleIds } },
         attributes: [
           'currency',
-          'method',
+          'payment_method',
           [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
         ],
-        group: ['currency', 'method'],
+        group: ['currency', 'payment_method'],
         raw: true
       });
 
       // Format output into a clean nested object: { "COP": { "cash": 50000, "transfer": 200 }, "USD": ... }
       payments.forEach(p => {
         const curr = p.currency || 'USD';
-        const method = p.method;
+        const method = p.payment_method;
         const total = parseFloat(p.total_amount) || 0;
 
         if (!paymentsBreakdown[curr]) {

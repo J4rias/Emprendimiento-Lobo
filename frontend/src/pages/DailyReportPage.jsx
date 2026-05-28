@@ -3,6 +3,7 @@ import { saleService } from '../services/api/saleService';
 import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
+import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
 import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -51,10 +52,6 @@ const DailyReportPage = () => {
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
-
     const getMethodLabel = (method) => {
         const methods = {
             cash: 'Efectivo',
@@ -62,6 +59,68 @@ const DailyReportPage = () => {
             transfer: 'Transferencia'
         };
         return methods[method] || method;
+    };
+
+    const fmtAmount = (amount, currency = 'USD') => {
+        const val = parseFloat(amount || 0);
+        if (currency === 'COP') return Math.round(val).toLocaleString('de-DE');
+        return val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const handlePrint = () => {
+        if (!report) return;
+        const selectedUser = filters.user_id ? users.find(u => String(u.id) === String(filters.user_id)) : null;
+        const userName = selectedUser ? (selectedUser.name || `${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim()) : 'Todos';
+
+        const breakdownRows = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
+            const methodRows = Object.entries(methods).map(([method, amount]) =>
+                `<tr>
+                    <td style="padding:3px 0; font-size:12px;">${getMethodLabel(method)}</td>
+                    <td style="padding:3px 0; text-align:right; font-size:12px; font-weight:bold;">${currency === 'USD' ? '$ ' : ''}${fmtAmount(amount, currency)}</td>
+                </tr>`
+            ).join('');
+            const total = Object.values(methods).reduce((a, b) => a + b, 0);
+            return `
+                <div style="margin-bottom:8px;">
+                    <div style="font-weight:bold; font-size:13px; border-bottom:1px solid #000; padding-bottom:2px; margin-bottom:4px;">
+                        ${currency}
+                    </div>
+                    <table style="width:100%; border-collapse:collapse;">
+                        ${methodRows}
+                        <tr style="border-top:1px dashed #000;">
+                            <td style="padding:3px 0; font-size:12px; font-weight:bold;">Total ${currency}</td>
+                            <td style="padding:3px 0; text-align:right; font-size:13px; font-weight:bold;">${currency === 'USD' ? '$ ' : ''}${fmtAmount(total, currency)}</td>
+                        </tr>
+                    </table>
+                </div>`;
+        }).join('');
+
+        const html = `
+            <div style="width:100%; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:1.2; color:#000;">
+                <div style="text-align:center; font-weight:bold; font-size:16px; margin-bottom:4px;">ARQUEO DE CAJA</div>
+                <div style="text-align:center; font-size:11px; margin-bottom:8px;">${report.date}</div>
+                <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+                <div style="font-size:12px; margin-bottom:2px;"><strong>Cajero:</strong> ${userName}</div>
+                <div style="font-size:12px; margin-bottom:8px;"><strong>Impreso:</strong> ${printFormatDate(new Date())}</div>
+                <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+                    <tr>
+                        <td style="font-size:13px; font-weight:bold;">Ventas Totales (USD)</td>
+                        <td style="text-align:right; font-size:15px; font-weight:bold;">$ ${fmtAmount(report.totalSalesUSD)}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:13px;">Operaciones</td>
+                        <td style="text-align:right; font-size:13px; font-weight:bold;">${report.salesCount || 0}</td>
+                    </tr>
+                </table>
+                <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+                <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">DESGLOSE POR MONEDA</div>
+                ${breakdownRows || '<div style="text-align:center; font-size:11px;">Sin pagos registrados</div>'}
+                <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                <div style="text-align:center; font-size:10px; margin-top:6px;">*** FIN DE ARQUEO ***</div>
+            </div>`;
+
+        printHTML(html, `Arqueo ${report.date}`);
     };
 
     return (
@@ -124,7 +183,7 @@ const DailyReportPage = () => {
                             <div>
                                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas Totales (Base USD)</p>
                                 <div className="text-3xl font-bold text-gray-900 mt-1">
-                                    ${report.totalSalesUSD?.toFixed(2) || '0.00'}
+                                    $ {fmtAmount(report.totalSalesUSD)}
                                 </div>
                             </div>
                         </div>
@@ -186,17 +245,6 @@ const DailyReportPage = () => {
                             )}
                         </div>
                     </div>
-
-                    <style dangerouslySetInnerHTML={{
-                        __html: `
-            @media print {
-               body * { visibility: hidden; }
-               .print-container, .print-container * { visibility: visible; }
-               .print-container { position: absolute; left: 0; top: 0; width: 100%; }
-               .shadow-sm, .shadow-md, .shadow { box-shadow: none !important; border: 1px solid #ddd; }
-               @page { size: auto; margin: 20mm; }
-            }
-          `}} />
 
                 </div>
             )}

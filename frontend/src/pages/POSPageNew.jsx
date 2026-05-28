@@ -324,7 +324,6 @@ const POSPage = () => {
         customer={pos.customer}
         onCustomerSelect={pos.handleSetCustomer}
         saleType={pos.saleType}
-        setSaleType={pos.setSaleType}
         paymentLines={pos.paymentLines}
         setPaymentLines={pos.setPaymentLines}
         notes={pos.notes}
@@ -340,6 +339,7 @@ const POSPage = () => {
         toDisplay={pos.toDisplay}
         displaySymbol={pos.displaySymbol}
         fmt={pos.fmt}
+        isAdmin={pos.isAdmin}
       />
 
       <StockConflictAlert
@@ -376,7 +376,7 @@ const POSPage = () => {
           pos.handleSetCustomer(c);
           pos.setShowCustomerSearch(false);
         }}
-        validateCredit={pos.saleType === 'credit'}
+        validateCredit={pos.saleType === 'credit' || pos.saleType === 'mixed'}
         saleAmount={parseFloat(pos.total)}
         exchangeRates={pos.exchangeRates}
       />
@@ -593,45 +593,70 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
 }
 
 function CheckoutModal({
-  show, onClose, customer, onCustomerSelect, saleType, setSaleType, paymentLines, setPaymentLines,
+  show, onClose, customer, onCustomerSelect, saleType, paymentLines, setPaymentLines,
   notes, setNotes,
   subtotal, discount, tax, total, onComplete, saving,
-  exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt,
+  exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt, isAdmin,
 }) {
   const [newPayCurrency, setNewPayCurrency] = useState(displayCurrency);
   const [newPayMethod, setNewPayMethod] = useState('cash');
   const [newPayAmount, setNewPayAmount] = useState('');
+  const [newPayRate, setNewPayRate] = useState(() => calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   if (!show) return null;
 
   const getCustomerDisplayName = (c) => {
     if (!c) return null;
-    if (c.type === 'natural') {
-      return `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Sin nombre';
-    }
+    if (c.type === 'natural') return `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Sin nombre';
     return c.businessName || c.tradeName || 'Sin nombre';
+  };
+
+  const hasCreditLine = paymentLines.some(l => l.method === 'credit');
+  const isCredit = newPayMethod === 'credit';
+  const effectiveCurrency = newPayCurrency;
+
+  const handleCurrencyChange = (code) => {
+    setNewPayCurrency(code);
+    setNewPayRate(calculateEffectiveRate('USD', code, exchangeRates) || 1);
+  };
+
+  const handleMethodChange = (method) => {
+    setNewPayMethod(method);
+    setNewPayRate(calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1);
   };
 
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    const rate = calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1;
-    setPaymentLines([...paymentLines, { currency: newPayCurrency, method: newPayMethod, amount, exchange_rate: rate }]);
+    if (isCredit && hasCreditLine) { toast.error('Solo se permite una línea de crédito'); return; }
+    if (isCredit && !customer) { toast.error('Selecciona un cliente para crédito'); return; }
+    const rate = parseFloat(newPayRate) || 1;
+    setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, exchange_rate: rate }]);
     setNewPayAmount('');
+    if (isCredit) setNewPayMethod('cash');
   };
 
-  const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-  const changeUSD = paidUSD - total;
+  const cashLines = paymentLines.filter(l => l.method !== 'credit');
+  const creditLineAmount = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + (l.amount / (l.exchange_rate || 1)), 0);
+  const paidUSD = cashLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+  const effectiveTotal = total - creditLineAmount;
+  const changeUSD = paidUSD - effectiveTotal;
   const totalDisplay = toDisplay(total);
   const paidDisplay = toDisplay(paidUSD);
   const changeDisplay = toDisplay(Math.abs(changeUSD));
+
+  const availableMethods = hasCreditLine
+    ? PAYMENT_METHODS.filter(m => m.id !== 'credit')
+    : PAYMENT_METHODS;
 
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
     if (currency === 'COP') return Math.round(n).toLocaleString('es-CO');
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const saleTypeLabel = saleType === 'mixed' ? 'Mixta' : saleType === 'credit' ? 'Crédito' : 'Contado';
 
   return (
     <>
@@ -647,25 +672,16 @@ function CheckoutModal({
             <span>Total:</span>
             <span className="text-green-600">{displaySymbol} {fmt(totalDisplay)}</span>
           </div>
+          {saleType !== 'cash' && (
+            <div className="flex justify-end">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${saleType === 'mixed' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}`}>
+                {saleTypeLabel}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Tipo de venta */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 mb-1">Tipo de Venta</label>
-          <div className="flex gap-2">
-            {[{ id: 'cash', label: 'Contado' }, { id: 'credit', label: 'Crédito' }].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => { setSaleType(t.id); setPaymentLines([]); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${saleType === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Cliente (siempre visible, obligatorio para crédito) */}
+        {/* Cliente */}
         <div>
           <label className="block text-sm font-semibold text-gray-900 mb-1">Cliente</label>
           <button
@@ -680,109 +696,142 @@ function CheckoutModal({
             {customer ? getCustomerDisplayName(customer) : 'Seleccionar cliente'}
           </button>
           {customer && (
-            <button
-              onClick={() => onCustomerSelect(null)}
-              className="mt-1 text-xs text-gray-600 hover:text-gray-900 underline"
-            >
+            <button onClick={() => onCustomerSelect(null)} className="mt-1 text-xs text-gray-600 hover:text-gray-900 underline">
               Limpiar selección
             </button>
           )}
         </div>
 
-        {/* Pagos - solo contado */}
-        {saleType === 'cash' && (
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-900">Pagos recibidos</label>
+        {/* Pagos */}
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-gray-900">Pagos recibidos</label>
 
-            {paymentLines.length > 0 && (
-              <div className="space-y-1">
-                {paymentLines.map((line, i) => {
-                  const MethodIcon = PAYMENT_ICONS[line.method] || Banknote;
-                  return (
-                    <div key={i} className="flex items-center justify-between bg-green-50 rounded px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <MethodIcon className="w-4 h-4 text-green-700" />
-                        <span className="font-medium text-green-800">{line.currency} {fmtLine(line.amount, line.currency)}</span>
-                        <span className="text-green-600 text-xs">({PAYMENT_METHODS.find(m => m.id === line.method)?.label})</span>
-                      </div>
-                      <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))}>
-                        <X className="w-4 h-4 text-red-500" />
-                      </button>
+          {paymentLines.length > 0 && (
+            <div className="space-y-1">
+              {paymentLines.map((line, i) => {
+                const isCreditLine = line.method === 'credit';
+                const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Banknote);
+                return (
+                  <div key={i} className={`flex items-center justify-between rounded px-3 py-2 text-sm ${isCreditLine ? 'bg-amber-50' : 'bg-green-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <MethodIcon className={`w-4 h-4 ${isCreditLine ? 'text-amber-700' : 'text-green-700'}`} />
+                      <span className={`font-medium ${isCreditLine ? 'text-amber-800' : 'text-green-800'}`}>
+                        {line.currency} {fmtLine(line.amount, line.currency)}
+                      </span>
+                      <span className={`text-xs ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
+                        ({PAYMENT_METHODS.find(m => m.id === line.method)?.label})
+                      </span>
+                      {!isCreditLine && line.currency !== 'USD' && (
+                        <span className="text-[10px] text-gray-400">@ {parseFloat(line.exchange_rate).toFixed(2)}</span>
+                      )}
                     </div>
-                  );
-                })}
+                    <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))}>
+                      <X className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Credit info */}
+          {hasCreditLine && (
+            <div className={`rounded-lg p-3 text-sm border ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+              {customer
+                ? <p>Se cargará <strong>$ {creditLineAmount.toFixed(2)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
+                : <p className="font-medium">Selecciona un cliente para la línea de crédito</p>
+              }
+            </div>
+          )}
+
+          {/* Add payment form */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
+            <div className="flex gap-2">
+              <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+              <select value={newPayCurrency} onChange={(e) => handleCurrencyChange(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+              </select>
+            </div>
+            {effectiveCurrency !== 'USD' && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 whitespace-nowrap">Tasa:</label>
+                <input
+                  type="number"
+                  value={newPayRate}
+                  onChange={(e) => setNewPayRate(e.target.value)}
+                  readOnly={!isAdmin}
+                  className={`w-28 px-2 py-1 border rounded text-sm text-right ${isAdmin ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-100 text-gray-500'}`}
+                  step="0.01"
+                />
               </div>
             )}
-
-            {/* Agregar pago */}
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
-              <div className="flex gap-2">
-                <select value={newPayMethod} onChange={(e) => setNewPayMethod(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                  {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
-                <select value={newPayCurrency} onChange={(e) => setNewPayCurrency(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                  {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="number" value={newPayAmount}
-                  onChange={(e) => setNewPayAmount(e.target.value)}
-                  placeholder={`Monto en ${newPayCurrency}`}
-                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm"
-                  onKeyDown={(e) => e.key === 'Enter' && addPaymentLine()}
-                />
-                <button onClick={addPaymentLine} className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700">
-                  +
-                </button>
-              </div>
-              {/* Botones rápidos */}
-              <div className="flex gap-1 flex-wrap">
-                {CURRENCIES.map((c) => (
+            <div className="flex gap-2">
+              <input
+                type="number" value={newPayAmount}
+                onChange={(e) => setNewPayAmount(e.target.value)}
+                placeholder={`Monto en ${effectiveCurrency}`}
+                className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm"
+                onKeyDown={(e) => e.key === 'Enter' && addPaymentLine()}
+              />
+              <button onClick={addPaymentLine} className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700">
+                +
+              </button>
+            </div>
+            {/* Quick buttons */}
+            <div className="flex gap-1 flex-wrap">
+              {CURRENCIES.map((c) => {
+                const btnRate = c.code === effectiveCurrency ? (parseFloat(newPayRate) || 1) : (calculateEffectiveRate('USD', c.code, exchangeRates) || 1);
+                const remaining = total - creditLineAmount;
+                return (
                   <button
                     key={c.code}
                     onClick={() => {
-                      const rate = calculateEffectiveRate('USD', c.code, exchangeRates) || 1;
-                      setNewPayCurrency(c.code);
+                      handleCurrencyChange(c.code);
                       setNewPayMethod('cash');
-                      setNewPayAmount(c.code === 'COP' ? String(Math.round(total * rate)) : (total * rate).toFixed(2));
+                      const r = c.code === newPayCurrency ? (parseFloat(newPayRate) || btnRate) : btnRate;
+                      setNewPayAmount(c.code === 'COP' ? String(Math.round(remaining * r)) : (remaining * r).toFixed(2));
                     }}
                     className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-xs hover:bg-gray-100"
                   >
                     Total en {c.code}
                   </button>
-                ))}
+                );
+              })}
+              {!hasCreditLine && (
+                <button
+                  onClick={() => {
+                    if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
+                    const creditRate = calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1;
+                    const creditAmount = newPayCurrency === 'COP' ? Math.round(total * creditRate) : parseFloat((total * creditRate).toFixed(6));
+                    setPaymentLines([...paymentLines, { currency: newPayCurrency, method: 'credit', amount: creditAmount, exchange_rate: creditRate }]);
+                  }}
+                  className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-700 rounded text-xs hover:bg-amber-100"
+                >
+                  Todo a Crédito
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Payment summary */}
+          {cashLines.length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border border-gray-200">
+              <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">{displaySymbol} {fmt(toDisplay(effectiveTotal))}</span></div>
+              <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{displaySymbol} {fmt(paidDisplay)}</span></div>
+              <div className="flex justify-between border-t pt-1">
+                {changeUSD >= 0 ? (
+                  <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">{displaySymbol} {fmt(changeDisplay)}</span></>
+                ) : (
+                  <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">{displaySymbol} {fmt(changeDisplay)}</span></>
+                )}
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Resumen de pago */}
-            {paymentLines.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border border-gray-200">
-                <div className="flex justify-between"><span>Total:</span><span className="font-semibold">{displaySymbol} {fmt(totalDisplay)}</span></div>
-                <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{displaySymbol} {fmt(paidDisplay)}</span></div>
-                <div className="flex justify-between border-t pt-1">
-                  {changeUSD >= 0 ? (
-                    <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">{displaySymbol} {fmt(changeDisplay)}</span></>
-                  ) : (
-                    <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">{displaySymbol} {fmt(changeDisplay)}</span></>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Crédito */}
-        {saleType === 'credit' && (
-          <div className={`rounded-lg p-3 text-sm border ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
-            {customer
-              ? <p>Se cargará <strong>{displaySymbol} {fmt(totalDisplay)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
-              : <p className="font-medium">Selecciona un cliente para ventas a crédito</p>
-            }
-          </div>
-        )}
-
-        {/* Notas */}
+        {/* Notes */}
         <div>
           <label className="block text-sm font-semibold text-gray-900 mb-1">Notas (opcional)</label>
           <textarea
@@ -792,7 +841,7 @@ function CheckoutModal({
           />
         </div>
 
-        {/* Botones */}
+        {/* Buttons */}
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-900 hover:bg-gray-50">
             Cancelar
@@ -815,7 +864,7 @@ function CheckoutModal({
         onCustomerSelect(c);
         setShowCustomerSearch(false);
       }}
-      validateCredit={saleType === 'credit'}
+      validateCredit={saleType === 'credit' || saleType === 'mixed'}
       saleAmount={total}
       exchangeRates={exchangeRates}
     />

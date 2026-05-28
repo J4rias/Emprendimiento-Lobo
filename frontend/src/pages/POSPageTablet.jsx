@@ -303,7 +303,6 @@ const POSPageTablet = () => {
         customer={pos.customer}
         onCustomerSelect={pos.handleSetCustomer}
         saleType={pos.saleType}
-        setSaleType={pos.setSaleType}
         paymentLines={pos.paymentLines}
         setPaymentLines={pos.setPaymentLines}
         notes={pos.notes}
@@ -319,6 +318,7 @@ const POSPageTablet = () => {
         toDisplay={pos.toDisplay}
         displaySymbol={pos.displaySymbol}
         fmt={pos.fmt}
+        isAdmin={pos.isAdmin}
       />
 
       <StockConflictAlert
@@ -354,7 +354,7 @@ const POSPageTablet = () => {
           pos.handleSetCustomer(c);
           pos.setShowCustomerSearch(false);
         }}
-        validateCredit={pos.saleType === 'credit'}
+        validateCredit={pos.saleType === 'credit' || pos.saleType === 'mixed'}
         saleAmount={parseFloat(pos.total)}
         exchangeRates={pos.exchangeRates}
       />
@@ -587,14 +587,15 @@ function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onTog
 }
 
 function TabletCheckoutModal({
-  show, onClose, customer, onCustomerSelect, saleType, setSaleType, paymentLines, setPaymentLines,
+  show, onClose, customer, onCustomerSelect, saleType, paymentLines, setPaymentLines,
   notes, setNotes,
   subtotal, discount, tax, total, onComplete, saving,
-  exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt,
+  exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt, isAdmin,
 }) {
   const [newPayCurrency, setNewPayCurrency] = useState(displayCurrency);
   const [newPayMethod, setNewPayMethod] = useState('cash');
   const [newPayAmount, setNewPayAmount] = useState('');
+  const [newPayRate, setNewPayRate] = useState(() => calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   if (!show) return null;
@@ -605,19 +606,43 @@ function TabletCheckoutModal({
     return c.businessName || c.tradeName || 'Sin nombre';
   };
 
+  const hasCreditLine = paymentLines.some(l => l.method === 'credit');
+  const isCredit = newPayMethod === 'credit';
+  const effectiveCurrency = newPayCurrency;
+
+  const handleCurrencyChange = (code) => {
+    setNewPayCurrency(code);
+    setNewPayRate(calculateEffectiveRate('USD', code, exchangeRates) || 1);
+  };
+
+  const handleMethodChange = (method) => {
+    setNewPayMethod(method);
+    setNewPayRate(calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1);
+  };
+
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    const rate = calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1;
-    setPaymentLines([...paymentLines, { currency: newPayCurrency, method: newPayMethod, amount, exchange_rate: rate }]);
+    if (isCredit && hasCreditLine) { toast.error('Solo se permite una línea de crédito'); return; }
+    if (isCredit && !customer) { toast.error('Selecciona un cliente para crédito'); return; }
+    const rate = parseFloat(newPayRate) || 1;
+    setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, exchange_rate: rate }]);
     setNewPayAmount('');
+    if (isCredit) setNewPayMethod('cash');
   };
 
-  const paidUSD = paymentLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-  const changeUSD = paidUSD - total;
+  const cashLines = paymentLines.filter(l => l.method !== 'credit');
+  const creditLineAmount = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + (l.amount / (l.exchange_rate || 1)), 0);
+  const paidUSD = cashLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
+  const effectiveTotal = total - creditLineAmount;
+  const changeUSD = paidUSD - effectiveTotal;
   const totalDisplay = toDisplay(total);
   const paidDisplay = toDisplay(paidUSD);
   const changeDisplay = toDisplay(Math.abs(changeUSD));
+
+  const availableMethods = hasCreditLine
+    ? PAYMENT_METHODS.filter(m => m.id !== 'credit')
+    : PAYMENT_METHODS;
 
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
@@ -625,23 +650,28 @@ function TabletCheckoutModal({
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const saleTypeLabel = saleType === 'mixed' ? 'Mixta' : saleType === 'credit' ? 'Crédito' : 'Contado';
+
   return (
     <>
-    {/* Fullscreen overlay for tablet */}
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
-      {/* Modal header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-        <h2 className="text-xl font-bold text-gray-900">Confirmar Venta</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-gray-900">Confirmar Venta</h2>
+          {saleType !== 'cash' && (
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${saleType === 'mixed' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}`}>
+              {saleTypeLabel}
+            </span>
+          )}
+        </div>
         <button onClick={onClose} className="p-2 rounded-lg active:bg-gray-100">
           <X className="w-6 h-6 text-gray-500" />
         </button>
       </div>
 
-      {/* Modal body - two columns */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: summary + sale type + customer */}
+        {/* Left: summary + customer + notes */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5 border-r border-gray-100">
-          {/* Summary */}
           <div className="bg-gray-50 p-5 rounded-xl space-y-2 text-base">
             <div className="flex justify-between"><span>Subtotal:</span><span className="font-semibold">{displaySymbol} {fmt(toDisplay(subtotal))}</span></div>
             {discount > 0 && <div className="flex justify-between"><span>Descuento:</span><span className="text-red-600 font-semibold">-{displaySymbol} {fmt(toDisplay(discount))}</span></div>}
@@ -649,26 +679,6 @@ function TabletCheckoutModal({
             <div className="border-t pt-2 flex justify-between font-bold text-xl">
               <span>Total:</span>
               <span className="text-green-600">{displaySymbol} {fmt(totalDisplay)}</span>
-            </div>
-          </div>
-
-          {/* Sale type */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">Tipo de Venta</label>
-            <div className="flex gap-3">
-              {[{ id: 'cash', label: 'Contado' }, { id: 'credit', label: 'Crédito' }].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => { setSaleType(t.id); setPaymentLines([]); }}
-                  className={`flex-1 py-3 rounded-xl text-base font-semibold transition-colors ${
-                    saleType === t.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -694,11 +704,11 @@ function TabletCheckoutModal({
           </div>
 
           {/* Credit info */}
-          {saleType === 'credit' && (
+          {hasCreditLine && (
             <div className={`rounded-xl p-4 text-base border-2 ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
               {customer
-                ? <p>Se cargará <strong>{displaySymbol} {fmt(totalDisplay)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
-                : <p className="font-medium">Selecciona un cliente para ventas a crédito</p>}
+                ? <p>Se cargará <strong>$ {creditLineAmount.toFixed(2)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
+                : <p className="font-medium">Selecciona un cliente para la línea de crédito</p>}
             </div>
           )}
 
@@ -713,93 +723,128 @@ function TabletCheckoutModal({
           </div>
         </div>
 
-        {/* Right: payments (cash only) + action buttons */}
+        {/* Right: payments + action buttons */}
         <div className="flex-1 flex flex-col overflow-y-auto p-6">
-          {saleType === 'cash' && (
-            <div className="space-y-4 flex-1">
-              <label className="block text-sm font-semibold text-gray-900">Pagos recibidos</label>
+          <div className="space-y-4 flex-1">
+            <label className="block text-sm font-semibold text-gray-900">Pagos recibidos</label>
 
-              {/* Existing payment lines */}
-              {paymentLines.length > 0 && (
-                <div className="space-y-2">
-                  {paymentLines.map((line, i) => {
-                    const MethodIcon = PAYMENT_ICONS[line.method] || Banknote;
-                    return (
-                      <div key={i} className="flex items-center justify-between bg-green-50 rounded-xl px-4 py-3 text-base">
-                        <div className="flex items-center gap-2">
-                          <MethodIcon className="w-5 h-5 text-green-700" />
-                          <span className="font-semibold text-green-800">{line.currency} {fmtLine(line.amount, line.currency)}</span>
-                          <span className="text-green-600 text-sm">({PAYMENT_METHODS.find(m => m.id === line.method)?.label})</span>
-                        </div>
-                        <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
-                          <X className="w-5 h-5 text-red-500" />
-                        </button>
+            {paymentLines.length > 0 && (
+              <div className="space-y-2">
+                {paymentLines.map((line, i) => {
+                  const isCreditLine = line.method === 'credit';
+                  const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Banknote);
+                  return (
+                    <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-3 text-base ${isCreditLine ? 'bg-amber-50' : 'bg-green-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <MethodIcon className={`w-5 h-5 ${isCreditLine ? 'text-amber-700' : 'text-green-700'}`} />
+                        <span className={`font-semibold ${isCreditLine ? 'text-amber-800' : 'text-green-800'}`}>
+                          {line.currency} {fmtLine(line.amount, line.currency)}
+                        </span>
+                        <span className={`text-sm ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
+                          ({PAYMENT_METHODS.find(m => m.id === line.method)?.label})
+                        </span>
+                        {!isCreditLine && line.currency !== 'USD' && (
+                          <span className="text-xs text-gray-400">@ {parseFloat(line.exchange_rate).toFixed(2)}</span>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
+                        <X className="w-5 h-5 text-red-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-              {/* Add payment */}
-              <div className="border-2 border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
-                <div className="flex gap-2">
-                  <select value={newPayMethod} onChange={(e) => setNewPayMethod(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
-                    {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-                  <select value={newPayCurrency} onChange={(e) => setNewPayCurrency(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
-                    {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                  </select>
-                </div>
-                <div className="flex gap-2">
+            {/* Add payment */}
+            <div className="border-2 border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
+              <div className="flex gap-2">
+                <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+                  {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+                <select value={newPayCurrency} onChange={(e) => handleCurrencyChange(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+                  {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                </select>
+              </div>
+              {effectiveCurrency !== 'USD' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-500 whitespace-nowrap">Tasa:</label>
                   <input
                     type="number"
-                    value={newPayAmount}
-                    onChange={(e) => setNewPayAmount(e.target.value)}
-                    placeholder={`Monto en ${newPayCurrency}`}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-base"
-                    onKeyDown={(e) => e.key === 'Enter' && addPaymentLine()}
+                    value={newPayRate}
+                    onChange={(e) => setNewPayRate(e.target.value)}
+                    readOnly={!isAdmin}
+                    className={`w-32 px-3 py-2 border rounded-xl text-base text-right ${isAdmin ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-100 text-gray-500'}`}
+                    step="0.01"
                   />
-                  <button onClick={addPaymentLine} className="w-14 bg-blue-600 text-white rounded-xl text-xl font-bold active:bg-blue-700">
-                    +
-                  </button>
                 </div>
-                {/* Quick buttons */}
-                <div className="flex gap-2">
-                  {CURRENCIES.map((c) => (
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={newPayAmount}
+                  onChange={(e) => setNewPayAmount(e.target.value)}
+                  placeholder={`Monto en ${effectiveCurrency}`}
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-base"
+                  onKeyDown={(e) => e.key === 'Enter' && addPaymentLine()}
+                />
+                <button onClick={addPaymentLine} className="w-14 bg-blue-600 text-white rounded-xl text-xl font-bold active:bg-blue-700">
+                  +
+                </button>
+              </div>
+              {/* Quick buttons */}
+              <div className="flex gap-2 flex-wrap">
+                {CURRENCIES.map((c) => {
+                  const btnRate = c.code === effectiveCurrency ? (parseFloat(newPayRate) || 1) : (calculateEffectiveRate('USD', c.code, exchangeRates) || 1);
+                  const remaining = total - creditLineAmount;
+                  return (
                     <button
                       key={c.code}
                       onClick={() => {
-                        const rate = calculateEffectiveRate('USD', c.code, exchangeRates) || 1;
-                        setNewPayCurrency(c.code);
+                        handleCurrencyChange(c.code);
                         setNewPayMethod('cash');
-                        setNewPayAmount(c.code === 'COP' ? String(Math.round(total * rate)) : (total * rate).toFixed(2));
+                        const r = c.code === newPayCurrency ? (parseFloat(newPayRate) || btnRate) : btnRate;
+                        setNewPayAmount(c.code === 'COP' ? String(Math.round(remaining * r)) : (remaining * r).toFixed(2));
                       }}
                       className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-100"
                     >
                       Total {c.code}
                     </button>
-                  ))}
+                  );
+                })}
+                {!hasCreditLine && (
+                  <button
+                    onClick={() => {
+                      if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
+                      const creditRate = calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1;
+                      const creditAmount = newPayCurrency === 'COP' ? Math.round(total * creditRate) : parseFloat((total * creditRate).toFixed(6));
+                      setPaymentLines([...paymentLines, { currency: newPayCurrency, method: 'credit', amount: creditAmount, exchange_rate: creditRate }]);
+                    }}
+                    className="flex-1 py-2.5 bg-amber-50 border border-amber-300 text-amber-700 rounded-xl text-sm font-medium active:bg-amber-100"
+                  >
+                    Todo a Crédito
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Payment summary */}
+            {cashLines.length > 0 && (
+              <div className="bg-gray-50 rounded-xl p-4 text-base space-y-1.5 border border-gray-200">
+                <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">{displaySymbol} {fmt(toDisplay(effectiveTotal))}</span></div>
+                <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{displaySymbol} {fmt(paidDisplay)}</span></div>
+                <div className="flex justify-between border-t pt-1.5">
+                  {changeUSD >= 0 ? (
+                    <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">{displaySymbol} {fmt(changeDisplay)}</span></>
+                  ) : (
+                    <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">{displaySymbol} {fmt(changeDisplay)}</span></>
+                  )}
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Payment summary */}
-              {paymentLines.length > 0 && (
-                <div className="bg-gray-50 rounded-xl p-4 text-base space-y-1.5 border border-gray-200">
-                  <div className="flex justify-between"><span>Total:</span><span className="font-semibold">{displaySymbol} {fmt(totalDisplay)}</span></div>
-                  <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{displaySymbol} {fmt(paidDisplay)}</span></div>
-                  <div className="flex justify-between border-t pt-1.5">
-                    {changeUSD >= 0 ? (
-                      <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">{displaySymbol} {fmt(changeDisplay)}</span></>
-                    ) : (
-                      <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">{displaySymbol} {fmt(changeDisplay)}</span></>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Action buttons - pinned to bottom */}
+          {/* Action buttons */}
           <div className="flex gap-3 mt-auto pt-4">
             <button onClick={onClose} className="flex-1 px-4 py-4 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-900 active:bg-gray-50">
               Cancelar
@@ -823,7 +868,7 @@ function TabletCheckoutModal({
         onCustomerSelect(c);
         setShowCustomerSearch(false);
       }}
-      validateCredit={saleType === 'credit'}
+      validateCredit={saleType === 'credit' || saleType === 'mixed'}
       saleAmount={total}
       exchangeRates={exchangeRates}
     />

@@ -47,10 +47,10 @@ const Sale = sequelize.define('Sale', {
     comment: 'Fecha y hora de la venta'
   },
   sale_type: {
-    type: DataTypes.ENUM('cash', 'credit'),
+    type: DataTypes.ENUM('cash', 'credit', 'mixed'),
     allowNull: false,
     defaultValue: 'cash',
-    comment: 'Tipo de venta: contado o crédito'
+    comment: 'Tipo de venta: contado, crédito o mixta'
   },
   payment_method: {
     type: DataTypes.ENUM('cash', 'card', 'transfer', 'mixed'),
@@ -86,6 +86,12 @@ const Sale = sequelize.define('Sale', {
     allowNull: false,
     defaultValue: 0.00,
     comment: 'Total de la venta'
+  },
+  credit_amount: {
+    type: DataTypes.DECIMAL(18, 6),
+    allowNull: false,
+    defaultValue: 0.00,
+    comment: 'Monto a crédito (para ventas mixtas)'
   },
   paid_amount: {
     type: DataTypes.DECIMAL(18, 6),
