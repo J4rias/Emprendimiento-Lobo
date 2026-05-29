@@ -543,15 +543,28 @@ class InventoryController {
         }
       }
 
+      // Convert all currencies to COP
+      let totalValueCOP = totalsByCurrency.COP;
+      for (const [currency, amount] of Object.entries(totalsByCurrency)) {
+        if (currency === 'COP' || amount === 0) continue;
+        try {
+          totalValueCOP += await ExchangeRate.convert(amount, currency, 'COP');
+        } catch (e) { /* already warned above */ }
+      }
+
+      const productsWithStock = new Set(inventory.filter(inv => parseFloat(inv.quantity) > 0).map(inv => inv.product_id)).size;
+
       res.json({
         success: true,
         data: {
           items: valuedItems,
           totalValue: totalValueUSD,  // Total converted to USD
+          totalValueCOP,  // Total converted to COP
           totalsByCurrency,  // Original breakdown by currency
           conversions,  // Conversion details
           warnings,  // Warnings for missing rates
-          currency: 'USD'
+          currency: 'USD',
+          productsWithStock
         }
       });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { usePOS, CURRENCIES, PAYMENT_METHODS } from '../hooks/usePOS';
+import { usePOS, CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, getSavedRate, saveRate, COP_TOLERANCE } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { saleService } from '../services/api/saleService';
 import POSTabs from '../components/pos/POSTabs';
@@ -332,6 +332,8 @@ const POSPage = () => {
         discount={pos.discount}
         tax={pos.tax}
         total={pos.total}
+        totalCOP={pos.totalCOP}
+        copPerUSD={pos.copPerUSD}
         onComplete={pos.handleCompleteSale}
         saving={pos.saving}
         exchangeRates={pos.exchangeRates}
@@ -595,13 +597,19 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
 function CheckoutModal({
   show, onClose, customer, onCustomerSelect, saleType, paymentLines, setPaymentLines,
   notes, setNotes,
-  subtotal, discount, tax, total, onComplete, saving,
+  subtotal, discount, tax, total, totalCOP, copPerUSD,
+  onComplete, saving,
   exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt, isAdmin,
 }) {
-  const [newPayCurrency, setNewPayCurrency] = useState(displayCurrency);
+  const getCOPRate = (code) => {
+    if (code === 'COP') return 1;
+    return getSavedRate(code) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1;
+  };
+
+  const [newPayCurrency, setNewPayCurrency] = useState('COP');
   const [newPayMethod, setNewPayMethod] = useState('cash');
   const [newPayAmount, setNewPayAmount] = useState('');
-  const [newPayRate, setNewPayRate] = useState(() => calculateEffectiveRate('USD', displayCurrency, exchangeRates) || 1);
+  const [newPayRate, setNewPayRate] = useState(() => getCOPRate('COP'));
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   if (!show) return null;
@@ -613,42 +621,36 @@ function CheckoutModal({
   };
 
   const hasCreditLine = paymentLines.some(l => l.method === 'credit');
-  const isCredit = newPayMethod === 'credit';
   const effectiveCurrency = newPayCurrency;
 
   const handleCurrencyChange = (code) => {
     setNewPayCurrency(code);
-    setNewPayRate(calculateEffectiveRate('USD', code, exchangeRates) || 1);
+    setNewPayRate(getCOPRate(code));
+    const allowed = METHODS_BY_CURRENCY[code] || ['cash'];
+    if (!allowed.includes(newPayMethod)) setNewPayMethod(allowed[0]);
   };
 
   const handleMethodChange = (method) => {
     setNewPayMethod(method);
-    setNewPayRate(calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1);
   };
 
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    if (isCredit && hasCreditLine) { toast.error('Solo se permite una línea de crédito'); return; }
-    if (isCredit && !customer) { toast.error('Selecciona un cliente para crédito'); return; }
-    const rate = parseFloat(newPayRate) || 1;
-    setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, exchange_rate: rate }]);
+    const copRate = parseFloat(newPayRate) || 1;
+    if (effectiveCurrency !== 'COP') saveRate(effectiveCurrency, copRate);
+    setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate }]);
     setNewPayAmount('');
-    if (isCredit) setNewPayMethod('cash');
   };
 
   const cashLines = paymentLines.filter(l => l.method !== 'credit');
-  const creditLineAmount = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + (l.amount / (l.exchange_rate || 1)), 0);
-  const paidUSD = cashLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-  const effectiveTotal = total - creditLineAmount;
-  const changeUSD = paidUSD - effectiveTotal;
-  const totalDisplay = toDisplay(total);
-  const paidDisplay = toDisplay(paidUSD);
-  const changeDisplay = toDisplay(Math.abs(changeUSD));
+  const creditCOP = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+  const paidCOP = cashLines.reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+  const effectiveTotalCOP = totalCOP - creditCOP;
+  const rawChangeCOP = paidCOP - effectiveTotalCOP;
+  const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : rawChangeCOP;
 
-  const availableMethods = hasCreditLine
-    ? PAYMENT_METHODS.filter(m => m.id !== 'credit')
-    : PAYMENT_METHODS;
+  const availableMethods = PAYMENT_METHODS.filter(m => (METHODS_BY_CURRENCY[effectiveCurrency] || ['cash']).includes(m.id));
 
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
@@ -665,12 +667,12 @@ function CheckoutModal({
 
         {/* Resumen */}
         <div className="bg-gray-50 p-4 rounded-lg space-y-1 text-sm">
-          <div className="flex justify-between"><span>Subtotal:</span><span>{displaySymbol} {fmt(toDisplay(subtotal))}</span></div>
-          {discount > 0 && <div className="flex justify-between"><span>Descuento:</span><span className="text-red-600">-{displaySymbol} {fmt(toDisplay(discount))}</span></div>}
-          {tax > 0 && <div className="flex justify-between"><span>Impuesto:</span><span>{displaySymbol} {fmt(toDisplay(tax))}</span></div>}
+          <div className="flex justify-between"><span>Subtotal:</span><span>COP$ {Math.round(subtotal * copPerUSD).toLocaleString('es-CO')}</span></div>
+          {discount > 0 && <div className="flex justify-between"><span>Descuento:</span><span className="text-red-600">-COP$ {Math.round(discount * copPerUSD).toLocaleString('es-CO')}</span></div>}
+          {tax > 0 && <div className="flex justify-between"><span>Impuesto:</span><span>COP$ {Math.round(tax * copPerUSD).toLocaleString('es-CO')}</span></div>}
           <div className="border-t pt-1 flex justify-between font-bold text-base">
             <span>Total:</span>
-            <span className="text-green-600">{displaySymbol} {fmt(totalDisplay)}</span>
+            <span className="text-green-600">COP$ {Math.round(totalCOP).toLocaleString('es-CO')}</span>
           </div>
           {saleType !== 'cash' && (
             <div className="flex justify-end">
@@ -719,10 +721,10 @@ function CheckoutModal({
                         {line.currency} {fmtLine(line.amount, line.currency)}
                       </span>
                       <span className={`text-xs ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
-                        ({PAYMENT_METHODS.find(m => m.id === line.method)?.label})
+                        ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label})
                       </span>
-                      {!isCreditLine && line.currency !== 'USD' && (
-                        <span className="text-[10px] text-gray-400">@ {parseFloat(line.exchange_rate).toFixed(2)}</span>
+                      {!isCreditLine && line.currency !== 'COP' && (
+                        <span className="text-[10px] text-gray-400">@ {parseFloat(line.cop_rate).toFixed(2)} COP/{line.currency}</span>
                       )}
                     </div>
                     <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))}>
@@ -738,7 +740,7 @@ function CheckoutModal({
           {hasCreditLine && (
             <div className={`rounded-lg p-3 text-sm border ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
               {customer
-                ? <p>Se cargará <strong>$ {creditLineAmount.toFixed(2)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
+                ? <p>Se cargará <strong>COP$ {Math.round(creditCOP).toLocaleString('es-CO')}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
                 : <p className="font-medium">Selecciona un cliente para la línea de crédito</p>
               }
             </div>
@@ -746,27 +748,39 @@ function CheckoutModal({
 
           {/* Add payment form */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
-            <div className="flex gap-2">
-              <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-              </select>
+            <div className="flex gap-2 items-center">
               <select value={newPayCurrency} onChange={(e) => handleCurrencyChange(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
                 {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
               </select>
+              <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white">
+                {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+              {effectiveCurrency !== 'COP' && (
+                <>
+                  <label className="text-xs text-gray-500 whitespace-nowrap">COP/{effectiveCurrency}:</label>
+                  <input
+                    type="number"
+                    value={newPayRate}
+                    onChange={(e) => setNewPayRate(e.target.value)}
+                    readOnly={!isAdmin}
+                    className={`w-24 px-2 py-1.5 border rounded text-sm text-right ${isAdmin ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-100 text-gray-500'}`}
+                    step="0.01"
+                  />
+                </>
+              )}
             </div>
-            {effectiveCurrency !== 'USD' && (
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-500 whitespace-nowrap">Tasa:</label>
-                <input
-                  type="number"
-                  value={newPayRate}
-                  onChange={(e) => setNewPayRate(e.target.value)}
-                  readOnly={!isAdmin}
-                  className={`w-28 px-2 py-1 border rounded text-sm text-right ${isAdmin ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-100 text-gray-500'}`}
-                  step="0.01"
-                />
-              </div>
-            )}
+            {(() => {
+              const remainingCOP = effectiveTotalCOP - paidCOP;
+              if (remainingCOP <= COP_TOLERANCE) return null;
+              const copRate = parseFloat(newPayRate) || 1;
+              const remainingInCurrency = remainingCOP / copRate;
+              const formatted = effectiveCurrency === 'COP'
+                ? Math.round(remainingInCurrency).toLocaleString('es-CO')
+                : remainingInCurrency.toFixed(2);
+              return (
+                <p className="text-sm font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
+              );
+            })()}
             <div className="flex gap-2">
               <input
                 type="number" value={newPayAmount}
@@ -782,49 +796,54 @@ function CheckoutModal({
             {/* Quick buttons */}
             <div className="flex gap-1 flex-wrap">
               {CURRENCIES.map((c) => {
-                const btnRate = c.code === effectiveCurrency ? (parseFloat(newPayRate) || 1) : (calculateEffectiveRate('USD', c.code, exchangeRates) || 1);
-                const remaining = total - creditLineAmount;
+                const remainingCOP = effectiveTotalCOP - paidCOP;
+                const hasPartial = paidCOP > 0;
                 return (
                   <button
                     key={c.code}
+                    disabled={remainingCOP <= 0}
                     onClick={() => {
                       handleCurrencyChange(c.code);
-                      setNewPayMethod('cash');
-                      const r = c.code === newPayCurrency ? (parseFloat(newPayRate) || btnRate) : btnRate;
-                      setNewPayAmount(c.code === 'COP' ? String(Math.round(remaining * r)) : (remaining * r).toFixed(2));
+                      setNewPayMethod((METHODS_BY_CURRENCY[c.code] || ['cash'])[0]);
+                      const r = getCOPRate(c.code);
+                      const amt = remainingCOP / r;
+                      setNewPayAmount(c.code === 'COP' ? String(Math.round(amt)) : amt.toFixed(2));
+                      setNewPayRate(r);
                     }}
-                    className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-xs hover:bg-gray-100"
+                    className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-xs hover:bg-gray-100 disabled:opacity-40"
                   >
-                    Total en {c.code}
+                    {hasPartial ? 'Restante' : 'Total'} en {c.code}
                   </button>
                 );
               })}
-              {!hasCreditLine && (
-                <button
-                  onClick={() => {
-                    if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
-                    const creditRate = calculateEffectiveRate('USD', newPayCurrency, exchangeRates) || 1;
-                    const creditAmount = newPayCurrency === 'COP' ? Math.round(total * creditRate) : parseFloat((total * creditRate).toFixed(6));
-                    setPaymentLines([...paymentLines, { currency: newPayCurrency, method: 'credit', amount: creditAmount, exchange_rate: creditRate }]);
-                  }}
-                  className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-700 rounded text-xs hover:bg-amber-100"
-                >
-                  Todo a Crédito
-                </button>
-              )}
+              {!hasCreditLine && (() => {
+                const remainingForCredit = effectiveTotalCOP - paidCOP;
+                const hasPartialPayment = paidCOP > 0;
+                return remainingForCredit > 0 ? (
+                  <button
+                    onClick={() => {
+                      if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
+                      setPaymentLines([...paymentLines, { currency: 'COP', method: 'credit', amount: Math.round(remainingForCredit), cop_rate: 1 }]);
+                    }}
+                    className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-700 rounded text-xs hover:bg-amber-100"
+                  >
+                    {hasPartialPayment ? 'Restante a Crédito' : 'Todo a Crédito'}
+                  </button>
+                ) : null;
+              })()}
             </div>
           </div>
 
           {/* Payment summary */}
           {cashLines.length > 0 && (
             <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border border-gray-200">
-              <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">{displaySymbol} {fmt(toDisplay(effectiveTotal))}</span></div>
-              <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{displaySymbol} {fmt(paidDisplay)}</span></div>
+              <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">COP$ {Math.round(effectiveTotalCOP).toLocaleString('es-CO')}</span></div>
+              <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">COP$ {Math.round(paidCOP).toLocaleString('es-CO')}</span></div>
               <div className="flex justify-between border-t pt-1">
-                {changeUSD >= 0 ? (
-                  <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">{displaySymbol} {fmt(changeDisplay)}</span></>
+                {changeCOP >= 0 ? (
+                  <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">COP$ {Math.round(changeCOP).toLocaleString('es-CO')}</span></>
                 ) : (
-                  <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">{displaySymbol} {fmt(changeDisplay)}</span></>
+                  <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">COP$ {Math.round(Math.abs(changeCOP)).toLocaleString('es-CO')}</span></>
                 )}
               </div>
             </div>

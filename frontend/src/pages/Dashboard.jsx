@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, TrendingUp, Calendar, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { productService } from '../services/api/productService';
 import { inventoryService } from '../services/api/inventoryService';
 import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
@@ -13,9 +12,8 @@ const Dashboard = () => {
   const { user } = useAuth();
 
   const getDashboardStats = async () => {
-    const productsData = await productService.getAll({ limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
     const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
-    const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
+    const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0, productsWithStock: 0 } }));
     const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
 
     // Stats for TODAY
@@ -35,11 +33,15 @@ const Dashboard = () => {
     const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
 
     return {
-      totalProducts: productsData.pagination?.total || 0,
+      productsWithStock: valuationData.data?.productsWithStock || 0,
       todaySales: todayStats.stats?.totalSales || 0,
+      todayRevenue: todayStats.stats?.totalRevenue || 0,
       todayRevenueCOP: todayStats.stats?.totalRevenueCOP || 0,
+      salesByCurrency: todayStats.stats?.salesByCurrency || {},
       lowStock: lowStockData.data?.length || 0,
-      inventoryValue: valuationData.data?.totalValue || 0,
+      inventoryValueUSD: valuationData.data?.totalValue || 0,
+      inventoryValueCOP: valuationData.data?.totalValueCOP || 0,
+      inventoryByCurrency: valuationData.data?.totalsByCurrency || {},
       pendingSales: pendingData.pagination?.total || 0,
       monthRevenueCOP: monthStatsData.stats?.totalRevenueCOP || 0,
       categoriesStats: categoriesData.data || []
@@ -53,29 +55,43 @@ const Dashboard = () => {
   });
 
   const stats = {
-    totalProducts: dashboardData.totalProducts || 0,
+    productsWithStock: dashboardData.productsWithStock || 0,
     todaySales: dashboardData.todaySales || 0,
+    todayRevenue: dashboardData.todayRevenue || 0,
     todayRevenueCOP: dashboardData.todayRevenueCOP || 0,
     lowStock: dashboardData.lowStock || 0,
-    inventoryValue: dashboardData.inventoryValue || 0,
+    inventoryValueUSD: dashboardData.inventoryValueUSD || 0,
+    inventoryValueCOP: dashboardData.inventoryValueCOP || 0,
+    inventoryByCurrency: dashboardData.inventoryByCurrency || {},
     pendingSales: dashboardData.pendingSales || 0,
-    monthRevenueCOP: dashboardData.monthRevenueCOP || 0
+    monthRevenueCOP: dashboardData.monthRevenueCOP || 0,
+    salesByCurrency: dashboardData.salesByCurrency || {}
   };
 
   const categoriesStats = dashboardData.categoriesStats || [];
 
   const statsCards = [
     {
-      name: 'Productos Totales',
-      value: stats.totalProducts,
+      name: 'Productos con Stock',
+      value: stats.productsWithStock,
       icon: Package,
       color: 'bg-blue-500',
       link: '/productos'
     },
     {
       name: 'Ventas del Día',
-      value: stats.todaySales,
-      subtitle: `COP ${Math.round(stats.todayRevenueCOP).toLocaleString('de-DE')}`,
+      render: () => {
+        const entries = Object.entries(stats.salesByCurrency);
+        if (entries.length === 0) return <p className="text-2xl font-bold text-gray-900">{stats.todaySales} ventas</p>;
+        return (
+          <div className="space-y-1 mt-1">
+            {entries.map(([c, d]) => {
+              const fmt = c === 'COP' ? Math.round(d.total).toLocaleString('de-DE') : d.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              return <p key={c} className="text-sm font-semibold text-gray-900">{c}: {fmt} <span className="text-gray-400 font-normal">({d.count})</span></p>;
+            })}
+          </div>
+        );
+      },
       icon: ShoppingCart,
       color: 'bg-green-500',
       link: '/ventas'
@@ -89,24 +105,25 @@ const Dashboard = () => {
     },
     {
       name: 'Valor Inventario',
-      value: formatMoney(stats.inventoryValue),
+      value: `COP ${Math.round(stats.inventoryValueCOP).toLocaleString('de-DE')}`,
+      subtitle: `USD ${formatMoney(stats.inventoryByCurrency.USD || 0)} · COP ${Math.round(stats.inventoryByCurrency.COP || 0).toLocaleString('de-DE')}`,
       icon: DollarSign,
       color: 'bg-purple-500',
       link: '/inventario'
     },
     {
-      name: 'Ventas Pendientes',
+      name: 'Cuentas por Cobrar',
       value: stats.pendingSales,
       icon: FileText,
       color: 'bg-orange-500',
-      link: '/ventas'
+      link: '/cuentas-por-cobrar'
     },
     {
       name: 'Ingresos del Mes',
       value: `COP ${Math.round(stats.monthRevenueCOP).toLocaleString('de-DE')}`,
       icon: TrendingUp,
       color: 'bg-indigo-500',
-      link: '/ventas'
+      link: `/reportes?type=sales&start=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end=${new Date().toISOString().split('T')[0]}`
     },
   ];
 
@@ -150,9 +167,13 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                {stat.subtitle && (
-                  <p className="text-sm text-gray-500 mt-1">{stat.subtitle}</p>
+                {stat.render ? stat.render() : (
+                  <>
+                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    {stat.subtitle && (
+                      <p className="text-sm text-gray-500 mt-1">{stat.subtitle}</p>
+                    )}
+                  </>
                 )}
               </div>
               <div className={`${stat.color} p-3 rounded-lg`}>

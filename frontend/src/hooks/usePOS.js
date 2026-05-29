@@ -22,10 +22,30 @@ export const CURRENCIES = [
 
 export const PAYMENT_METHODS = [
   { id: 'cash',     label: 'Efectivo' },
-  { id: 'card',     label: 'Tarjeta' },
+  { id: 'card',     label: 'Punto de venta' },
   { id: 'transfer', label: 'Transferencia' },
-  { id: 'credit',   label: 'Crédito' },
 ];
+
+export const METHODS_BY_CURRENCY = {
+  COP: ['cash', 'transfer'],
+  VES: ['cash', 'card', 'transfer'],
+  USD: ['cash', 'transfer'],
+};
+
+// Tolerancia de redondeo para diferencias de conversión multi-moneda
+export const COP_TOLERANCE = 40;
+
+const POS_RATES_KEY = 'pos_custom_rates';
+export const getSavedRate = (currency) => {
+  try { return JSON.parse(localStorage.getItem(POS_RATES_KEY))?.[currency] || null; } catch { return null; }
+};
+export const saveRate = (currency, rate) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(POS_RATES_KEY)) || {};
+    saved[currency] = rate;
+    localStorage.setItem(POS_RATES_KEY, JSON.stringify(saved));
+  } catch { /* ignore */ }
+};
 
 // ============= HOOK =============
 export function usePOS() {
@@ -622,6 +642,26 @@ export function usePOS() {
 
   const { subtotal, discount, tax, total } = calculateTotals();
 
+  // ============= COP DERIVED VALUES =============
+  const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+  const totalCOP = total * copPerUSD;
+
+  const convertPaymentLinesToBackend = useCallback((lines) => {
+    const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+    return lines.map(line => {
+      if (line.currency === 'USD') {
+        return { currency: 'USD', method: line.method, amount: line.amount, exchange_rate: 1 };
+      }
+      if (line.currency === 'VES') {
+        // VES se envía como VES con monto original; exchange_rate = copPerUSD / cop_rate
+        const vesRate = copPerUSD / (parseFloat(line.cop_rate) || 1);
+        return { currency: 'VES', method: line.method, amount: line.amount, exchange_rate: vesRate };
+      }
+      // COP: monto tal cual con tasa del sistema
+      return { currency: 'COP', method: line.method, amount: line.amount, exchange_rate: copPerUSD };
+    });
+  }, [exchangeRates]);
+
   // ============= CHECKOUT =============
   const performSale = async (authorizedBy) => {
     setSaving(true);
@@ -633,7 +673,7 @@ export function usePOS() {
         session_id: sessionId,
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
-        payment_lines: paymentLines,
+        payment_lines: convertPaymentLinesToBackend(paymentLines),
         authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
         items: cart.map((item) => ({
           product_id: item.product_id,
@@ -647,9 +687,12 @@ export function usePOS() {
         notes,
       });
 
-      const cashLines = paymentLines.filter(l => l.method !== 'credit');
-      const paidUSD = cashLines.reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-      const changeAmount = saleType === 'cash' ? Math.max(0, paidUSD - total).toFixed(2) : '0';
+      const paidCOP = paymentLines
+        .filter(l => l.method !== 'credit')
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      const rawChangeCOP = saleType === 'cash' ? paidCOP - totalCOP : 0;
+      const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
+      const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
       setSaleResult({ ...result.sale, totals: { subtotal, discount, tax, total }, changeAmount });
       setShowCheckoutModal(false);
@@ -683,19 +726,19 @@ export function usePOS() {
     }
 
     if (saleType === 'cash' || saleType === 'mixed') {
-      const cashPaidUSD = paymentLines
+      const cashPaidCOP = paymentLines
         .filter(l => l.method !== 'credit')
-        .reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-      const creditUSD = paymentLines
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      const creditCOP = paymentLines
         .filter(l => l.method === 'credit')
-        .reduce((sum, l) => sum + (l.amount / (l.exchange_rate || 1)), 0);
-      const expectedCash = total - creditUSD;
-      if (saleType === 'cash' && cashPaidUSD < total - 0.01) {
-        toast.error(`Monto insuficiente. Faltan: $ ${(total - cashPaidUSD).toFixed(2)}`);
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      const expectedCashCOP = totalCOP - creditCOP;
+      if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
+        toast.error(`Monto insuficiente. Faltan: COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-CO')}`);
         return;
       }
-      if (saleType === 'mixed' && cashPaidUSD < expectedCash - 0.01) {
-        toast.error(`Monto en efectivo insuficiente. Faltan: $ ${(expectedCash - cashPaidUSD).toFixed(2)}`);
+      if (saleType === 'mixed' && cashPaidCOP < expectedCashCOP - COP_TOLERANCE) {
+        toast.error(`Monto en efectivo insuficiente. Faltan: COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-CO')}`);
         return;
       }
     }
@@ -800,6 +843,8 @@ export function usePOS() {
     discount,
     tax,
     total,
+    totalCOP,
+    copPerUSD,
     handleCompleteSale,
     saving,
 

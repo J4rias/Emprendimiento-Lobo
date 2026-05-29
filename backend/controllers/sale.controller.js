@@ -382,7 +382,8 @@ exports.getSales = async (req, res) => {
     }
 
     if (status) {
-      where.status = status;
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      where.status = statuses.length === 1 ? statuses[0] : { [Op.in]: statuses };
     }
 
     if (sale_type) {
@@ -852,7 +853,7 @@ exports.addPayment = async (req, res) => {
 
 exports.getSalesStats = async (req, res) => {
   try {
-    const { start_date, end_date, warehouse_id } = req.query;
+    const { start_date, end_date, warehouse_id, summary_only } = req.query;
 
     const where = {};
 
@@ -888,6 +889,13 @@ exports.getSalesStats = async (req, res) => {
       raw: true
     });
     const totalRevenueCOP = Math.round(parseFloat(copResult[0]?.total_cop || 0));
+
+    // summary_only skips heavy queries (topProducts, salesByType, salesByStatus, salesByCurrency)
+    if (summary_only === 'true') {
+      return res.json({
+        stats: { totalSales, totalRevenue: totalRevenue || 0, totalRevenueCOP }
+      });
+    }
 
     const salesByType = await Sale.findAll({
       where,
@@ -934,6 +942,35 @@ exports.getSalesStats = async (req, res) => {
       raw: false
     });
 
+    // Sales count and total by currency
+    let salesByCurrency = {};
+    if (totalSales > 0) {
+      try {
+        const statusWhere = { ...where, status: { [Op.in]: ['completed', 'pending'] } };
+        const saleIds = (await Sale.findAll({ where: statusWhere, attributes: ['id'], raw: true })).map(s => s.id);
+        if (saleIds.length > 0) {
+          const currRows = await SalePayment.findAll({
+            where: { sale_id: { [Op.in]: saleIds } },
+            attributes: [
+              'currency',
+              [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('sale_id'))), 'sale_count'],
+              [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
+            ],
+            group: ['currency'],
+            raw: true
+          });
+          currRows.forEach(r => {
+            salesByCurrency[r.currency || 'USD'] = {
+              count: parseInt(r.sale_count) || 0,
+              total: parseFloat(r.total_amount) || 0
+            };
+          });
+        }
+      } catch (e) {
+        console.error('Error fetching salesByCurrency:', e.message);
+      }
+    }
+
     res.json({
       stats: {
         totalSales,
@@ -941,7 +978,8 @@ exports.getSalesStats = async (req, res) => {
         totalRevenueCOP,
         salesByType,
         salesByStatus,
-        topProducts
+        topProducts,
+        salesByCurrency
       }
     });
 
@@ -979,8 +1017,14 @@ exports.getDailyClosure = async (req, res) => {
       where.user_id = user_id;
     }
 
-    // 1. Fetch total sales base (USD) amount and count
+    // 1. Fetch total sales base (USD) amount, COP equivalent, and count
     const totalSalesUSD = await Sale.sum('total', { where }) || 0;
+    const copResult = await Sale.findOne({
+      where,
+      attributes: [[sequelize.literal('SUM(total * exchange_rate)'), 'totalCOP']],
+      raw: true
+    });
+    const totalSalesCOP = parseFloat(copResult?.totalCOP) || 0;
     const salesCount = await Sale.count({ where });
 
     // 2. Fetch all sales IDs to get their payments
@@ -1018,11 +1062,30 @@ exports.getDailyClosure = async (req, res) => {
         }
         paymentsBreakdown[curr][method] = total;
       });
+
+      // 4. Count distinct sales per currency
+      const salesByCurrency = await SalePayment.findAll({
+        where: { sale_id: { [Op.in]: saleIds } },
+        attributes: [
+          'currency',
+          [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('sale_id'))), 'sale_count']
+        ],
+        group: ['currency'],
+        raw: true
+      });
+
+      salesByCurrency.forEach(r => {
+        const curr = r.currency || 'USD';
+        if (paymentsBreakdown[curr]) {
+          paymentsBreakdown[curr]._salesCount = parseInt(r.sale_count) || 0;
+        }
+      });
     }
 
     res.json({
       date: startOfDay.toISOString().split('T')[0],
       totalSalesUSD,
+      totalSalesCOP: Math.round(totalSalesCOP),
       salesCount,
       paymentsBreakdown
     });

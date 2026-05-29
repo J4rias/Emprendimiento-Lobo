@@ -17,7 +17,7 @@ const DailyReportPage = () => {
 
     const [filters, setFilters] = useState({
         date: new Date().toISOString().split('T')[0],
-        user_id: hasPermission('sales.view_all') ? '' : user?.id
+        user_id: user?.role?.name === 'Administrador' ? '' : (user?.id || '')
     });
 
     useEffect(() => {
@@ -55,7 +55,7 @@ const DailyReportPage = () => {
     const getMethodLabel = (method) => {
         const methods = {
             cash: 'Efectivo',
-            card: 'Tarjeta',
+            card: 'Punto de venta',
             transfer: 'Transferencia'
         };
         return methods[method] || method;
@@ -105,8 +105,8 @@ const DailyReportPage = () => {
                 <div style="border-top:1px dashed #000; margin:6px 0;"></div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
                     <tr>
-                        <td style="font-size:13px; font-weight:bold;">Ventas Totales (USD)</td>
-                        <td style="text-align:right; font-size:15px; font-weight:bold;">$ ${fmtAmount(report.totalSalesUSD)}</td>
+                        <td style="font-size:13px; font-weight:bold;">Ventas Totales</td>
+                        <td style="text-align:right; font-size:15px; font-weight:bold;">COP ${fmtAmount(report.totalSalesCOP || 0, 'COP')}</td>
                     </tr>
                     <tr>
                         <td style="font-size:13px;">Operaciones</td>
@@ -116,6 +116,18 @@ const DailyReportPage = () => {
                 <div style="border-top:1px dashed #000; margin:6px 0;"></div>
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">DESGLOSE POR MONEDA</div>
                 ${breakdownRows || '<div style="text-align:center; font-size:11px;">Sin pagos registrados</div>'}
+                <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">CUADRE FÍSICO (EFECTIVO)</div>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+                    ${Object.entries(report.paymentsBreakdown || {})
+                        .filter(([, methods]) => (methods.cash || 0) > 0)
+                        .map(([currency, methods]) =>
+                            `<tr>
+                                <td style="font-size:13px; font-weight:bold;">${currency}</td>
+                                <td style="text-align:right; font-size:15px; font-weight:bold;">${fmtAmount(methods.cash, currency)}</td>
+                            </tr>`
+                        ).join('')}
+                </table>
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
                 <div style="text-align:center; font-size:10px; margin-top:6px;">*** FIN DE ARQUEO ***</div>
             </div>`;
@@ -181,9 +193,9 @@ const DailyReportPage = () => {
                                 <DollarSign className="w-8 h-8" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas Totales (Base USD)</p>
+                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas Totales</p>
                                 <div className="text-3xl font-bold text-gray-900 mt-1">
-                                    $ {fmtAmount(report.totalSalesUSD)}
+                                    COP {fmtAmount(report.totalSalesCOP || 0, 'COP')}
                                 </div>
                             </div>
                         </div>
@@ -217,13 +229,17 @@ const DailyReportPage = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {Object.entries(report.paymentsBreakdown).map(([currency, methods]) => (
+                                    {Object.entries(report.paymentsBreakdown).map(([currency, methods]) => {
+                                        const salesCount = methods._salesCount || 0;
+                                        const paymentMethods = Object.entries(methods).filter(([k]) => k !== '_salesCount');
+                                        return (
                                         <div key={currency} className="border border-gray-200 rounded-lg overflow-hidden">
                                             <div className="bg-slate-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                                                 <span className="font-bold text-slate-700">Recibido en {currency}</span>
+                                                {salesCount > 0 && <span className="text-xs text-slate-500">{salesCount} venta{salesCount !== 1 ? 's' : ''}</span>}
                                             </div>
                                             <div className="divide-y divide-gray-100">
-                                                {Object.entries(methods).map(([method, amount]) => (
+                                                {paymentMethods.map(([method, amount]) => (
                                                     <div key={method} className="flex justify-between items-center px-4 py-3 hover:bg-slate-50">
                                                         <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
                                                         <span className="font-semibold text-gray-900">
@@ -236,15 +252,39 @@ const DailyReportPage = () => {
                                             <div className="bg-slate-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
                                                 <span className="text-slate-600">Total {currency}:</span>
                                                 <span className="text-slate-900">
-                                                    {Object.values(methods).reduce((a, b) => a + b, 0).toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
                     </div>
+
+                    {/* Cuadre Físico — solo efectivo por moneda */}
+                    {(() => {
+                        const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
+                            .map(([currency, methods]) => [currency, methods.cash || 0])
+                            .filter(([, amount]) => amount > 0);
+                        if (cashByCurrency.length === 0) return null;
+                        return (
+                            <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
+                                <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
+                                <div className="flex flex-wrap justify-between">
+                                    {cashByCurrency.map(([currency, amount]) => (
+                                        <div key={currency}>
+                                            <p className="text-xs text-slate-400">{currency}</p>
+                                            <p className="text-2xl font-bold">
+                                                {fmtAmount(amount, currency)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                 </div>
             )}
