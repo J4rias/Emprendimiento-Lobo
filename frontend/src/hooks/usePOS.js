@@ -90,7 +90,8 @@ export function usePOS() {
   const [selectedPriceListCurrency, setSelectedPriceListCurrency] = useState('USD');
   const [priceListDetails, setPriceListDetails] = useState({});
   const [exchangeRates, setExchangeRates] = useState([]);
-  const [displayCurrency, setDisplayCurrency] = useState('COP');
+  const [displayCurrency, _setDisplayCurrency] = useState(() => localStorage.getItem('pos_display_currency') || 'COP');
+  const setDisplayCurrency = useCallback((c) => { localStorage.setItem('pos_display_currency', c); _setDisplayCurrency(c); }, []);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   // ============= MODAL STATES =============
