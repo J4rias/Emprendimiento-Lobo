@@ -44,7 +44,7 @@ const POSPage = () => {
           <div className="flex items-center gap-3">
             {/* Selector de moneda */}
             <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-              {CURRENCIES.map((c) => (
+              {CURRENCIES.filter(c => c.code !== 'VES').map((c) => (
                 <button
                   key={c.code}
                   onClick={() => pos.setDisplayCurrency(c.code)}
@@ -57,34 +57,6 @@ const POSPage = () => {
                   {c.code}
                 </button>
               ))}
-            </div>
-
-            {/* Lista de precios */}
-            <div className="flex items-center gap-2">
-              {pos.selectedPriceList ? (
-                <>
-                  <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900">
-                    {pos.priceLists.find(l => l.id === pos.selectedPriceList)?.name || 'Lista de precios'}
-                  </div>
-                  <button
-                    onClick={() => pos.selectPriceList(null)}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-                  >
-                    Cambiar
-                  </button>
-                </>
-              ) : (
-                <select
-                  value={pos.selectedPriceList || ''}
-                  onChange={(e) => pos.selectPriceList(parseInt(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="" disabled>Selecciona lista de precios</option>
-                  {pos.priceLists.map((list) => (
-                    <option key={list.id} value={list.id}>{list.name}</option>
-                  ))}
-                </select>
-              )}
             </div>
 
             {/* Clock */}
@@ -146,7 +118,15 @@ const POSPage = () => {
             ) : pos.products.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {pos.products.map((product) => (
+                  {pos.products
+                    .filter(product => {
+                      if (pos.displayCurrency !== 'USD' || pos.isAdmin) return true;
+                      return (product.presentations || []).some(p => {
+                        const detail = pos.priceListDetails[`${product.id}-${p.id}`];
+                        return detail && parseFloat(detail.package_price_usd) > 0;
+                      });
+                    })
+                    .map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -168,7 +148,7 @@ const POSPage = () => {
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">
-                  {pos.selectedPriceList ? 'No hay productos' : 'Selecciona una lista de precios'}
+                  No hay productos
                 </p>
               </div>
             )}

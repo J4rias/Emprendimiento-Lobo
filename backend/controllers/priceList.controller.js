@@ -491,7 +491,7 @@ class PriceListController {
             }
 
             // Build CSV
-            const headers = ['SKU', 'Producto', 'Presentación', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', `Costo/Paquete (${priceList.currency})`, `Costo/Paquete (COP)`, `Costo Unitario (${priceList.currency})`, `Costo Unitario (COP)`, `Precio/Paquete (${priceList.currency})`, `Precio/Paquete (COP)`, `Precio Unitario (${priceList.currency})`, `Precio Unitario (COP)`, 'Margen %'];
+            const headers = ['SKU', 'Producto', 'Presentación', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', `Costo/Paquete (${priceList.currency})`, `Costo/Paquete (COP)`, `Costo Unitario (${priceList.currency})`, `Costo Unitario (COP)`, `Precio/Paquete (${priceList.currency})`, `Precio/Paquete (COP)`, 'Precio/Paquete (USD directo)', `Precio Unitario (${priceList.currency})`, `Precio Unitario (COP)`, 'Margen COP %', 'Margen USD %'];
 
             const rows = await Promise.all(priceList.details.map(async d => {
                 const unitsPerPackage = d.presentation?.units_per_package || 1;
@@ -522,6 +522,11 @@ class PriceListController {
                     } catch(e) { console.error(e.message); }
                 }
 
+                const pkgPriceUsd = parseFloat(d.package_price_usd) || 0;
+                const costUsd = costInListCurrency; // list currency is USD
+                const marginCop = parseFloat(d.margin_percentage) || 0;
+                const marginUsd = costUsd > 0 ? ((pkgPriceUsd - costUsd) / costUsd * 100) : 0;
+
                 return [
                     d.product?.sku || '',
                     `"${(d.product?.name || '').replace(/"/g, '""')}"`,
@@ -535,9 +540,11 @@ class PriceListController {
                     unitCostInCop.toFixed(2),
                     parseFloat(d.package_price).toFixed(2),
                     (parseFloat(d.package_price) * rateToCop).toFixed(2),
+                    pkgPriceUsd.toFixed(2),
                     parseFloat(d.unit_price).toFixed(2),
                     (parseFloat(d.unit_price) * rateToCop).toFixed(2),
-                    parseFloat(d.margin_percentage).toFixed(1)
+                    marginCop.toFixed(1),
+                    marginUsd.toFixed(1)
                 ].join(',');
             }));
 
@@ -566,7 +573,8 @@ class PriceListController {
                 margin_percentage,
                 is_frozen,
                 frozen_price,
-                frozen_currency
+                frozen_currency,
+                package_price_usd
             } = req.body;
 
             if (!presentation_id || !product_id) {
@@ -599,7 +607,7 @@ class PriceListController {
             }
 
             // Upsert: actualiza si existe, inserta si no existe
-            const [detail] = await PriceListDetail.upsert({
+            const upsertData = {
                 price_list_id: parseInt(id),
                 presentation_id: parseInt(presentation_id),
                 product_id: parseInt(product_id),
@@ -611,7 +619,11 @@ class PriceListController {
                 is_frozen: is_frozen || false,
                 frozen_price: frozen_price ? parseFloat(frozen_price) : null,
                 frozen_currency: frozen_currency || 'USD'
-            }, { returning: true });
+            };
+            if (package_price_usd !== undefined) {
+                upsertData.package_price_usd = parseFloat(package_price_usd) || 0;
+            }
+            const [detail] = await PriceListDetail.upsert(upsertData, { returning: true });
 
             res.json({ success: true, data: detail });
         } catch (error) {

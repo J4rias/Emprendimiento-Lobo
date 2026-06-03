@@ -43,7 +43,7 @@ const POSPageTablet = () => {
         <div className="flex items-center gap-2">
           {/* Currency selector - bigger touch targets */}
           <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-            {CURRENCIES.map((c) => (
+            {CURRENCIES.filter(c => c.code !== 'VES').map((c) => (
               <button
                 key={c.code}
                 onClick={() => pos.setDisplayCurrency(c.code)}
@@ -57,27 +57,6 @@ const POSPageTablet = () => {
               </button>
             ))}
           </div>
-
-          {/* Price list */}
-          {pos.selectedPriceList ? (
-            <button
-              onClick={() => pos.selectPriceList(null)}
-              className="min-h-[40px] px-3 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900 active:bg-blue-100"
-            >
-              {pos.priceLists.find(l => l.id === pos.selectedPriceList)?.name || 'Lista'}
-            </button>
-          ) : (
-            <select
-              value={pos.selectedPriceList || ''}
-              onChange={(e) => pos.selectPriceList(parseInt(e.target.value))}
-              className="min-h-[40px] px-3 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="" disabled>Lista de precios</option>
-              {pos.priceLists.map((list) => (
-                <option key={list.id} value={list.id}>{list.name}</option>
-              ))}
-            </select>
-          )}
 
           {/* Clock */}
           <div className="flex items-center gap-1 text-gray-400 text-sm min-w-[60px]">
@@ -133,7 +112,15 @@ const POSPageTablet = () => {
             ) : pos.products.length > 0 ? (
               <>
                 <div className="grid grid-cols-3 gap-3">
-                  {pos.products.map((product) => (
+                  {pos.products
+                    .filter(product => {
+                      if (pos.displayCurrency !== 'USD' || pos.isAdmin) return true;
+                      return (product.presentations || []).some(p => {
+                        const detail = pos.priceListDetails[`${product.id}-${p.id}`];
+                        return detail && parseFloat(detail.package_price_usd) > 0;
+                      });
+                    })
+                    .map((product) => (
                     <TabletProductCard
                       key={product.id}
                       product={product}
@@ -154,7 +141,7 @@ const POSPageTablet = () => {
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-base text-gray-500">
-                  {pos.selectedPriceList ? 'No hay productos' : 'Selecciona una lista de precios'}
+                  No hay productos
                 </p>
               </div>
             )}

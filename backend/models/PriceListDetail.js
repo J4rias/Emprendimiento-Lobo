@@ -78,6 +78,12 @@ const PriceListDetail = sequelize.define('PriceListDetail', {
         allowNull: true,
         defaultValue: 'USD',
         comment: 'Moneda en la que se congeló el precio'
+    },
+    package_price_usd: {
+        type: DataTypes.DECIMAL(18, 6),
+        allowNull: false,
+        defaultValue: 0,
+        comment: 'Precio de venta por paquete en USD directo (no depende de tasa)'
     }
 }, {
     tableName: 'price_list_details',

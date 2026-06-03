@@ -319,6 +319,19 @@ export function usePOS() {
       const key = `${product.id}-${presentation.id}`;
       const detail = priceListDetails[key];
 
+      // Modo USD directo: usar package_price_usd sin conversión
+      if (displayCurrency === 'USD' && detail) {
+        const usdPrice = parseFloat(detail.package_price_usd) || 0;
+        const unitsPerPkg = parseFloat(presentation.units_per_package) || 1;
+        return {
+          pkgPrice: usdPrice,
+          unitPrice: usdPrice / unitsPerPkg,
+          is_frozen: false,
+          frozen_price: null,
+          frozen_currency: null
+        };
+      }
+
       let pkgPrice = detail && parseFloat(detail.package_price) > 0
         ? parseFloat(detail.package_price)
         : (parseFloat(presentation.package_price) || 0);
@@ -344,11 +357,16 @@ export function usePOS() {
         frozen_currency: detail?.frozen_currency
       };
     },
-    [priceListDetails, selectedPriceListCurrency, exchangeRates]
+    [priceListDetails, selectedPriceListCurrency, exchangeRates, displayCurrency]
   );
 
   const getEffectivePriceUSD = useCallback(
     (presentation, priceListItem) => {
+      // Modo USD directo: usar package_price_usd sin conversión
+      if (displayCurrency === 'USD' && priceListItem) {
+        return parseFloat(priceListItem.package_price_usd) || 0;
+      }
+
       if (priceListItem?.is_frozen && priceListItem.frozen_price) {
         const frozenCurrency = priceListItem.frozen_currency || 'USD';
         const rate = calculateEffectiveRate(frozenCurrency, 'USD', exchangeRates);
@@ -365,7 +383,7 @@ export function usePOS() {
       }
       return price;
     },
-    [exchangeRates, selectedPriceListCurrency]
+    [exchangeRates, selectedPriceListCurrency, displayCurrency]
   );
 
   // ============= STOCK HELPERS =============
