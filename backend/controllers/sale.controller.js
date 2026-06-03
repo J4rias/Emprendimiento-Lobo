@@ -1034,48 +1034,85 @@ exports.getDailyClosure = async (req, res) => {
     });
     const creditTotalUSD = parseFloat(creditResult?.creditTotal) || 0;
 
-    // === PAYMENTS BREAKDOWN (by payment_date) ===
-    const paymentWhere = {
-      payment_date: { [Op.between]: [startOfDay, endOfDay] }
-    };
-    if (user_id) paymentWhere.created_by = user_id;
+    // === PAYMENTS BREAKDOWN (only today's sales, not old credit collections) ===
+    const todaySaleIds = (await Sale.findAll({
+      where: salesWhere, attributes: ['id']
+    })).map(s => s.id);
 
     const paymentsBreakdown = {};
 
-    const payments = await SalePayment.findAll({
-      where: paymentWhere,
+    if (todaySaleIds.length > 0) {
+      const paymentWhere = {
+        payment_date: { [Op.between]: [startOfDay, endOfDay] },
+        sale_id: { [Op.in]: todaySaleIds }
+      };
+      if (user_id) paymentWhere.created_by = user_id;
+
+      const payments = await SalePayment.findAll({
+        where: paymentWhere,
+        attributes: [
+          'currency',
+          'payment_method',
+          [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
+        ],
+        group: ['currency', 'payment_method'],
+        raw: true
+      });
+
+      payments.forEach(p => {
+        const curr = p.currency || 'USD';
+        const method = p.payment_method;
+        const total = parseFloat(p.total_amount) || 0;
+        if (!paymentsBreakdown[curr]) paymentsBreakdown[curr] = {};
+        paymentsBreakdown[curr][method] = total;
+      });
+
+      const salesByCurrency = await SalePayment.findAll({
+        where: paymentWhere,
+        attributes: [
+          'currency',
+          [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('sale_id'))), 'sale_count']
+        ],
+        group: ['currency'],
+        raw: true
+      });
+
+      salesByCurrency.forEach(r => {
+        const curr = r.currency || 'USD';
+        if (paymentsBreakdown[curr]) {
+          paymentsBreakdown[curr]._salesCount = parseInt(r.sale_count) || 0;
+        }
+      });
+    }
+
+    // === CREDIT COLLECTIONS (payments today for old credit/mixed sales) ===
+    const creditCollectionWhere = {
+      payment_date: { [Op.between]: [startOfDay, endOfDay] }
+    };
+    if (user_id) creditCollectionWhere.created_by = user_id;
+
+    const creditCollections = await SalePayment.findAll({
+      where: creditCollectionWhere,
+      include: [{
+        model: Sale,
+        as: 'sale',
+        where: {
+          sale_date: { [Op.lt]: startOfDay },
+          sale_type: { [Op.in]: ['credit', 'mixed'] }
+        },
+        attributes: []
+      }],
       attributes: [
         'currency',
-        'payment_method',
-        [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
-      ],
-      group: ['currency', 'payment_method'],
-      raw: true
-    });
-
-    payments.forEach(p => {
-      const curr = p.currency || 'USD';
-      const method = p.payment_method;
-      const total = parseFloat(p.total_amount) || 0;
-      if (!paymentsBreakdown[curr]) paymentsBreakdown[curr] = {};
-      paymentsBreakdown[curr][method] = total;
-    });
-
-    const salesByCurrency = await SalePayment.findAll({
-      where: paymentWhere,
-      attributes: [
-        'currency',
-        [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('sale_id'))), 'sale_count']
+        [sequelize.fn('SUM', sequelize.col('SalePayment.amount')), 'total_amount']
       ],
       group: ['currency'],
       raw: true
     });
 
-    salesByCurrency.forEach(r => {
-      const curr = r.currency || 'USD';
-      if (paymentsBreakdown[curr]) {
-        paymentsBreakdown[curr]._salesCount = parseInt(r.sale_count) || 0;
-      }
+    const creditCollectedByCurrency = {};
+    creditCollections.forEach(c => {
+      creditCollectedByCurrency[c.currency || 'USD'] = parseFloat(c.total_amount) || 0;
     });
 
     res.json({
@@ -1084,7 +1121,8 @@ exports.getDailyClosure = async (req, res) => {
       totalSalesCOP: Math.round(totalSalesCOP),
       salesCount,
       creditTotalUSD,
-      paymentsBreakdown
+      paymentsBreakdown,
+      creditCollectedByCurrency
     });
 
   } catch (error) {
