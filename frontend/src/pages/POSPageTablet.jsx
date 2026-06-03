@@ -604,11 +604,7 @@ function TabletCheckoutModal({
     setNewPayCurrency(def);
     setNewPayMethod('cash');
     setNewPayAmount('');
-    if (def === 'COP' && isUSD) {
-      setNewPayRate(getSavedRate('COP', 'USD') || copPerUSD);
-    } else {
-      setNewPayRate(getCOPRate(def));
-    }
+    setNewPayRate(getCOPRate(def));
   }, [displayCurrency]);
 
   if (!show) return null;
@@ -624,8 +620,8 @@ function TabletCheckoutModal({
 
   const handleCurrencyChange = (code) => {
     setNewPayCurrency(code);
-    if (code === 'COP' && isUSD) {
-      setNewPayRate(getSavedRate('COP', 'USD') || copPerUSD);
+    if (isUSD && code !== 'USD') {
+      setNewPayRate(getSavedRate(code, 'USD') || calculateEffectiveRate('USD', code, exchangeRates) || 1);
     } else {
       setNewPayRate(getCOPRate(code));
     }
@@ -640,21 +636,24 @@ function TabletCheckoutModal({
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    const copRate = effectiveCurrency === 'COP' ? (isUSD ? (copPerUSD / (parseFloat(newPayRate) || copPerUSD)) : 1) : (parseFloat(newPayRate) || 1);
-    if (effectiveCurrency !== displayCurrency) {
-      if (effectiveCurrency === 'COP' && isUSD) {
-        saveRate('COP', parseFloat(newPayRate), 'USD');
-      } else {
-        saveRate(effectiveCurrency, copRate, displayCurrency);
-      }
+    let copRate;
+    if (isUSD && effectiveCurrency !== 'USD') {
+      copRate = copPerUSD / (parseFloat(newPayRate) || 1);
+      saveRate(effectiveCurrency, parseFloat(newPayRate), 'USD');
+    } else if (effectiveCurrency === 'COP') {
+      copRate = 1;
+    } else {
+      copRate = parseFloat(newPayRate) || 1;
+      if (effectiveCurrency !== displayCurrency) saveRate(effectiveCurrency, copRate, 'COP');
     }
+    const displayRate = (isUSD && effectiveCurrency !== 'USD') ? (parseFloat(newPayRate) || 1) : null;
     const existingIdx = paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
     if (existingIdx >= 0) {
       const updated = [...paymentLines];
-      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate };
+      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
       setPaymentLines(updated);
     } else {
-      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate }]);
+      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) }]);
     }
     setNewPayAmount('');
   };
@@ -767,8 +766,12 @@ function TabletCheckoutModal({
                         <span className={`text-sm ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
                           ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label})
                         </span>
-                        {!isCreditLine && line.currency !== 'COP' && line.currency !== displayCurrency && (
-                          <span className="text-xs text-gray-400">@ {parseFloat(line.cop_rate).toFixed(2)} COP/{line.currency}</span>
+                        {!isCreditLine && line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)) && (
+                          <span className="text-xs text-gray-400">
+                            @ {line.display_rate
+                              ? `${line.currency === 'COP' ? Math.round(line.display_rate).toLocaleString('es-CO') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                              : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
+                          </span>
                         )}
                       </div>
                       <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
@@ -791,7 +794,7 @@ function TabletCheckoutModal({
                 </select>
                 {effectiveCurrency !== displayCurrency && (
                   <>
-                    <label className="text-sm text-gray-500 whitespace-nowrap">COP/{effectiveCurrency === 'COP' ? 'USD' : effectiveCurrency}:</label>
+                    <label className="text-sm text-gray-500 whitespace-nowrap">{isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`}:</label>
                     <input
                       type="number"
                       value={newPayRate}
@@ -807,10 +810,12 @@ function TabletCheckoutModal({
                 const remainingCOP = effectiveTotalCOP - paidCOP;
                 if (remainingCOP <= COP_TOLERANCE) return null;
                 let remainingInCurrency, formatted;
-                if (effectiveCurrency === 'COP' && isUSD) {
-                  const customRate = parseFloat(newPayRate) || copPerUSD;
-                  remainingInCurrency = remainingCOP / copPerUSD * customRate;
-                  formatted = Math.round(remainingInCurrency).toLocaleString('es-CO');
+                if (isUSD && effectiveCurrency !== 'USD') {
+                  const customRate = parseFloat(newPayRate) || 1;
+                  remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
+                  formatted = effectiveCurrency === 'COP'
+                    ? Math.round(remainingInCurrency).toLocaleString('es-CO')
+                    : remainingInCurrency.toFixed(2);
                 } else {
                   const copRate = parseFloat(newPayRate) || 1;
                   remainingInCurrency = remainingCOP / copRate;

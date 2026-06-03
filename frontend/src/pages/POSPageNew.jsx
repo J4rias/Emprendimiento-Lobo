@@ -603,11 +603,7 @@ function CheckoutModal({
     setNewPayCurrency(def);
     setNewPayMethod('cash');
     setNewPayAmount('');
-    if (def === 'COP' && isUSD) {
-      setNewPayRate(getSavedRate('COP', 'USD') || copPerUSD);
-    } else {
-      setNewPayRate(getCOPRate(def));
-    }
+    setNewPayRate(getCOPRate(def));
   }, [displayCurrency]);
 
   if (!show) return null;
@@ -623,8 +619,9 @@ function CheckoutModal({
 
   const handleCurrencyChange = (code) => {
     setNewPayCurrency(code);
-    if (code === 'COP' && isUSD) {
-      setNewPayRate(getSavedRate('COP', 'USD') || copPerUSD);
+    if (isUSD && code !== 'USD') {
+      // Foreign currency in USD mode: rate is {code}/USD
+      setNewPayRate(getSavedRate(code, 'USD') || calculateEffectiveRate('USD', code, exchangeRates) || 1);
     } else {
       setNewPayRate(getCOPRate(code));
     }
@@ -639,21 +636,26 @@ function CheckoutModal({
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    const copRate = effectiveCurrency === 'COP' ? (isUSD ? (copPerUSD / (parseFloat(newPayRate) || copPerUSD)) : 1) : (parseFloat(newPayRate) || 1);
-    if (effectiveCurrency !== displayCurrency) {
-      if (effectiveCurrency === 'COP' && isUSD) {
-        saveRate('COP', parseFloat(newPayRate), 'USD');
-      } else {
-        saveRate(effectiveCurrency, copRate, displayCurrency);
-      }
+    let copRate;
+    if (isUSD && effectiveCurrency !== 'USD') {
+      // Foreign currency in USD mode: rate input is {currency}/USD
+      copRate = copPerUSD / (parseFloat(newPayRate) || 1);
+      saveRate(effectiveCurrency, parseFloat(newPayRate), 'USD');
+    } else if (effectiveCurrency === 'COP') {
+      copRate = 1;
+    } else {
+      // Foreign currency in COP mode: rate input is COP/{currency}
+      copRate = parseFloat(newPayRate) || 1;
+      if (effectiveCurrency !== displayCurrency) saveRate(effectiveCurrency, copRate, 'COP');
     }
+    const displayRate = (isUSD && effectiveCurrency !== 'USD') ? (parseFloat(newPayRate) || 1) : null;
     const existingIdx = paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
     if (existingIdx >= 0) {
       const updated = [...paymentLines];
-      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate };
+      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
       setPaymentLines(updated);
     } else {
-      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate }]);
+      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) }]);
     }
     setNewPayAmount('');
   };
@@ -738,8 +740,12 @@ function CheckoutModal({
                       <span className={`text-xs ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
                         ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label})
                       </span>
-                      {!isCreditLine && line.currency !== 'COP' && line.currency !== displayCurrency && (
-                        <span className="text-[10px] text-gray-400">@ {parseFloat(line.cop_rate).toFixed(2)} COP/{line.currency}</span>
+                      {!isCreditLine && line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)) && (
+                        <span className="text-[10px] text-gray-400">
+                          @ {line.display_rate
+                            ? `${line.currency === 'COP' ? Math.round(line.display_rate).toLocaleString('es-CO') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                            : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
+                        </span>
                       )}
                     </div>
                     <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))}>
@@ -772,7 +778,7 @@ function CheckoutModal({
               </select>
               {effectiveCurrency !== displayCurrency && (
                 <>
-                  <label className="text-xs text-gray-500 whitespace-nowrap">COP/{effectiveCurrency === 'COP' ? 'USD' : effectiveCurrency}:</label>
+                  <label className="text-xs text-gray-500 whitespace-nowrap">{isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`}:</label>
                   <input
                     type="number"
                     value={newPayRate}
@@ -788,10 +794,13 @@ function CheckoutModal({
               const remainingCOP = effectiveTotalCOP - paidCOP;
               if (remainingCOP <= COP_TOLERANCE) return null;
               let remainingInCurrency, formatted;
-              if (effectiveCurrency === 'COP' && isUSD) {
-                const customRate = parseFloat(newPayRate) || copPerUSD;
-                remainingInCurrency = remainingCOP / copPerUSD * customRate;
-                formatted = Math.round(remainingInCurrency).toLocaleString('es-CO');
+              if (isUSD && effectiveCurrency !== 'USD') {
+                // Foreign currency in USD mode: convert remaining USD to {currency}
+                const customRate = parseFloat(newPayRate) || 1;
+                remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
+                formatted = effectiveCurrency === 'COP'
+                  ? Math.round(remainingInCurrency).toLocaleString('es-CO')
+                  : remainingInCurrency.toFixed(2);
               } else {
                 const copRate = parseFloat(newPayRate) || 1;
                 remainingInCurrency = remainingCOP / copRate;
