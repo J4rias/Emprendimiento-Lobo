@@ -398,8 +398,6 @@ export function usePOS() {
 
     const priceMap = {};
     cart.forEach(item => {
-      if (item.is_frozen) return; // preserve manually edited prices
-
       const product = products.find(p => p.id === item.product_id);
       if (!product) return;
       const presentation = product.presentations?.find(pr => pr.id === item.presentation_id);
