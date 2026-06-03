@@ -128,6 +128,7 @@ const POSPageTablet = () => {
                       otherReservations={pos.otherReservations}
                       onAdd={pos.handleAddProduct}
                       toDisplay={pos.toDisplay}
+                      displayCurrency={pos.displayCurrency}
                       displaySymbol={pos.displaySymbol}
                       getEffectivePriceUSD={pos.getEffectivePriceUSD}
                       fmt={pos.fmt}
@@ -353,7 +354,7 @@ const POSPageTablet = () => {
 
 // ============= TABLET SUB-COMPONENTS =============
 
-function TabletProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displaySymbol, getEffectivePriceUSD, fmt }) {
+function TabletProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, getEffectivePriceUSD, fmt }) {
   const [selectedPresentation, setSelectedPresentation] = useState(product.presentations?.[0]);
 
   if (!selectedPresentation) return null;
@@ -368,7 +369,7 @@ function TabletProductCard({ product, priceListDetails, otherReservations, onAdd
   const noStock = available <= 0;
 
   const priceListItem = priceListDetails[`${product.id}-${selectedPresentation.id}`];
-  const isFrozen = !!priceListItem?.is_frozen;
+  const isFrozen = displayCurrency !== 'USD' && !!priceListItem?.is_frozen;
   const priceUSD = getEffectivePriceUSD(selectedPresentation, priceListItem);
 
   return (

@@ -134,6 +134,7 @@ const POSPage = () => {
                       otherReservations={pos.otherReservations}
                       onAdd={pos.handleAddProduct}
                       toDisplay={pos.toDisplay}
+                      displayCurrency={pos.displayCurrency}
                       displaySymbol={pos.displaySymbol}
                       exchangeRates={pos.exchangeRates}
                       getEffectivePriceUSD={pos.getEffectivePriceUSD}
@@ -368,7 +369,7 @@ const POSPage = () => {
 
 // ============= SUB-COMPONENTS =============
 
-function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displaySymbol, exchangeRates, getEffectivePriceUSD, fmt }) {
+function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, exchangeRates, getEffectivePriceUSD, fmt }) {
   const [selectedPresentation, setSelectedPresentation] = useState(product.presentations?.[0]);
   const [quantity, setQuantity] = useState(1);
 
@@ -383,7 +384,7 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
   const lowStock = available <= unitsPerPkg * 3;
 
   const priceListItem = priceListDetails[`${product.id}-${selectedPresentation.id}`];
-  const isFrozen = !!priceListItem?.is_frozen;
+  const isFrozen = displayCurrency !== 'USD' && !!priceListItem?.is_frozen;
   const priceUSD = getEffectivePriceUSD(selectedPresentation, priceListItem);
 
   return (
