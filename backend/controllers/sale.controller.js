@@ -1034,9 +1034,10 @@ exports.getDailyClosure = async (req, res) => {
     });
     const creditTotalUSD = parseFloat(creditResult?.creditTotal) || 0;
 
-    // === PAYMENTS BREAKDOWN (only today's sales, not old credit collections) ===
+    // === PAYMENTS BREAKDOWN (only today's cash/mixed sales, not credit sales) ===
     const todaySaleIds = (await Sale.findAll({
-      where: salesWhere, attributes: ['id']
+      where: { ...salesWhere, sale_type: { [Op.in]: ['cash', 'mixed'] } },
+      attributes: ['id']
     })).map(s => s.id);
 
     const paymentsBreakdown = {};
@@ -1097,8 +1098,10 @@ exports.getDailyClosure = async (req, res) => {
         model: Sale,
         as: 'sale',
         where: {
-          sale_date: { [Op.lt]: startOfDay },
-          sale_type: { [Op.in]: ['credit', 'mixed'] }
+          [Op.or]: [
+            { sale_type: 'credit' },
+            { sale_date: { [Op.lt]: startOfDay }, sale_type: 'mixed' }
+          ]
         },
         attributes: []
       }],
