@@ -725,6 +725,32 @@ export function usePOS() {
   const performSale = async (authorizedBy) => {
     setSaving(true);
     try {
+      // Calculate change BEFORE sending to backend so we store net amounts
+      const paidCOP = paymentLines
+        .filter(l => l.method !== 'credit')
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      const creditCOP = paymentLines
+        .filter(l => l.method === 'credit')
+        .reduce((s, l) => s + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      const rawChangeCOP = saleType === 'cash' ? paidCOP - (totalCOP - creditCOP) : 0;
+      const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
+      const changeAmount = (changeCOP / copPerUSD).toFixed(2);
+
+      // Subtract change from the last non-credit payment line
+      let adjustedLines = paymentLines;
+      if (changeCOP > 0) {
+        adjustedLines = [...paymentLines];
+        for (let i = adjustedLines.length - 1; i >= 0; i--) {
+          if (adjustedLines[i].method !== 'credit') {
+            const line = adjustedLines[i];
+            const copRate = parseFloat(line.cop_rate) || 1;
+            const changeInCurrency = changeCOP / copRate;
+            adjustedLines[i] = { ...line, amount: line.amount - changeInCurrency };
+            break;
+          }
+        }
+      }
+
       const result = await saleService.createSale({
         customer_id: customer?.id || null,
         warehouse_id: 1,
@@ -732,7 +758,7 @@ export function usePOS() {
         session_id: sessionId,
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
-        payment_lines: convertPaymentLinesToBackend(paymentLines),
+        payment_lines: convertPaymentLinesToBackend(adjustedLines),
         authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
         items: cart.map((item) => ({
           product_id: item.product_id,
@@ -745,13 +771,6 @@ export function usePOS() {
         })),
         notes,
       });
-
-      const paidCOP = paymentLines
-        .filter(l => l.method !== 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
-      const rawChangeCOP = saleType === 'cash' ? paidCOP - totalCOP : 0;
-      const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
-      const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
       setSaleResult({ ...result.sale, totals: { subtotal, discount, tax, total }, changeAmount });
       setShowCheckoutModal(false);
