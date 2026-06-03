@@ -587,10 +587,15 @@ function TabletCheckoutModal({
     return getSavedRate(code) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1;
   };
 
-  const [newPayCurrency, setNewPayCurrency] = useState('COP');
+  const isUSD = displayCurrency === 'USD';
+  const sSym = isUSD ? '$' : 'COP$';
+  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.round(usdVal * copPerUSD).toLocaleString('es-CO');
+  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.round(copVal).toLocaleString('es-CO');
+
+  const [newPayCurrency, setNewPayCurrency] = useState(isUSD ? 'USD' : 'COP');
   const [newPayMethod, setNewPayMethod] = useState('cash');
   const [newPayAmount, setNewPayAmount] = useState('');
-  const [newPayRate, setNewPayRate] = useState(() => getCOPRate('COP'));
+  const [newPayRate, setNewPayRate] = useState(() => getCOPRate(isUSD ? 'USD' : 'COP'));
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   if (!show) return null;
@@ -662,12 +667,12 @@ function TabletCheckoutModal({
         {/* Left: summary + customer + notes */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5 border-r border-gray-100">
           <div className="bg-gray-50 p-5 rounded-xl space-y-2 text-base">
-            <div className="flex justify-between"><span>Subtotal:</span><span className="font-semibold">COP$ {Math.round(subtotal * copPerUSD).toLocaleString('es-CO')}</span></div>
-            {discount > 0 && <div className="flex justify-between"><span>Descuento:</span><span className="text-red-600 font-semibold">-COP$ {Math.round(discount * copPerUSD).toLocaleString('es-CO')}</span></div>}
-            {tax > 0 && <div className="flex justify-between"><span>Impuesto:</span><span className="font-semibold">COP$ {Math.round(tax * copPerUSD).toLocaleString('es-CO')}</span></div>}
+            <div className="flex justify-between"><span>Subtotal:</span><span className="font-semibold">{sSym} {fmtTotal(subtotal)}</span></div>
+            {discount > 0 && <div className="flex justify-between"><span>Descuento:</span><span className="text-red-600 font-semibold">-{sSym} {fmtTotal(discount)}</span></div>}
+            {tax > 0 && <div className="flex justify-between"><span>Impuesto:</span><span className="font-semibold">{sSym} {fmtTotal(tax)}</span></div>}
             <div className="border-t pt-2 flex justify-between font-bold text-xl">
               <span>Total:</span>
-              <span className="text-green-600">COP$ {Math.round(totalCOP).toLocaleString('es-CO')}</span>
+              <span className="text-green-600">{sSym} {fmtTotal(total)}</span>
             </div>
           </div>
 
@@ -696,7 +701,7 @@ function TabletCheckoutModal({
           {hasCreditLine && (
             <div className={`rounded-xl p-4 text-base border-2 ${customer ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
               {customer
-                ? <p>Se cargará <strong>COP$ {Math.round(creditCOP).toLocaleString('es-CO')}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
+                ? <p>Se cargará <strong>{sSym} {fmtCOP(creditCOP)}</strong> al crédito de <strong>{getCustomerDisplayName(customer)}</strong></p>
                 : <p className="font-medium">Selecciona un cliente para la línea de crédito</p>}
             </div>
           )}
@@ -795,27 +800,6 @@ function TabletCheckoutModal({
               </div>
               {/* Quick buttons */}
               <div className="flex gap-2 flex-wrap">
-                {CURRENCIES.map((c) => {
-                  const remainingCOP = effectiveTotalCOP - paidCOP;
-                  const hasPartial = paidCOP > 0;
-                  return (
-                    <button
-                      key={c.code}
-                      disabled={remainingCOP <= 0}
-                      onClick={() => {
-                        handleCurrencyChange(c.code);
-                        setNewPayMethod((METHODS_BY_CURRENCY[c.code] || ['cash'])[0]);
-                        const r = getCOPRate(c.code);
-                        const amt = remainingCOP / r;
-                        setNewPayAmount(c.code === 'COP' ? String(Math.round(amt)) : amt.toFixed(2));
-                        setNewPayRate(r);
-                      }}
-                      className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-100 disabled:opacity-40"
-                    >
-                      {hasPartial ? 'Restante' : 'Total'} {c.code}
-                    </button>
-                  );
-                })}
                 {!hasCreditLine && (() => {
                   const remainingForCredit = effectiveTotalCOP - paidCOP;
                   const hasPartialPayment = paidCOP > 0;
@@ -823,7 +807,10 @@ function TabletCheckoutModal({
                     <button
                       onClick={() => {
                         if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
-                        setPaymentLines([...paymentLines, { currency: 'COP', method: 'credit', amount: Math.round(remainingForCredit), cop_rate: 1 }]);
+                        const creditLine = isUSD
+                          ? { currency: 'USD', method: 'credit', amount: parseFloat((remainingForCredit / copPerUSD).toFixed(2)), cop_rate: copPerUSD }
+                          : { currency: 'COP', method: 'credit', amount: Math.round(remainingForCredit), cop_rate: 1 };
+                        setPaymentLines([...paymentLines, creditLine]);
                       }}
                       className="flex-1 py-2.5 bg-amber-50 border border-amber-300 text-amber-700 rounded-xl text-sm font-medium active:bg-amber-100"
                     >
@@ -837,13 +824,13 @@ function TabletCheckoutModal({
             {/* Payment summary */}
             {cashLines.length > 0 && (
               <div className="bg-gray-50 rounded-xl p-4 text-base space-y-1.5 border border-gray-200">
-                <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">COP$ {Math.round(effectiveTotalCOP).toLocaleString('es-CO')}</span></div>
-                <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">COP$ {Math.round(paidCOP).toLocaleString('es-CO')}</span></div>
+                <div className="flex justify-between"><span>Total a pagar:</span><span className="font-semibold">{sSym} {fmtCOP(effectiveTotalCOP)}</span></div>
+                <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{sSym} {fmtCOP(paidCOP)}</span></div>
                 <div className="flex justify-between border-t pt-1.5">
                   {changeCOP >= 0 ? (
-                    <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">COP$ {Math.round(changeCOP).toLocaleString('es-CO')}</span></>
+                    <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">{sSym} {fmtCOP(changeCOP)}</span></>
                   ) : (
-                    <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">COP$ {Math.round(Math.abs(changeCOP)).toLocaleString('es-CO')}</span></>
+                    <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">{sSym} {fmtCOP(Math.abs(changeCOP))}</span></>
                   )}
                 </div>
               </div>

@@ -752,11 +752,17 @@ export function usePOS() {
         .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
       const expectedCashCOP = totalCOP - creditCOP;
       if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
-        toast.error(`Monto insuficiente. Faltan: COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-CO')}`);
+        const faltante = displayCurrency === 'USD'
+          ? `$ ${((totalCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
+          : `COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-CO')}`;
+        toast.error(`Monto insuficiente. Faltan: ${faltante}`);
         return;
       }
       if (saleType === 'mixed' && cashPaidCOP < expectedCashCOP - COP_TOLERANCE) {
-        toast.error(`Monto en efectivo insuficiente. Faltan: COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-CO')}`);
+        const faltante = displayCurrency === 'USD'
+          ? `$ ${((expectedCashCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
+          : `COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-CO')}`;
+        toast.error(`Monto en efectivo insuficiente. Faltan: ${faltante}`);
         return;
       }
     }
