@@ -386,14 +386,14 @@ function TabletProductCard({ product, priceListDetails, otherReservations, onAdd
       }`}
     >
       {/* Category dot + name */}
-      <div className="flex items-center gap-1.5 mb-1">
+      <div className="flex items-start gap-1.5 mb-1">
         {product.category && (
           <div
-            className="w-2.5 h-2.5 rounded-full shrink-0"
+            className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
             style={{ backgroundColor: product.category.color || '#9CA3AF' }}
           />
         )}
-        <h3 className="font-semibold text-sm text-gray-900 truncate">{product.name}</h3>
+        <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
       </div>
 
       {/* Presentation */}
@@ -468,7 +468,7 @@ function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onTog
       {/* Row 1: name + remove */}
       <div className="flex justify-between items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-gray-900 truncate">{item.product_name}</p>
+          <p className="font-semibold text-sm text-gray-900 line-clamp-2 leading-tight">{item.product_name}</p>
           <p className="text-xs text-gray-500">{item.presentation_name}</p>
         </div>
         <button

@@ -4,7 +4,7 @@ import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle } from 'lucide-react';
+import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const DailyReportPage = () => {
@@ -186,17 +186,51 @@ const DailyReportPage = () => {
             ) : (
                 <div className="space-y-6 print-container">
 
-                    {/* Tarjetas de Resumen Global */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Totales recibidos por moneda */}
+                    {(() => {
+                        const currencyTotals = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
+                            const total = Object.entries(methods)
+                                .filter(([k]) => k !== '_salesCount')
+                                .reduce((sum, [, amount]) => sum + amount, 0);
+                            return [currency, total];
+                        }).filter(([, total]) => total > 0);
+
+                        const iconStyles = {
+                            USD: 'bg-emerald-100 text-emerald-600',
+                            COP: 'bg-blue-100 text-blue-600',
+                            VES: 'bg-amber-100 text-amber-600'
+                        };
+                        return currencyTotals.length > 0 ? (
+                            <div className={`grid grid-cols-1 ${currencyTotals.length >= 3 ? 'md:grid-cols-3' : currencyTotals.length === 2 ? 'md:grid-cols-2' : ''} gap-4`}>
+                                {currencyTotals.map(([currency, total]) => (
+                                    <div key={currency} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                        <div className={`p-4 rounded-lg ${iconStyles[currency] || 'bg-gray-100 text-gray-600'}`}>
+                                            <DollarSign className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Recibido {currency}</p>
+                                            <div className="text-3xl font-bold text-gray-900 mt-1">
+                                                {currency === 'USD' ? '$ ' : ''}{fmtAmount(total, currency)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null;
+                    })()}
+
+                    {/* Ventas del dia, operaciones, credito */}
+                    <div className={`grid grid-cols-1 ${report.creditTotalUSD > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                            <div className="p-4 bg-emerald-100 rounded-lg text-emerald-600">
-                                <DollarSign className="w-8 h-8" />
+                            <div className="p-4 bg-indigo-100 rounded-lg text-indigo-600">
+                                <ShoppingCart className="w-8 h-8" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas Totales</p>
-                                <div className="text-3xl font-bold text-gray-900 mt-1">
-                                    COP {fmtAmount(report.totalSalesCOP || 0, 'COP')}
+                                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas del Dia</p>
+                                <div className="text-2xl font-bold text-gray-900 mt-1">
+                                    $ {fmtAmount(report.totalSalesUSD || 0, 'USD')}
                                 </div>
+                                <p className="text-sm text-gray-500 mt-1">COP {fmtAmount(report.totalSalesCOP || 0, 'COP')}</p>
                             </div>
                         </div>
 
@@ -206,12 +240,27 @@ const DailyReportPage = () => {
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Operaciones</p>
-                                <div className="text-3xl font-bold text-gray-900 mt-1">
+                                <div className="text-2xl font-bold text-gray-900 mt-1">
                                     {report.salesCount || 0}
                                 </div>
                                 <p className="text-sm text-gray-500 mt-1">Facturas procesadas</p>
                             </div>
                         </div>
+
+                        {report.creditTotalUSD > 0 && (
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                <div className="p-4 bg-orange-100 rounded-lg text-orange-600">
+                                    <CreditCard className="w-8 h-8" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Credito Otorgado</p>
+                                    <div className="text-2xl font-bold text-gray-900 mt-1">
+                                        $ {fmtAmount(report.creditTotalUSD, 'USD')}
+                                    </div>
+                                    <p className="text-sm text-gray-500 mt-1">Pendiente por cobrar</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Desglose de Caja Fuerte (Multimoneda) */}
