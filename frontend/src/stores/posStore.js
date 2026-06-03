@@ -129,6 +129,21 @@ export const usePOSStore = create(
       },
 
       /**
+       * Batch-update prices for all non-frozen cart items (used on displayCurrency switch)
+       * priceMap: { "productId-presentationId-sellByUnit": { unit_price, package_price, unit_price_each, is_frozen, frozen_price, frozen_currency } }
+       */
+      recalculateCartPrices: (tabId, priceMap) => {
+        set((state) => updateTab(state, tabId, (tab) => ({
+          ...tab,
+          cart: tab.cart.map((item) => {
+            const key = `${item.product_id}-${item.presentation_id}-${item.sellByUnit || false}`;
+            const update = priceMap[key];
+            return update ? { ...item, ...update } : item;
+          }),
+        })));
+      },
+
+      /**
        * Update item quantity in cart
        */
       updateQuantity: (tabId, productId, presentationId, sellByUnit, quantity) => {

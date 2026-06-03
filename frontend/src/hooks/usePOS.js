@@ -35,15 +35,20 @@ export const METHODS_BY_CURRENCY = {
 // Tolerancia de redondeo para diferencias de conversión multi-moneda
 export const COP_TOLERANCE = 40;
 
-const POS_RATES_KEY = 'pos_custom_rates';
-export const getSavedRate = (currency) => {
-  try { return JSON.parse(localStorage.getItem(POS_RATES_KEY))?.[currency] || null; } catch { return null; }
-};
-export const saveRate = (currency, rate) => {
+const POS_RATES_PREFIX = 'pos_custom_rates_';
+export const getSavedRate = (currency, mode = 'COP') => {
   try {
-    const saved = JSON.parse(localStorage.getItem(POS_RATES_KEY)) || {};
+    return JSON.parse(localStorage.getItem(POS_RATES_PREFIX + mode))?.[currency]
+      || JSON.parse(localStorage.getItem('pos_custom_rates'))?.[currency]
+      || null;
+  } catch { return null; }
+};
+export const saveRate = (currency, rate, mode = 'COP') => {
+  try {
+    const key = POS_RATES_PREFIX + mode;
+    const saved = JSON.parse(localStorage.getItem(key)) || {};
     saved[currency] = rate;
-    localStorage.setItem(POS_RATES_KEY, JSON.stringify(saved));
+    localStorage.setItem(key, JSON.stringify(saved));
   } catch { /* ignore */ }
 };
 
@@ -58,7 +63,7 @@ export function usePOS() {
     tabs, activeTabId, otherReservations, getAvailableUnits,
     addToCart, updateQuantity, updateCartItemPrice, updateCartItemDiscount,
     applyDiscountToAll, toggleSellMode, removeFromCart,
-    setTabCustomer, closeTab,
+    setTabCustomer, closeTab, recalculateCartPrices,
   } = usePOSStore(useShallow(s => ({
     tabs: s.tabs, activeTabId: s.activeTabId,
     otherReservations: s.otherReservations, getAvailableUnits: s.getAvailableUnits,
@@ -66,6 +71,7 @@ export function usePOS() {
     updateCartItemPrice: s.updateCartItemPrice, updateCartItemDiscount: s.updateCartItemDiscount,
     applyDiscountToAll: s.applyDiscountToAll, toggleSellMode: s.toggleSellMode,
     removeFromCart: s.removeFromCart, setTabCustomer: s.setTabCustomer, closeTab: s.closeTab,
+    recalculateCartPrices: s.recalculateCartPrices,
   })));
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -385,6 +391,42 @@ export function usePOS() {
     },
     [exchangeRates, selectedPriceListCurrency, displayCurrency]
   );
+
+  // ============= RECALCULATE CART ON CURRENCY SWITCH =============
+  useEffect(() => {
+    if (!activeTabId || cart.length === 0) return;
+
+    const priceMap = {};
+    cart.forEach(item => {
+      if (item.is_frozen) return; // preserve manually edited prices
+
+      const product = products.find(p => p.id === item.product_id);
+      if (!product) return;
+      const presentation = product.presentations?.find(pr => pr.id === item.presentation_id);
+      if (!presentation) return;
+
+      const priceInfo = getPrice(product, presentation);
+      if (priceInfo.pkgPrice <= 0) return; // skip if no price available in this mode
+
+      const unitsPerPkg = parseFloat(presentation.units_per_package) || 1;
+      const unitPriceEach = priceInfo.unitPrice || (priceInfo.pkgPrice / unitsPerPkg);
+      const newUnitPrice = item.sellByUnit ? unitPriceEach : priceInfo.pkgPrice;
+
+      const key = `${item.product_id}-${item.presentation_id}-${item.sellByUnit || false}`;
+      priceMap[key] = {
+        unit_price: newUnitPrice,
+        package_price: priceInfo.pkgPrice,
+        unit_price_each: unitPriceEach,
+        is_frozen: priceInfo.is_frozen,
+        frozen_price: priceInfo.frozen_price || null,
+        frozen_currency: priceInfo.frozen_currency || null,
+      };
+    });
+
+    if (Object.keys(priceMap).length > 0) {
+      recalculateCartPrices(activeTabId, priceMap);
+    }
+  }, [displayCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============= STOCK HELPERS =============
   const getProductStockDetails = useCallback((product, presentation) => {
@@ -741,6 +783,19 @@ export function usePOS() {
     if ((saleType === 'credit' || saleType === 'mixed') && !customer) {
       toast.error('Selecciona un cliente para ventas a crédito');
       return;
+    }
+
+    if (saleType === 'credit') {
+      const creditCOP = paymentLines
+        .filter(l => l.method === 'credit')
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+      if (creditCOP < totalCOP - COP_TOLERANCE) {
+        const faltante = displayCurrency === 'USD'
+          ? `$ ${((totalCOP - creditCOP) / copPerUSD).toFixed(2)}`
+          : `COP$ ${Math.round(totalCOP - creditCOP).toLocaleString('es-CO')}`;
+        toast.error(`Monto a crédito insuficiente. Faltan: ${faltante}`);
+        return;
+      }
     }
 
     if (saleType === 'cash' || saleType === 'mixed') {

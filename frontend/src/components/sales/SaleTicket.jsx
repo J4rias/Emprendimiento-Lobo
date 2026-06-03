@@ -76,7 +76,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
           </div>
         ` : '<div><strong>Cliente:</strong> CONSUMIDOR FINAL</div>'}
         
-        <div style="margin-top: 4px;"><strong>Vendedor:</strong> ${sale.creator?.full_name || sale.creator?.username || 'N/A'}</div>
+        <div style="margin-top: 4px;"><strong>Vendedor:</strong> ${sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}`.trim() : 'N/A'}</div>
       </div>
 
       <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
