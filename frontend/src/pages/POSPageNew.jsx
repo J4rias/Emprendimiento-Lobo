@@ -647,7 +647,14 @@ function CheckoutModal({
         saveRate(effectiveCurrency, copRate, displayCurrency);
       }
     }
-    setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate }]);
+    const existingIdx = paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
+    if (existingIdx >= 0) {
+      const updated = [...paymentLines];
+      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate };
+      setPaymentLines(updated);
+    } else {
+      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate }]);
+    }
     setNewPayAmount('');
   };
 
