@@ -57,6 +57,12 @@ const Sale = sequelize.define('Sale', {
     allowNull: true,
     comment: 'Método de pago (solo para ventas de contado)'
   },
+  currency_mode: {
+    type: DataTypes.ENUM('USD', 'COP'),
+    allowNull: false,
+    defaultValue: 'COP',
+    comment: 'Modo de moneda activo en el POS al momento de la venta'
+  },
   exchange_rate: {
     type: DataTypes.DECIMAL(18, 6),
     allowNull: false,

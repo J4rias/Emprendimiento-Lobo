@@ -186,7 +186,7 @@ const CreditNotesPage = () => {
                       {new Date(note.credit_note_date).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{note.customer?.businessName || note.customer?.firstName + ' ' + note.customer?.lastName}</div>
+                      <div className="text-sm font-medium text-gray-900">{note.customer?.businessName || `${note.customer?.firstName || ''} ${note.customer?.lastName || ''}`.trim() || 'Cliente General'}</div>
                       <div className="text-sm text-gray-500">{note.customer?.documentType}-{note.customer?.documentNumber}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

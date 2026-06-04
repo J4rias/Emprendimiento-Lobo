@@ -755,6 +755,7 @@ export function usePOS() {
         customer_id: customer?.id || null,
         warehouse_id: 1,
         sale_type: saleType,
+        currency_mode: displayCurrency === 'USD' ? 'USD' : 'COP',
         session_id: sessionId,
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,

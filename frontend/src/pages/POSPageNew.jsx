@@ -798,16 +798,13 @@ function CheckoutModal({
                 // Foreign currency in USD mode: convert remaining USD to {currency}
                 const customRate = parseFloat(newPayRate) || 1;
                 remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
-                formatted = effectiveCurrency === 'COP'
-                  ? Math.round(remainingInCurrency).toLocaleString('es-CO')
-                  : remainingInCurrency.toFixed(2);
               } else {
                 const copRate = parseFloat(newPayRate) || 1;
                 remainingInCurrency = remainingCOP / copRate;
-                formatted = effectiveCurrency === 'COP'
-                  ? Math.round(remainingInCurrency).toLocaleString('es-CO')
-                  : remainingInCurrency.toFixed(2);
               }
+              formatted = effectiveCurrency === 'USD'
+                ? remainingInCurrency.toFixed(2)
+                : Math.ceil(remainingInCurrency).toLocaleString('es-CO');
               return (
                 <p className="text-sm font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
               );

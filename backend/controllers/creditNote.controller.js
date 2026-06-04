@@ -111,7 +111,7 @@ exports.getAllCreditNotes = async (req, res) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'email', 'phone']
+          attributes: ['id', 'firstName', 'lastName', 'businessName', 'tradeName', 'type', 'documentType', 'documentNumber', 'email', 'phone']
         },
         {
           model: Warehouse,
@@ -186,7 +186,7 @@ exports.getCreditNoteById = async (req, res) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'email', 'phone', 'address']
+          attributes: ['id', 'firstName', 'lastName', 'businessName', 'tradeName', 'type', 'email', 'phone', 'address']
         },
         {
           model: Warehouse,
@@ -445,7 +445,7 @@ exports.createCreditNote = async (req, res) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
+          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'email']
         },
         {
           model: CreditNoteDetail,
@@ -645,7 +645,7 @@ exports.approveCreditNote = async (req, res) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
+          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'email']
         },
         {
           model: User,

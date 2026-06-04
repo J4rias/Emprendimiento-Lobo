@@ -813,16 +813,13 @@ function TabletCheckoutModal({
                 if (isUSD && effectiveCurrency !== 'USD') {
                   const customRate = parseFloat(newPayRate) || 1;
                   remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
-                  formatted = effectiveCurrency === 'COP'
-                    ? Math.round(remainingInCurrency).toLocaleString('es-CO')
-                    : remainingInCurrency.toFixed(2);
                 } else {
                   const copRate = parseFloat(newPayRate) || 1;
                   remainingInCurrency = remainingCOP / copRate;
-                  formatted = effectiveCurrency === 'COP'
-                    ? Math.round(remainingInCurrency).toLocaleString('es-CO')
-                    : remainingInCurrency.toFixed(2);
                 }
+                formatted = effectiveCurrency === 'USD'
+                  ? remainingInCurrency.toFixed(2)
+                  : Math.ceil(remainingInCurrency).toLocaleString('es-CO');
                 return (
                   <p className="text-base font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
                 );
