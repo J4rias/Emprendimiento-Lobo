@@ -41,6 +41,11 @@ export const saleService = {
     return response.data;
   },
 
+  getProductSales: async (params = {}) => {
+    const response = await api.get('/sales/product-sales', { params });
+    return response.data;
+  },
+
   getDailyClosure: async (params = {}) => {
     const response = await api.get('/sales/daily-closure', { params });
     return response.data;

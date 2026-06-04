@@ -34,6 +34,12 @@ router.get('/daily-closure',
   saleController.getDailyClosure
 );
 
+router.get('/product-sales',
+  auth,
+  authorize('sales.view'),
+  saleController.getProductSales
+);
+
 router.get('/by-number/:saleNumber',
   auth,
   authorize('sales.view'),

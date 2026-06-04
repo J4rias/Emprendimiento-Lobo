@@ -14,10 +14,12 @@ import {
   Package,
   ShoppingCart,
   DollarSign,
+  BarChart3,
   Loader2
 } from 'lucide-react';
 
 const SALES_PAGE_SIZE = 50;
+const INVENTORY_PAGE_SIZE = 50;
 
 const getCustomerName = (customer) => {
   if (!customer) return 'Cliente General';
@@ -55,11 +57,20 @@ const ReportsPage = () => {
   const [exportingCSV, setExportingCSV] = useState(false);
   const salesAdjustedRange = useRef(null);
 
+  // Inventory state (independent of mutation, like sales)
+  const [inventoryRows, setInventoryRows] = useState([]);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [hasMoreInventory, setHasMoreInventory] = useState(false);
+  const [loadingMoreInventory, setLoadingMoreInventory] = useState(false);
+  const [inventoryStats, setInventoryStats] = useState(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
   const reportTypes = [
     { value: 'sales', label: 'Reporte de Ventas', icon: DollarSign },
     { value: 'inventory', label: 'Inventario Valorizado', icon: Package },
     { value: 'purchases', label: 'Reporte de Compras', icon: ShoppingCart },
     { value: 'top_products', label: 'Productos Más Vendidos', icon: TrendingUp },
+    { value: 'product_sales', label: 'Ventas por Producto', icon: BarChart3 },
     { value: 'low_stock', label: 'Productos con Bajo Stock', icon: Package }
   ];
 
@@ -101,29 +112,58 @@ const ReportsPage = () => {
     }
   }, []);
 
+  const processInventoryItem = (item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const cost = parseFloat(item.product?.cost) || 0;
+    const value = qty * cost;
+    return { ...item, quantity: qty, value };
+  };
+
+  const generateInventoryReport = useCallback(async () => {
+    setInventoryStats(null);
+    setInventoryRows([]);
+    setInventoryLoading(true);
+    try {
+      const res = await inventoryService.getAll({ page: 1, limit: INVENTORY_PAGE_SIZE });
+      const items = (res.data || []).map(processInventoryItem);
+      const pagination = res.pagination || {};
+      setInventoryRows(items);
+      setInventoryPage(1);
+      setHasMoreInventory(pagination.page < pagination.totalPages);
+      setInventoryStats({
+        total_items: pagination.total || items.length,
+        total_value: null,
+        total_quantity: null
+      });
+    } catch (e) {
+      console.error('Error generating inventory report:', e);
+      toast.error('Error al generar el reporte de inventario');
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, []);
+
+  const loadMoreInventory = useCallback(async () => {
+    if (loadingMoreInventory || !hasMoreInventory) return;
+    try {
+      setLoadingMoreInventory(true);
+      const nextPage = inventoryPage + 1;
+      const res = await inventoryService.getAll({ page: nextPage, limit: INVENTORY_PAGE_SIZE });
+      const items = (res.data || []).map(processInventoryItem);
+      const pagination = res.pagination || {};
+      setInventoryRows(prev => [...prev, ...items]);
+      setInventoryPage(nextPage);
+      setHasMoreInventory(pagination.page < pagination.totalPages);
+    } catch (e) {
+      console.error('Error loading more inventory:', e);
+    } finally {
+      setLoadingMoreInventory(false);
+    }
+  }, [loadingMoreInventory, hasMoreInventory, inventoryPage]);
+
   const generateReportMutation = useMutation({
     mutationFn: async ({ type, dateRange: range }) => {
       switch (type) {
-        case 'inventory': {
-          const inventoryData = await inventoryService.getAll({ limit: 1000 });
-          const items = inventoryData.data || inventoryData.inventory || [];
-          let totalValue = 0;
-          const processedData = items.map(item => {
-            const qty = parseFloat(item.quantity) || 0;
-            const cost = parseFloat(item.product?.cost) || 0;
-            const value = qty * cost;
-            totalValue += value;
-            return { ...item, quantity: qty, value };
-          });
-          return {
-            stats: {
-              total_items: processedData.length,
-              total_value: totalValue,
-              total_quantity: processedData.reduce((sum, item) => sum + item.quantity, 0)
-            },
-            data: processedData
-          };
-        }
         case 'purchases': {
           const purchaseOrders = await purchaseOrderService.getAll({
             start_date: range.start_date + 'T00:00:00',
@@ -159,6 +199,28 @@ const ReportsPage = () => {
               total_units_sold: topProducts.reduce((sum, p) => sum + p.total_quantity, 0)
             },
             data: topProducts
+          };
+        }
+        case 'product_sales': {
+          const productSalesData = await saleService.getProductSales({
+            start_date: range.start_date + 'T00:00:00',
+            end_date: range.end_date + 'T23:59:59',
+          });
+          const items = (productSalesData.data || []).map(item => ({
+            product: item.product,
+            total_quantity: parseFloat(item.dataValues?.total_quantity || item.total_quantity || 0),
+            num_sales: parseInt(item.dataValues?.num_sales || item.num_sales || 0),
+            total_usd: parseFloat(item.dataValues?.total_usd || item.total_usd || 0),
+            total_cop: Math.round(parseFloat(item.dataValues?.total_cop || item.total_cop || 0)),
+          }));
+          return {
+            stats: {
+              total_products: items.length,
+              total_units: items.reduce((sum, p) => sum + p.total_quantity, 0),
+              total_usd: items.reduce((sum, p) => sum + p.total_usd, 0),
+              total_cop: items.reduce((sum, p) => sum + p.total_cop, 0),
+            },
+            data: items
           };
         }
         case 'low_stock': {
@@ -203,6 +265,8 @@ const ReportsPage = () => {
       autoGenerated.current = true;
       if (reportType === 'sales') {
         generateSalesReport(dateRange);
+      } else if (reportType === 'inventory') {
+        generateInventoryReport();
       } else {
         generateReportMutation.mutate({ type: reportType, dateRange });
       }
@@ -210,9 +274,9 @@ const ReportsPage = () => {
   }, []);
 
   const reportResult = generateReportMutation.data;
-  const stats = reportType === 'sales' ? salesStats : (reportResult?.stats ?? null);
-  const reportData = reportType === 'sales' ? salesRows : (reportResult?.data ?? null);
-  const loading = reportType === 'sales' ? salesLoading : generateReportMutation.isPending;
+  const stats = reportType === 'sales' ? salesStats : reportType === 'inventory' ? inventoryStats : (reportResult?.stats ?? null);
+  const reportData = reportType === 'sales' ? salesRows : reportType === 'inventory' ? inventoryRows : (reportResult?.data ?? null);
+  const loading = reportType === 'sales' ? salesLoading : reportType === 'inventory' ? inventoryLoading : generateReportMutation.isPending;
 
   const fetchAllSalesForExport = async () => {
     if (!salesAdjustedRange.current) return [];
@@ -228,6 +292,35 @@ const ReportsPage = () => {
       page++;
     }
     return allSales;
+  };
+
+  const fetchAllInventoryForExport = async () => {
+    const allItems = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const res = await inventoryService.getAll({ page, limit: 200 });
+      const items = (res.data || []).map(processInventoryItem);
+      allItems.push(...items);
+      const pagination = res.pagination || {};
+      hasMore = pagination.page < pagination.totalPages;
+      page++;
+    }
+    return allItems;
+  };
+
+  const buildInventoryCSV = (items) => {
+    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Costo Unitario,Valor Total\n';
+    items.forEach(item => {
+      const presentations = item.product?.presentations || [];
+      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
+      const unitsPerPackage = defaultPresentation?.units_per_package || 1;
+      const totalUnits = item.quantity || 0;
+      const stockPackages = Math.floor(totalUnits / unitsPerPackage);
+      const stockRemainingUnits = totalUnits % unitsPerPackage;
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.cost || 0},${item.value || 0}\n`;
+    });
+    return csv;
   };
 
   const buildSalesCSV = (sales) => {
@@ -274,10 +367,22 @@ const ReportsPage = () => {
         }
         break;
       }
-      case 'inventory':
-        csvContent = generateInventoryCSV();
-        filename = `inventario_valorizado_${new Date().toISOString().split('T')[0]}.csv`;
+      case 'inventory': {
+        setExportingCSV(true);
+        try {
+          const allInventory = await fetchAllInventoryForExport();
+          csvContent = buildInventoryCSV(allInventory);
+          filename = `inventario_valorizado_${new Date().toISOString().split('T')[0]}.csv`;
+          toast.success(`${allInventory.length} items exportados`);
+        } catch (e) {
+          console.error('Error exporting inventory CSV:', e);
+          toast.error('Error al exportar inventario');
+          return;
+        } finally {
+          setExportingCSV(false);
+        }
         break;
+      }
       case 'purchases':
         csvContent = generatePurchasesCSV();
         filename = `reporte_compras_${dateRange.start_date}_${dateRange.end_date}.csv`;
@@ -285,6 +390,10 @@ const ReportsPage = () => {
       case 'top_products':
         csvContent = generateTopProductsCSV();
         filename = `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        break;
+      case 'product_sales':
+        csvContent = generateProductSalesCSV();
+        filename = `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}.csv`;
         break;
       case 'low_stock':
         csvContent = generateLowStockCSV();
@@ -295,20 +404,6 @@ const ReportsPage = () => {
     }
 
     downloadCSV(csvContent, filename);
-  };
-
-  const generateInventoryCSV = () => {
-    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Costo Unitario,Valor Total\n';
-    reportData.forEach(item => {
-      const presentations = item.product?.presentations || [];
-      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
-      const unitsPerPackage = defaultPresentation?.units_per_package || 1;
-      const totalUnits = item.quantity || 0;
-      const stockPackages = Math.floor(totalUnits / unitsPerPackage);
-      const stockRemainingUnits = totalUnits % unitsPerPackage;
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${stockPackages},${stockRemainingUnits},${unitsPerPackage},${item.product?.cost || 0},${item.value || 0}\n`;
-    });
-    return csv;
   };
 
   const generatePurchasesCSV = () => {
@@ -323,6 +418,14 @@ const ReportsPage = () => {
     let csv = 'SKU,Producto,Cantidad Vendida,Monto Total\n';
     reportData.forEach(item => {
       csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.total_amount}\n`;
+    });
+    return csv;
+  };
+
+  const generateProductSalesCSV = () => {
+    let csv = 'SKU,Producto,Cant. Vendida,# Ventas,Total USD,Total COP\n';
+    reportData.forEach(item => {
+      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.num_sales},${parseFloat(item.total_usd || 0).toFixed(2)},${Math.round(item.total_cop || 0)}\n`;
     });
     return csv;
   };
@@ -368,14 +471,6 @@ const ReportsPage = () => {
               <div className="text-sm text-gray-600">Total Items</div>
               <div className="text-2xl font-bold text-gray-900">{stats.total_items}</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Cantidad Total</div>
-              <div className="text-2xl font-bold text-gray-900">{stats.total_quantity}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-600">Valor Total</div>
-              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_value || 0).toFixed(2)}</div>
-            </div>
           </div>
         );
       case 'purchases':
@@ -412,6 +507,27 @@ const ReportsPage = () => {
             </div>
           </div>
         );
+      case 'product_sales':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Productos</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_products}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total Unidades</div>
+              <div className="text-2xl font-bold text-gray-900">{stats.total_units}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total USD</div>
+              <div className="text-2xl font-bold text-gray-900">$ {parseFloat(stats.total_usd || 0).toFixed(2)}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Total COP</div>
+              <div className="text-2xl font-bold text-gray-900">COP {Math.round(stats.total_cop || 0).toLocaleString('de-DE')}</div>
+            </div>
+          </div>
+        );
       case 'low_stock':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -439,6 +555,19 @@ const ReportsPage = () => {
     observer.observe(el);
     return () => observer.disconnect();
   }, [reportType, hasMoreSales, loadMoreSales]);
+
+  const inventorySentinelRef = useRef(null);
+  useEffect(() => {
+    if (reportType !== 'inventory' || !hasMoreInventory) return;
+    const el = inventorySentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreInventory(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [reportType, hasMoreInventory, loadMoreInventory]);
 
   const renderReportTable = () => {
     if (!reportData || reportData.length === 0) {
@@ -491,30 +620,44 @@ const ReportsPage = () => {
         );
       case 'inventory':
         return (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Almacén</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Total</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.map((item, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">$ {parseFloat(item.product?.cost || 0).toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.value || 0).toFixed(2)}</td>
+          <div>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Almacén</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {inventoryRows.map((item, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">$ {parseFloat(item.product?.cost || 0).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.value || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {loadingMoreInventory && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-500">Cargando más inventario...</span>
+              </div>
+            )}
+            {!hasMoreInventory && inventoryRows.length > 0 && (
+              <div className="text-center py-3 text-xs text-gray-400">
+                {inventoryRows.length} items cargados
+              </div>
+            )}
+            {hasMoreInventory && <div ref={inventorySentinelRef} className="h-1" />}
+          </div>
         );
       case 'purchases':
         return (
@@ -559,6 +702,33 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_amount || 0).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'product_sales':
+        return (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cant. Vendida</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"># Ventas</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total USD</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total COP</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.map((item, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.num_sales}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_usd || 0).toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">COP {Math.round(item.total_cop || 0).toLocaleString('de-DE')}</td>
                 </tr>
               ))}
             </tbody>
@@ -620,6 +790,8 @@ const ReportsPage = () => {
                 setReportType(e.target.value);
                 setSalesRows([]);
                 setSalesStats(null);
+                setInventoryRows([]);
+                setInventoryStats(null);
                 generateReportMutation.reset();
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -632,7 +804,7 @@ const ReportsPage = () => {
             </select>
           </div>
 
-          {['sales', 'purchases', 'top_products'].includes(reportType) && (
+          {['sales', 'purchases', 'top_products', 'product_sales'].includes(reportType) && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -665,7 +837,7 @@ const ReportsPage = () => {
 
         <div className="flex gap-3 mt-6">
           <button
-            onClick={() => reportType === 'sales' ? generateSalesReport(dateRange) : generateReportMutation.mutate({ type: reportType, dateRange })}
+            onClick={() => reportType === 'sales' ? generateSalesReport(dateRange) : reportType === 'inventory' ? generateInventoryReport() : generateReportMutation.mutate({ type: reportType, dateRange })}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >

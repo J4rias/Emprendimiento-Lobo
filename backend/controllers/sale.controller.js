@@ -920,7 +920,7 @@ exports.getSalesStats = async (req, res) => {
     const topProducts = await SaleDetail.findAll({
       attributes: [
         'product_id',
-        [sequelize.fn('SUM', sequelize.col('SaleDetail.quantity')), 'total_quantity'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`is_unit` = 1 THEN `SaleDetail`.`quantity` ELSE `SaleDetail`.`quantity` * `presentation`.`units_per_package` END')), 'total_quantity'],
         [sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'total_amount']
       ],
       include: [
@@ -934,10 +934,15 @@ exports.getSalesStats = async (req, res) => {
           model: Product,
           as: 'product',
           attributes: ['id', 'name', 'sku']
+        },
+        {
+          model: ProductPresentation,
+          as: 'presentation',
+          attributes: []
         }
       ],
       group: ['SaleDetail.product_id', 'product.id', 'product.name', 'product.sku'],
-      order: [[sequelize.fn('SUM', sequelize.col('SaleDetail.quantity')), 'DESC']],
+      order: [[sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`is_unit` = 1 THEN `SaleDetail`.`quantity` ELSE `SaleDetail`.`quantity` * `presentation`.`units_per_package` END')), 'DESC']],
       limit: parseInt(req.query.top_limit) || 10,
       raw: false
     });
@@ -987,6 +992,61 @@ exports.getSalesStats = async (req, res) => {
     console.error('Error fetching sales stats:', error);
     res.status(500).json({
       message: 'Error al obtener estadísticas de ventas',
+      error: error.message
+    });
+  }
+};
+
+exports.getProductSales = async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+
+    const where = {
+      status: { [Op.in]: ['completed', 'pending'] }
+    };
+
+    if (start_date && end_date) {
+      where.sale_date = { [Op.between]: [new Date(start_date), new Date(end_date)] };
+    } else if (start_date) {
+      where.sale_date = { [Op.gte]: new Date(start_date) };
+    }
+
+    const productSales = await SaleDetail.findAll({
+      attributes: [
+        'product_id',
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`is_unit` = 1 THEN `SaleDetail`.`quantity` ELSE `SaleDetail`.`quantity` * `presentation`.`units_per_package` END')), 'total_quantity'],
+        [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('SaleDetail.sale_id'))), 'num_sales'],
+        [sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'total_usd'],
+        [sequelize.fn('SUM', sequelize.literal('`SaleDetail`.`total` * `sale`.`exchange_rate`')), 'total_cop']
+      ],
+      include: [
+        {
+          model: Sale,
+          as: 'sale',
+          where,
+          attributes: []
+        },
+        {
+          model: Product,
+          as: 'product',
+          attributes: ['id', 'name', 'sku']
+        },
+        {
+          model: ProductPresentation,
+          as: 'presentation',
+          attributes: []
+        }
+      ],
+      group: ['SaleDetail.product_id', 'product.id', 'product.name', 'product.sku'],
+      order: [[sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'DESC']],
+      raw: false
+    });
+
+    res.json({ data: productSales, count: productSales.length });
+  } catch (error) {
+    console.error('Error fetching product sales:', error);
+    res.status(500).json({
+      message: 'Error al obtener ventas por producto',
       error: error.message
     });
   }
