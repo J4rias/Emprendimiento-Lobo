@@ -736,18 +736,32 @@ export function usePOS() {
       const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
       const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
-      // Subtract change from the last non-credit payment line
+      // Subtract change from COP lines only (change is always given in COP)
       let adjustedLines = paymentLines;
       if (changeCOP > 0) {
         adjustedLines = [...paymentLines];
-        for (let i = adjustedLines.length - 1; i >= 0; i--) {
-          if (adjustedLines[i].method !== 'credit') {
-            const line = adjustedLines[i];
-            const copRate = parseFloat(line.cop_rate) || 1;
-            const changeInCurrency = changeCOP / copRate;
-            adjustedLines[i] = { ...line, amount: line.amount - changeInCurrency };
-            break;
+        let remainingChange = changeCOP;
+
+        // Deduct from COP cash lines (back to front)
+        for (let i = adjustedLines.length - 1; i >= 0 && remainingChange > 0; i--) {
+          const line = adjustedLines[i];
+          if (line.method !== 'credit' && line.currency === 'COP') {
+            const deductible = Math.min(remainingChange, line.amount);
+            adjustedLines[i] = { ...line, amount: line.amount - deductible };
+            remainingChange -= deductible;
           }
+        }
+
+        // If change couldn't be fully absorbed by COP lines, it means
+        // COP change was given from the register for a foreign currency overpayment.
+        // Record a negative COP line so the cierre tracks the COP that left the register.
+        if (remainingChange > COP_TOLERANCE) {
+          adjustedLines.push({
+            currency: 'COP',
+            method: 'cash',
+            amount: -Math.round(remainingChange),
+            cop_rate: 1,
+          });
         }
       }
 

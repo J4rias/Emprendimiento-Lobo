@@ -262,7 +262,7 @@ exports.createSale = async (req, res) => {
 
     if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
       for (const payLine of cashLines) {
-        if (parseFloat(payLine.amount) > 0) {
+        if (parseFloat(payLine.amount) !== 0) {
           await SalePayment.create({
             sale_id: sale.id,
             payment_date: new Date(),
