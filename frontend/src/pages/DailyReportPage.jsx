@@ -4,7 +4,7 @@ import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart } from 'lucide-react';
+import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart, RefreshCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const DailyReportPage = () => {
@@ -117,16 +117,44 @@ const DailyReportPage = () => {
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">DESGLOSE POR MONEDA</div>
                 ${breakdownRows || '<div style="text-align:center; font-size:11px;">Sin pagos registrados</div>'}
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                ${(report.cashRefunds?.refund_count > 0) ? `
+                <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">DEVOLUCIONES EN EFECTIVO</div>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+                    <tr>
+                        <td style="font-size:12px;">Cantidad</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">${report.cashRefunds.refund_count}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:12px;">Total USD</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:12px;">Total COP</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">${fmtAmount(report.cashRefunds.refund_cop, 'COP')}</td>
+                    </tr>
+                </table>
+                <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+                ` : ''}
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">CUADRE FÍSICO (EFECTIVO)</div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
-                    ${Object.entries(report.paymentsBreakdown || {})
-                        .filter(([, methods]) => (methods.cash || 0) > 0)
-                        .map(([currency, methods]) =>
-                            `<tr>
-                                <td style="font-size:13px; font-weight:bold;">${currency}</td>
-                                <td style="text-align:right; font-size:15px; font-weight:bold;">${fmtAmount(methods.cash, currency)}</td>
-                            </tr>`
-                        ).join('')}
+                    ${(() => {
+                        const refundUSD = report.cashRefunds?.refund_usd || 0;
+                        const refundCOP = report.cashRefunds?.refund_cop || 0;
+                        const refundMap = { USD: refundUSD, COP: refundCOP };
+                        return Object.entries(report.paymentsBreakdown || {})
+                            .map(([currency, methods]) => {
+                                const cash = methods.cash || 0;
+                                const refund = refundMap[currency] || 0;
+                                return [currency, cash - refund];
+                            })
+                            .filter(([, amount]) => amount !== 0)
+                            .map(([currency, amount]) =>
+                                `<tr>
+                                    <td style="font-size:13px; font-weight:bold;">${currency}</td>
+                                    <td style="text-align:right; font-size:15px; font-weight:bold;">${fmtAmount(amount, currency)}</td>
+                                </tr>`
+                            ).join('');
+                    })()}
                 </table>
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
                 <div style="text-align:center; font-size:10px; margin-top:6px;">*** FIN DE ARQUEO ***</div>
@@ -224,7 +252,8 @@ const DailyReportPage = () => {
                         const hasCredit = report.creditTotalUSD > 0;
                         const creditCollected = report.creditCollectedByCurrency || {};
                         const hasCreditCollections = Object.keys(creditCollected).length > 0;
-                        const cardCount = 2 + (hasCredit ? 1 : 0) + (hasCreditCollections ? 1 : 0);
+                        const hasRefunds = report.cashRefunds?.refund_count > 0;
+                        const cardCount = 2 + (hasCredit ? 1 : 0) + (hasCreditCollections ? 1 : 0) + (hasRefunds ? 1 : 0);
                         const gridCols = cardCount >= 4 ? 'md:grid-cols-4' : cardCount === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2';
 
                         return (
@@ -288,6 +317,23 @@ const DailyReportPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {hasRefunds && (
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-rose-200 flex items-center gap-4">
+                                    <div className="p-4 bg-rose-100 rounded-lg text-rose-600">
+                                        <RefreshCcw className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Devoluciones</p>
+                                        <div className="text-2xl font-bold text-rose-600 mt-1">
+                                            $ {fmtAmount(report.cashRefunds.refund_usd, 'USD')}
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            {report.cashRefunds.refund_count} devoluci{report.cashRefunds.refund_count !== 1 ? 'ones' : 'on'} en efectivo
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         );
                     })()}
@@ -341,16 +387,23 @@ const DailyReportPage = () => {
                         </div>
                     </div>
 
-                    {/* Cuadre Físico — solo efectivo por moneda */}
+                    {/* Cuadre Físico — solo efectivo por moneda, menos devoluciones */}
                     {(() => {
+                        const refundUSD = report.cashRefunds?.refund_usd || 0;
+                        const refundCOP = report.cashRefunds?.refund_cop || 0;
+                        const refundMap = { USD: refundUSD, COP: refundCOP };
                         const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
-                            .map(([currency, methods]) => [currency, methods.cash || 0])
-                            .filter(([, amount]) => amount > 0);
-                        if (cashByCurrency.length === 0) return null;
+                            .map(([currency, methods]) => {
+                                const cash = methods.cash || 0;
+                                const refund = refundMap[currency] || 0;
+                                return [currency, cash - refund];
+                            })
+                            .filter(([, amount]) => amount !== 0);
+                        if (cashByCurrency.length === 0 && !refundUSD) return null;
                         return (
                             <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
                                 <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
-                                <div className="flex flex-wrap justify-between">
+                                <div className="flex flex-wrap justify-between gap-4">
                                     {cashByCurrency.map(([currency, amount]) => (
                                         <div key={currency}>
                                             <p className="text-xs text-slate-400">{currency}</p>
@@ -360,6 +413,11 @@ const DailyReportPage = () => {
                                         </div>
                                     ))}
                                 </div>
+                                {(refundUSD > 0 || refundCOP > 0) && (
+                                    <p className="text-xs text-slate-400 mt-2">
+                                        Incluye descuento por devoluciones: {refundUSD > 0 ? `$ ${fmtAmount(refundUSD, 'USD')} USD` : ''}{refundUSD > 0 && refundCOP > 0 ? ' / ' : ''}{refundCOP > 0 ? `${fmtAmount(refundCOP, 'COP')} COP` : ''}
+                                    </p>
+                                )}
                             </div>
                         );
                     })()}

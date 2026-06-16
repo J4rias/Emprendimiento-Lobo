@@ -418,7 +418,7 @@ exports.createCreditNote = async (req, res) => {
       tax_amount,
       total,
       refund_method: refund_method || 'none',
-      refund_amount: refund_amount || (refund_method === 'credit_balance' ? total : 0),
+      refund_amount: refund_amount || (refund_method !== 'none' ? total : 0),
       refund_reference: refund_reference || null,
       notes: notes || null,
       created_by: req.user.id
@@ -512,6 +512,11 @@ exports.approveCreditNote = async (req, res) => {
             {
               model: ProductPresentation,
               as: 'presentation'
+            },
+            {
+              model: SaleDetail,
+              as: 'saleDetail',
+              attributes: ['id', 'is_unit']
             }
           ]
         },
@@ -547,8 +552,10 @@ exports.approveCreditNote = async (req, res) => {
     // Process each returned product
     for (const detail of creditNote.details) {
       if (detail.return_to_stock) {
-        // Calculate total units to return
-        const totalUnits = (detail.package_quantity_returned * detail.presentation.units_per_package) + detail.loose_units_returned;
+        // Calculate total units to return (respect is_unit)
+        const uph = parseFloat(detail.presentation.units_per_package) || 1;
+        const effectiveUph = detail.saleDetail?.is_unit ? 1 : uph;
+        const totalUnits = (detail.package_quantity_returned * effectiveUph) + detail.loose_units_returned;
 
         // Find or create inventory record
         let inventory = await Inventory.findOne({

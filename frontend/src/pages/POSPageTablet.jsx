@@ -647,7 +647,9 @@ function TabletCheckoutModal({
       if (effectiveCurrency !== displayCurrency) saveRate(effectiveCurrency, copRate, 'COP');
     }
     const displayRate = (isUSD && effectiveCurrency !== 'USD') ? (parseFloat(newPayRate) || 1) : null;
-    const existingIdx = paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
+    const existingIdx = displayRate
+      ? -1  // Never merge cross-currency payments (they have independent rates)
+      : paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
     if (existingIdx >= 0) {
       const updated = [...paymentLines];
       updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
@@ -799,8 +801,7 @@ function TabletCheckoutModal({
                       type="number"
                       value={newPayRate}
                       onChange={(e) => setNewPayRate(e.target.value)}
-                      readOnly={!isAdmin}
-                      className={`w-28 px-3 py-3 border rounded-xl text-base text-right ${isAdmin ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-100 text-gray-500'}`}
+                      className="w-28 px-3 py-3 border border-blue-400 bg-white rounded-xl text-base text-right"
                       step="0.01"
                     />
                   </>

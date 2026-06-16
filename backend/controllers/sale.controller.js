@@ -1,4 +1,4 @@
-const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, sequelize } = require('../models');
+const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, CreditNote, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
@@ -1180,6 +1180,28 @@ exports.getDailyClosure = async (req, res) => {
       creditCollectedByCurrency[c.currency || 'USD'] = parseFloat(c.total_amount) || 0;
     });
 
+    // === CASH REFUNDS FROM CREDIT NOTES (devoluciones en efectivo) ===
+    const cashRefundResult = await sequelize.query(
+      `SELECT
+         COALESCE(SUM(cn.total * cn.exchange_rate), 0) AS refund_cop,
+         COALESCE(SUM(cn.total), 0) AS refund_usd,
+         COUNT(*) AS refund_count
+       FROM credit_notes cn
+       WHERE cn.status = 'applied'
+         AND cn.refund_method = 'cash'
+         AND cn.approved_at BETWEEN :startOfDay AND :endOfDay
+         ${user_id ? 'AND cn.created_by = :user_id' : ''}`,
+      {
+        replacements: { startOfDay, endOfDay, ...(user_id ? { user_id } : {}) },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+    const cashRefunds = {
+      refund_cop: Math.round(parseFloat(cashRefundResult[0]?.refund_cop || 0)),
+      refund_usd: parseFloat(cashRefundResult[0]?.refund_usd || 0),
+      refund_count: parseInt(cashRefundResult[0]?.refund_count || 0)
+    };
+
     res.json({
       date: startOfDay.toISOString().split('T')[0],
       totalSalesUSD,
@@ -1187,7 +1209,8 @@ exports.getDailyClosure = async (req, res) => {
       salesCount,
       creditTotalUSD,
       paymentsBreakdown,
-      creditCollectedByCurrency
+      creditCollectedByCurrency,
+      cashRefunds
     });
 
   } catch (error) {

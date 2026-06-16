@@ -19,13 +19,19 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
         const initItems = async () => {
             // Build map of already returned units per sale_detail_id
             const returnedMap = {};
+            // Build is_unit lookup from sale details
+            const isUnitMap = {};
+            for (const detail of sale.details) {
+                isUnitMap[detail.id] = detail.is_unit;
+            }
+
             try {
                 const cn = await creditNoteService.getAll({ sale_id: sale.id, status: 'applied', limit: 100 });
                 for (const note of cn.data || []) {
                     for (const d of note.details || []) {
                         const uph = d.presentation?.units_per_package || 1;
-                        // package_quantity_returned is in presentation units; loose_units_returned is in base units
-                        const units = d.package_quantity_returned + ((d.loose_units_returned || 0) / uph);
+                        const effectiveUph = isUnitMap[d.sale_detail_id] ? 1 : uph;
+                        const units = d.package_quantity_returned + ((d.loose_units_returned || 0) / effectiveUph);
                         returnedMap[d.sale_detail_id] = (returnedMap[d.sale_detail_id] || 0) + units;
                     }
                 }
@@ -130,11 +136,12 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                 type: totals.isFullReturn ? 'full' : 'partial',
                 refund_method: isConsumidorFinal ? (refundMethod === 'credit_balance' ? 'none' : refundMethod) : refundMethod,
                 items: itemsToReturn.map(item => {
+                    const isUnit = item.is_unit;
                     const unitsPerPackage = item.presentation?.units_per_package || 1;
                     return {
                         sale_detail_id: item.id,
-                        package_quantity_returned: Math.floor(item.returnQuantity / unitsPerPackage),
-                        loose_units_returned: item.returnQuantity % unitsPerPackage,
+                        package_quantity_returned: isUnit ? item.returnQuantity : Math.floor(item.returnQuantity / unitsPerPackage),
+                        loose_units_returned: isUnit ? 0 : item.returnQuantity % unitsPerPackage,
                         return_to_stock: true
                     };
                 })
