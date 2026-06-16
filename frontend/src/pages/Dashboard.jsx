@@ -148,7 +148,7 @@ const Dashboard = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/pos')}
+          onClick={() => navigate('/pos/new')}
           className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
         >
           <ShoppingCart className="w-5 h-5" />
@@ -235,7 +235,7 @@ const Dashboard = () => {
         <h2 className="text-lg font-bold text-gray-900 mb-4">Acciones Rápidas</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
-            onClick={() => navigate('/pos')}
+            onClick={() => navigate('/pos/new')}
             className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <div className="bg-blue-100 p-2 rounded-lg">

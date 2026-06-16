@@ -38,7 +38,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   // Rutas de los subitems de cada acordeón
   const productsRoutes = ['/productos', '/categorias', '/proveedores', '/marcas'];
-  const posRoutes = ['/pos', '/pos/new', '/pos/tablet'];
+  const posRoutes = ['/pos/new', '/pos/tablet'];
   const configRoutes = ['/usuarios', '/roles', '/configuracion', '/tasas-cambio'];
   const arRoutes = ['/cuentas-por-cobrar', '/cuentas-por-cobrar/clientes'];
 
@@ -137,11 +137,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'sales.create',
       isAccordion: true,
       items: [
-        {
-          name: 'POS Clásico',
-          path: '/pos',
-          permission: 'sales.create',
-        },
         {
           name: 'POS Desktop',
           path: '/pos/new',
