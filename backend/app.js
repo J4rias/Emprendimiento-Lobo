@@ -54,7 +54,9 @@ const allowedOrigins = [
   'http://localhost:3004',
   'http://localhost:3005',
   'http://localhost:3006',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
+  'https://catalogo.atlas-group.cloud',
+  'http://catalogo.atlas-group.cloud'
 ].filter(Boolean);
 
 app.use(cors({
@@ -132,6 +134,7 @@ app.get('/health', async (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/catalog', require('./routes/catalog.routes'));
 app.use('/api/company', companyRoutes); // Movido arriba para que el GET público no sea atrapado por la protección de /api
 app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);

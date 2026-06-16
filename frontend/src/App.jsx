@@ -39,6 +39,7 @@ const PriceListsPage          = lazy(() => import('./pages/PriceListsPage'));
 const DailyReportPage              = lazy(() => import('./pages/DailyReportPage'));
 const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivablePage'));
 const ARCustomerDetailPage         = lazy(() => import('./pages/ARCustomerDetailPage'));
+const CatalogPage                  = lazy(() => import('./pages/CatalogPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-[400px] flex items-center justify-center">
@@ -90,6 +91,7 @@ function AppRoutes() {
   return (
     <Suspense fallback={<LoadingFallback />}>
     <Routes>
+      <Route path="/catalogo" element={<CatalogPage />} />
       <Route
         path="/login"
         element={user ? <Navigate to="/dashboard" /> : <LoginPage />}
