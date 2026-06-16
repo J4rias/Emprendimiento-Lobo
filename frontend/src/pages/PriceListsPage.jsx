@@ -7,8 +7,8 @@ import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
     Search, Download,
-    CheckCircle, AlertCircle, X, Percent,
-    Package, Printer, RefreshCw, Lock, Unlock
+    CheckCircle, AlertCircle, X,
+    Package, Printer, Lock, Unlock
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -22,7 +22,6 @@ const PriceListsPage = () => {
         name: '',
         description: '',
         currency: 'USD',
-        basePercentage: 0,
         isDefault: false,
         validity_days: 5
     });
@@ -101,7 +100,6 @@ const PriceListsPage = () => {
                     name: data.name,
                     description: data.description || '',
                     currency: data.currency,
-                    basePercentage: parseFloat(data.basePercentage) || 0,
                     isDefault: data.isDefault,
                     validity_days: data.validity_days || 5
                 });
@@ -202,8 +200,7 @@ const PriceListsPage = () => {
                     name: '',
                     description: '',
                     currency: 'USD',
-                    basePercentage: 0,
-                    isDefault: false,
+                                isDefault: false,
                     validity_days: 5
                 });
                 setDetails(stockProducts.map(item => ({
@@ -273,23 +270,6 @@ const PriceListsPage = () => {
                 client_updated_at: item.server_updated_at || null
             });
         }
-    };
-
-    const applyGeneralMargin = () => {
-        const pct = parseFloat(formData.basePercentage) || 0;
-        setDetails(prev => prev.map(d => {
-            const pkgCostUsd = getCostInUSD(d.package_cost, d.native_currency);
-            const pkgPrice = pkgCostUsd > 0 ? pkgCostUsd * (1 + pct / 100) : 0;
-            const unitPrice = d.units_per_package > 0 ? pkgPrice / d.units_per_package : 0;
-            return {
-                ...d,
-                package_price: Math.round(pkgPrice * 1000000) / 1000000,
-                unit_price: Math.round(unitPrice * 1000000) / 1000000,
-                margin_percentage: Math.round(pct * 10000) / 10000,
-                package_price_cop_str: undefined
-            };
-        }));
-        toast.success(`Margen del ${pct}% aplicado a todos los productos`);
     };
 
     const updateDetailPrice = (index, field, value) => {
@@ -485,32 +465,6 @@ const PriceListsPage = () => {
                                 </button>
                             </>
                         )}
-                    </div>
-                </div>
-
-                {/* Global Margin */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <Percent className="w-5 h-5 text-blue-600" /> Margen de Ganancia General
-                        </h2>
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={formData.basePercentage}
-                                onChange={e => setFormData(p => ({ ...p, basePercentage: parseFloat(e.target.value) || 0 }))}
-                                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center"
-                            />
-                            <span className="text-gray-500">%</span>
-                            <button
-                                onClick={applyGeneralMargin}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                            >
-                                <RefreshCw className="w-4 h-4" /> Aplicar a Todos
-                            </button>
-                        </div>
                     </div>
                 </div>
 
