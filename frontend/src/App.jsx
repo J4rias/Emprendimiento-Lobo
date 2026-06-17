@@ -35,6 +35,7 @@ const PurchaseOrderReceivePage= lazy(() => import('./pages/PurchaseOrderReceiveP
 const CreditNotesPage         = lazy(() => import('./pages/CreditNotesPage'));
 const DeliveriesPage          = lazy(() => import('./pages/DeliveriesPage'));
 const SupplierPaymentsPage    = lazy(() => import('./pages/SupplierPaymentsPage'));
+const SupplierResumenPage     = lazy(() => import('./pages/SupplierResumenPage'));
 const PriceListsPage          = lazy(() => import('./pages/PriceListsPage'));
 const DailyReportPage              = lazy(() => import('./pages/DailyReportPage'));
 const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivablePage'));
@@ -356,6 +357,16 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <SupplierPaymentsPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/cuentas-por-pagar"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SupplierResumenPage />
             </AppLayout>
           </PrivateRoute>
         }

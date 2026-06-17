@@ -338,6 +338,7 @@ class PurchaseOrderController {
         order_date,
         expected_delivery_date,
         currency,
+        settlement_currency,
         notes,
         items
       } = req.body;
@@ -374,6 +375,10 @@ class PurchaseOrderController {
 
       const total = subtotal - discount_amount + tax_amount;
 
+      // Determine settlement currency default based on invoice currency
+      const effectiveCurrency = currency || 'USD';
+      const effectiveSettlement = settlement_currency || (effectiveCurrency === 'COP' ? 'COP' : 'VES');
+
       // Create purchase order
       const purchaseOrder = await PurchaseOrder.create(
         {
@@ -382,7 +387,8 @@ class PurchaseOrderController {
           warehouse_id,
           order_date: order_date || new Date(),
           expected_delivery_date,
-          currency: currency || 'USD',
+          currency: effectiveCurrency,
+          settlement_currency: effectiveSettlement,
           subtotal,
           tax_amount,
           discount_amount,
@@ -463,6 +469,7 @@ class PurchaseOrderController {
         order_date,
         expected_delivery_date,
         currency,
+        settlement_currency,
         notes,
         items
       } = req.body;
@@ -515,6 +522,7 @@ class PurchaseOrderController {
           order_date: order_date || order.order_date,
           expected_delivery_date: expected_delivery_date || order.expected_delivery_date,
           currency: currency || order.currency,
+          settlement_currency: settlement_currency || order.settlement_currency,
           notes,
           subtotal,
           tax_amount,

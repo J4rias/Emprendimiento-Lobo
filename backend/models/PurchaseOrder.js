@@ -55,7 +55,13 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
     type: DataTypes.ENUM('USD', 'COP', 'VES'),
     allowNull: false,
     defaultValue: 'USD',
-    comment: 'Moneda de la orden de compra'
+    comment: 'Moneda de la orden de compra (moneda de la factura)'
+  },
+  settlement_currency: {
+    type: DataTypes.ENUM('USD', 'VES', 'COP'),
+    allowNull: false,
+    defaultValue: 'VES',
+    comment: 'Moneda de pago: VES=bolívares (cat. USD), USD=divisas/Zelle (cat. DIVISAS), COP=pesos (cat. COP)'
   },
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),

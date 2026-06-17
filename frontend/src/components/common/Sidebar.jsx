@@ -24,6 +24,7 @@ import {
   Receipt,
   Calculator,
   BookOpen,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -178,6 +179,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: Receipt,
       path: '/supplier-payments',
       permission: 'supplier_payments.view',
+    },
+    {
+      name: 'Cuentas por Pagar',
+      icon: ClipboardList,
+      path: '/cuentas-por-pagar',
+      permission: 'suppliers.view',
     },
     {
       name: 'Cuentas por Cobrar',
