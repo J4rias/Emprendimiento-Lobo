@@ -583,6 +583,7 @@ function CheckoutModal({
   exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt, isAdmin,
 }) {
   const getCOPRate = (code) => {
+    if (displayCurrency === 'USD' && code === 'USD') return copPerUSD;
     if (code === displayCurrency) return code === 'COP' ? 1 : (getSavedRate(code, displayCurrency) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1);
     return getSavedRate(code, displayCurrency) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1;
   };
@@ -637,7 +638,10 @@ function CheckoutModal({
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
     let copRate;
-    if (isUSD && effectiveCurrency !== 'USD') {
+    if (isUSD && effectiveCurrency === 'USD') {
+      // USD payment in USD mode: use copPerUSD directly to avoid rounding on roundtrip
+      copRate = copPerUSD;
+    } else if (isUSD && effectiveCurrency !== 'USD') {
       // Foreign currency in USD mode: rate input is {currency}/USD
       copRate = copPerUSD / (parseFloat(newPayRate) || 1);
       saveRate(effectiveCurrency, parseFloat(newPayRate), 'USD');
@@ -795,8 +799,9 @@ function CheckoutModal({
               const remainingCOP = effectiveTotalCOP - paidCOP;
               if (remainingCOP <= COP_TOLERANCE) return null;
               let remainingInCurrency, formatted;
-              if (isUSD && effectiveCurrency !== 'USD') {
-                // Foreign currency in USD mode: convert remaining USD to {currency}
+              if (isUSD && effectiveCurrency === 'USD') {
+                remainingInCurrency = remainingCOP / copPerUSD;
+              } else if (isUSD && effectiveCurrency !== 'USD') {
                 const customRate = parseFloat(newPayRate) || 1;
                 remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
               } else {

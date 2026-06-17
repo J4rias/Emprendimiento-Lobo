@@ -709,7 +709,8 @@ export function usePOS() {
     const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
     return lines.map(line => {
       if (line.currency === 'USD') {
-        return { currency: 'USD', method: line.method, amount: line.amount, exchange_rate: 1 };
+        const usdRate = copPerUSD / (parseFloat(line.cop_rate) || copPerUSD);
+        return { currency: 'USD', method: line.method, amount: line.amount, exchange_rate: usdRate };
       }
       if (line.currency === 'VES') {
         // VES se envía como VES con monto original; exchange_rate = copPerUSD / cop_rate

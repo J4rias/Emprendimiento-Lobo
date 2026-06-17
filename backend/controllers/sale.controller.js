@@ -204,6 +204,15 @@ exports.createSale = async (req, res) => {
     const total = subtotal - discount_amount + tax_amount;
     const change_amount = sale_type === 'cash' ? Math.max(0, paid_amount - total) : 0;
 
+    // Validate cash sales have sufficient payment
+    if (sale_type === 'cash' && paid_amount > 0 && paid_amount < total - 0.05) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Pago insuficiente. Total: $${total.toFixed(2)}, Pagado: $${paid_amount.toFixed(2)}`
+      });
+    }
+
     // For credit/mixed sales: credit_amount is either the full total (credit) or the credit lines (mixed)
     if (sale_type === 'credit') {
       credit_amount = total;
