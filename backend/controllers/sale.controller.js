@@ -1,4 +1,4 @@
-const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, CreditNote, sequelize } = require('../models');
+const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, CreditNote, ExchangeRate, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
@@ -62,11 +62,12 @@ exports.createSale = async (req, res) => {
     const cashLines = payment_lines.filter(l => l.method !== 'credit');
     const creditLines = payment_lines.filter(l => l.method === 'credit');
 
-    // Calculate total paid USD (excluding credit lines)
+    // Calculate total paid USD (excluding credit lines and change/vuelto lines)
     let paid_amount = 0;
     if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
       paid_amount = cashLines.reduce((sum, line) => {
         const amount = parseFloat(line.amount) || 0;
+        if (amount <= 0) return sum; // Skip change/vuelto lines (negative amounts)
         const rate = parseFloat(line.exchange_rate) || 1;
         return sum + (amount / rate);
       }, 0);
@@ -101,6 +102,7 @@ exports.createSale = async (req, res) => {
     let subtotal = 0;
     let tax_amount = 0;
     const saleDetails = [];
+    let vesUsdRate = null; // Lazy-loaded VES→USD rate for cost conversion
 
     for (const item of items) {
       const product = await Product.findByPk(item.product_id);
@@ -178,6 +180,23 @@ exports.createSale = async (req, res) => {
         });
       }
 
+      // Calculate cost_price in USD (base currency)
+      const rawCost = parseFloat(is_unit ? presentation.cost : presentation.package_cost) || 0;
+      let costPrice = null;
+      if (rawCost > 0) {
+        if (presentation.purchase_currency === 'COP' && exchange_rate > 1) {
+          costPrice = rawCost / exchange_rate;
+        } else if (presentation.purchase_currency === 'VES') {
+          if (vesUsdRate === null) {
+            try { vesUsdRate = await ExchangeRate.getRate('VES', 'USD'); }
+            catch (e) { vesUsdRate = 0; }
+          }
+          costPrice = vesUsdRate > 0 ? rawCost * vesUsdRate : null;
+        } else {
+          costPrice = rawCost; // USD - use as-is
+        }
+      }
+
       saleDetails.push({
         product_id: item.product_id,
         presentation_id: item.presentation_id,
@@ -191,7 +210,7 @@ exports.createSale = async (req, res) => {
         tax_amount: item_tax,
         subtotal: item_subtotal,
         total: item_total,
-        cost_price: presentation.cost_price,
+        cost_price: costPrice,
         notes: item.notes || null
       });
 
