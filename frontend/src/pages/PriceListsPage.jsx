@@ -615,7 +615,17 @@ const PriceListsPage = () => {
                                                     <td className="px-4 py-3 text-right">
                                                         {(() => {
                                                             const costUsd = getCostInUSD(d.package_cost, d.native_currency);
-                                                            const marginCop = d.margin_percentage || 0;
+                                                            // For frozen COP prices, compute COP margin from COP values directly
+                                                            // to avoid stale rate mismatch (package_price USD saved at old rate vs cost converted at current rate)
+                                                            let marginCop;
+                                                            if (d.is_frozen && d.frozen_currency === 'COP' && d.frozen_price) {
+                                                                const copCost = d.native_currency === 'COP'
+                                                                    ? d.package_cost
+                                                                    : (d.package_cost || 0) * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
+                                                                marginCop = copCost > 0 ? ((d.frozen_price - copCost) / copCost * 100) : 0;
+                                                            } else {
+                                                                marginCop = d.margin_percentage || 0;
+                                                            }
                                                             const marginUsd = costUsd > 0 ? ((d.package_price_usd - costUsd) / costUsd * 100) : 0;
                                                             const fmtMargin = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                                                             const colorClass = (v) => v < 0 ? 'text-red-600' : v === 0 ? 'text-gray-400' : 'text-green-700';

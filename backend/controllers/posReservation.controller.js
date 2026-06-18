@@ -70,9 +70,11 @@ exports.reserve = async (req, res, next) => {
 
     // Calcular reservas de OTROS tabs (excluyendo la reserva actual de este session+tab)
     // NOT (session_id = A AND tab_id = B)  ≡  (session_id != A  OR  tab_id != B)
+    // Solo contar reservas no expiradas
     const reservedByOthers = await PosReservation.sum('units_reserved', {
       where: {
         product_id,
+        expires_at: { [Op.gte]: new Date() },
         [Op.or]: [
           { session_id: { [Op.ne]: session_id } },
           { tab_id: { [Op.ne]: tab_id } }
@@ -122,9 +124,9 @@ exports.reserve = async (req, res, next) => {
 
     await transaction.commit();
 
-    // Obtener el total de reservas de otros para el broadcast
+    // Obtener el total de reservas no expiradas para el broadcast
     const totalReservedNow = await PosReservation.sum('units_reserved', {
-      where: { product_id }
+      where: { product_id, expires_at: { [Op.gte]: new Date() } }
     }) || 0;
 
     // Emitir evento a través de Socket.io
@@ -200,9 +202,9 @@ exports.releaseItem = async (req, res, next) => {
 
     await transaction.commit();
 
-    // Obtener total de reservas actuales para este producto
+    // Obtener total de reservas no expiradas para este producto
     const totalReservedNow = await PosReservation.sum('units_reserved', {
-      where: { product_id }
+      where: { product_id, expires_at: { [Op.gte]: new Date() } }
     }) || 0;
 
     // Emitir evento
@@ -266,7 +268,7 @@ exports.releaseTab = async (req, res, next) => {
     if (io && affectedProducts.length > 0) {
       for (const product_id of affectedProducts) {
         const totalReservedNow = await PosReservation.sum('units_reserved', {
-          where: { product_id }
+          where: { product_id, expires_at: { [Op.gte]: new Date() } }
         }) || 0;
 
         io.to('pos-room').emit('reservation:changed', {
@@ -296,6 +298,7 @@ exports.releaseTab = async (req, res, next) => {
 exports.getAll = async (req, res, next) => {
   try {
     const reservations = await PosReservation.findAll({
+      where: { expires_at: { [Op.gte]: new Date() } },
       attributes: ['product_id', 'presentation_id', 'units_reserved'],
       raw: true
     });
@@ -348,7 +351,7 @@ exports.cleanupExpired = async (req, res, next) => {
     if (io && affectedProducts.length > 0) {
       for (const product_id of affectedProducts) {
         const totalReservedNow = await PosReservation.sum('units_reserved', {
-          where: { product_id }
+          where: { product_id, expires_at: { [Op.gte]: new Date() } }
         }) || 0;
 
         io.to('pos-room').emit('reservation:changed', {

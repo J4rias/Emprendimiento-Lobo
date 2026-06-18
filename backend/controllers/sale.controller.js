@@ -151,11 +151,13 @@ exports.createSale = async (req, res) => {
       // Validar disponibilidad considerando reservas de OTROS tabs
       // (las reservas de ESTA tab se liberarán al finalizar la venta)
       // NOT (session_id = A AND tab_id = B)  ≡  (session_id != A  OR  tab_id != B)
+      // Solo contar reservas no expiradas
       let reserved_by_others = 0;
       if (session_id && tab_id) {
         reserved_by_others = await PosReservation.sum('units_reserved', {
           where: {
             product_id: item.product_id,
+            expires_at: { [Op.gte]: new Date() },
             [Op.or]: [
               { session_id: { [Op.ne]: session_id } },
               { tab_id: { [Op.ne]: tab_id } }
@@ -341,7 +343,7 @@ exports.createSale = async (req, res) => {
       if (io) {
         for (const product_id of affected_product_ids) {
           const totalReserved = await PosReservation.sum('units_reserved', {
-            where: { product_id }
+            where: { product_id, expires_at: { [Op.gte]: new Date() } }
           }) || 0;
 
           io.to('pos-room').emit('reservation:changed', {

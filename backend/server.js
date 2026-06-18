@@ -1,5 +1,6 @@
 const http = require('http');
 const { Server } = require('socket.io');
+const { Op } = require('sequelize');
 const app = require('./app');
 const { testConnection, sequelize } = require('./config/database');
 require('dotenv').config();
@@ -29,8 +30,7 @@ const io = new Server(httpServer, {
 app.set('io', io);
 
 // Load Socket.io handlers
-// NOTE: Disabled while legacy POS is active — re-enable when new POS is deployed
-// require('./socket/posSocket')(io);
+require('./socket/posSocket')(io);
 
 // Start server
 const startServer = async () => {
@@ -44,6 +44,23 @@ const startServer = async () => {
       await sequelize.sync(); // Reverted alter: true due to FK crash
       console.log('✅ Database synced successfully');
     }
+
+    // Cleanup expired POS reservations on startup and every 30 minutes
+    const { PosReservation } = require('./models');
+    const cleanupExpired = async () => {
+      try {
+        const deleted = await PosReservation.destroy({
+          where: { expires_at: { [Op.lt]: new Date() } }
+        });
+        if (deleted > 0) {
+          console.log(`🧹 Cleaned up ${deleted} expired POS reservations`);
+        }
+      } catch (err) {
+        console.error('Error cleaning up expired reservations:', err.message);
+      }
+    };
+    await cleanupExpired();
+    setInterval(cleanupExpired, 30 * 60 * 1000);
 
     // Start listening
     httpServer.on('error', (err) => {

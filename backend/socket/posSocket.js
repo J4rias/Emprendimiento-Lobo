@@ -1,4 +1,5 @@
 const { PosReservation } = require('../models');
+const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -36,6 +37,7 @@ module.exports = (io) => {
       // Send current state of all reservations to this client
       try {
         const reservations = await PosReservation.findAll({
+          where: { expires_at: { [Op.gte]: new Date() } },
           attributes: ['product_id', 'presentation_id', 'units_reserved'],
           raw: true
         });
@@ -81,7 +83,7 @@ module.exports = (io) => {
           // Broadcast updates for affected products
           for (const product_id of affectedProducts) {
             const totalReserved = await PosReservation.sum('units_reserved', {
-              where: { product_id }
+              where: { product_id, expires_at: { [Op.gte]: new Date() } }
             }) || 0;
 
             io.to('pos-room').emit('reservation:changed', {
