@@ -35,6 +35,7 @@ const companyRoutes = require('./routes/company.routes');
 const priceListRoutes = require('./routes/priceList.routes');
 const posRoutes = require('./routes/pos.routes');
 const arRoutes = require('./routes/ar.routes');
+const preOrderRoutes = require('./routes/preOrder.routes');
 
 const app = express();
 // Trust nginx-proxy-manager (first proxy hop) so express-rate-limit can read real client IPs
@@ -158,6 +159,7 @@ app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/price-lists', priceListRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/ar', arRoutes);
+app.use('/api/pre-orders', preOrderRoutes);
 
 // 404 handler
 app.use((req, res) => {

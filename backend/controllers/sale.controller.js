@@ -1334,3 +1334,56 @@ exports.validateCreditPin = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error al validar PIN' });
   }
 };
+
+// GET /api/sales/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
+exports.getSalesSummary = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const today = new Date();
+    const dateFrom = from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const dateTo = to || dateFrom;
+
+    const [summary] = await sequelize.query(`
+      SELECT
+        COUNT(*) as sale_count,
+        COALESCE(SUM(total), 0) as total_sales,
+        COALESCE(SUM(paid_amount), 0) as total_paid,
+        COALESCE(SUM(credit_amount), 0) as total_credit,
+        COALESCE(SUM(CASE WHEN sale_type = 'cash' THEN total ELSE 0 END), 0) as cash_total,
+        COALESCE(SUM(CASE WHEN sale_type = 'credit' THEN total ELSE 0 END), 0) as credit_total,
+        COALESCE(SUM(CASE WHEN sale_type = 'mixed' THEN total ELSE 0 END), 0) as mixed_total
+      FROM sales
+      WHERE status = 'completed'
+        AND DATE(sale_date) >= :dateFrom
+        AND DATE(sale_date) <= :dateTo
+    `, { replacements: { dateFrom, dateTo }, type: sequelize.QueryTypes.SELECT });
+
+    const [topProducts] = await sequelize.query(`
+      SELECT
+        p.name as product_name,
+        SUM(sd.quantity) as total_quantity,
+        SUM(sd.total) as total_revenue
+      FROM sale_details sd
+      JOIN sales s ON s.id = sd.sale_id
+      JOIN products p ON p.id = sd.product_id
+      WHERE s.status = 'completed'
+        AND DATE(s.sale_date) >= :dateFrom
+        AND DATE(s.sale_date) <= :dateTo
+      GROUP BY sd.product_id, p.name
+      ORDER BY total_revenue DESC
+      LIMIT 10
+    `, { replacements: { dateFrom, dateTo }, type: sequelize.QueryTypes.SELECT });
+
+    res.json({
+      success: true,
+      data: {
+        period: { from: dateFrom, to: dateTo },
+        summary: summary || { sale_count: 0, total_sales: 0, total_paid: 0, total_credit: 0 },
+        top_products: topProducts || []
+      }
+    });
+  } catch (error) {
+    console.error('Error getting sales summary:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener resumen de ventas', error: error.message });
+  }
+};

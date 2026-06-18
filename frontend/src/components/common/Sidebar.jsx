@@ -25,6 +25,7 @@ import {
   Calculator,
   BookOpen,
   ClipboardList,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -155,6 +156,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: ShoppingCart,
       path: '/ventas',
       permission: 'sales.view',
+    },
+    {
+      name: 'Pre-Pedidos',
+      icon: Bot,
+      path: '/pre-pedidos',
+      permission: 'pre_orders.view',
     },
     {
       name: 'Compras',

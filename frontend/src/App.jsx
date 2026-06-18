@@ -41,6 +41,7 @@ const DailyReportPage              = lazy(() => import('./pages/DailyReportPage'
 const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivablePage'));
 const ARCustomerDetailPage         = lazy(() => import('./pages/ARCustomerDetailPage'));
 const CatalogPage                  = lazy(() => import('./pages/CatalogPage'));
+const PreOrdersPage                = lazy(() => import('./pages/PreOrdersPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-[400px] flex items-center justify-center">
@@ -367,6 +368,16 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <SupplierResumenPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/pre-pedidos"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <PreOrdersPage />
             </AppLayout>
           </PrivateRoute>
         }

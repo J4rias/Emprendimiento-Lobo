@@ -39,6 +39,8 @@ const Delivery = require('./Delivery');
 const DeliveryDetail = require('./DeliveryDetail');
 const CompanySettings = require('./CompanySettings');
 const PosReservation = require('./PosReservation');
+const PreOrder = require('./PreOrder');
+const PreOrderDetail = require('./PreOrderDetail');
 
 // Define associations
 
@@ -371,6 +373,36 @@ Product.hasMany(DeliveryDetail, { foreignKey: 'product_id', as: 'deliveryDetails
 DeliveryDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
 ProductPresentation.hasMany(DeliveryDetail, { foreignKey: 'presentation_id', as: 'deliveryDetails' });
 
+// PreOrder - Customer (Many to One, optional)
+PreOrder.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Customer.hasMany(PreOrder, { foreignKey: 'customer_id', as: 'preOrders' });
+
+// PreOrder - User (Approved by)
+PreOrder.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+
+// PreOrder - User (Created by)
+PreOrder.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// PreOrder - Sale (Converted to)
+PreOrder.belongsTo(Sale, { foreignKey: 'converted_sale_id', as: 'convertedSale' });
+Sale.hasOne(PreOrder, { foreignKey: 'converted_sale_id', as: 'preOrder' });
+
+// PreOrder - Warehouse (Many to One)
+PreOrder.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
+Warehouse.hasMany(PreOrder, { foreignKey: 'warehouse_id', as: 'preOrders' });
+
+// PreOrder - PreOrderDetail (One to Many)
+PreOrder.hasMany(PreOrderDetail, { foreignKey: 'pre_order_id', as: 'details' });
+PreOrderDetail.belongsTo(PreOrder, { foreignKey: 'pre_order_id', as: 'preOrder' });
+
+// PreOrderDetail - Product (Many to One)
+PreOrderDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(PreOrderDetail, { foreignKey: 'product_id', as: 'preOrderDetails' });
+
+// PreOrderDetail - ProductPresentation (Many to One)
+PreOrderDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(PreOrderDetail, { foreignKey: 'presentation_id', as: 'preOrderDetails' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -412,4 +444,6 @@ module.exports = {
   DeliveryDetail,
   CompanySettings,
   PosReservation,
+  PreOrder,
+  PreOrderDetail,
 };
