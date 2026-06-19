@@ -20,6 +20,14 @@ router.get(
   customerController.getActiveCustomers
 );
 
+// Get customer activity summary (must be before /:id)
+router.get(
+  '/activity',
+  authenticate,
+  authorize('customers.view'),
+  customerController.getCustomerActivity
+);
+
 // Get customers with overdue credit balances (cuentas por cobrar vencidas)
 router.get(
   '/overdue',
@@ -66,6 +74,14 @@ router.get(
   authenticate,
   authorize('customers.view'),
   customerController.getStatement
+);
+
+// Get customer purchase history
+router.get(
+  '/:id/purchases',
+  authenticate,
+  authorize('customers.view'),
+  customerController.getCustomerPurchases
 );
 
 // Get customer credit balance (saldo a favor / overpayment)

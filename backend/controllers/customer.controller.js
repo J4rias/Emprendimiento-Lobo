@@ -1,4 +1,4 @@
-const { Customer, PriceList, Sale, SalePayment, CreditNote, ExchangeRate } = require('../models');
+const { Customer, PriceList, Sale, SaleDetail, SalePayment, CreditNote, ExchangeRate, Product, ProductPresentation } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -1005,6 +1005,145 @@ class CustomerController {
         credit_balance_cop: Math.round(creditBalanceCOP),
         credit_balance_usd: 0 // not used, kept for compatibility
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get purchase history for a specific customer
+  async getCustomerPurchases(req, res, next) {
+    try {
+      const { id } = req.params;
+      const {
+        from,
+        to
+      } = req.query;
+
+      const customer = await Customer.findOne({
+        where: { id, isDeleted: false },
+        attributes: ['id']
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cliente no encontrado'
+        });
+      }
+
+      const now = new Date();
+      const dateFrom = from ? new Date(from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const dateTo = to ? new Date(to) : now;
+
+      const sales = await Sale.findAll({
+        where: {
+          customer_id: id,
+          status: { [Op.ne]: 'cancelled' },
+          sale_date: { [Op.between]: [dateFrom, dateTo] }
+        },
+        include: [
+          {
+            model: SaleDetail,
+            as: 'details',
+            attributes: ['product_id', 'quantity', 'unit_price', 'total', 'is_unit'],
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name']
+              },
+              {
+                model: ProductPresentation,
+                as: 'presentation',
+                attributes: ['id', 'units_per_package']
+              }
+            ]
+          }
+        ],
+        order: [['sale_date', 'DESC']]
+      });
+
+      const data = sales.map(sale => ({
+        sale_id: sale.id,
+        date: sale.sale_date,
+        total_usd: parseFloat(sale.total),
+        total_cop: sale.currency_mode === 'COP'
+          ? Math.round(parseFloat(sale.total))
+          : Math.round(parseFloat(sale.total) * parseFloat(sale.exchange_rate)),
+        payment_type: sale.sale_type,
+        items: (sale.details || []).map(d => {
+          const qty = parseFloat(d.quantity);
+          const upp = d.presentation ? parseInt(d.presentation.units_per_package) || 1 : 1;
+          const normalizedQty = d.is_unit ? qty : qty * upp;
+          return {
+            product_id: d.product_id,
+            product_name: d.product ? d.product.name : null,
+            quantity: normalizedQty,
+            units_per_package: upp,
+            unit_price: parseFloat(d.unit_price),
+            total: parseFloat(d.total)
+          };
+        })
+      }));
+
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get customer activity summary
+  async getCustomerActivity(req, res, next) {
+    try {
+      const {
+        days = 90,
+        min_purchases = 1
+      } = req.query;
+
+      const daysInt = parseInt(days);
+      const minPurchases = parseInt(min_purchases);
+      const dateFrom = new Date(Date.now() - daysInt * 24 * 60 * 60 * 1000);
+
+      const results = await sequelize.query(`
+        SELECT
+          c.id AS customer_id,
+          COALESCE(c.business_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name,
+          COALESCE(c.phone, c.mobile) AS customer_phone,
+          COUNT(s.id) AS total_purchases,
+          ROUND(SUM(s.total), 2) AS total_spent_usd,
+          MIN(DATE(s.sale_date)) AS first_purchase,
+          MAX(DATE(s.sale_date)) AS last_purchase,
+          CASE
+            WHEN COUNT(s.id) > 1
+            THEN ROUND(DATEDIFF(MAX(s.sale_date), MIN(s.sale_date)) / (COUNT(s.id) - 1), 1)
+            ELSE NULL
+          END AS avg_days_between_purchases
+        FROM customers c
+        INNER JOIN sales s ON s.customer_id = c.id
+        WHERE s.status != 'cancelled'
+          AND s.deleted_at IS NULL
+          AND s.sale_date >= :dateFrom
+          AND c.is_deleted = 0
+        GROUP BY c.id
+        HAVING total_purchases >= :minPurchases
+        ORDER BY total_purchases DESC
+      `, {
+        replacements: { dateFrom, minPurchases },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const data = results.map(r => ({
+        customer_id: r.customer_id,
+        customer_name: r.customer_name,
+        customer_phone: r.customer_phone,
+        total_purchases: parseInt(r.total_purchases),
+        total_spent_usd: parseFloat(r.total_spent_usd),
+        first_purchase: r.first_purchase,
+        last_purchase: r.last_purchase,
+        avg_days_between_purchases: r.avg_days_between_purchases ? parseFloat(r.avg_days_between_purchases) : null
+      }));
+
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

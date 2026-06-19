@@ -922,10 +922,28 @@ exports.getSalesStats = async (req, res) => {
     });
     const totalRevenueCOP = Math.round(parseFloat(copResult[0]?.total_cop || 0));
 
+    // Total cost from sale details (quantity × cost_price — cost_price matches quantity granularity)
+    const costResult = await sequelize.query(`
+      SELECT COALESCE(SUM(sd.quantity * sd.cost_price), 0) AS total_cost
+      FROM sale_details sd
+      INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
+      WHERE s.status IN ('completed', 'pending')
+        AND sd.cost_price IS NOT NULL
+        ${start_date && end_date ? 'AND s.sale_date BETWEEN :start_date AND :end_date' : start_date ? 'AND s.sale_date >= :start_date' : ''}
+        ${warehouse_id ? 'AND s.warehouse_id = :warehouse_id' : ''}
+    `, {
+      replacements: { start_date, end_date, warehouse_id },
+      type: sequelize.QueryTypes.SELECT
+    });
+    const totalCost = parseFloat(costResult[0]?.total_cost || 0);
+    const revenue = totalRevenue || 0;
+    const grossProfit = revenue - totalCost;
+    const grossMarginPct = revenue > 0 ? Math.round((grossProfit / revenue) * 10000) / 100 : 0;
+
     // summary_only skips heavy queries (topProducts, salesByType, salesByStatus, salesByCurrency)
     if (summary_only === 'true') {
       return res.json({
-        stats: { totalSales, totalRevenue: totalRevenue || 0, totalRevenueCOP }
+        stats: { totalSales, totalRevenue: revenue, totalRevenueCOP, totalCost, grossProfit, grossMarginPct }
       });
     }
 
@@ -953,7 +971,8 @@ exports.getSalesStats = async (req, res) => {
       attributes: [
         'product_id',
         [sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`is_unit` = 1 THEN `SaleDetail`.`quantity` ELSE `SaleDetail`.`quantity` * `presentation`.`units_per_package` END')), 'total_quantity'],
-        [sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'total_amount']
+        [sequelize.fn('SUM', sequelize.col('SaleDetail.total')), 'total_amount'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`cost_price` IS NOT NULL THEN `SaleDetail`.`quantity` * `SaleDetail`.`cost_price` ELSE 0 END')), 'total_cost']
       ],
       include: [
         {
@@ -977,6 +996,15 @@ exports.getSalesStats = async (req, res) => {
       order: [[sequelize.fn('SUM', sequelize.literal('CASE WHEN `SaleDetail`.`is_unit` = 1 THEN `SaleDetail`.`quantity` ELSE `SaleDetail`.`quantity` * `presentation`.`units_per_package` END')), 'DESC']],
       limit: parseInt(req.query.top_limit) || 10,
       raw: false
+    });
+
+    // Add gross_margin_pct to each top product
+    const topProductsWithMargin = topProducts.map(p => {
+      const json = p.toJSON();
+      const amount = parseFloat(json.total_amount) || 0;
+      const cost = parseFloat(json.total_cost) || 0;
+      json.gross_margin_pct = amount > 0 ? Math.round(((amount - cost) / amount) * 10000) / 100 : 0;
+      return json;
     });
 
     // Sales count and total by currency
@@ -1011,11 +1039,14 @@ exports.getSalesStats = async (req, res) => {
     res.json({
       stats: {
         totalSales,
-        totalRevenue: totalRevenue || 0,
+        totalRevenue: revenue,
         totalRevenueCOP,
+        totalCost,
+        grossProfit,
+        grossMarginPct,
         salesByType,
         salesByStatus,
-        topProducts,
+        topProducts: topProductsWithMargin,
         salesByCurrency
       }
     });
@@ -1024,6 +1055,72 @@ exports.getSalesStats = async (req, res) => {
     console.error('Error fetching sales stats:', error);
     res.status(500).json({
       message: 'Error al obtener estadísticas de ventas',
+      error: error.message
+    });
+  }
+};
+
+exports.getDailySeries = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const dateTo = to || new Date().toISOString().slice(0, 10);
+    const dateFrom = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const rows = await sequelize.query(`
+      SELECT
+        ds.date,
+        ds.sale_count,
+        ds.total_usd,
+        ds.total_cop,
+        ROUND(COALESCE(dc.total_cost, 0), 2) AS total_cost,
+        ROUND(ds.total_usd - COALESCE(dc.total_cost, 0), 2) AS gross_profit
+      FROM (
+        SELECT
+          DATE(s.sale_date) AS date,
+          COUNT(*) AS sale_count,
+          ROUND(SUM(s.total), 2) AS total_usd,
+          ROUND(SUM(s.total * s.exchange_rate)) AS total_cop
+        FROM sales s
+        WHERE s.status IN ('completed', 'pending')
+          AND s.deleted_at IS NULL
+          AND DATE(s.sale_date) BETWEEN :dateFrom AND :dateTo
+        GROUP BY DATE(s.sale_date)
+      ) ds
+      LEFT JOIN (
+        SELECT
+          DATE(s.sale_date) AS date,
+          SUM(
+            CASE WHEN sd.cost_price IS NOT NULL
+              THEN sd.quantity * sd.cost_price
+            ELSE 0 END
+          ) AS total_cost
+        FROM sale_details sd
+        INNER JOIN sales s ON s.id = sd.sale_id
+          AND s.status IN ('completed', 'pending')
+          AND s.deleted_at IS NULL
+          AND DATE(s.sale_date) BETWEEN :dateFrom AND :dateTo
+        GROUP BY DATE(s.sale_date)
+      ) dc ON dc.date = ds.date
+      ORDER BY ds.date ASC
+    `, {
+      replacements: { dateFrom, dateTo },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const data = rows.map(r => ({
+      date: r.date,
+      sale_count: parseInt(r.sale_count),
+      total_usd: parseFloat(r.total_usd),
+      total_cop: parseInt(r.total_cop),
+      total_cost: parseFloat(r.total_cost),
+      gross_profit: parseFloat(r.gross_profit)
+    }));
+
+    res.json({ data });
+  } catch (error) {
+    console.error('Error fetching daily series:', error);
+    res.status(500).json({
+      message: 'Error al obtener serie diaria de ventas',
       error: error.message
     });
   }

@@ -40,6 +40,12 @@ router.get('/summary',
   saleController.getSalesSummary
 );
 
+router.get('/daily-series',
+  auth,
+  authorize('sales.view'),
+  saleController.getDailySeries
+);
+
 router.get('/product-sales',
   auth,
   authorize('sales.view'),
