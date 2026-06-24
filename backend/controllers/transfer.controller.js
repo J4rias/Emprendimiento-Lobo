@@ -125,6 +125,7 @@ const createTransfer = async (req, res, next) => {
           product_id,
           warehouse_id: origin_warehouse_id
         },
+        lock: transaction.LOCK.UPDATE,
         transaction
       });
 

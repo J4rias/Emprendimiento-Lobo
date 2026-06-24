@@ -1,4 +1,4 @@
-const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, Batch, PosReservation, Role, CreditNote, ExchangeRate, sequelize } = require('../models');
+const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, InventoryMovement, Batch, PosReservation, Role, CreditNote, ExchangeRate, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
@@ -219,6 +219,21 @@ exports.createSale = async (req, res) => {
       // Both cash and credit reduce physical stock immediately (goods leave warehouse on sale)
       await inventory.update({
         quantity: parseFloat(inventory.quantity) - units_to_deduct
+      }, { transaction });
+
+      // Register inventory movement for audit trail
+      await InventoryMovement.create({
+        product_id: item.product_id,
+        warehouse_id,
+        presentation_id: item.presentation_id,
+        movement_type: 'egreso',
+        quantity: units_to_deduct,
+        unit_cost: presentation.cost || null,
+        package_cost: presentation.package_cost || null,
+        currency: presentation.purchase_currency || 'USD',
+        reason: `Venta ${sale_number}`,
+        document_number: sale_number,
+        user_id: req.user.id
       }, { transaction });
     }
 
@@ -703,7 +718,9 @@ exports.cancelSale = async (req, res) => {
         where: {
           product_id: detail.product_id,
           warehouse_id: sale.warehouse_id
-        }
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
       });
 
       if (inventory) {
@@ -713,6 +730,18 @@ exports.cancelSale = async (req, res) => {
           // Restore physical stock (goods return to warehouse on cancellation)
           await inventory.update({
             quantity: parseFloat(inventory.quantity) + units_to_return
+          }, { transaction });
+
+          // Register inventory movement for audit trail
+          await InventoryMovement.create({
+            product_id: detail.product_id,
+            warehouse_id: sale.warehouse_id,
+            presentation_id: detail.presentation_id,
+            movement_type: 'ingreso',
+            quantity: units_to_return,
+            reason: `Cancelación venta ${sale.sale_number}`,
+            document_number: sale.sale_number,
+            user_id: req.user.id
           }, { transaction });
         }
       }

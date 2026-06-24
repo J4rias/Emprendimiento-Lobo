@@ -576,7 +576,7 @@ exports.approveCreditNote = async (req, res) => {
 
         // Update inventory - ADD returned quantity
         await inventory.update({
-          quantity: parseInt(inventory.quantity) + totalUnits
+          quantity: parseFloat(inventory.quantity) + totalUnits
         }, { transaction });
 
         // Create inventory movement record
