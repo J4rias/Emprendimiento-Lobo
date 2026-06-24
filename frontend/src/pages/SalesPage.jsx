@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, CreditCard, RefreshCcw } from 'lucide-react';
+import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, Smartphone, CreditCard, RefreshCcw } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from '../components/common/Modal';
 import { formatDate } from '../utils/formatUtils';
-import { printSaleTicket } from '../components/sales/SaleTicket';
+import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
 import SaleReturnModal from '../components/sales/SaleReturnModal';
 
@@ -223,7 +223,16 @@ const SalesPage = () => {
   const handlePrintTicket = () => {
     if (selectedSale) {
       printSaleTicket(selectedSale, companySettings, {
-        displayCurrency: 'COP', // Optional if we want it to default to the ticket's setup
+        displayCurrency: 'COP',
+        exchangeRate: selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1
+      });
+    }
+  };
+
+  const handlePrintTicketPortable = () => {
+    if (selectedSale) {
+      printSaleTicketPortable(selectedSale, companySettings, {
+        displayCurrency: 'COP',
         exchangeRate: selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1
       });
     }
@@ -592,13 +601,22 @@ const SalesPage = () => {
           <div className="flex items-center gap-4">
             <span>Detalle de Venta - {selectedSale?.sale_number}</span>
             {selectedSale && (
-              <button
-                onClick={handlePrintTicket}
-                className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-xs font-bold border border-blue-100"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Imprimir Comprobante
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handlePrintTicket}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-xs font-bold border border-blue-100"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Imprimir
+                </button>
+                <button
+                  onClick={handlePrintTicketPortable}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100 transition-colors text-xs font-bold border border-amber-100"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Portátil
+                </button>
+              </div>
             )}
           </div>
         }

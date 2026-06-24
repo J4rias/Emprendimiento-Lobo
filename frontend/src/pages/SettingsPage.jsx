@@ -27,11 +27,16 @@ const SettingsPage = () => {
     name: '', address: '', phone: '', email: '', tax_id: '', website: '',
   });
   const [companyLoading, setCompanyLoading] = useState(false);
-  // Printer settings state
+  // Printer settings state — Desktop (DIG E200L)
   const [printerSettings, setPrinterSettings] = useState({
     width: '72mm',
     margin: '0mm',
     zoom: '1.0'
+  });
+  // Printer settings state — Portable (GOOJPRT MP-3)
+  const [portablePrinterSettings, setPortablePrinterSettings] = useState({
+    width: '72mm',
+    fontSize: '13px',
   });
 
   // Users state
@@ -323,12 +328,22 @@ const SettingsPage = () => {
     if (saved) {
       setPrinterSettings(JSON.parse(saved));
     }
+    const savedPortable = localStorage.getItem('pos_printer_portable_settings');
+    if (savedPortable) {
+      setPortablePrinterSettings(JSON.parse(savedPortable));
+    }
   }, []);
 
   const handlePrinterSubmit = (e) => {
     e.preventDefault();
     localStorage.setItem('pos_printer_settings', JSON.stringify(printerSettings));
-    toast.success('Configuración de impresora guardada');
+    toast.success('Configuración de impresora desktop guardada');
+  };
+
+  const handlePortablePrinterSubmit = (e) => {
+    e.preventDefault();
+    localStorage.setItem('pos_printer_portable_settings', JSON.stringify(portablePrinterSettings));
+    toast.success('Configuración de impresora portátil guardada');
   };
 
   const handleCompanySubmit = async (e) => {
@@ -753,85 +768,119 @@ const SettingsPage = () => {
       {/* Printer Tab */}
       {
         activeTab === 'impresora' && (
-          <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Configuración de Ticketera (DIG E200L)</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Ajusta estos parámetros para que el ticket se imprima correctamente en tu impresora térmica.
-            </p>
+          <div className="space-y-6 max-w-2xl">
+            {/* Desktop printer */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Desktop — DIG E200L</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Impresora conectada por USB a la PC. Usa el diálogo de impresión del navegador.
+              </p>
 
-            <form onSubmit={handlePrinterSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
-                  <select
-                    value={printerSettings.width}
-                    onChange={(e) => setPrinterSettings({ ...printerSettings, width: e.target.value })}
-                    className="input w-full"
-                  >
-                    <option value="72mm">72mm (DIG E200L — área imprimible real)</option>
-                    <option value="80mm">80mm (Ancho total del papel)</option>
-                    <option value="58mm">58mm (Impresoras pequeñas)</option>
-                  </select>
-                  <p className="mt-1 text-xs text-gray-400">La DIG E200L usa papel de 80mm.</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Zoom de Impresión</label>
-                  <select
-                    value={printerSettings.zoom}
-                    onChange={(e) => setPrinterSettings({ ...printerSettings, zoom: e.target.value })}
-                    className="input w-full"
-                  >
-                    <option value="0.8">0.8 (Pequeño)</option>
-                    <option value="0.9">0.9 (Medio-Pequeño)</option>
-                    <option value="1.0">1.0 (Normal)</option>
-                    <option value="1.1">1.1 (Grande)</option>
-                    <option value="1.2">1.2 (Extra Grande)</option>
-                  </select>
-                  <p className="mt-1 text-xs text-gray-400">Si el texto sale muy pequeño o grande, ajusta el zoom.</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Margen Izquierdo/Derecho</label>
-                  <select
-                    value={printerSettings.margin}
-                    onChange={(e) => setPrinterSettings({ ...printerSettings, margin: e.target.value })}
-                    className="input w-full"
-                  >
-                    <option value="0mm">Sin margen</option>
-                    <option value="1mm">1mm</option>
-                    <option value="2mm">2mm</option>
-                    <option value="3mm">3mm</option>
-                    <option value="5mm">5mm</option>
-                  </select>
-                  <p className="mt-1 text-xs text-gray-400">Si el texto se corta a los lados, agrega un poco de margen.</p>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <Printer className="h-5 w-5 text-blue-400" />
+              <form onSubmit={handlePrinterSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
+                    <select
+                      value={printerSettings.width}
+                      onChange={(e) => setPrinterSettings({ ...printerSettings, width: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="72mm">72mm (área imprimible real)</option>
+                      <option value="80mm">80mm (ancho total)</option>
+                      <option value="58mm">58mm (pequeñas)</option>
+                    </select>
                   </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-blue-700">
-                      <strong>Tip para DIG E200L:</strong> En el diálogo de impresión de Chrome/Edge:
-                      <ul className="list-disc ml-5 mt-1">
-                        <li>Márgenes: <strong>Ninguno</strong></li>
-                        <li>Encabezados y pies de página: <strong>Desactivar</strong></li>
-                        <li>Tamaño de papel: <strong>80mm x 297mm</strong> (o similar)</li>
-                      </ul>
-                    </p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
+                    <select
+                      value={printerSettings.zoom}
+                      onChange={(e) => setPrinterSettings({ ...printerSettings, zoom: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="0.8">0.8</option>
+                      <option value="0.9">0.9</option>
+                      <option value="1.0">1.0</option>
+                      <option value="1.1">1.1</option>
+                      <option value="1.2">1.2</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Margen</label>
+                    <select
+                      value={printerSettings.margin}
+                      onChange={(e) => setPrinterSettings({ ...printerSettings, margin: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="0mm">0mm</option>
+                      <option value="1mm">1mm</option>
+                      <option value="2mm">2mm</option>
+                      <option value="3mm">3mm</option>
+                      <option value="5mm">5mm</option>
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-2">
-                <button type="submit" className="btn-primary w-full md:w-auto">
-                  Guardar Configuración
-                </button>
-              </div>
-            </form>
+                <div className="pt-2">
+                  <button type="submit" className="btn-primary w-full md:w-auto">
+                    Guardar Desktop
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Portable printer */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Portátil — GOOJPRT MP-3 (Bluetooth)</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Impresora Bluetooth 80mm. Imprime vía RawBT enviando imagen del ticket.
+              </p>
+
+              <form onSubmit={handlePortablePrinterSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
+                    <select
+                      value={portablePrinterSettings.width}
+                      onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, width: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="72mm">72mm (área imprimible 80mm)</option>
+                      <option value="80mm">80mm (ancho total)</option>
+                      <option value="58mm">58mm</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tamaño de Fuente</label>
+                    <select
+                      value={portablePrinterSettings.fontSize}
+                      onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, fontSize: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="11px">11px (Compacto)</option>
+                      <option value="12px">12px (Pequeño)</option>
+                      <option value="13px">13px (Normal)</option>
+                      <option value="14px">14px (Grande)</option>
+                      <option value="15px">15px (Extra Grande)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded">
+                  <p className="text-sm text-amber-700">
+                    <strong>Requisito:</strong> La app <strong>RawBT</strong> debe estar instalada y configurada con la impresora Bluetooth emparejada.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button type="submit" className="btn-primary w-full md:w-auto">
+                    Guardar Portátil
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )
       }

@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePOS, CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, getSavedRate, saveRate, COP_TOLERANCE } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { saleService } from '../services/api/saleService';
+import { printSaleTicketPortable } from '../components/sales/SaleTicket';
+import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
@@ -18,6 +20,17 @@ const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone }
 // ============= TABLET POS =============
 const POSPageTablet = () => {
   const pos = usePOS();
+  const { companySettings } = useCompany();
+
+  const handlePortablePrint = useCallback(() => {
+    if (pos.saleResult) {
+      printSaleTicketPortable(pos.saleResult, companySettings, {
+        displayCurrency: pos.displayCurrency,
+        currencySymbol: pos.displaySymbol,
+        exchangeRate: calculateEffectiveRate('USD', pos.displayCurrency, pos.exchangeRates) || 1
+      });
+    }
+  }, [pos.saleResult, companySettings, pos.displayCurrency, pos.displaySymbol, pos.exchangeRates]);
 
   if (!pos.hasPermission('sales.create')) {
     return (
@@ -334,7 +347,7 @@ const POSPageTablet = () => {
         toDisplay={pos.toDisplay}
         displaySymbol={pos.displaySymbol}
         fmt={pos.fmt}
-        onPrint={pos.handlePrint}
+        onPrint={handlePortablePrint}
       />
 
       <CustomerSearch

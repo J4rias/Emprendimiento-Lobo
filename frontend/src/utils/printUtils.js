@@ -1,9 +1,11 @@
+import html2canvas from 'html2canvas';
+
 /**
  * Print utilities for tickets and invoices
  */
 
 /**
- * Print HTML content
+ * Print HTML content via browser print dialog (desktop)
  * @param {string} content - HTML content to print
  * @param {string} title - Document title
  */
@@ -168,4 +170,53 @@ export const alignRight = (text, width = 48) => {
 export const twoColumn = (label, value, width = 48) => {
   const spacing = Math.max(1, width - label.length - value.length);
   return label + ' '.repeat(spacing) + value;
+};
+
+/**
+ * Print HTML content via RawBT (portable Bluetooth thermal printer).
+ * Renders the ticket HTML into a canvas, converts to base64 image,
+ * and sends to RawBT via its rawbt: URI scheme.
+ * @param {string} content - HTML content to print
+ */
+export const printPortable = async (content) => {
+  const portableSettings = JSON.parse(
+    localStorage.getItem('pos_printer_portable_settings') || '{"width": "72mm", "fontSize": "13px"}'
+  );
+  const width = portableSettings.width || '72mm';
+  const fontSize = portableSettings.fontSize || '13px';
+  // Parse width to pixels (1mm ≈ 3.78px at 96dpi)
+  const widthPx = Math.round(parseFloat(width) * 3.78);
+
+  // Create offscreen container
+  const container = document.createElement('div');
+  container.style.cssText = `
+    position: fixed; left: -9999px; top: 0;
+    width: ${widthPx}px; max-width: ${widthPx}px;
+    background: #fff; color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: ${fontSize}; line-height: 1.1;
+    padding: 4px; box-sizing: border-box;
+    overflow: hidden;
+  `;
+  container.innerHTML = content;
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      width: widthPx,
+      windowWidth: widthPx,
+      scale: 2,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+
+    const dataUrl = canvas.toDataURL('image/png');
+    // RawBT accepts rawbt: URI with base64 image
+    window.location.href = 'rawbt:' + dataUrl;
+  } catch (err) {
+    console.error('Error generating portable print image:', err);
+    alert('Error al generar imagen para impresión portátil');
+  } finally {
+    document.body.removeChild(container);
+  }
 };

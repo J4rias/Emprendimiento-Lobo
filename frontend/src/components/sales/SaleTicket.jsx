@@ -1,5 +1,6 @@
 import {
   printHTML,
+  printPortable,
   formatCurrency,
   formatDate,
   centerText,
@@ -8,19 +9,15 @@ import {
 } from '../../utils/printUtils';
 
 /**
- * Generate and print sale ticket
- * @param {object} sale - Sale object with details
- * @param {object} companyInfo - Company information
- * @param {object} printOptions - Options like displayCurrency and exchangeRate
+ * Build ticket HTML string (shared by desktop and portable print)
  */
-export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
+const buildTicketHTML = (sale, companyInfo = {}, printOptions = {}) => {
   const {
     displayCurrency = 'USD',
     currencySymbol = '$',
     exchangeRate = 1
   } = printOptions;
 
-  // Custom formatter for the ticket — 0 decimals for COP
   const isCOP = displayCurrency === 'COP';
   const tFormat = (amount) => {
     const val = parseFloat(amount || 0) * exchangeRate;
@@ -31,43 +28,18 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
     const roundedVal = Math.round(val * 100) / 100;
     return `${currencySymbol} ${roundedVal.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
-  const {
-    name = 'EMPRENDIMIENTO LOBO',
-    address = '',
-    phone = '',
-    email = '',
-    ruc = ''
-  } = companyInfo;
 
-  // Calculate totals
   const subtotal = parseFloat(sale.subtotal || 0);
   const discount = parseFloat(sale.discount_amount || 0);
-  const tax = parseFloat(sale.tax_amount || 0);
-  const total = parseFloat(sale.total || 0);
-  const paid = parseFloat(sale.paid_amount || 0);
-  const change = parseFloat(sale.change_amount || 0);
 
-  // Building ticket HTML
-  const ticketHTML = `
+  return `
     <div style="width: 100%; max-width: 100%; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000; overflow: hidden;">
-      <!-- Header (comentado temporalmente) -->
-      ${false ? `
-      <div style="text-align: center; margin-bottom: 8px;">
-        <div style="font-size: 20px; font-weight: bold; margin-bottom: 2px;">${name.toUpperCase()}</div>
-        ${ruc || companyInfo.tax_id ? `<div style="font-size: 14px; font-weight: bold;">RIF: ${ruc || companyInfo.tax_id}</div>` : ''}
-        ${address ? `<div style="font-size: 11px; margin-top: 2px;">${address}</div>` : ''}
-        ${phone || email ? `<div style="font-size: 11px;">${phone ? `Tel: ${phone}` : ''} ${email ? `| ${email}` : ''}</div>` : ''}
-      </div>
-
-      <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
-      ` : ''}
-
       <!-- Sale Info -->
       <div style="margin-bottom: 8px; font-size: 13px;">
         <div style="text-align: center; font-weight: bold; margin-bottom: 4px;">PRESUPUESTO</div>
         <div><strong>Nro:</strong> ${(sale.sale_number || '').replace(/^VEN/, 'PRE')}</div>
         <div><strong>Fecha:</strong> ${formatDate(sale.sale_date || new Date())}</div>
-        
+
         ${sale.customer ? `
           <div style="margin-top: 4px; border-top: 1px solid #000; pt: 2px;">
             <div><strong>Cliente:</strong> ${sale.customer.fullName || (sale.customer.firstName ? `${sale.customer.firstName} ${sale.customer.lastName}` : (sale.customer.businessName || 'GENERAL'))}</div>
@@ -75,7 +47,7 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
             ${sale.customer.documentNumber ? `<div><strong>Doc:</strong> ${sale.customer.documentType ? sale.customer.documentType + '-' : ''}${sale.customer.documentNumber}</div>` : ''}
           </div>
         ` : '<div><strong>Cliente:</strong> CONSUMIDOR FINAL</div>'}
-        
+
         <div style="margin-top: 4px;"><strong>Vendedor:</strong> ${sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}`.trim() : 'N/A'}</div>
       </div>
 
@@ -138,14 +110,28 @@ export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
 
       <!-- Footer -->
       <div style="text-align: center; margin-top: 8px; font-size: 11px;">
-<div style="margin-top: 8px; font-size: 10px;">
+        <div style="margin-top: 8px; font-size: 10px;">
           Fecha de impresión: ${formatDate(new Date())}
         </div>
       </div>
     </div>
   `;
+};
 
+/**
+ * Print sale ticket via browser print dialog (desktop)
+ */
+export const printSaleTicket = (sale, companyInfo = {}, printOptions = {}) => {
+  const ticketHTML = buildTicketHTML(sale, companyInfo, printOptions);
   printHTML(ticketHTML, `Ticket ${sale.sale_number}`);
+};
+
+/**
+ * Print sale ticket via RawBT (portable Bluetooth thermal printer)
+ */
+export const printSaleTicketPortable = (sale, companyInfo = {}, printOptions = {}) => {
+  const ticketHTML = buildTicketHTML(sale, companyInfo, printOptions);
+  printPortable(ticketHTML);
 };
 
 export default printSaleTicket;

@@ -1442,42 +1442,134 @@ exports.getSalesSummary = async (req, res) => {
     const dateFrom = from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const dateTo = to || dateFrom;
 
-    const [summary] = await sequelize.query(`
+    const replacements = { dateFrom, dateTo };
+    const statusFilter = "s.status IN ('completed','pending')";
+    const dateFilter = "DATE(s.sale_date) >= :dateFrom AND DATE(s.sale_date) <= :dateTo";
+
+    // --- Summary + sales_by_type ---
+    const [summaryRow] = await sequelize.query(`
       SELECT
         COUNT(*) as sale_count,
-        COALESCE(SUM(total), 0) as total_sales,
-        COALESCE(SUM(paid_amount), 0) as total_paid,
-        COALESCE(SUM(credit_amount), 0) as total_credit,
-        COALESCE(SUM(CASE WHEN sale_type = 'cash' THEN total ELSE 0 END), 0) as cash_total,
-        COALESCE(SUM(CASE WHEN sale_type = 'credit' THEN total ELSE 0 END), 0) as credit_total,
-        COALESCE(SUM(CASE WHEN sale_type = 'mixed' THEN total ELSE 0 END), 0) as mixed_total
-      FROM sales
-      WHERE status = 'completed'
-        AND DATE(sale_date) >= :dateFrom
-        AND DATE(sale_date) <= :dateTo
-    `, { replacements: { dateFrom, dateTo }, type: sequelize.QueryTypes.SELECT });
+        COALESCE(SUM(s.total), 0) as total_sales_usd,
+        COALESCE(SUM(s.total * s.exchange_rate), 0) as total_sales_cop,
+        COALESCE(SUM(s.paid_amount), 0) as total_paid_usd,
+        COALESCE(SUM(s.total - s.paid_amount), 0) as total_credit_usd,
+        COALESCE(SUM(CASE WHEN s.sale_type='cash' THEN 1 ELSE 0 END), 0) as cash_count,
+        COALESCE(SUM(CASE WHEN s.sale_type='cash' THEN s.total ELSE 0 END), 0) as cash_total,
+        COALESCE(SUM(CASE WHEN s.sale_type='credit' THEN 1 ELSE 0 END), 0) as credit_count,
+        COALESCE(SUM(CASE WHEN s.sale_type='credit' THEN s.total ELSE 0 END), 0) as credit_total,
+        COALESCE(SUM(CASE WHEN s.sale_type='mixed' THEN 1 ELSE 0 END), 0) as mixed_count,
+        COALESCE(SUM(CASE WHEN s.sale_type='mixed' THEN s.total ELSE 0 END), 0) as mixed_total
+      FROM sales s
+      WHERE ${statusFilter} AND ${dateFilter}
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
 
-    const [topProducts] = await sequelize.query(`
+    const sr = summaryRow || {};
+
+    // --- Payments by currency (cash/mixed sales only) ---
+    const paymentRows = await sequelize.query(`
+      SELECT
+        sp.currency,
+        sp.payment_method,
+        SUM(sp.amount) as total_amount,
+        COUNT(DISTINCT sp.sale_id) as sale_count
+      FROM sale_payments sp
+      JOIN sales s ON s.id = sp.sale_id
+      WHERE ${statusFilter} AND ${dateFilter}
+        AND s.sale_type IN ('cash','mixed')
+      GROUP BY sp.currency, sp.payment_method
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
+
+    const payments_by_currency = {};
+    for (const row of paymentRows) {
+      const curr = row.currency || 'USD';
+      if (!payments_by_currency[curr]) {
+        payments_by_currency[curr] = { sales_count: 0, cash: 0, transfer: 0, total: 0 };
+      }
+      const amount = parseFloat(row.total_amount) || 0;
+      const method = row.payment_method === 'cash' ? 'cash' : 'transfer';
+      payments_by_currency[curr][method] += amount;
+      payments_by_currency[curr].total += amount;
+    }
+    // Sales count per currency (distinct)
+    const currSalesCounts = await sequelize.query(`
+      SELECT
+        sp.currency,
+        COUNT(DISTINCT sp.sale_id) as sale_count
+      FROM sale_payments sp
+      JOIN sales s ON s.id = sp.sale_id
+      WHERE ${statusFilter} AND ${dateFilter}
+        AND s.sale_type IN ('cash','mixed')
+      GROUP BY sp.currency
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
+    for (const row of currSalesCounts) {
+      const curr = row.currency || 'USD';
+      if (payments_by_currency[curr]) {
+        payments_by_currency[curr].sales_count = parseInt(row.sale_count) || 0;
+      }
+    }
+
+    // --- Credit: given today + collections by currency ---
+    // total_credit_usd = SUM(total - paid_amount) already covers credit + mixed
+    const creditGivenUSD = parseFloat(sr.total_credit_usd) || 0;
+
+    // Credit collections: payments today for credit sales, or old mixed sales
+    const creditCollections = await sequelize.query(`
+      SELECT
+        sp.currency,
+        SUM(sp.amount) as total_amount
+      FROM sale_payments sp
+      JOIN sales s ON s.id = sp.sale_id
+      WHERE s.status IN ('completed','pending')
+        AND DATE(sp.payment_date) >= :dateFrom AND DATE(sp.payment_date) <= :dateTo
+        AND (
+          s.sale_type = 'credit'
+          OR (s.sale_type = 'mixed' AND DATE(s.sale_date) < :dateFrom)
+        )
+      GROUP BY sp.currency
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
+
+    const collected_by_currency = {};
+    for (const row of creditCollections) {
+      collected_by_currency[row.currency || 'USD'] = parseFloat(row.total_amount) || 0;
+    }
+
+    // --- Top products (array, top 10) ---
+    const topProducts = await sequelize.query(`
       SELECT
         p.name as product_name,
         SUM(sd.quantity) as total_quantity,
-        SUM(sd.total) as total_revenue
+        SUM(sd.total) as total_revenue_usd
       FROM sale_details sd
       JOIN sales s ON s.id = sd.sale_id
       JOIN products p ON p.id = sd.product_id
-      WHERE s.status = 'completed'
-        AND DATE(s.sale_date) >= :dateFrom
-        AND DATE(s.sale_date) <= :dateTo
+      WHERE ${statusFilter} AND ${dateFilter}
       GROUP BY sd.product_id, p.name
-      ORDER BY total_revenue DESC
+      ORDER BY total_revenue_usd DESC
       LIMIT 10
-    `, { replacements: { dateFrom, dateTo }, type: sequelize.QueryTypes.SELECT });
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
 
     res.json({
       success: true,
       data: {
         period: { from: dateFrom, to: dateTo },
-        summary: summary || { sale_count: 0, total_sales: 0, total_paid: 0, total_credit: 0 },
+        summary: {
+          sale_count: parseInt(sr.sale_count) || 0,
+          total_sales_usd: parseFloat(sr.total_sales_usd) || 0,
+          total_sales_cop: Math.round(parseFloat(sr.total_sales_cop) || 0),
+          total_paid_usd: parseFloat(sr.total_paid_usd) || 0,
+          total_credit_usd: parseFloat(sr.total_credit_usd) || 0,
+          sales_by_type: {
+            cash: { count: parseInt(sr.cash_count) || 0, total_usd: parseFloat(sr.cash_total) || 0 },
+            credit: { count: parseInt(sr.credit_count) || 0, total_usd: parseFloat(sr.credit_total) || 0 },
+            mixed: { count: parseInt(sr.mixed_count) || 0, total_usd: parseFloat(sr.mixed_total) || 0 }
+          }
+        },
+        payments_by_currency,
+        credit: {
+          given_usd: creditGivenUSD,
+          collected_by_currency
+        },
         top_products: topProducts || []
       }
     });
