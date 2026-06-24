@@ -460,7 +460,7 @@ export function usePOS() {
       .reduce((sum, i) => sum + (i.sellByUnit ? i.quantity : i.quantity * i.units_per_package), 0);
 
     if (currentUnitsInCart + units > available) {
-      setConflictData({ productName: product.name, requested: units, available: available - currentUnitsInCart, reservedByOthers: totalStock - available });
+      setConflictData({ productName: product.name, requested: currentUnitsInCart + units, available, reservedByOthers: totalStock - available });
       setShowConflictAlert(true);
       return;
     }
@@ -502,7 +502,7 @@ export function usePOS() {
       if (err.response?.status === 409) {
         setConflictData({
           productName: product.name,
-          requested: units,
+          requested: currentUnitsInCart + units,
           available: err.response.data.available || 0,
           reservedByOthers: err.response.data.reserved_by_others || 0,
         });
@@ -589,7 +589,7 @@ export function usePOS() {
       if (err.response?.status === 409) {
         setConflictData({
           productName: item.product_name,
-          requested: newUnitsForThis,
+          requested: totalUnitsRequested,
           available: err.response.data.available || 0,
           reservedByOthers: err.response.data.reserved_by_others || 0,
         });

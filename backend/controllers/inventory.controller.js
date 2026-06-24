@@ -19,7 +19,6 @@ class InventoryController {
 
       const offset = (page - 1) * limit;
       const where = warehouse_id === 'all' ? {} : { warehouse_id };
-      const productWhere = {};
 
       // Search and category filters are best handled by finding matching products first
       // This avoids complex join issues with findAndCountAll and ensures barcode search works
@@ -48,6 +47,52 @@ class InventoryController {
 
         const matchingProductIds = matchingProducts.map(p => p.id);
         where.product_id = { [Op.in]: matchingProductIds.length > 0 ? matchingProductIds : [0] };
+      }
+
+      // Status filters — applied in SQL BEFORE pagination
+      const statusFilters = [];
+
+      if (out_of_stock === 'true') {
+        statusFilters.push(sequelize.literal('`Inventory`.`quantity` <= 0'));
+      }
+
+      if (low_stock === 'true') {
+        statusFilters.push(sequelize.literal('`Inventory`.`quantity` <= `product`.`reorder_point`'));
+      }
+
+      if (expiring === 'true') {
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+        const batchWhere = {
+          expiration_date: { [Op.lte]: thirtyDaysFromNow, [Op.gte]: new Date() },
+          quantity: { [Op.gt]: 0 }
+        };
+        if (warehouse_id !== 'all') {
+          batchWhere.warehouse_id = warehouse_id;
+        }
+
+        const expiringBatches = await Batch.findAll({
+          where: batchWhere,
+          attributes: ['product_id'],
+          group: ['product_id'],
+          raw: true
+        });
+
+        const expiringProductIds = expiringBatches.map(b => parseInt(b.product_id));
+        if (expiringProductIds.length > 0) {
+          statusFilters.push(sequelize.literal(`\`Inventory\`.\`product_id\` IN (${expiringProductIds.join(',')})`));
+        } else {
+          statusFilters.push(sequelize.literal('1 = 0'));
+        }
+      }
+
+      if (statusFilters.length === 1) {
+        if (!where[Op.and]) where[Op.and] = [];
+        where[Op.and].push(statusFilters[0]);
+      } else if (statusFilters.length > 1) {
+        if (!where[Op.and]) where[Op.and] = [];
+        where[Op.and].push({ [Op.or]: statusFilters });
       }
 
       const { rows: inventory, count } = await Inventory.findAndCountAll({
@@ -99,42 +144,14 @@ class InventoryController {
         return plainItem;
       });
 
-      // Filter items in JavaScript if needed
-      let filteredInventory = inventoryWithPresentations;
-      if (low_stock === 'true') {
-        filteredInventory = inventoryWithPresentations.filter(item =>
-          parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
-        );
-      }
-
-      if (expiring === 'true') {
-        const thirtyDaysFromNow = new Date();
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-        filteredInventory = inventoryWithPresentations.filter(item => {
-          // Check if any batch is expiring within 30 days
-          return item.product && item.product.batches && item.product.batches.some(batch => {
-            if (!batch.expiration_date) return false;
-            const expirationDate = new Date(batch.expiration_date);
-            return expirationDate <= thirtyDaysFromNow && expirationDate >= new Date();
-          });
-        });
-      }
-
-      if (out_of_stock === 'true') {
-        filteredInventory = inventoryWithPresentations.filter(item =>
-          parseFloat(item.quantity) <= 0
-        );
-      }
-
       res.json({
         success: true,
-        data: filteredInventory,
+        data: inventoryWithPresentations,
         pagination: {
-          total: (low_stock === 'true' || expiring === 'true' || out_of_stock === 'true') ? filteredInventory.length : count,
+          total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
+          totalPages: Math.ceil(count / parseInt(limit))
         }
       });
     } catch (error) {
