@@ -65,12 +65,15 @@ const SupplierPaymentsPage = () => {
   const [viewingPayment, setViewingPayment] = useState(null);
   const [editingPayment, setEditingPayment] = useState(null);
   const [error, setError] = useState(null);
+  const [payableBalanceSummary, setPayableBalanceSummary] = useState(null);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [creditBalances, setCreditBalances] = useState(null);
 
   // Query: supplier payments
   const { data: paymentsData = {}, isLoading: loading } = useQuery({
     queryKey: ['supplier-payments', currentPage, debouncedSearch, supplierFilter, paymentMethodFilter],
     queryFn: async () => {
-      const response = await supplierPaymentService.getPayments({
+      const response = await supplierPaymentService.getAll({
         page: currentPage,
         search: debouncedSearch,
         supplier_id: supplierFilter,
@@ -195,7 +198,7 @@ const SupplierPaymentsPage = () => {
   const [userEditedAmount, setUserEditedAmount] = useState(false); // Track if user manually changed the amount
 
   // Debounce search
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
@@ -315,43 +318,9 @@ const SupplierPaymentsPage = () => {
     }
   };
 
-  const fetchPayments = async () => {
-    try {
-      setLoading(true);
-      const response = await supplierPaymentService.getAll({
-        page: currentPage,
-        limit: 20,
-        search: debouncedSearch,
-        supplier_id: supplierFilter || undefined,
-        payment_method: paymentMethodFilter || undefined
-      });
-      setPayments(response.data);
-      setTotalPages(response.pagination.totalPages);
-      setError(null);
-    } catch (err) {
-      setError('Error al cargar los pagos');
-      console.error('Error fetching payments:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await supplierPaymentService.getStats();
-      setStats(response.data);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const response = await supplierService.getActive();
-      setSuppliers(response.data || []);
-    } catch (err) {
-      console.error('Error fetching suppliers:', err);
-    }
+  const invalidatePaymentQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['supplier-payments'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier-payment-stats'] });
   };
 
   const fetchPurchaseOrdersBySupplier = async (supplierId) => {
@@ -398,8 +367,7 @@ const SupplierPaymentsPage = () => {
       };
       await supplierPaymentService.create(payload);
       setShowCreateModal(false);
-      fetchPayments();
-      fetchStats();
+      invalidatePaymentQueries();
       resetForm();
       alert('Pago registrado exitosamente');
     } catch (err) {
@@ -412,8 +380,7 @@ const SupplierPaymentsPage = () => {
     try {
       await supplierPaymentService.update(editingPayment.id, formData);
       setShowEditModal(false);
-      fetchPayments();
-      fetchStats();
+      invalidatePaymentQueries();
       resetForm();
       alert('Pago actualizado exitosamente');
     } catch (err) {
