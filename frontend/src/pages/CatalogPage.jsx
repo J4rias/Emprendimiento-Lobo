@@ -231,7 +231,7 @@ const ProductCard = ({ product }) => (
     {/* Product image */}
     <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100">
       <img
-        src={product.image_url ? `${API_BASE_URL}${product.image_url}` : `${API_BASE_URL}/uploads/products/placeholder.jpg`}
+        src={product.image_url ? `${API_BASE_URL}${product.image_url}` : '/images/placeholder-product.jpg'}
         alt={product.name}
         className="w-full h-full object-contain p-2"
         loading="lazy"
