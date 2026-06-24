@@ -22,6 +22,7 @@ exports.getCatalog = async (req, res) => {
       SELECT
         p.id,
         p.name,
+        p.image_url,
         p.category_id,
         c.name AS category_name,
         c.color AS category_color,

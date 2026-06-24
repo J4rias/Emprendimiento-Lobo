@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, ChevronUp, Flame, Sparkles, Package } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = API_URL.replace(/\/api$/, '');
 
 // Category emoji mapping
 const CATEGORY_ICONS = {
@@ -227,11 +228,16 @@ const CatalogPage = () => {
 
 const ProductCard = ({ product }) => (
   <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-    {/* Category icon header */}
-    <div className="bg-gradient-to-br from-slate-50 to-slate-100 px-3 pt-2.5 pb-1.5 flex items-center justify-between">
-      <span className="text-2xl">{CATEGORY_ICONS[product.category_name] || '📦'}</span>
+    {/* Product image */}
+    <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100">
+      <img
+        src={product.image_url ? `${API_BASE_URL}${product.image_url}` : `${API_BASE_URL}/uploads/products/placeholder.jpg`}
+        alt={product.name}
+        className="w-full h-full object-contain p-2"
+        loading="lazy"
+      />
       {product.low_stock ? (
-        <span className="text-[9px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+        <span className="absolute top-1.5 right-1.5 text-[9px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
           Últimos disp.
         </span>
       ) : null}
