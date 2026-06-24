@@ -91,7 +91,7 @@ exports.create = async (req, res) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone'] }
+        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone'] }
       ]
     });
 
@@ -119,7 +119,7 @@ exports.getAll = async (req, res) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone'] },
+        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone'] },
         { model: User, as: 'approver', attributes: ['id', 'first_name', 'last_name'] }
       ],
       order: [['created_at', 'DESC']],
@@ -170,7 +170,7 @@ exports.getById = async (req, res) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'base_price'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email'] },
+        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone', 'email'] },
         { model: User, as: 'approver', attributes: ['id', 'first_name', 'last_name'] },
         { model: Sale, as: 'convertedSale', attributes: ['id', 'sale_number', 'total'] }
       ]
