@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePOS, CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, getSavedRate, saveRate, COP_TOLERANCE } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { saleService } from '../services/api/saleService';
+import { bankService } from '../services/api/bankService';
 import { printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
@@ -611,7 +612,13 @@ function TabletCheckoutModal({
   const [newPayMethod, setNewPayMethod] = useState('cash');
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayRate, setNewPayRate] = useState(() => getCOPRate(isUSD ? 'USD' : 'COP'));
+  const [newPayBank, setNewPayBank] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [banks, setBanks] = useState([]);
+
+  useEffect(() => {
+    bankService.getAll().then(setBanks).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const def = isUSD ? 'USD' : 'COP';
@@ -619,6 +626,7 @@ function TabletCheckoutModal({
     setNewPayMethod('cash');
     setNewPayAmount('');
     setNewPayRate(getCOPRate(def));
+    setNewPayBank('');
   }, [displayCurrency]);
 
   if (!show) return null;
@@ -645,12 +653,16 @@ function TabletCheckoutModal({
 
   const handleMethodChange = (method) => {
     setNewPayMethod(method);
+    setNewPayBank('');
     if (method === 'usdt') {
       setNewPayRate(getSavedRate('usdt', 'COP') || copPerUSD);
     } else if (newPayMethod === 'usdt' && method !== 'usdt') {
       handleCurrencyChange(newPayCurrency);
     }
   };
+
+  // Banks filtered by the selected currency
+  const filteredBanks = banks.filter(b => b.currency === effectiveCurrency);
 
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
@@ -677,12 +689,13 @@ function TabletCheckoutModal({
     const existingIdx = (displayRate || isUSDT)
       ? -1
       : paymentLines.findIndex(l => l.currency === backendCurrency && l.method === newPayMethod);
+    const bankId = (newPayMethod === 'transfer' && newPayBank) ? parseInt(newPayBank) : undefined;
     if (existingIdx >= 0) {
       const updated = [...paymentLines];
       updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
       setPaymentLines(updated);
     } else {
-      setPaymentLines([...paymentLines, { currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) }]);
+      setPaymentLines([...paymentLines, { currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }), ...(bankId && { bank_id: bankId }) }]);
     }
     setNewPayAmount('');
   };
@@ -793,7 +806,7 @@ function TabletCheckoutModal({
                           {line.currency} {fmtLine(line.amount, line.currency)}
                         </span>
                         <span className={`text-sm ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
-                          ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label})
+                          ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label}{line.bank_id ? ` - ${banks.find(b => b.id === line.bank_id)?.name || ''}` : ''})
                         </span>
                         {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                           <span className="text-xs text-gray-400">
@@ -823,6 +836,12 @@ function TabletCheckoutModal({
                 <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                   {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
+                {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
+                  <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+                    <option value="">Banco</option>
+                    {filteredBanks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
                 {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
                   <>
                     <label className="text-sm text-gray-500 whitespace-nowrap">
