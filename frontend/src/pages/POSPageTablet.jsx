@@ -12,7 +12,7 @@ import Modal from '../components/common/Modal';
 import {
   Search, X, AlertCircle, CheckCircle, User,
   Package, Lock, Banknote, CreditCard, Smartphone,
-  Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
+  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
