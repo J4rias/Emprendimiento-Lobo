@@ -226,6 +226,21 @@ class ProductController {
         await transaction.rollback();
         return res.status(400).json({ success: false, message: 'El nombre del producto es obligatorio' });
       }
+
+      // Check for duplicate product name (including inactive)
+      const existingProduct = await Product.findOne({
+        where: { name: name.trim() }
+      });
+      if (existingProduct) {
+        await transaction.rollback();
+        const status = existingProduct.is_active ? 'activo' : 'inactivo';
+        return res.status(409).json({
+          success: false,
+          message: `Ya existe un producto con el nombre "${name.trim()}" (${status}, SKU: ${existingProduct.sku})`,
+          existingProductId: existingProduct.id
+        });
+      }
+
       if (!category_id) {
         await transaction.rollback();
         return res.status(400).json({ success: false, message: 'La categoría es obligatoria' });
