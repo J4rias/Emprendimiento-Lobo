@@ -7,7 +7,7 @@ const BOT_PERMISSIONS = [
   'products.view', 'categories.view', 'price_lists.view',
   'exchange_rates.view', 'customers.view', 'customers.create',
   'pre_orders.create', 'pre_orders.view',
-  'sales.view', 'inventory.view', 'accounts_receivable.view',
+  'sales.view', 'inventory.view', 'ar.view',
 ];
 
 const auth = async (req, res, next) => {

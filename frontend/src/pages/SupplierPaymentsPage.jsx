@@ -574,7 +574,8 @@ const SupplierPaymentsPage = () => {
       check: 'Cheque',
       card: 'Tarjeta',
       other: 'Otro',
-      credit_balance: 'Uso de Saldo a Favor'
+      credit_balance: 'Uso de Saldo a Favor',
+      usdt: 'USDT'
     };
     return methods[method] || method;
   };
@@ -586,7 +587,8 @@ const SupplierPaymentsPage = () => {
       check: 'bg-purple-100 text-purple-700',
       card: 'bg-yellow-100 text-yellow-700',
       other: 'bg-gray-100 text-gray-700',
-      credit_balance: 'bg-indigo-100 text-indigo-700'
+      credit_balance: 'bg-indigo-100 text-indigo-700',
+      usdt: 'bg-cyan-100 text-cyan-700'
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${config[method] || config.other}`}>

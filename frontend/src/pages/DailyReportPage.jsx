@@ -56,7 +56,8 @@ const DailyReportPage = () => {
         const methods = {
             cash: 'Efectivo',
             card: 'Punto de venta',
-            transfer: 'Transferencia'
+            transfer: 'Transferencia',
+            usdt: 'USDT'
         };
         return methods[method] || method;
     };
@@ -156,6 +157,15 @@ const DailyReportPage = () => {
                             ).join('');
                     })()}
                 </table>
+                ${(() => {
+                    const usdtTotal = Object.values(report.paymentsBreakdown || {})
+                        .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
+                    if (!usdtTotal) return '';
+                    return `<div style="font-weight:bold; font-size:12px; margin-bottom:4px;">USDT recibido</div>
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+                        <tr><td style="font-size:13px; font-weight:bold;">USDT</td><td style="text-align:right; font-size:15px; font-weight:bold;">$ ${fmtAmount(usdtTotal, 'USD')}</td></tr>
+                    </table>`;
+                })()}
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
                 <div style="text-align:center; font-size:10px; margin-top:6px;">*** FIN DE ARQUEO ***</div>
             </div>`;
@@ -399,7 +409,10 @@ const DailyReportPage = () => {
                                 return [currency, cash - refund];
                             })
                             .filter(([, amount]) => amount !== 0);
-                        if (cashByCurrency.length === 0 && !refundUSD) return null;
+                        // USDT total across all currencies
+                        const usdtTotal = Object.values(report.paymentsBreakdown || {})
+                            .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
+                        if (cashByCurrency.length === 0 && !refundUSD && !usdtTotal) return null;
                         return (
                             <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
                                 <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
@@ -413,6 +426,12 @@ const DailyReportPage = () => {
                                         </div>
                                     ))}
                                 </div>
+                                {usdtTotal > 0 && (
+                                    <div className="mt-4 pt-3 border-t border-slate-600">
+                                        <p className="text-xs text-cyan-300 uppercase tracking-wide mb-1">USDT recibido</p>
+                                        <p className="text-xl font-bold text-cyan-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
+                                    </div>
+                                )}
                                 {(refundUSD > 0 || refundCOP > 0) && (
                                     <p className="text-xs text-slate-400 mt-2">
                                         Incluye descuento por devoluciones: {refundUSD > 0 ? `$ ${fmtAmount(refundUSD, 'USD')} USD` : ''}{refundUSD > 0 && refundCOP > 0 ? ' / ' : ''}{refundCOP > 0 ? `${fmtAmount(refundCOP, 'COP')} COP` : ''}

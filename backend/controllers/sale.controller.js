@@ -255,6 +255,7 @@ exports.createSale = async (req, res) => {
     }
 
     // Update customer's credit_used for sales with credit component
+    let credit_due_date = null;
     if ((sale_type === 'credit' || sale_type === 'mixed') && customer_id && credit_amount > 0) {
       const customer = await Customer.findByPk(customer_id, { transaction });
 
@@ -270,14 +271,22 @@ exports.createSale = async (req, res) => {
       await customer.update({
         credit_used: currentCreditUsed + credit_amount
       }, { transaction });
+
+      // Calculate credit due date from customer's credit_days
+      const creditDays = parseInt(customer.credit_days) || 0;
+      if (creditDays > 0) {
+        credit_due_date = new Date();
+        credit_due_date.setDate(credit_due_date.getDate() + creditDays);
+      }
     }
 
+    const saleDate = new Date();
     const sale = await Sale.create({
       sale_number,
       customer_id: customer_id || null,
       warehouse_id,
       user_id: req.user.id,
-      sale_date: new Date(),
+      sale_date: saleDate,
       sale_type,
       currency_mode,
       exchange_rate,
@@ -287,6 +296,7 @@ exports.createSale = async (req, res) => {
       discount_amount,
       total,
       credit_amount,
+      credit_due_date,
       paid_amount: (sale_type === 'cash' || sale_type === 'mixed') ? paid_amount : 0,
       change_amount,
       status: sale_type === 'cash' ? 'completed' : 'pending',
@@ -316,6 +326,7 @@ exports.createSale = async (req, res) => {
             currency: payLine.currency || 'USD',
             exchange_rate: payLine.exchange_rate || 1,
             reference: payLine.reference || null,
+            bank_id: payLine.bank_id || null,
             created_by: req.user.id
           }, { transaction });
 
@@ -832,6 +843,7 @@ exports.addPayment = async (req, res) => {
         currency: payLine.currency || 'USD',
         exchange_rate: payLine.exchange_rate || 1,
         reference: payLine.reference || null,
+        bank_id: payLine.bank_id || null,
         notes: notes || null,
         created_by: req.user.id
       }, { transaction });
@@ -1513,10 +1525,10 @@ exports.getSalesSummary = async (req, res) => {
     for (const row of paymentRows) {
       const curr = row.currency || 'USD';
       if (!payments_by_currency[curr]) {
-        payments_by_currency[curr] = { sales_count: 0, cash: 0, transfer: 0, total: 0 };
+        payments_by_currency[curr] = { sales_count: 0, cash: 0, transfer: 0, usdt: 0, total: 0 };
       }
       const amount = parseFloat(row.total_amount) || 0;
-      const method = row.payment_method === 'cash' ? 'cash' : 'transfer';
+      const method = row.payment_method === 'usdt' ? 'usdt' : (row.payment_method === 'cash' ? 'cash' : 'transfer');
       payments_by_currency[curr][method] += amount;
       payments_by_currency[curr].total += amount;
     }

@@ -23,7 +23,7 @@ const SalePayment = sequelize.define('SalePayment', {
     comment: 'Fecha del pago'
   },
   payment_method: {
-    type: DataTypes.ENUM('cash', 'card', 'transfer', 'check', 'other'),
+    type: DataTypes.ENUM('cash', 'card', 'transfer', 'check', 'other', 'credit_balance', 'usdt'),
     allowNull: false,
     comment: 'Método de pago'
   },

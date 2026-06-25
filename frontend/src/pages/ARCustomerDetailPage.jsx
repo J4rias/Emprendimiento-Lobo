@@ -39,7 +39,7 @@ const BUCKET_LABELS = {
 
 const METHOD_LABELS = {
   cash: 'Efectivo', transfer: 'Transferencia', card: 'Tarjeta',
-  check: 'Cheque', credit_balance: 'Monedero',
+  check: 'Cheque', credit_balance: 'Monedero', usdt: 'USDT',
 };
 
 /**

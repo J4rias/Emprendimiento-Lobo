@@ -41,6 +41,7 @@ const CompanySettings = require('./CompanySettings');
 const PosReservation = require('./PosReservation');
 const PreOrder = require('./PreOrder');
 const PreOrderDetail = require('./PreOrderDetail');
+const Bank = require('./Bank');
 
 // Define associations
 
@@ -230,6 +231,10 @@ Sale.hasMany(SalePayment, { foreignKey: 'sale_id', as: 'payments' });
 // SalePayment - User (Created by)
 SalePayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
+// SalePayment - Bank (optional)
+SalePayment.belongsTo(Bank, { foreignKey: 'bank_id', as: 'bank' });
+Bank.hasMany(SalePayment, { foreignKey: 'bank_id', as: 'salePayments' });
+
 // Supplier - SupplierContact (One to Many)
 Supplier.hasMany(SupplierContact, { foreignKey: 'supplier_id', as: 'contacts' });
 SupplierContact.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
@@ -294,6 +299,10 @@ PurchaseOrder.hasMany(SupplierPayment, { foreignKey: 'purchase_order_id', as: 'p
 // SupplierPayment - User (Created by)
 SupplierPayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(SupplierPayment, { foreignKey: 'created_by', as: 'supplierPayments' });
+
+// SupplierPayment - Bank (optional)
+SupplierPayment.belongsTo(Bank, { foreignKey: 'bank_id', as: 'bank' });
+Bank.hasMany(SupplierPayment, { foreignKey: 'bank_id', as: 'supplierPayments' });
 
 // SupplierPaymentAllocation - SupplierPayment (Many to One)
 SupplierPaymentAllocation.belongsTo(SupplierPayment, { foreignKey: 'payment_id', as: 'payment' });
@@ -446,4 +455,5 @@ module.exports = {
   PosReservation,
   PreOrder,
   PreOrderDetail,
+  Bank,
 };

@@ -137,6 +137,7 @@ const CreditNoteDetailExpanded = ({ transaction }) => {
         credit_balance: 'Monedero (Saldo a Favor)',
         cash: 'Efectivo',
         transfer: 'Transferencia',
+        usdt: 'USDT',
         none: 'Sin reembolso'
     };
     const typeLabels = { full: 'Devolución Total', partial: 'Devolución Parcial' };
@@ -193,6 +194,7 @@ const PaymentDetailExpanded = ({ transaction, currency }) => {
         card: 'Tarjeta',
         check: 'Cheque',
         credit_balance: 'Monedero',
+        usdt: 'USDT',
     };
 
     return (

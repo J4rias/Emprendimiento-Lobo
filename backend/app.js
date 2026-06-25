@@ -160,6 +160,7 @@ app.use('/api/price-lists', priceListRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/ar', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
+app.use('/api/banks', require('./routes/bank.routes'));
 
 // 404 handler
 app.use((req, res) => {

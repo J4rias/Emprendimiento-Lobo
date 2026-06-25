@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone };
+const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone, usdt: Hash };
 
 // ============= TABLET POS =============
 const POSPageTablet = () => {
@@ -645,14 +645,23 @@ function TabletCheckoutModal({
 
   const handleMethodChange = (method) => {
     setNewPayMethod(method);
+    if (method === 'usdt') {
+      setNewPayRate(getSavedRate('usdt', 'COP') || copPerUSD);
+    } else if (newPayMethod === 'usdt' && method !== 'usdt') {
+      handleCurrencyChange(newPayCurrency);
+    }
   };
 
   const addPaymentLine = () => {
     const amount = parseFloat(newPayAmount);
     if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
     let copRate;
-    if (isUSD && effectiveCurrency === 'USD') {
-      // USD payment in USD mode: use copPerUSD directly to avoid rounding on roundtrip
+    const isUSDT = newPayMethod === 'usdt';
+    if (isUSDT) {
+      // USDT: rate input is always COP/USDT, amount is in USDT (≈USD)
+      copRate = parseFloat(newPayRate) || copPerUSD;
+      saveRate('usdt', copRate, 'COP');
+    } else if (isUSD && effectiveCurrency === 'USD') {
       copRate = copPerUSD;
     } else if (isUSD && effectiveCurrency !== 'USD') {
       copRate = copPerUSD / (parseFloat(newPayRate) || 1);
@@ -663,16 +672,17 @@ function TabletCheckoutModal({
       copRate = parseFloat(newPayRate) || 1;
       if (effectiveCurrency !== displayCurrency) saveRate(effectiveCurrency, copRate, 'COP');
     }
+    const backendCurrency = isUSDT ? 'USD' : effectiveCurrency;
     const displayRate = (isUSD && effectiveCurrency !== 'USD') ? (parseFloat(newPayRate) || 1) : null;
-    const existingIdx = displayRate
-      ? -1  // Never merge cross-currency payments (they have independent rates)
-      : paymentLines.findIndex(l => l.currency === effectiveCurrency && l.method === newPayMethod);
+    const existingIdx = (displayRate || isUSDT)
+      ? -1
+      : paymentLines.findIndex(l => l.currency === backendCurrency && l.method === newPayMethod);
     if (existingIdx >= 0) {
       const updated = [...paymentLines];
       updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
       setPaymentLines(updated);
     } else {
-      setPaymentLines([...paymentLines, { currency: effectiveCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) }]);
+      setPaymentLines([...paymentLines, { currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) }]);
     }
     setNewPayAmount('');
   };
@@ -785,9 +795,11 @@ function TabletCheckoutModal({
                         <span className={`text-sm ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
                           ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label})
                         </span>
-                        {!isCreditLine && line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)) && (
+                        {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                           <span className="text-xs text-gray-400">
-                            @ {line.display_rate
+                            @ {line.method === 'usdt'
+                              ? `${Math.round(line.cop_rate).toLocaleString('es-CO')} COP/USDT`
+                              : line.display_rate
                               ? `${line.currency === 'COP' ? Math.round(line.display_rate).toLocaleString('es-CO') : line.display_rate.toFixed(2)} ${line.currency}/USD`
                               : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
                           </span>
@@ -811,9 +823,11 @@ function TabletCheckoutModal({
                 <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                   {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
-                {effectiveCurrency !== displayCurrency && (
+                {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
                   <>
-                    <label className="text-sm text-gray-500 whitespace-nowrap">{isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`}:</label>
+                    <label className="text-sm text-gray-500 whitespace-nowrap">
+                      {newPayMethod === 'usdt' ? 'COP/USDT' : (isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`)}:
+                    </label>
                     <input
                       type="number"
                       value={newPayRate}

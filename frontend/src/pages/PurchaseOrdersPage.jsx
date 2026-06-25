@@ -728,8 +728,8 @@ const PurchaseOrdersPage = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                       {viewingOrder.payment_history.map((pay, idx) => {
-                        const methodLabels = { cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque', card: 'Tarjeta', credit_balance: 'Saldo a Favor' };
-                        const methodColors = { cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700', check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700', credit_balance: 'bg-indigo-100 text-indigo-700', other: 'bg-gray-100 text-gray-700' };
+                        const methodLabels = { cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque', card: 'Tarjeta', credit_balance: 'Saldo a Favor', usdt: 'USDT' };
+                        const methodColors = { cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700', check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700', credit_balance: 'bg-indigo-100 text-indigo-700', other: 'bg-gray-100 text-gray-700', usdt: 'bg-cyan-100 text-cyan-700' };
                         const badgeColor = methodColors[pay.payment_method] || methodColors.other;
                         const label = methodLabels[pay.payment_method] || pay.payment_method;
 

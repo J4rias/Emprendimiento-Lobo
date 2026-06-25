@@ -53,7 +53,7 @@ const Sale = sequelize.define('Sale', {
     comment: 'Tipo de venta: contado, crédito o mixta'
   },
   payment_method: {
-    type: DataTypes.ENUM('cash', 'card', 'transfer', 'mixed'),
+    type: DataTypes.ENUM('cash', 'card', 'transfer', 'mixed', 'usdt'),
     allowNull: true,
     comment: 'Método de pago (solo para ventas de contado)'
   },

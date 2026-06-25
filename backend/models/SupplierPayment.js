@@ -37,7 +37,7 @@ const SupplierPayment = sequelize.define('SupplierPayment', {
     comment: 'Fecha del pago'
   },
   payment_method: {
-    type: DataTypes.ENUM('cash', 'transfer', 'check', 'card', 'other'),
+    type: DataTypes.ENUM('cash', 'transfer', 'check', 'card', 'other', 'usdt'),
     allowNull: false,
     defaultValue: 'transfer',
     comment: 'Método de pago utilizado'

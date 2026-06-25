@@ -24,12 +24,13 @@ export const PAYMENT_METHODS = [
   { id: 'cash',     label: 'Efectivo' },
   { id: 'card',     label: 'Punto de venta' },
   { id: 'transfer', label: 'Transferencia' },
+  { id: 'usdt',     label: 'USDT' },
 ];
 
 export const METHODS_BY_CURRENCY = {
-  COP: ['cash', 'transfer'],
+  COP: ['cash', 'transfer', 'usdt'],
   VES: ['cash', 'card', 'transfer'],
-  USD: ['cash', 'transfer'],
+  USD: ['cash', 'transfer', 'usdt'],
 };
 
 // Tolerancia de redondeo para diferencias de conversión multi-moneda
@@ -708,17 +709,18 @@ export function usePOS() {
   const convertPaymentLinesToBackend = useCallback((lines) => {
     const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
     return lines.map(line => {
+      const base = { currency: line.currency, method: line.method, amount: line.amount, ...(line.bank_id && { bank_id: line.bank_id }) };
       if (line.currency === 'USD') {
         const usdRate = copPerUSD / (parseFloat(line.cop_rate) || copPerUSD);
-        return { currency: 'USD', method: line.method, amount: line.amount, exchange_rate: usdRate };
+        return { ...base, exchange_rate: usdRate };
       }
       if (line.currency === 'VES') {
         // VES se envía como VES con monto original; exchange_rate = copPerUSD / cop_rate
         const vesRate = copPerUSD / (parseFloat(line.cop_rate) || 1);
-        return { currency: 'VES', method: line.method, amount: line.amount, exchange_rate: vesRate };
+        return { ...base, exchange_rate: vesRate };
       }
       // COP: monto tal cual con tasa del sistema
-      return { currency: 'COP', method: line.method, amount: line.amount, exchange_rate: copPerUSD };
+      return { ...base, exchange_rate: copPerUSD };
     });
   }, [exchangeRates]);
 

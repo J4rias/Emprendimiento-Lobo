@@ -706,7 +706,7 @@ const SalesPage = () => {
                         <div key={idx} className="bg-slate-50 p-2 rounded space-y-0.5">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">{formatDate(p.payment_date)}</span>
-                            <span className="font-semibold text-slate-700 capitalize">{p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
+                            <span className="font-semibold text-slate-700 capitalize">{({ cash: 'Efectivo', transfer: 'Transferencia', card: 'Tarjeta', usdt: 'USDT', credit_balance: 'Monedero' })[p.payment_method] || p.payment_method}</span>
                             <span className="font-bold text-emerald-600">COP {Math.round(amountCOP).toLocaleString('de-DE')}</span>
                           </div>
                           {showRate && (

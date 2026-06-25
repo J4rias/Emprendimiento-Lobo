@@ -19,6 +19,7 @@ export const PAYMENT_METHODS = {
   CHECK: 'check',
   OTHER: 'other',
   CREDIT_BALANCE: 'credit_balance',
+  USDT: 'usdt',
 };
 
 // Sale types
