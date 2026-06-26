@@ -739,14 +739,14 @@ export function usePOS() {
       const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
       const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
-      // Subtract change from COP lines only (change is always given in COP)
+      // Subtract change from payment lines
       let adjustedLines = paymentLines;
       if (changeCOP > 0) {
         adjustedLines = [...paymentLines];
         let remainingChange = changeCOP;
 
-        // Deduct from COP cash lines (back to front)
-        for (let i = adjustedLines.length - 1; i >= 0 && remainingChange > 0; i--) {
+        // 1. Deduct from COP cash lines first (change given in COP)
+        for (let i = adjustedLines.length - 1; i >= 0 && remainingChange > COP_TOLERANCE; i--) {
           const line = adjustedLines[i];
           if (line.method !== 'credit' && line.currency === 'COP') {
             const deductible = Math.min(remainingChange, line.amount);
@@ -755,9 +755,21 @@ export function usePOS() {
           }
         }
 
-        // If change couldn't be fully absorbed by COP lines, it means
-        // COP change was given from the register for a foreign currency overpayment.
-        // Record a negative COP line so the cierre tracks the COP that left the register.
+        // 2. In USD mode with no COP to absorb, deduct from USD lines (change given in USD)
+        if (remainingChange > COP_TOLERANCE && displayCurrency === 'USD') {
+          let remainingUSD = remainingChange / copPerUSD;
+          for (let i = adjustedLines.length - 1; i >= 0 && remainingUSD > 0.005; i--) {
+            const line = adjustedLines[i];
+            if (line.method !== 'credit' && line.currency === 'USD') {
+              const deductible = Math.min(remainingUSD, line.amount);
+              adjustedLines[i] = { ...line, amount: parseFloat((line.amount - deductible).toFixed(2)) };
+              remainingUSD -= deductible;
+            }
+          }
+          remainingChange = remainingUSD * copPerUSD;
+        }
+
+        // 3. Fallback: negative COP line (COP change given from register for foreign overpayment)
         if (remainingChange > COP_TOLERANCE) {
           adjustedLines.push({
             currency: 'COP',

@@ -613,6 +613,7 @@ function TabletCheckoutModal({
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayRate, setNewPayRate] = useState(() => getCOPRate(isUSD ? 'USD' : 'COP'));
   const [newPayBank, setNewPayBank] = useState('');
+  const [changeRate, setChangeRate] = useState(() => getSavedRate('changeRate', 'COP') || Math.round(copPerUSD));
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [banks, setBanks] = useState([]);
 
@@ -924,6 +925,31 @@ function TabletCheckoutModal({
                   <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">{sSym} {fmtCOP(Math.abs(changeCOP))}</span></>
                 )}
               </div>
+              {isUSD && changeCOP > 0 && (() => {
+                const changeUSD = changeCOP / copPerUSD;
+                const vueltoCOP = Math.round(changeUSD * changeRate);
+                return (
+                  <div className="space-y-1.5 border-t border-dashed pt-1.5 mt-1.5">
+                    <div className="flex items-center justify-end gap-2 text-sm text-gray-500">
+                      <span className="whitespace-nowrap">Tasa vuelto COP/USD:</span>
+                      <input
+                        type="number"
+                        value={changeRate}
+                        onChange={(e) => { const v = parseFloat(e.target.value) || 0; setChangeRate(v); saveRate('changeRate', v, 'COP'); }}
+                        className="w-32 px-4 py-3 border border-blue-400 rounded-xl text-right text-base bg-white"
+                        step="1"
+                      />
+                    </div>
+                    <div className="flex justify-between text-base font-semibold text-green-700">
+                      <span>Entregar:</span>
+                      <span>COP$ {vueltoCOP.toLocaleString('es-CO')}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+              {isUSD && changeCOP <= 0 && paidCOP <= 0 && (
+                <p className="text-sm text-blue-600 mt-1">Puedes agregar pagos en COP cambiando la moneda del selector</p>
+              )}
             </div>
           </div>
 

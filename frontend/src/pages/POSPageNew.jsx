@@ -599,6 +599,7 @@ function CheckoutModal({
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayRate, setNewPayRate] = useState(() => getCOPRate(isUSD ? 'USD' : 'COP'));
   const [newPayBank, setNewPayBank] = useState('');
+  const [changeRate, setChangeRate] = useState(() => getSavedRate('changeRate', 'COP') || Math.round(copPerUSD));
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [banks, setBanks] = useState([]);
 
@@ -897,6 +898,31 @@ function CheckoutModal({
                 <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">{sSym} {fmtCOP(Math.abs(changeCOP))}</span></>
               )}
             </div>
+            {isUSD && changeCOP > 0 && (() => {
+              const changeUSD = changeCOP / copPerUSD;
+              const vueltoCOP = Math.round(changeUSD * changeRate);
+              return (
+                <div className="space-y-1 border-t border-dashed pt-1 mt-1">
+                  <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+                    <span className="whitespace-nowrap">Tasa vuelto COP/USD:</span>
+                    <input
+                      type="number"
+                      value={changeRate}
+                      onChange={(e) => { const v = parseFloat(e.target.value) || 0; setChangeRate(v); saveRate('changeRate', v, 'COP'); }}
+                      className="w-28 px-3 py-1.5 border border-blue-400 rounded text-right text-sm bg-white"
+                      step="1"
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-green-700">
+                    <span>Entregar:</span>
+                    <span>COP$ {vueltoCOP.toLocaleString('es-CO')}</span>
+                  </div>
+                </div>
+              );
+            })()}
+            {isUSD && changeCOP <= 0 && paidCOP <= 0 && (
+              <p className="text-xs text-blue-600 mt-1">Puedes agregar pagos en COP cambiando la moneda del selector</p>
+            )}
           </div>
         </div>
 
