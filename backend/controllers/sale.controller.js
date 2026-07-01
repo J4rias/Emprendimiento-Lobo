@@ -862,10 +862,12 @@ exports.addPayment = async (req, res) => {
     }
 
     const newPaidAmount = parseFloat(sale.paid_amount) + newlyPaidUSD;
+    const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
     const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 
     await sale.update({
       paid_amount: newPaidAmount,
+      credit_amount: newCreditAmount,
       status: newStatus,
       updated_by: req.user.id
     }, { transaction });
