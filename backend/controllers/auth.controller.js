@@ -27,7 +27,7 @@ class AuthController {
       // Check if account is locked
       if (user.locked_until && user.locked_until > new Date()) {
         return res.status(401).json({
-          message: 'Cuenta temporalmente bloqueada. Intente mas tarde.'
+          message: 'Cuenta temporalmente bloqueada. Intente más tarde.'
         });
       }
 
@@ -51,7 +51,7 @@ class AuthController {
           await user.save();
 
           return res.status(401).json({
-            message: 'Cuenta bloqueada por multiples intentos fallidos.'
+            message: 'Cuenta bloqueada por múltiples intentos fallidos.'
           });
         }
 
@@ -77,7 +77,7 @@ class AuthController {
 
       // Send response
       res.json({
-        message: 'Sesion iniciada',
+        message: 'Sesión iniciada',
         data: {
           user: user.toJSON(),
           token
@@ -120,7 +120,7 @@ class AuthController {
 
       if (!isPasswordValid) {
         return res.status(400).json({
-          message: 'La contrasena actual es incorrecta'
+          message: 'La contraseña actual es incorrecta'
         });
       }
 
@@ -129,7 +129,7 @@ class AuthController {
       await user.save();
 
       res.json({
-        message: 'Contrasena cambiada exitosamente'
+        message: 'Contraseña cambiada exitosamente'
       });
     } catch (error) {
       next(error);
@@ -143,7 +143,7 @@ class AuthController {
       // or log the logout event for audit purposes
 
       res.json({
-        message: 'Sesion cerrada'
+        message: 'Sesión cerrada'
       });
     } catch (error) {
       next(error);
