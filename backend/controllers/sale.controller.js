@@ -53,7 +53,6 @@ exports.createSale = async (req, res) => {
       if (!isAdmin && !authorized_by) {
         await transaction.rollback();
         return res.status(403).json({
-          success: false,
           message: 'Venta a crédito requiere autorización de un administrador'
         });
       }
@@ -173,7 +172,6 @@ exports.createSale = async (req, res) => {
       if (available < units_to_deduct) {
         await transaction.rollback();
         return res.status(409).json({
-          success: false,
           conflict: true,
           message: `Stock insuficiente para ${product.name}. Otro vendedor reservó parte del stock.`,
           product_name: product.name,
@@ -245,7 +243,6 @@ exports.createSale = async (req, res) => {
     if (sale_type === 'cash' && paid_amount > 0 && paid_amount < total - 0.05) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: `Pago insuficiente. Total: $${total.toFixed(2)}, Pagado: $${paid_amount.toFixed(2)}`
       });
     }
@@ -263,7 +260,6 @@ exports.createSale = async (req, res) => {
       if (!customer) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -1402,7 +1398,7 @@ exports.validateCreditPin = async (req, res) => {
     const { pin } = req.body;
 
     if (!pin || !/^\d{4,6}$/.test(pin)) {
-      return res.status(400).json({ success: false, message: 'PIN debe ser de 4 a 6 dígitos' });
+      return res.status(400).json({ message: 'PIN debe ser de 4 a 6 dígitos' });
     }
 
     // Find admin users with a credit_pin set (raw SQL because credit_pin is not in User model)
@@ -1418,7 +1414,6 @@ exports.validateCreditPin = async (req, res) => {
 
     if (!admins || admins.length === 0) {
       return res.status(400).json({
-        success: false,
         message: 'No hay administradores con PIN configurado'
       });
     }
@@ -1437,7 +1432,6 @@ exports.validateCreditPin = async (req, res) => {
           { replacements: [admin.id] }
         );
         return res.json({
-          success: true,
           admin_id: admin.id,
           admin_name: `${admin.first_name} ${admin.last_name}`
         });
@@ -1470,14 +1464,13 @@ exports.validateCreditPin = async (req, res) => {
     });
 
     return res.status(400).json({
-      success: false,
       message: allLocked
         ? 'PIN bloqueado por demasiados intentos. Intente en 15 minutos.'
         : 'PIN incorrecto'
     });
   } catch (error) {
     logger.error('Error validating credit PIN:', error);
-    res.status(500).json({ success: false, message: 'Error al validar PIN' });
+    res.status(500).json({ message: 'Error al validar PIN' });
   }
 };
 
@@ -1597,7 +1590,6 @@ exports.getSalesSummary = async (req, res) => {
     `, { replacements, type: sequelize.QueryTypes.SELECT });
 
     res.json({
-      success: true,
       data: {
         period: { from: dateFrom, to: dateTo },
         summary: {
@@ -1622,6 +1614,6 @@ exports.getSalesSummary = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error getting sales summary:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener resumen de ventas' });
+    res.status(500).json({ message: 'Error al obtener resumen de ventas' });
   }
 };

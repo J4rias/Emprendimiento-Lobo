@@ -47,7 +47,6 @@ const createTransfer = async (req, res, next) => {
     if (!origin_warehouse_id || !destination_warehouse_id) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Se requieren almacén de origen y destino'
       });
     }
@@ -55,7 +54,6 @@ const createTransfer = async (req, res, next) => {
     if (origin_warehouse_id === destination_warehouse_id) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'El almacén de origen y destino deben ser diferentes'
       });
     }
@@ -63,7 +61,6 @@ const createTransfer = async (req, res, next) => {
     if (!items || items.length === 0) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Se requiere al menos un producto para transferir'
       });
     }
@@ -74,7 +71,6 @@ const createTransfer = async (req, res, next) => {
     if (!originWarehouse || !destinationWarehouse) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Almacén no encontrado'
       });
     }
@@ -91,7 +87,6 @@ const createTransfer = async (req, res, next) => {
       if (!product) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: `Producto con ID ${product_id} no encontrado`
         });
       }
@@ -104,7 +99,6 @@ const createTransfer = async (req, res, next) => {
         if (!presentation) {
           await transaction.rollback();
           return res.status(404).json({
-            success: false,
             message: `Presentación con ID ${presentation_id} no encontrada`
           });
         }
@@ -117,7 +111,6 @@ const createTransfer = async (req, res, next) => {
       if (totalUnits <= 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: `La cantidad total debe ser mayor a cero para el producto ${product.name}`
         });
       }
@@ -134,7 +127,6 @@ const createTransfer = async (req, res, next) => {
       if (!inventory || inventory.quantity < totalUnits) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: `Stock insuficiente en almacén de origen para ${product.name}. Disponible: ${inventory?.quantity || 0}, Requerido: ${totalUnits}`
         });
       }
@@ -214,7 +206,6 @@ const createTransfer = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Transferencia creada exitosamente',
       data: {
         transfer: createdTransfer,
@@ -298,7 +289,6 @@ const getTransfers = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: {
         transfers: rows,
         pagination: {
@@ -339,13 +329,11 @@ const getTransferById = async (req, res, next) => {
 
     if (!transfer) {
       return res.status(404).json({
-        success: false,
         message: 'Transferencia no encontrada'
       });
     }
 
     res.json({
-      success: true,
       data: transfer
     });
 
@@ -379,7 +367,6 @@ const receiveTransfer = async (req, res, next) => {
     if (!transfer) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Transferencia no encontrada'
       });
     }
@@ -387,7 +374,6 @@ const receiveTransfer = async (req, res, next) => {
     if (transfer.status !== 'pending') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden recibir transferencias pendientes'
       });
     }
@@ -468,7 +454,6 @@ const receiveTransfer = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Transferencia recibida exitosamente',
       data: {
         transfer: updatedTransfer,
@@ -507,7 +492,6 @@ const cancelTransfer = async (req, res, next) => {
     if (!transfer) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Transferencia no encontrada'
       });
     }
@@ -515,7 +499,6 @@ const cancelTransfer = async (req, res, next) => {
     if (transfer.status !== 'pending') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden cancelar transferencias pendientes'
       });
     }
@@ -590,7 +573,6 @@ const cancelTransfer = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Transferencia cancelada exitosamente',
       data: {
         transfer: updatedTransfer,

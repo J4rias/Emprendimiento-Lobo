@@ -12,10 +12,10 @@ const getSettings = async (req, res) => {
       defaults: { name: 'Mi Empresa' },
     });
 
-    return res.json({ success: true, data: settings });
+    return res.json({ data: settings });
   } catch (error) {
     logger.error('Error al obtener configuración de empresa:', error);
-    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -28,7 +28,7 @@ const updateSettings = async (req, res) => {
     const { name, address, phone, email, tax_id, website } = req.body;
 
     if (!name || name.trim() === '') {
-      return res.status(400).json({ success: false, message: 'El nombre de la empresa es obligatorio' });
+      return res.status(400).json({ message: 'El nombre de la empresa es obligatorio' });
     }
 
     const [settings] = await CompanySettings.findOrCreate({
@@ -38,10 +38,10 @@ const updateSettings = async (req, res) => {
 
     await settings.update({ name, address, phone, email, tax_id, website });
 
-    return res.json({ success: true, data: settings, message: 'Configuración guardada correctamente' });
+    return res.json({ data: settings, message: 'Configuración guardada correctamente' });
   } catch (error) {
     logger.error('Error al actualizar configuración de empresa:', error);
-    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 

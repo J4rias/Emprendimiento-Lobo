@@ -150,7 +150,6 @@ exports.getAllCreditNotes = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: rows,
       pagination: {
         total: count,
@@ -162,7 +161,6 @@ exports.getAllCreditNotes = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching credit notes', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -231,19 +229,16 @@ exports.getCreditNoteById = async (req, res) => {
 
     if (!creditNote) {
       return res.status(404).json({
-        success: false,
         message: 'Nota de crédito no encontrada'
       });
     }
 
     res.json({
-      success: true,
       data: creditNote
     });
   } catch (error) {
     logger.error('Error fetching credit note', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -273,7 +268,6 @@ exports.createCreditNote = async (req, res) => {
     if (!sale_id || !reason || !type || !items || items.length === 0) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Faltan campos requeridos: sale_id, reason, type, items'
       });
     }
@@ -302,7 +296,6 @@ exports.createCreditNote = async (req, res) => {
     if (!sale) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Venta no encontrada'
       });
     }
@@ -311,7 +304,6 @@ exports.createCreditNote = async (req, res) => {
     if (refund_method === 'credit_balance' && !sale.customer_id) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'El Consumidor Final no tiene monedero. Seleccione otro método de reembolso.'
       });
     }
@@ -330,7 +322,6 @@ exports.createCreditNote = async (req, res) => {
       if (!saleDetail) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: `Detalle de venta ${item.sale_detail_id} no encontrado en la venta`
         });
       }
@@ -369,7 +360,6 @@ exports.createCreditNote = async (req, res) => {
       if (unitsReturned > availableToReturn) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: `Solo quedan ${availableToReturn / effectiveUph} unidades disponibles para devolver de "${saleDetail.product.name}" (ya se devolvieron ${alreadyReturned / effectiveUph})`
         });
       }
@@ -466,7 +456,6 @@ exports.createCreditNote = async (req, res) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Nota de crédito creada exitosamente',
       data: createdCreditNote
     });
@@ -474,7 +463,6 @@ exports.createCreditNote = async (req, res) => {
     await transaction.rollback();
     logger.error('Error creating credit note', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -533,7 +521,6 @@ exports.approveCreditNote = async (req, res) => {
     if (!creditNote) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Nota de crédito no encontrada'
       });
     }
@@ -542,7 +529,6 @@ exports.approveCreditNote = async (req, res) => {
     if (creditNote.status !== 'draft') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden aprobar notas de crédito en estado borrador'
       });
     }
@@ -677,7 +663,6 @@ exports.approveCreditNote = async (req, res) => {
     });
 
     res.json({
-      success: true,
       message: 'Nota de crédito aprobada y aplicada exitosamente',
       data: updatedCreditNote
     });
@@ -685,7 +670,6 @@ exports.approveCreditNote = async (req, res) => {
     await transaction.rollback();
     logger.error('Error approving credit note', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -708,7 +692,6 @@ exports.cancelCreditNote = async (req, res) => {
     if (!creditNote) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Nota de crédito no encontrada'
       });
     }
@@ -717,7 +700,6 @@ exports.cancelCreditNote = async (req, res) => {
     if (creditNote.status === 'cancelled') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'La nota de crédito ya está cancelada'
       });
     }
@@ -725,7 +707,6 @@ exports.cancelCreditNote = async (req, res) => {
     if (creditNote.status === 'applied') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'No se puede cancelar una nota de crédito que ya ha sido aplicada'
       });
     }
@@ -739,14 +720,12 @@ exports.cancelCreditNote = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Nota de crédito cancelada exitosamente'
     });
   } catch (error) {
     await transaction.rollback();
     logger.error('Error cancelling credit note', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -807,7 +786,6 @@ exports.getCreditNoteStats = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: {
         total_credit_notes: totalCreditNotes,
         credit_notes_by_status: creditNotesByStatus,
@@ -818,7 +796,6 @@ exports.getCreditNoteStats = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching credit note stats', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }

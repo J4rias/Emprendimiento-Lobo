@@ -138,7 +138,6 @@ class ProductController {
       });
 
       res.json({
-        success: true,
         data: products,
         pagination: {
           total: count,
@@ -185,13 +184,11 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          success: false,
           message: 'Product not found'
         });
       }
 
       res.json({
-        success: true,
         data: product
       });
     } catch (error) {
@@ -224,7 +221,7 @@ class ProductController {
       // Basic validation
       if (!name || name.trim() === '') {
         await transaction.rollback();
-        return res.status(400).json({ success: false, message: 'El nombre del producto es obligatorio' });
+        return res.status(400).json({ message: 'El nombre del producto es obligatorio' });
       }
 
       // Check for duplicate product name (including inactive)
@@ -235,7 +232,6 @@ class ProductController {
         await transaction.rollback();
         const status = existingProduct.is_active ? 'activo' : 'inactivo';
         return res.status(409).json({
-          success: false,
           message: `Ya existe un producto con el nombre "${name.trim()}" (${status}, SKU: ${existingProduct.sku})`,
           existingProductId: existingProduct.id
         });
@@ -243,11 +239,11 @@ class ProductController {
 
       if (!category_id) {
         await transaction.rollback();
-        return res.status(400).json({ success: false, message: 'La categoría es obligatoria' });
+        return res.status(400).json({ message: 'La categoría es obligatoria' });
       }
       if (unit_size === undefined || unit_size === null || unit_size === '') {
         await transaction.rollback();
-        return res.status(400).json({ success: false, message: 'El tamaño de la unidad es obligatorio' });
+        return res.status(400).json({ message: 'El tamaño de la unidad es obligatorio' });
       }
 
       // Parse presentations if provided as string (from FormData)
@@ -259,7 +255,7 @@ class ProductController {
             : presentationsData;
         } catch (e) {
           await transaction.rollback();
-          return res.status(400).json({ success: false, message: 'Formato de presentaciones inválido' });
+          return res.status(400).json({ message: 'Formato de presentaciones inválido' });
         }
       }
 
@@ -269,14 +265,12 @@ class ProductController {
           if (!p.units_per_package || p.units_per_package <= 0) {
             await transaction.rollback();
             return res.status(400).json({
-              success: false,
               message: `La presentación "${p.name || 'sin nombre'}" debe tener una cantidad válida de unidades`
             });
           }
           if (!p.presentation_type_id) {
             await transaction.rollback();
             return res.status(400).json({
-              success: false,
               message: `La presentación "${p.name || 'sin nombre'}" debe tener un tipo de unidad seleccionado`
             });
           }
@@ -298,7 +292,6 @@ class ProductController {
         if (existingBarcode) {
           await transaction.rollback();
           return res.status(400).json({
-            success: false,
             message: 'El código de barras ya está asignado a otro producto'
           });
         }
@@ -428,7 +421,6 @@ class ProductController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Producto creado exitosamente',
         data: product
       });
@@ -450,13 +442,13 @@ class ProductController {
 
       // Basic validation for updates
       if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
-        return res.status(400).json({ success: false, message: 'El nombre del producto no puede estar vacío' });
+        return res.status(400).json({ message: 'El nombre del producto no puede estar vacío' });
       }
       if (updateData.category_id !== undefined && !updateData.category_id) {
-        return res.status(400).json({ success: false, message: 'La categoría no puede estar vacía' });
+        return res.status(400).json({ message: 'La categoría no puede estar vacía' });
       }
       if (updateData.unit_size !== undefined && (updateData.unit_size === null || updateData.unit_size === '')) {
-        return res.status(400).json({ success: false, message: 'El tamaño de la unidad no puede estar vacío' });
+        return res.status(400).json({ message: 'El tamaño de la unidad no puede estar vacío' });
       }
 
       // Extract presentation fields (unit_size and unit_size_measure are now product fields)
@@ -486,7 +478,6 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          success: false,
           message: 'Product not found'
         });
       }
@@ -574,7 +565,6 @@ class ProductController {
 
           if (existingBarcode && existingBarcode.product_id !== product.id) {
             return res.status(400).json({
-              success: false,
               message: 'El código de barras ya está asignado a otro producto'
             });
           }
@@ -622,7 +612,6 @@ class ProductController {
       }
 
       res.json({
-        success: true,
         message: 'Product updated successfully',
         data: product
       });
@@ -640,7 +629,6 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          success: false,
           message: 'Product not found'
         });
       }
@@ -652,7 +640,6 @@ class ProductController {
 
       if (inventory) {
         return res.status(400).json({
-          success: false,
           message: 'Cannot delete product with existing inventory'
         });
       }
@@ -661,7 +648,6 @@ class ProductController {
       await product.update({ is_active: false });
 
       res.json({
-        success: true,
         message: 'Product deleted successfully'
       });
     } catch (error) {
@@ -689,7 +675,6 @@ class ProductController {
 
       if (barcodeRecord?.product) {
         return res.json({
-          success: true,
           data: barcodeRecord.product
         });
       }
@@ -706,14 +691,12 @@ class ProductController {
 
       if (!productBySku) {
         return res.status(200).json({
-          success: true,
           data: null,
           message: 'Barcode not found'
         });
       }
 
       return res.json({
-        success: true,
         data: productBySku
       });
     } catch (error) {
@@ -730,7 +713,6 @@ class ProductController {
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          success: false,
           message: 'Product not found'
         });
       }
@@ -745,7 +727,6 @@ class ProductController {
       });
 
       return res.json({
-        success: true,
         data: presentations
       });
     } catch (error) {
@@ -773,7 +754,6 @@ class ProductController {
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          success: false,
           message: 'Product not found'
         });
       }
@@ -785,7 +765,7 @@ class ProductController {
       }
 
       if (units_per_package === undefined || units_per_package === null || units_per_package <= 0) {
-        return res.status(400).json({ success: false, message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
+        return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
       }
 
       // If this is set as default, unmark all other presentations as default
@@ -826,7 +806,6 @@ class ProductController {
       });
 
       return res.status(201).json({
-        success: true,
         data: createdPresentation,
         message: 'Presentation created successfully'
       });
@@ -843,18 +822,17 @@ class ProductController {
       const presentation = await ProductPresentation.findByPk(presentationId);
       if (!presentation) {
         return res.status(404).json({
-          success: false,
           message: 'Presentation not found'
         });
       }
 
       // Validaciones básicas para edición
       if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
-        return res.status(400).json({ success: false, message: 'El nombre de la presentación no puede estar vacío' });
+        return res.status(400).json({ message: 'El nombre de la presentación no puede estar vacío' });
       }
 
       if (updateData.units_per_package !== undefined && (updateData.units_per_package === null || updateData.units_per_package <= 0)) {
-        return res.status(400).json({ success: false, message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
+        return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
       }
 
       // Update units_per_presentation if units_per_package is updated
@@ -892,7 +870,6 @@ class ProductController {
       });
 
       return res.json({
-        success: true,
         data: updatedPresentation,
         message: 'Presentation updated successfully'
       });
@@ -908,7 +885,6 @@ class ProductController {
       const presentation = await ProductPresentation.findByPk(presentationId);
       if (!presentation) {
         return res.status(404).json({
-          success: false,
           message: 'Presentation not found'
         });
       }
@@ -920,7 +896,6 @@ class ProductController {
 
       if (presentationCount <= 1) {
         return res.status(400).json({
-          success: false,
           message: 'Cannot delete the last presentation. A product must have at least one presentation.'
         });
       }
@@ -942,7 +917,6 @@ class ProductController {
       await presentation.destroy();
 
       return res.json({
-        success: true,
         message: 'Presentation deleted successfully'
       });
     } catch (error) {
@@ -957,7 +931,6 @@ class ProductController {
       const presentation = await ProductPresentation.findByPk(presentationId);
       if (!presentation) {
         return res.status(404).json({
-          success: false,
           message: 'Presentation not found'
         });
       }
@@ -980,7 +953,6 @@ class ProductController {
       });
 
       return res.json({
-        success: true,
         data: updatedPresentation,
         message: 'Default presentation updated successfully'
       });

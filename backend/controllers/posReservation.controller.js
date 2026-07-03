@@ -22,7 +22,6 @@ exports.reserve = async (req, res, next) => {
     if (!session_id || !tab_id || !user_id || !product_id || !presentation_id || units_requested === undefined) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Faltan parámetros requeridos'
       });
     }
@@ -32,7 +31,6 @@ exports.reserve = async (req, res, next) => {
     if (!product) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Producto no encontrado'
       });
     }
@@ -42,7 +40,6 @@ exports.reserve = async (req, res, next) => {
     if (!presentation) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Presentación no encontrada'
       });
     }
@@ -51,7 +48,7 @@ exports.reserve = async (req, res, next) => {
     const warehouse = await Warehouse.findOne({ where: { is_active: true }, transaction });
     if (!warehouse) {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: 'No hay almacén configurado' });
+      return res.status(400).json({ message: 'No hay almacén configurado' });
     }
 
     const inventory = await Inventory.findOne({
@@ -63,7 +60,6 @@ exports.reserve = async (req, res, next) => {
     if (!inventory) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'No hay inventario registrado para este producto'
       });
     }
@@ -89,7 +85,6 @@ exports.reserve = async (req, res, next) => {
     if (available < units_requested) {
       await transaction.rollback();
       return res.status(409).json({
-        success: false,
         conflict: true,
         message: 'Stock insuficiente',
         product_name: product.name,
@@ -141,7 +136,6 @@ exports.reserve = async (req, res, next) => {
     }
 
     res.status(200).json({
-      success: true,
       message: 'Reserva actualizada',
       data: {
         reserved: units_requested,
@@ -173,7 +167,6 @@ exports.releaseItem = async (req, res, next) => {
     if (!session_id || !tab_id || !presentation_id) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Faltan parámetros requeridos'
       });
     }
@@ -186,7 +179,6 @@ exports.releaseItem = async (req, res, next) => {
     if (!reservation) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Reserva no encontrada'
       });
     }
@@ -219,7 +211,6 @@ exports.releaseItem = async (req, res, next) => {
     }
 
     res.status(200).json({
-      success: true,
       message: 'Reserva liberada',
       data: {
         remaining_reserved: newUnits,
@@ -245,7 +236,6 @@ exports.releaseTab = async (req, res, next) => {
 
     if (!session_id || !tab_id) {
       return res.status(400).json({
-        success: false,
         message: 'Faltan parámetros requeridos'
       });
     }
@@ -280,7 +270,6 @@ exports.releaseTab = async (req, res, next) => {
     }
 
     res.status(200).json({
-      success: true,
       message: 'Reservas de la pestaña liberadas',
       data: {
         affected_products: affectedProducts
@@ -313,7 +302,6 @@ exports.getAll = async (req, res, next) => {
     });
 
     res.status(200).json({
-      success: true,
       data: byProduct
     });
   } catch (error) {
@@ -363,7 +351,6 @@ exports.cleanupExpired = async (req, res, next) => {
     }
 
     res.status(200).json({
-      success: true,
       message: `${deletedCount} reservas expiradas eliminadas`,
       data: {
         deleted_count: deletedCount,

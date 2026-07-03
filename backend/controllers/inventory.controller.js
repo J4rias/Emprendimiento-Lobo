@@ -146,7 +146,6 @@ class InventoryController {
       });
 
       res.json({
-        success: true,
         data: inventoryWithPresentations,
         pagination: {
           total: count,
@@ -157,7 +156,7 @@ class InventoryController {
       });
     } catch (error) {
       logger.error('Error in getByWarehouse', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -187,18 +186,16 @@ class InventoryController {
 
       if (!inventory) {
         return res.status(404).json({
-          success: false,
           message: 'Inventory item not found'
         });
       }
 
       res.json({
-        success: true,
         data: inventory
       });
     } catch (error) {
       logger.error('Error in getById', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -230,7 +227,6 @@ class InventoryController {
       const totalQuantity = inventory.reduce((sum, inv) => sum + parseFloat(inv.quantity), 0);
 
       res.json({
-        success: true,
         data: {
           inventory,
           totalQuantity
@@ -238,7 +234,7 @@ class InventoryController {
       });
     } catch (error) {
       logger.error('Error in getByProduct', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -272,13 +268,12 @@ class InventoryController {
       );
 
       res.json({
-        success: true,
         data: lowStockItems,
         count: lowStockItems.length
       });
     } catch (error) {
       logger.error('Error in getLowStock', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -305,7 +300,6 @@ class InventoryController {
       if (!product_id || !warehouse_id || !type) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Faltan campos requeridos'
         });
       }
@@ -313,7 +307,6 @@ class InventoryController {
       if (!['add', 'remove'].includes(type)) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Invalid adjustment type. Must be "add" or "remove"'
         });
       }
@@ -327,7 +320,6 @@ class InventoryController {
         if (!presentation) {
           await transaction.rollback();
           return res.status(404).json({
-            success: false,
             message: 'Presentación no encontrada'
           });
         }
@@ -341,7 +333,6 @@ class InventoryController {
       if (totalUnits <= 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'La cantidad debe ser mayor a 0'
         });
       }
@@ -365,7 +356,6 @@ class InventoryController {
       if (newQuantity < 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'No hay suficiente stock para realizar esta operación'
         });
       }
@@ -415,7 +405,6 @@ class InventoryController {
       });
 
       res.json({
-        success: true,
         message: 'Inventario ajustado correctamente',
         data: {
           inventory,
@@ -425,7 +414,7 @@ class InventoryController {
     } catch (error) {
       await transaction.rollback();
       logger.error('Error in adjustInventory', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -466,13 +455,12 @@ class InventoryController {
       });
 
       res.json({
-        success: true,
         data: batches,
         count: batches.length
       });
     } catch (error) {
       logger.error('Error in getExpiringProducts', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -579,7 +567,6 @@ class InventoryController {
       const productsWithStock = new Set(inventory.filter(inv => parseFloat(inv.quantity) > 0).map(inv => inv.product_id)).size;
 
       res.json({
-        success: true,
         data: {
           items: valuedItems,
           totalValue: totalValueUSD,  // Total converted to USD
@@ -593,7 +580,7 @@ class InventoryController {
       });
     } catch (error) {
       logger.error('Error in getValuation', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -638,7 +625,6 @@ class InventoryController {
       });
 
       res.json({
-        success: true,
         data: movements,
         pagination: {
           total: count,
@@ -649,7 +635,7 @@ class InventoryController {
 
     } catch (error) {
       logger.error('Error in getMovements', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 
@@ -662,13 +648,12 @@ class InventoryController {
       });
 
       res.json({
-        success: true,
         data: warehouses
       });
 
     } catch (error) {
       logger.error('Error in getWarehouses', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 }

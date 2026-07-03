@@ -48,7 +48,6 @@ class ExchangeRateController {
       });
 
       res.json({
-        success: true,
         data: rates,
         pagination: {
           total: count,
@@ -94,14 +93,12 @@ class ExchangeRateController {
         });
 
         return res.json({
-          success: true,
           data: latestRates,
           message: 'No hay tasas para la fecha especificada. Se muestran las más recientes.'
         });
       }
 
       res.json({
-        success: true,
         data: rates
       });
     } catch (error) {
@@ -123,13 +120,11 @@ class ExchangeRateController {
 
       if (!rate) {
         return res.status(404).json({
-          success: false,
           message: 'Exchange rate not found'
         });
       }
 
       res.json({
-        success: true,
         data: rate
       });
     } catch (error) {
@@ -152,7 +147,6 @@ class ExchangeRateController {
       // Validar que no sean la misma moneda
       if (from_currency === to_currency) {
         return res.status(400).json({
-          success: false,
           message: 'La moneda origen y destino no pueden ser iguales'
         });
       }
@@ -172,7 +166,6 @@ class ExchangeRateController {
           await existing.destroy();
         } else {
           return res.status(400).json({
-            success: false,
             message: `Ya existe una tasa de cambio de ${from_currency} a ${to_currency} para la fecha ${effective_date}`
           });
         }
@@ -198,7 +191,6 @@ class ExchangeRateController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Tasa de cambio creada exitosamente',
         data: exchangeRate
       });
@@ -218,7 +210,6 @@ class ExchangeRateController {
 
       if (!exchangeRate) {
         return res.status(404).json({
-          success: false,
           message: 'Exchange rate not found'
         });
       }
@@ -231,7 +222,6 @@ class ExchangeRateController {
 
         if (from === to) {
           return res.status(400).json({
-            success: false,
             message: 'La moneda origen y destino no pueden ser iguales'
           });
         }
@@ -247,7 +237,6 @@ class ExchangeRateController {
 
         if (existing) {
           return res.status(400).json({
-            success: false,
             message: `Ya existe una tasa de cambio de ${from} a ${to} para la fecha ${date}`
           });
         }
@@ -268,7 +257,6 @@ class ExchangeRateController {
       });
 
       res.json({
-        success: true,
         message: 'Tasa de cambio actualizada exitosamente',
         data: exchangeRate
       });
@@ -286,7 +274,6 @@ class ExchangeRateController {
 
       if (!exchangeRate) {
         return res.status(404).json({
-          success: false,
           message: 'Exchange rate not found'
         });
       }
@@ -295,7 +282,6 @@ class ExchangeRateController {
       await exchangeRate.destroy();
 
       res.json({
-        success: true,
         message: 'Tasa de cambio eliminada exitosamente'
       });
     } catch (error) {
@@ -310,7 +296,6 @@ class ExchangeRateController {
 
       if (amount === undefined || !from_currency || !to_currency) {
         return res.status(400).json({
-          success: false,
           message: 'Se requieren los parámetros: amount (puede ser 0), from_currency, to_currency'
         });
       }
@@ -325,7 +310,6 @@ class ExchangeRateController {
       const rate = await ExchangeRate.getRate(from_currency, to_currency, date);
 
       res.json({
-        success: true,
         data: {
           amount: parseFloat(amount),
           from_currency,
@@ -337,7 +321,7 @@ class ExchangeRateController {
       });
     } catch (error) {
       logger.error('Error al convertir monto', { error: error.message });
-      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 }

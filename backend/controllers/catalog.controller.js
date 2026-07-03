@@ -110,6 +110,6 @@ exports.getCatalog = async (req, res) => {
 
   } catch (error) {
     logger.error('Error fetching catalog', { error: error.message });
-    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

@@ -16,19 +16,16 @@ const handleMulterError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
-        success: false,
         message: 'El archivo es demasiado grande. Máximo 5MB'
       });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
-        success: false,
         message: 'Demasiados archivos. Máximo 5'
       });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({
-        success: false,
         message: 'Campo de archivo inesperado'
       });
     }
@@ -36,13 +33,11 @@ const handleMulterError = (error, req, res, next) => {
 
   if (error.message === 'Solo se permiten archivos de imagen') {
     return res.status(400).json({
-      success: false,
       message: 'Solo se permiten archivos de imagen'
     });
   }
 
   res.status(400).json({
-    success: false,
     message: error.message || 'Error al subir el archivo'
   });
 };
@@ -52,7 +47,6 @@ router.post('/', authorize('products.update'), ...uploadSingle('image'), handleM
   try {
     if (!req.processedFiles || req.processedFiles.length === 0) {
       return res.status(400).json({
-        success: false,
         message: 'No se pudo procesar la imagen'
       });
     }
@@ -60,7 +54,6 @@ router.post('/', authorize('products.update'), ...uploadSingle('image'), handleM
     const uploadedFile = req.processedFiles[0];
 
     res.json({
-      success: true,
       message: 'Imagen subida exitosamente',
       data: {
         url: uploadedFile.url,
@@ -72,7 +65,6 @@ router.post('/', authorize('products.update'), ...uploadSingle('image'), handleM
   } catch (error) {
     logger.error('Error en upload:', error);
     res.status(500).json({
-      success: false,
       message: 'Error al subir la imagen'
     });
   }
@@ -83,13 +75,11 @@ router.post('/multiple', authorize('products.update'), ...uploadMultiple('images
   try {
     if (!req.processedFiles || req.processedFiles.length === 0) {
       return res.status(400).json({
-        success: false,
         message: 'No se pudieron procesar las imágenes'
       });
     }
 
     res.json({
-      success: true,
       message: `${req.processedFiles.length} imágenes subidas exitosamente`,
       data: req.processedFiles.map(file => ({
         url: file.url,
@@ -101,7 +91,6 @@ router.post('/multiple', authorize('products.update'), ...uploadMultiple('images
   } catch (error) {
     logger.error('Error en upload multiple:', error);
     res.status(500).json({
-      success: false,
       message: 'Error al subir las imágenes'
     });
   }
@@ -114,7 +103,6 @@ router.delete('/image', authorize('products.update'), async (req, res) => {
 
     if (!url) {
       return res.status(400).json({
-        success: false,
         message: 'URL de la imagen requerida'
       });
     }
@@ -123,19 +111,17 @@ router.delete('/image', authorize('products.update'), async (req, res) => {
     const imagePath = path.resolve(path.join(__dirname, '../public', url));
 
     if (!imagePath.startsWith(basePath + path.sep)) {
-      return res.status(400).json({ success: false, message: 'Ruta de imagen inválida' });
+      return res.status(400).json({ message: 'Ruta de imagen inválida' });
     }
 
     try {
       await fs.unlink(imagePath);
       res.json({
-        success: true,
         message: 'Imagen eliminada exitosamente'
       });
     } catch (error) {
       if (error.code === 'ENOENT') {
         res.json({
-          success: true,
           message: 'Imagen eliminada exitosamente'
         });
       } else {
@@ -145,7 +131,6 @@ router.delete('/image', authorize('products.update'), async (req, res) => {
   } catch (error) {
     logger.error('Error eliminando imagen:', error);
     res.status(500).json({
-      success: false,
       message: 'Error al eliminar la imagen'
     });
   }

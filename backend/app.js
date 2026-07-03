@@ -159,7 +159,6 @@ app.use('/api/banks', require('./routes/bank.routes'));
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    success: false,
     message: 'Endpoint not found'
   });
 });

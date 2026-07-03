@@ -77,7 +77,6 @@ exports.getAllQuotes = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: {
         quotes,
         pagination: {
@@ -144,13 +143,11 @@ exports.getQuoteById = async (req, res, next) => {
 
     if (!quote) {
       return res.status(404).json({
-        success: false,
         message: 'Cotización no encontrada'
       });
     }
 
     res.json({
-      success: true,
       data: quote
     });
   } catch (error) {
@@ -172,7 +169,6 @@ exports.createQuote = async (req, res, next) => {
     if (!customer) {
       await t.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Cliente no encontrado'
       });
     }
@@ -189,7 +185,6 @@ exports.createQuote = async (req, res, next) => {
       if (!product) {
         await t.rollback();
         return res.status(404).json({
-          success: false,
           message: `Producto con ID ${detail.productId} no encontrado`
         });
       }
@@ -274,7 +269,6 @@ exports.createQuote = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Cotización creada exitosamente',
       data: fullQuote
     });
@@ -302,7 +296,6 @@ exports.updateQuote = async (req, res, next) => {
     if (!quote) {
       await t.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Cotización no encontrada'
       });
     }
@@ -311,7 +304,6 @@ exports.updateQuote = async (req, res, next) => {
     if (!quote.canBeEdited() && !status) {
       await t.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Esta cotización no puede ser editada en su estado actual'
       });
     }
@@ -322,7 +314,6 @@ exports.updateQuote = async (req, res, next) => {
       await t.commit();
 
       return res.json({
-        success: true,
         message: 'Estado de cotización actualizado',
         data: quote
       });
@@ -348,7 +339,6 @@ exports.updateQuote = async (req, res, next) => {
         if (!product) {
           await t.rollback();
           return res.status(404).json({
-            success: false,
             message: `Producto con ID ${detail.productId} no encontrado`
           });
         }
@@ -434,7 +424,6 @@ exports.updateQuote = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Cotización actualizada exitosamente',
       data: fullQuote
     });
@@ -457,7 +446,6 @@ exports.deleteQuote = async (req, res, next) => {
 
     if (!quote) {
       return res.status(404).json({
-        success: false,
         message: 'Cotización no encontrada'
       });
     }
@@ -465,7 +453,6 @@ exports.deleteQuote = async (req, res, next) => {
     // Solo se puede eliminar en estado draft
     if (quote.status !== 'draft') {
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden eliminar cotizaciones en estado borrador'
       });
     }
@@ -473,7 +460,6 @@ exports.deleteQuote = async (req, res, next) => {
     await quote.update({ isDeleted: true });
 
     res.json({
-      success: true,
       message: 'Cotización eliminada exitosamente'
     });
   } catch (error) {
@@ -539,7 +525,6 @@ exports.getQuoteStats = async (req, res, next) => {
       : 0;
 
     res.json({
-      success: true,
       data: {
         byStatus: statusCounts,
         totals: {

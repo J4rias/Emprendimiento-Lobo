@@ -131,7 +131,6 @@ exports.getAllDeliveries = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: rows,
       pagination: {
         total: count,
@@ -143,7 +142,6 @@ exports.getAllDeliveries = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching deliveries', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -206,19 +204,16 @@ exports.getDeliveryById = async (req, res) => {
 
     if (!delivery) {
       return res.status(404).json({
-        success: false,
         message: 'Entrega no encontrada'
       });
     }
 
     res.json({
-      success: true,
       data: delivery
     });
   } catch (error) {
     logger.error('Error fetching delivery', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -250,7 +245,6 @@ exports.createDelivery = async (req, res) => {
     if (!sale_id || !delivery_address || !delivery_method) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Faltan campos requeridos: sale_id, delivery_address, delivery_method'
       });
     }
@@ -279,7 +273,6 @@ exports.createDelivery = async (req, res) => {
     if (!sale) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Venta no encontrada'
       });
     }
@@ -293,7 +286,6 @@ exports.createDelivery = async (req, res) => {
     if (existingDelivery) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Esta venta ya tiene una entrega asociada'
       });
     }
@@ -368,7 +360,6 @@ exports.createDelivery = async (req, res) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Entrega creada exitosamente',
       data: createdDelivery
     });
@@ -376,7 +367,6 @@ exports.createDelivery = async (req, res) => {
     await transaction.rollback();
     logger.error('Error creating delivery', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -409,7 +399,6 @@ exports.updateDelivery = async (req, res) => {
     if (!delivery) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Entrega no encontrada'
       });
     }
@@ -418,7 +407,6 @@ exports.updateDelivery = async (req, res) => {
     if (!['pending', 'in_transit'].includes(delivery.status)) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden actualizar entregas en estado pendiente o en tránsito'
       });
     }
@@ -455,7 +443,6 @@ exports.updateDelivery = async (req, res) => {
     });
 
     res.json({
-      success: true,
       message: 'Entrega actualizada exitosamente',
       data: updatedDelivery
     });
@@ -463,7 +450,6 @@ exports.updateDelivery = async (req, res) => {
     await transaction.rollback();
     logger.error('Error updating delivery', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -485,7 +471,6 @@ exports.markAsInTransit = async (req, res) => {
     if (!delivery) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Entrega no encontrada'
       });
     }
@@ -494,7 +479,6 @@ exports.markAsInTransit = async (req, res) => {
     if (delivery.status !== 'pending') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden marcar como en tránsito las entregas pendientes'
       });
     }
@@ -507,14 +491,12 @@ exports.markAsInTransit = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Entrega marcada como en tránsito'
     });
   } catch (error) {
     await transaction.rollback();
     logger.error('Error marking delivery as in transit', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -537,7 +519,6 @@ exports.confirmDelivery = async (req, res) => {
     if (!delivery) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Entrega no encontrada'
       });
     }
@@ -546,7 +527,6 @@ exports.confirmDelivery = async (req, res) => {
     if (!['pending', 'in_transit'].includes(delivery.status)) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Solo se pueden confirmar entregas pendientes o en tránsito'
       });
     }
@@ -571,14 +551,12 @@ exports.confirmDelivery = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Entrega confirmada exitosamente'
     });
   } catch (error) {
     await transaction.rollback();
     logger.error('Error confirming delivery', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -601,7 +579,6 @@ exports.cancelDelivery = async (req, res) => {
     if (!delivery) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Entrega no encontrada'
       });
     }
@@ -610,7 +587,6 @@ exports.cancelDelivery = async (req, res) => {
     if (delivery.status === 'delivered') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'No se puede cancelar una entrega ya completada'
       });
     }
@@ -618,7 +594,6 @@ exports.cancelDelivery = async (req, res) => {
     if (delivery.status === 'cancelled') {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'La entrega ya está cancelada'
       });
     }
@@ -632,14 +607,12 @@ exports.cancelDelivery = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Entrega cancelada exitosamente'
     });
   } catch (error) {
     await transaction.rollback();
     logger.error('Error cancelling delivery', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }
@@ -706,7 +679,6 @@ exports.getDeliveryStats = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: {
         total_deliveries: totalDeliveries,
         pending_deliveries: pendingDeliveries,
@@ -718,7 +690,6 @@ exports.getDeliveryStats = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching delivery stats', { error: error.message });
     res.status(500).json({
-      success: false,
       message: 'Error interno del servidor'
     });
   }

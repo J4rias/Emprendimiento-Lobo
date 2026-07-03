@@ -4,7 +4,6 @@ const authorize = (...permissionNames) => {
       // Check if user is authenticated
       if (!req.user) {
         return res.status(401).json({
-          success: false,
           message: 'Authentication required.'
         });
       }
@@ -20,7 +19,6 @@ const authorize = (...permissionNames) => {
 
       if (!hasPermission) {
         return res.status(403).json({
-          success: false,
           message: 'Insufficient permissions.',
           required: permissionNames,
           current: userPermissionNames
@@ -30,7 +28,6 @@ const authorize = (...permissionNames) => {
       next();
     } catch (error) {
       res.status(500).json({
-        success: false,
         message: 'Authorization error.',
         error: error.message
       });

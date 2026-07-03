@@ -22,7 +22,6 @@ const getAll = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: brands,
       pagination: {
         total: count,
@@ -44,13 +43,11 @@ const getById = async (req, res, next) => {
 
     if (!brand) {
       return res.status(404).json({
-        success: false,
         message: 'Brand not found'
       });
     }
 
     res.json({
-      success: true,
       data: brand
     });
   } catch (error) {
@@ -69,7 +66,6 @@ const create = async (req, res, next) => {
     const brand = await Brand.create(brandData);
 
     res.status(201).json({
-      success: true,
       message: 'Brand created successfully',
       data: brand
     });
@@ -87,7 +83,6 @@ const update = async (req, res, next) => {
     const brand = await Brand.findByPk(id);
     if (!brand) {
       return res.status(404).json({
-        success: false,
         message: 'Brand not found'
       });
     }
@@ -95,7 +90,6 @@ const update = async (req, res, next) => {
     await brand.update(updateData);
 
     res.json({
-      success: true,
       message: 'Brand updated successfully',
       data: brand
     });
@@ -112,7 +106,6 @@ const deleteBrand = async (req, res, next) => {
 
     if (!brand) {
       return res.status(404).json({
-        success: false,
         message: 'Brand not found'
       });
     }
@@ -120,7 +113,6 @@ const deleteBrand = async (req, res, next) => {
     await brand.update({ is_active: false });
 
     res.json({
-      success: true,
       message: 'Brand deleted successfully'
     });
   } catch (error) {
@@ -138,7 +130,6 @@ const getActive = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: brands
     });
   } catch (error) {

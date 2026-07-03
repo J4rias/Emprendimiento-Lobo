@@ -172,7 +172,6 @@ class PurchaseOrderController {
       }));
 
       res.json({
-        success: true,
         data: ordersWithInvoice,
         pagination: {
           total: count,
@@ -239,7 +238,6 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -320,7 +318,6 @@ class PurchaseOrderController {
 
 
       res.json({
-        success: true,
         data: orderJson
       });
     } catch (error) {
@@ -348,7 +345,6 @@ class PurchaseOrderController {
       if (!supplier_id || !warehouse_id || !items || items.length === 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Proveedor, almacén y productos son requeridos'
         });
       }
@@ -448,7 +444,6 @@ class PurchaseOrderController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Orden de compra creada exitosamente',
         data: completeOrder
       });
@@ -480,7 +475,6 @@ class PurchaseOrderController {
       if (!order) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -488,7 +482,6 @@ class PurchaseOrderController {
       if (order.status !== 'draft') {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Solo se pueden editar órdenes en estado borrador'
         });
       }
@@ -589,7 +582,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra actualizada exitosamente',
         data: updatedOrder
       });
@@ -608,14 +600,12 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
 
       if (order.status !== 'draft') {
         return res.status(400).json({
-          success: false,
           message: 'Solo se pueden aprobar órdenes en estado borrador'
         });
       }
@@ -627,7 +617,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra aprobada exitosamente',
         data: order
       });
@@ -646,14 +635,12 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
 
       if (order.status === 'received') {
         return res.status(400).json({
-          success: false,
           message: 'No se puede cancelar una orden completamente recibida'
         });
       }
@@ -667,7 +654,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra cancelada exitosamente',
         data: order
       });
@@ -687,7 +673,6 @@ class PurchaseOrderController {
       if (!received_items || received_items.length === 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Debe especificar los productos recibidos'
         });
       }
@@ -708,7 +693,6 @@ class PurchaseOrderController {
       if (!order) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -716,7 +700,6 @@ class PurchaseOrderController {
       if (!['sent', 'confirmed', 'partially_received'].includes(order.status)) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'El estado de la orden no permite recibir mercancía'
         });
       }
@@ -728,7 +711,6 @@ class PurchaseOrderController {
         if (!detail) {
           await transaction.rollback();
           return res.status(400).json({
-            success: false,
             message: `Detalle con ID ${receivedItem.detail_id} no encontrado en la orden`
           });
         }
@@ -745,7 +727,6 @@ class PurchaseOrderController {
         if (totalReceivedPackages > totalOrderedPackages || totalReceivedUnits > totalOrderedUnits) {
           await transaction.rollback();
           return res.status(400).json({
-            success: false,
             message: `No se puede recibir más cantidad de la ordenada para ${detail.product.name}`
           });
         }
@@ -918,7 +899,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Mercancía recibida exitosamente',
         data: finalOrder
       });
@@ -975,7 +955,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         data: {
           total_orders: totalOrders,
           pending_orders: pendingOrders,

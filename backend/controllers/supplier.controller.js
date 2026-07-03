@@ -30,7 +30,6 @@ const getAll = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: suppliers,
       pagination: {
         total: count,
@@ -61,13 +60,11 @@ const getById = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        success: false,
         message: 'Supplier not found'
       });
     }
 
     res.json({
-      success: true,
       data: supplier
     });
   } catch (error) {
@@ -117,7 +114,6 @@ const create = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Supplier created successfully',
       data: supplierWithContacts
     });
@@ -143,7 +139,6 @@ const update = async (req, res, next) => {
     if (!supplier) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Supplier not found'
       });
     }
@@ -239,7 +234,6 @@ const update = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Supplier updated successfully',
       data: supplierWithContacts
     });
@@ -257,7 +251,6 @@ const deleteSupplier = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        success: false,
         message: 'Supplier not found'
       });
     }
@@ -265,7 +258,6 @@ const deleteSupplier = async (req, res, next) => {
     await supplier.update({ is_active: false });
 
     res.json({
-      success: true,
       message: 'Supplier deleted successfully'
     });
   } catch (error) {
@@ -283,7 +275,6 @@ const getActive = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: suppliers
     });
   } catch (error) {
@@ -299,7 +290,7 @@ const getStatement = async (req, res, next) => {
     // Validate supplier exists
     const supplier = await Supplier.findByPk(id);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Supplier not found' });
+      return res.status(404).json({ message: 'Supplier not found' });
     }
 
     // 1. Fetch Purchase Orders (Debts/Liabilities) - Excluding cancelled ones
@@ -438,7 +429,6 @@ const getStatement = async (req, res, next) => {
     ledger.sort((a, b) => a.date - b.date);
 
     res.json({
-      success: true,
       data: {
         supplier: { id: supplier.id, name: supplier.name, company_name: supplier.company_name },
         summary: summary,
@@ -475,7 +465,7 @@ const getLedger = async (req, res, next) => {
 
     const supplier = await Supplier.findByPk(id);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // 1. Get all non-cancelled POs for this supplier
@@ -608,7 +598,6 @@ const getLedger = async (req, res, next) => {
     } catch (e) { /* rate not available */ }
 
     res.json({
-      success: true,
       data: {
         supplier: { id: supplier.id, name: supplier.name },
         bcv_rate: bcvRate,
@@ -639,7 +628,6 @@ const getResumen = async (req, res, next) => {
       let bcvRate = null;
       try { bcvRate = await ExchangeRate.getRate('USD', 'VES'); } catch (e) {}
       return res.json({
-        success: true,
         data: { bcv_rate: bcvRate, totals: { USD: 0, DIVISAS: 0, COP: 0 }, ves_needed: 0, suppliers: [] }
       });
     }
@@ -766,7 +754,6 @@ const getResumen = async (req, res, next) => {
     } catch (e) { /* rate not available */ }
 
     res.json({
-      success: true,
       data: {
         bcv_rate: bcvRate,
         totals,

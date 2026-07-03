@@ -20,7 +20,6 @@ class AuthController {
 
       if (!user) {
         return res.status(401).json({
-          success: false,
           message: 'Invalid credentials'
         });
       }
@@ -28,7 +27,6 @@ class AuthController {
       // Check if account is locked
       if (user.locked_until && user.locked_until > new Date()) {
         return res.status(401).json({
-          success: false,
           message: 'Account is temporarily locked. Please try again later.'
         });
       }
@@ -36,7 +34,6 @@ class AuthController {
       // Check if user is active
       if (!user.is_active) {
         return res.status(401).json({
-          success: false,
           message: 'Account is inactive. Please contact administrator.'
         });
       }
@@ -54,7 +51,6 @@ class AuthController {
           await user.save();
 
           return res.status(401).json({
-            success: false,
             message: 'Account locked due to multiple failed login attempts.'
           });
         }
@@ -62,7 +58,6 @@ class AuthController {
         await user.save();
 
         return res.status(401).json({
-          success: false,
           message: 'Invalid credentials'
         });
       }
@@ -82,7 +77,6 @@ class AuthController {
 
       // Send response
       res.json({
-        success: true,
         message: 'Login successful',
         data: {
           user: user.toJSON(),
@@ -107,7 +101,6 @@ class AuthController {
       });
 
       res.json({
-        success: true,
         data: user
       });
     } catch (error) {
@@ -127,7 +120,6 @@ class AuthController {
 
       if (!isPasswordValid) {
         return res.status(400).json({
-          success: false,
           message: 'Current password is incorrect'
         });
       }
@@ -137,7 +129,6 @@ class AuthController {
       await user.save();
 
       res.json({
-        success: true,
         message: 'Password changed successfully'
       });
     } catch (error) {
@@ -152,7 +143,6 @@ class AuthController {
       // or log the logout event for audit purposes
 
       res.json({
-        success: true,
         message: 'Logout successful'
       });
     } catch (error) {
