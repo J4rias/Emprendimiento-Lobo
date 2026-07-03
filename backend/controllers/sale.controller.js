@@ -396,7 +396,7 @@ exports.createSale = async (req, res) => {
 
     res.status(201).json({
       message: 'Venta creada exitosamente',
-      sale: createdSale
+      data: createdSale
     });
 
   } catch (error) {
@@ -517,7 +517,7 @@ exports.getSales = async (req, res) => {
     }));
 
     res.json({
-      sales: salesWithCN,
+      data: salesWithCN,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -592,7 +592,7 @@ exports.getSaleById = async (req, res) => {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    res.json({ sale });
+    res.json({ data: sale });
 
   } catch (error) {
     logger.error('Error fetching sale:', error);
@@ -680,7 +680,7 @@ exports.updateSale = async (req, res) => {
 
     res.json({
       message: 'Venta actualizada exitosamente',
-      sale: updatedSale
+      data: updatedSale
     });
 
   } catch (error) {
@@ -775,7 +775,7 @@ exports.cancelSale = async (req, res) => {
 
     res.json({
       message: 'Venta cancelada exitosamente',
-      sale
+      data: sale
     });
 
   } catch (error) {
@@ -917,8 +917,7 @@ exports.addPayment = async (req, res) => {
 
     res.json({
       message: 'Pagos registrados exitosamente',
-      payments: createdPayments,
-      sale: updatedSale
+      data: { payments: createdPayments, sale: updatedSale }
     });
 
   } catch (error) {
@@ -990,7 +989,7 @@ exports.getSalesStats = async (req, res) => {
     // summary_only skips heavy queries (topProducts, salesByType, salesByStatus, salesByCurrency)
     if (summary_only === 'true') {
       return res.json({
-        stats: { totalSales, totalRevenue: revenue, totalRevenueCOP, totalCost, grossProfit, grossMarginPct }
+        data: { totalSales, totalRevenue: revenue, totalRevenueCOP, totalCost, grossProfit, grossMarginPct }
       });
     }
 
@@ -1084,7 +1083,7 @@ exports.getSalesStats = async (req, res) => {
     }
 
     res.json({
-      stats: {
+      data: {
         totalSales,
         totalRevenue: revenue,
         totalRevenueCOP,
@@ -1374,14 +1373,16 @@ exports.getDailyClosure = async (req, res) => {
     };
 
     res.json({
-      date: startOfDay.toISOString().split('T')[0],
-      totalSalesUSD,
-      totalSalesCOP: Math.round(totalSalesCOP),
-      salesCount,
-      creditTotalUSD,
-      paymentsBreakdown,
-      creditCollectedByCurrency,
-      cashRefunds
+      data: {
+        date: startOfDay.toISOString().split('T')[0],
+        totalSalesUSD,
+        totalSalesCOP: Math.round(totalSalesCOP),
+        salesCount,
+        creditTotalUSD,
+        paymentsBreakdown,
+        creditCollectedByCurrency,
+        cashRefunds
+      }
     });
 
   } catch (error) {
