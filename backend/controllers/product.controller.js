@@ -184,7 +184,7 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          message: 'Product not found'
+          message: 'Producto no encontrado'
         });
       }
 
@@ -478,7 +478,7 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          message: 'Product not found'
+          message: 'Producto no encontrado'
         });
       }
 
@@ -612,7 +612,7 @@ class ProductController {
       }
 
       res.json({
-        message: 'Product updated successfully',
+        message: 'Producto actualizado exitosamente',
         data: product
       });
     } catch (error) {
@@ -629,7 +629,7 @@ class ProductController {
 
       if (!product) {
         return res.status(404).json({
-          message: 'Product not found'
+          message: 'Producto no encontrado'
         });
       }
 
@@ -648,7 +648,7 @@ class ProductController {
       await product.update({ is_active: false });
 
       res.json({
-        message: 'Product deleted successfully'
+        message: 'Producto eliminado exitosamente'
       });
     } catch (error) {
       next(error);
@@ -713,7 +713,7 @@ class ProductController {
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          message: 'Product not found'
+          message: 'Producto no encontrado'
         });
       }
 
@@ -754,7 +754,7 @@ class ProductController {
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          message: 'Product not found'
+          message: 'Producto no encontrado'
         });
       }
 
