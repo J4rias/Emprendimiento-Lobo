@@ -72,7 +72,7 @@ exports.create = async (req, res) => {
       total: subtotal,
       currency,
       exchangeRate: exchangeRate ? 1 / exchangeRate : null, // Store as COP/USD
-      createdBy: req.userId,
+      createdBy: req.user.id,
       warehouseId: warehouse.id
     }, { transaction });
 
@@ -199,7 +199,7 @@ exports.approve = async (req, res) => {
 
     await preOrder.update({
       status: 'approved',
-      approvedBy: req.userId,
+      approvedBy: req.user.id,
       approvedAt: new Date()
     });
 
@@ -222,7 +222,7 @@ exports.reject = async (req, res) => {
 
     await preOrder.update({
       status: 'rejected',
-      approvedBy: req.userId,
+      approvedBy: req.user.id,
       approvedAt: new Date()
     });
 
@@ -404,8 +404,8 @@ exports.convert = async (req, res) => {
       sale_number,
       customer_id: saleBody.customer_id,
       warehouse_id: saleBody.warehouse_id,
-      user_id: req.userId,
-      created_by: req.userId,
+      user_id: req.user.id,
+      created_by: req.user.id,
       sale_type: saleBody.sale_type,
       currency_mode: saleBody.currency_mode,
       status: 'completed',
@@ -435,7 +435,7 @@ exports.convert = async (req, res) => {
           method: line.method || 'cash',
           exchange_rate: parseFloat(line.exchange_rate) || 1,
           reference: line.reference || null,
-          created_by: req.userId
+          created_by: req.user.id
         }, { transaction });
       }
     }

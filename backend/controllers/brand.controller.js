@@ -63,7 +63,7 @@ const create = async (req, res, next) => {
   try {
     const brandData = {
       ...req.body,
-      created_by: req.userId
+      created_by: req.user.id
     };
 
     const brand = await Brand.create(brandData);
@@ -82,7 +82,7 @@ const create = async (req, res, next) => {
 const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body, updated_by: req.userId };
+    const updateData = { ...req.body, updated_by: req.user.id };
 
     const brand = await Brand.findByPk(id);
     if (!brand) {

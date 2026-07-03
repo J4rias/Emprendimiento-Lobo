@@ -85,7 +85,7 @@ const create = async (req, res, next) => {
     // Create supplier
     const supplier = await Supplier.create({
       ...supplierData,
-      created_by: req.userId
+      created_by: req.user.id
     }, { transaction });
 
     // Create contacts if provided
@@ -96,7 +96,7 @@ const create = async (req, res, next) => {
         ...contact,
         supplier_id: supplier.id,
         is_primary: index === 0 && !hasPrimary ? true : contact.is_primary,
-        created_by: req.userId
+        created_by: req.user.id
       }));
 
       await SupplierContact.bulkCreate(contactsToCreate, { transaction });
@@ -151,7 +151,7 @@ const update = async (req, res, next) => {
     // Update supplier
     await supplier.update({
       ...supplierData,
-      updated_by: req.userId
+      updated_by: req.user.id
     }, { transaction });
 
     // Handle contacts update
@@ -182,7 +182,7 @@ const update = async (req, res, next) => {
           newContacts.map(contact => ({
             ...contact,
             supplier_id: id,
-            created_by: req.userId
+            created_by: req.user.id
           })),
           { transaction }
         );
@@ -193,7 +193,7 @@ const update = async (req, res, next) => {
         await SupplierContact.update(
           {
             ...contact,
-            updated_by: req.userId
+            updated_by: req.user.id
           },
           {
             where: {
@@ -212,7 +212,7 @@ const update = async (req, res, next) => {
 
       if (contactsToDelete.length > 0) {
         await SupplierContact.update(
-          { is_active: false, updated_by: req.userId },
+          { is_active: false, updated_by: req.user.id },
           {
             where: {
               id: contactsToDelete,

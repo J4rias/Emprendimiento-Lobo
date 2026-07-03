@@ -186,8 +186,8 @@ class ExchangeRateController {
         effective_date,
         source,
         notes,
-        created_by: req.userId,
-        updated_by: req.userId
+        created_by: req.user.id,
+        updated_by: req.user.id
       });
 
       // Recargar con relaciones
@@ -256,7 +256,7 @@ class ExchangeRateController {
       // Actualizar
       await exchangeRate.update({
         ...updateData,
-        updated_by: req.userId
+        updated_by: req.user.id
       });
 
       // Recargar con relaciones

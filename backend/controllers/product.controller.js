@@ -329,7 +329,7 @@ class ProductController {
         max_stock,
         reorder_point,
         image_url: finalImageUrl,
-        created_by: req.userId
+        created_by: req.user.id
       }, { transaction });
 
       // Create presentations if provided
@@ -494,7 +494,7 @@ class ProductController {
       // Update product
       await product.update({
         ...updateData,
-        updated_by: req.userId
+        updated_by: req.user.id
       });
 
       // Update or create default presentation if presentation data provided

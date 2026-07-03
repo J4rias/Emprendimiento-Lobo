@@ -193,7 +193,7 @@ class PriceListController {
                 validity_days: validity_days || 5,
                 validFrom,
                 status: 'active',
-                updated_by: req.user?.id || req.userId
+                updated_by: req.user.id
             }, { transaction });
 
             // If details provided, create them
@@ -297,7 +297,7 @@ class PriceListController {
             }
 
             // Update header
-            const updateData = { updated_by: req.user?.id || req.userId };
+            const updateData = { updated_by: req.user.id };
             if (name !== undefined) updateData.name = name.trim();
             if (description !== undefined) updateData.description = description;
             // currency is hardcoded to USD, so it's not updated here
@@ -383,7 +383,7 @@ class PriceListController {
                 validity_days: original.validity_days,
                 validFrom: new Date(),
                 status: 'active',
-                updated_by: req.user?.id || req.userId
+                updated_by: req.user.id
             }, { transaction });
 
             // Copy details
