@@ -237,8 +237,8 @@ const getTransfers = async (req, res, next) => {
       origin_warehouse_id,
       destination_warehouse_id,
       search,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -262,17 +262,17 @@ const getTransfers = async (req, res, next) => {
       };
     }
 
-    if (start_date && end_date) {
+    if (date_from && date_to) {
       where.transfer_date = {
-        [Op.between]: [start_date, end_date]
+        [Op.between]: [date_from, date_to]
       };
-    } else if (start_date) {
+    } else if (date_from) {
       where.transfer_date = {
-        [Op.gte]: start_date
+        [Op.gte]: date_from
       };
-    } else if (end_date) {
+    } else if (date_to) {
       where.transfer_date = {
-        [Op.lte]: end_date
+        [Op.lte]: date_to
       };
     }
 
