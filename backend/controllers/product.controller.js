@@ -640,7 +640,7 @@ class ProductController {
 
       if (inventory) {
         return res.status(400).json({
-          message: 'Cannot delete product with existing inventory'
+          message: 'No se puede eliminar un producto con inventario existente'
         });
       }
 

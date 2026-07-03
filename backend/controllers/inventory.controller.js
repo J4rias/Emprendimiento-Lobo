@@ -186,7 +186,7 @@ class InventoryController {
 
       if (!inventory) {
         return res.status(404).json({
-          message: 'Inventory item not found'
+          message: 'Artículo de inventario no encontrado'
         });
       }
 
