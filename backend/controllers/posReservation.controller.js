@@ -38,7 +38,7 @@ exports.reserve = async (req, res, next) => {
     }
 
     // Verificar que la presentación existe
-    const presentation = await Product.findByPk(presentation_id, { transaction });
+    const presentation = await ProductPresentation.findByPk(presentation_id, { transaction });
     if (!presentation) {
       await transaction.rollback();
       return res.status(404).json({
@@ -101,7 +101,7 @@ exports.reserve = async (req, res, next) => {
 
     // UPSERT: crear o actualizar reserva
     const [reservation, created] = await PosReservation.findOrCreate({
-      where: { session/session_id, tab_id, presentation_id },
+      where: { session_id, tab_id, presentation_id },
       defaults: {
         session_id,
         tab_id,
@@ -170,7 +170,7 @@ exports.releaseItem = async (req, res, next) => {
       units_to_release
     } = req.body;
 
-    if (!session_id || !tab/tab_id || !presentation_id) {
+    if (!session_id || !tab_id || !presentation_id) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -272,7 +272,7 @@ exports.releaseTab = async (req, res, next) => {
         }) || 0;
 
         io.to('pos-room').emit('reservation:changed', {
-          product: product_id,
+          product_id,
           total_reserved: totalReservedNow,
           action: 'release_tab'
         });
