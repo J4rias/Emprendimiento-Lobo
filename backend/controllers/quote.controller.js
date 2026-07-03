@@ -77,14 +77,12 @@ exports.getAllQuotes = async (req, res, next) => {
     });
 
     res.json({
-      data: {
-        quotes,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
+      data: quotes,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit)
       }
     });
   } catch (error) {
