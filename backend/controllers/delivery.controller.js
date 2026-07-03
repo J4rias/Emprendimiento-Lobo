@@ -56,8 +56,8 @@ exports.getAllDeliveries = async (req, res) => {
       search = '',
       status,
       customer_id,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -84,13 +84,13 @@ exports.getAllDeliveries = async (req, res) => {
     }
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.scheduled_date = {};
-      if (start_date) {
-        where.scheduled_date[Op.gte] = start_date;
+      if (date_from) {
+        where.scheduled_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.scheduled_date[Op.lte] = end_date;
+      if (date_to) {
+        where.scheduled_date[Op.lte] = date_to;
       }
     }
 
@@ -651,18 +651,18 @@ exports.cancelDelivery = async (req, res) => {
  */
 exports.getDeliveryStats = async (req, res) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { date_from, date_to } = req.query;
 
     const where = {};
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.scheduled_date = {};
-      if (start_date) {
-        where.scheduled_date[Op.gte] = start_date;
+      if (date_from) {
+        where.scheduled_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.scheduled_date[Op.lte] = end_date;
+      if (date_to) {
+        where.scheduled_date[Op.lte] = date_to;
       }
     }
 

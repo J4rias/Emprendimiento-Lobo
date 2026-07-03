@@ -604,8 +604,8 @@ class InventoryController {
         product_id,
         warehouse_id,
         movement_type,
-        start_date,
-        end_date,
+        date_from,
+        date_to,
         page = 1,
         limit = 50
       } = req.query;
@@ -616,10 +616,10 @@ class InventoryController {
       if (warehouse_id) where.warehouse_id = warehouse_id;
       if (movement_type) where.movement_type = movement_type;
 
-      if (start_date || end_date) {
+      if (date_from || date_to) {
         where.created_at = {};
-        if (start_date) where.created_at[Op.gte] = start_date;
-        if (end_date) where.created_at[Op.lte] = end_date;
+        if (date_from) where.created_at[Op.gte] = date_from;
+        if (date_to) where.created_at[Op.lte] = date_to;
       }
 
       const offset = (page - 1) * limit;

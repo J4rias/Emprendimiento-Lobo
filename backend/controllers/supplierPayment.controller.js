@@ -54,8 +54,8 @@ exports.getAllPayments = async (req, res) => {
       supplier_id,
       payment_method,
       currency,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -87,13 +87,13 @@ exports.getAllPayments = async (req, res) => {
     }
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.payment_date = {};
-      if (start_date) {
-        where.payment_date[Op.gte] = start_date;
+      if (date_from) {
+        where.payment_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.payment_date[Op.lte] = end_date;
+      if (date_to) {
+        where.payment_date[Op.lte] = date_to;
       }
     }
 
@@ -710,18 +710,18 @@ exports.getPaymentsBySupplier = async (req, res) => {
  */
 exports.getPaymentStats = async (req, res) => {
   try {
-    const { start_date, end_date, supplier_id } = req.query;
+    const { date_from, date_to, supplier_id } = req.query;
 
     const where = {};
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.payment_date = {};
-      if (start_date) {
-        where.payment_date[Op.gte] = start_date;
+      if (date_from) {
+        where.payment_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.payment_date[Op.lte] = end_date;
+      if (date_to) {
+        where.payment_date[Op.lte] = date_to;
       }
     }
 

@@ -60,8 +60,8 @@ exports.getAllCreditNotes = async (req, res) => {
       customer_id,
       sale_id,
       status,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -90,13 +90,13 @@ exports.getAllCreditNotes = async (req, res) => {
     }
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.credit_note_date = {};
-      if (start_date) {
-        where.credit_note_date[Op.gte] = start_date;
+      if (date_from) {
+        where.credit_note_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.credit_note_date[Op.lte] = end_date;
+      if (date_to) {
+        where.credit_note_date[Op.lte] = date_to;
       }
     }
 
@@ -758,18 +758,18 @@ exports.cancelCreditNote = async (req, res) => {
  */
 exports.getCreditNoteStats = async (req, res) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { date_from, date_to } = req.query;
 
     const where = {};
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.credit_note_date = {};
-      if (start_date) {
-        where.credit_note_date[Op.gte] = start_date;
+      if (date_from) {
+        where.credit_note_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.credit_note_date[Op.lte] = end_date;
+      if (date_to) {
+        where.credit_note_date[Op.lte] = date_to;
       }
     }
 

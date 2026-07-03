@@ -422,8 +422,8 @@ exports.getSales = async (req, res) => {
       sale_type,
       customer_id,
       warehouse_id,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -456,17 +456,17 @@ exports.getSales = async (req, res) => {
       where.warehouse_id = warehouse_id;
     }
 
-    if (start_date && end_date) {
+    if (date_from && date_to) {
       where.sale_date = {
-        [Op.between]: [new Date(start_date), new Date(end_date)]
+        [Op.between]: [new Date(date_from), new Date(date_to)]
       };
-    } else if (start_date) {
+    } else if (date_from) {
       where.sale_date = {
-        [Op.gte]: new Date(start_date)
+        [Op.gte]: new Date(date_from)
       };
-    } else if (end_date) {
+    } else if (date_to) {
       where.sale_date = {
-        [Op.lte]: new Date(end_date)
+        [Op.lte]: new Date(date_to)
       };
     }
 
@@ -936,17 +936,17 @@ exports.addPayment = async (req, res) => {
 
 exports.getSalesStats = async (req, res) => {
   try {
-    const { start_date, end_date, warehouse_id, summary_only } = req.query;
+    const { date_from, date_to, warehouse_id, summary_only } = req.query;
 
     const where = {};
 
-    if (start_date && end_date) {
+    if (date_from && date_to) {
       where.sale_date = {
-        [Op.between]: [new Date(start_date), new Date(end_date)]
+        [Op.between]: [new Date(date_from), new Date(date_to)]
       };
-    } else if (start_date) {
+    } else if (date_from) {
       where.sale_date = {
-        [Op.gte]: new Date(start_date)
+        [Op.gte]: new Date(date_from)
       };
     }
 
@@ -980,10 +980,10 @@ exports.getSalesStats = async (req, res) => {
       INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
       WHERE s.status IN ('completed', 'pending')
         AND sd.cost_price IS NOT NULL
-        ${start_date && end_date ? 'AND s.sale_date BETWEEN :start_date AND :end_date' : start_date ? 'AND s.sale_date >= :start_date' : ''}
+        ${date_from && date_to ? 'AND s.sale_date BETWEEN :date_from AND :date_to' : date_from ? 'AND s.sale_date >= :date_from' : ''}
         ${warehouse_id ? 'AND s.warehouse_id = :warehouse_id' : ''}
     `, {
-      replacements: { start_date, end_date, warehouse_id },
+      replacements: { date_from, date_to, warehouse_id },
       type: sequelize.QueryTypes.SELECT
     });
     const totalCost = parseFloat(costResult[0]?.total_cost || 0);
@@ -1177,16 +1177,16 @@ exports.getDailySeries = async (req, res) => {
 
 exports.getProductSales = async (req, res) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { date_from, date_to } = req.query;
 
     const where = {
       status: { [Op.in]: ['completed', 'pending'] }
     };
 
-    if (start_date && end_date) {
-      where.sale_date = { [Op.between]: [new Date(start_date), new Date(end_date)] };
-    } else if (start_date) {
-      where.sale_date = { [Op.gte]: new Date(start_date) };
+    if (date_from && date_to) {
+      where.sale_date = { [Op.between]: [new Date(date_from), new Date(date_to)] };
+    } else if (date_from) {
+      where.sale_date = { [Op.gte]: new Date(date_from) };
     }
 
     const productSales = await SaleDetail.findAll({
