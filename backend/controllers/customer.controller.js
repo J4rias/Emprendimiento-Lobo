@@ -1015,8 +1015,8 @@ class CustomerController {
     try {
       const { id } = req.params;
       const {
-        from,
-        to
+        date_from,
+        date_to
       } = req.query;
 
       const customer = await Customer.findOne({
@@ -1032,8 +1032,8 @@ class CustomerController {
       }
 
       const now = new Date();
-      const dateFrom = from ? new Date(from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const dateTo = to ? new Date(to) : now;
+      const dateFrom = date_from ? new Date(date_from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const dateTo = date_to ? new Date(date_to) : now;
 
       const sales = await Sale.findAll({
         where: {

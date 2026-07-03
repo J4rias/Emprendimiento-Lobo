@@ -1112,9 +1112,9 @@ exports.getSalesStats = async (req, res) => {
 
 exports.getDailySeries = async (req, res) => {
   try {
-    const { from, to } = req.query;
-    const dateTo = to || new Date().toISOString().slice(0, 10);
-    const dateFrom = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { date_from, date_to } = req.query;
+    const dateTo = date_to || new Date().toISOString().slice(0, 10);
+    const dateFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const rows = await sequelize.query(`
       SELECT
@@ -1481,13 +1481,13 @@ exports.validateCreditPin = async (req, res) => {
   }
 };
 
-// GET /api/sales/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/sales/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
 exports.getSalesSummary = async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const { date_from, date_to } = req.query;
     const today = new Date();
-    const dateFrom = from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    const dateTo = to || dateFrom;
+    const dateFrom = date_from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const dateTo = date_to || dateFrom;
 
     const replacements = { dateFrom, dateTo };
     const statusFilter = "s.status IN ('completed','pending')";
