@@ -20,21 +20,21 @@ class AuthController {
 
       if (!user) {
         return res.status(401).json({
-          message: 'Invalid credentials'
+          message: 'Credenciales incorrectas'
         });
       }
 
       // Check if account is locked
       if (user.locked_until && user.locked_until > new Date()) {
         return res.status(401).json({
-          message: 'Account is temporarily locked. Please try again later.'
+          message: 'Cuenta temporalmente bloqueada. Intente mas tarde.'
         });
       }
 
       // Check if user is active
       if (!user.is_active) {
         return res.status(401).json({
-          message: 'Account is inactive. Please contact administrator.'
+          message: 'Cuenta inactiva. Contacte al administrador.'
         });
       }
 
@@ -51,14 +51,14 @@ class AuthController {
           await user.save();
 
           return res.status(401).json({
-            message: 'Account locked due to multiple failed login attempts.'
+            message: 'Cuenta bloqueada por multiples intentos fallidos.'
           });
         }
 
         await user.save();
 
         return res.status(401).json({
-          message: 'Invalid credentials'
+          message: 'Credenciales incorrectas'
         });
       }
 
@@ -77,7 +77,7 @@ class AuthController {
 
       // Send response
       res.json({
-        message: 'Login successful',
+        message: 'Sesion iniciada',
         data: {
           user: user.toJSON(),
           token
@@ -120,7 +120,7 @@ class AuthController {
 
       if (!isPasswordValid) {
         return res.status(400).json({
-          message: 'Current password is incorrect'
+          message: 'La contrasena actual es incorrecta'
         });
       }
 
@@ -129,7 +129,7 @@ class AuthController {
       await user.save();
 
       res.json({
-        message: 'Password changed successfully'
+        message: 'Contrasena cambiada exitosamente'
       });
     } catch (error) {
       next(error);
@@ -143,7 +143,7 @@ class AuthController {
       // or log the logout event for audit purposes
 
       res.json({
-        message: 'Logout successful'
+        message: 'Sesion cerrada'
       });
     } catch (error) {
       next(error);
