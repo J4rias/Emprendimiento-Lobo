@@ -120,7 +120,7 @@ class ExchangeRateController {
 
       if (!rate) {
         return res.status(404).json({
-          message: 'Exchange rate not found'
+          message: 'Tasa de cambio no encontrada'
         });
       }
 
@@ -210,7 +210,7 @@ class ExchangeRateController {
 
       if (!exchangeRate) {
         return res.status(404).json({
-          message: 'Exchange rate not found'
+          message: 'Tasa de cambio no encontrada'
         });
       }
 
@@ -274,7 +274,7 @@ class ExchangeRateController {
 
       if (!exchangeRate) {
         return res.status(404).json({
-          message: 'Exchange rate not found'
+          message: 'Tasa de cambio no encontrada'
         });
       }
 
