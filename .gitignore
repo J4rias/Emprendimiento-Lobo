@@ -69,3 +69,7 @@ tmp/orchestrator-report.md
 
 # Markdown
 *.md
+# Orchestrator local (groundctl only)
+scripts/orchestrator.py
+tmp/orchestrator-state.json
+tmp/orchestrator-report.md
