@@ -1,6 +1,7 @@
 const { Inventory, Product, Warehouse, Batch, Category, ProductPresentation, ExchangeRate, InventoryMovement, User, Barcode } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 class InventoryController {
   // Get inventory by warehouse
@@ -155,7 +156,8 @@ class InventoryController {
         }
       });
     } catch (error) {
-      next(error);
+      logger.error('Error in getByWarehouse', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -195,7 +197,8 @@ class InventoryController {
         data: inventory
       });
     } catch (error) {
-      next(error);
+      logger.error('Error in getById', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -234,7 +237,8 @@ class InventoryController {
         }
       });
     } catch (error) {
-      next(error);
+      logger.error('Error in getByProduct', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -273,7 +277,8 @@ class InventoryController {
         count: lowStockItems.length
       });
     } catch (error) {
-      next(error);
+      logger.error('Error in getLowStock', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -419,7 +424,8 @@ class InventoryController {
       });
     } catch (error) {
       await transaction.rollback();
-      next(error);
+      logger.error('Error in adjustInventory', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -465,7 +471,8 @@ class InventoryController {
         count: batches.length
       });
     } catch (error) {
-      next(error);
+      logger.error('Error in getExpiringProducts', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -585,17 +592,8 @@ class InventoryController {
         }
       });
     } catch (error) {
-      console.error('Error in getValuation:', error);
-      // Return default values on error
-      res.json({
-        success: true,
-        data: {
-          items: [],
-          totalValue: 0,
-          totalsByCurrency: { USD: 0, COP: 0, VES: 0 },
-          currency: 'USD'
-        }
-      });
+      logger.error('Error in getValuation', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -650,7 +648,8 @@ class InventoryController {
       });
 
     } catch (error) {
-      next(error);
+      logger.error('Error in getMovements', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
@@ -668,7 +667,8 @@ class InventoryController {
       });
 
     } catch (error) {
-      next(error);
+      logger.error('Error in getWarehouses', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 }
