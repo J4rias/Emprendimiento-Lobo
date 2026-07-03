@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const { ExchangeRate, User } = require('../models');
 const { Op } = require('sequelize');
 
@@ -39,7 +40,7 @@ class ExchangeRateController {
         where,
         include: [
           { model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] },
-          { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] }
+          { model: User, as: 'updater', attributes: ['id', 'substring', 'first_name', 'last_name'] }
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -180,7 +181,7 @@ class ExchangeRateController {
       // Crear la tasa de cambio
       const exchangeRate = await ExchangeRate.create({
         from_currency,
-        to_currency,
+        to: to_currency,
         rate,
         effective_date,
         source,
@@ -335,10 +336,8 @@ class ExchangeRateController {
         }
       });
     } catch (error) {
-      res.status(404).json({
-        success: false,
-        message: `No se encontró una tasa de cambio válida: ${error.message}`
-      });
+      logger.error('Error al convertir monto', { error: error.message });
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 }
