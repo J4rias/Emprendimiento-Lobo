@@ -824,6 +824,19 @@ exports.addPayment = async (req, res) => {
       return res.status(400).json({ message: 'No se enviaron líneas de pago' });
     }
 
+    // Pre-calculate total to validate before creating any records
+    const totalNewlyPaidUSD = payment_lines.reduce((sum, payLine) => {
+      return sum + (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
+    }, 0);
+
+    const remainingBalance = parseFloat(sale.total) - parseFloat(sale.paid_amount);
+    if (totalNewlyPaidUSD > remainingBalance + 0.01) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: 'El pago excede el saldo pendiente de la venta'
+      });
+    }
+
     let newlyPaidUSD = 0;
     const createdPayments = [];
 
@@ -857,7 +870,7 @@ exports.addPayment = async (req, res) => {
       }
     }
 
-    const newPaidAmount = parseFloat(sale.paid_amount) + newlyPaidUSD;
+    const newPaidAmount = Math.min(parseFloat(sale.paid_amount) + newlyPaidUSD, parseFloat(sale.total));
     const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
     const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 

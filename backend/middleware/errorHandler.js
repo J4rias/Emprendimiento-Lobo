@@ -65,11 +65,19 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Default Error
+  // body-parser JSON malformado — evita exponer stack trace al cliente
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      message: 'JSON inválido en el cuerpo de la solicitud'
+    });
+  }
+
+  // Default Error — no exponer err.message ni stack en producción
+  const isProd = process.env.NODE_ENV === 'production';
   res.status(err.statusCode || 500).json({
     success: false,
-    message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    message: isProd ? 'Internal server error' : (err.message || 'Internal server error')
   });
 };
 

@@ -1,7 +1,10 @@
 const express = require('express');
+const fs = require('fs').promises;
+const path = require('path');
 const router = express.Router();
 const { uploadSingle, uploadMultiple } = require('../middleware/upload');
 const auth = require('../middleware/auth');
+const authorize = require('../middleware/authorize');
 const multer = require('multer');
 const logger = require('../config/logger');
 
@@ -10,8 +13,6 @@ router.use(auth);
 
 // Manejador de errores de multer
 const handleMulterError = (error, req, res, next) => {
-  logger.info('Multer error:', error);
-  
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
@@ -32,14 +33,14 @@ const handleMulterError = (error, req, res, next) => {
       });
     }
   }
-  
+
   if (error.message === 'Solo se permiten archivos de imagen') {
     return res.status(400).json({
       success: false,
       message: 'Solo se permiten archivos de imagen'
     });
   }
-  
+
   res.status(400).json({
     success: false,
     message: error.message || 'Error al subir el archivo'
@@ -47,10 +48,7 @@ const handleMulterError = (error, req, res, next) => {
 };
 
 // Subir una sola imagen
-router.post('/', (req, res, next) => {
-  logger.info('Upload route hit');
-  next();
-}, ...uploadSingle('image'), handleMulterError, (req, res) => {
+router.post('/', authorize('products.update'), ...uploadSingle('image'), handleMulterError, (req, res) => {
   try {
     if (!req.processedFiles || req.processedFiles.length === 0) {
       return res.status(400).json({
@@ -60,14 +58,7 @@ router.post('/', (req, res, next) => {
     }
 
     const uploadedFile = req.processedFiles[0];
-    
-    logger.info('Upload successful - response:', {
-      url: uploadedFile.url,
-      filename: uploadedFile.filename,
-      originalName: uploadedFile.originalName,
-      size: uploadedFile.size
-    });
-    
+
     res.json({
       success: true,
       message: 'Imagen subida exitosamente',
@@ -82,14 +73,13 @@ router.post('/', (req, res, next) => {
     logger.error('Error en upload:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al subir la imagen',
-      error: error.message
+      message: 'Error al subir la imagen'
     });
   }
 });
 
 // Subir múltiples imágenes
-router.post('/multiple', ...uploadMultiple('images', 5), handleMulterError, (req, res) => {
+router.post('/multiple', authorize('products.update'), ...uploadMultiple('images', 5), handleMulterError, (req, res) => {
   try {
     if (!req.processedFiles || req.processedFiles.length === 0) {
       return res.status(400).json({
@@ -112,17 +102,16 @@ router.post('/multiple', ...uploadMultiple('images', 5), handleMulterError, (req
     logger.error('Error en upload multiple:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al subir las imágenes',
-      error: error.message
+      message: 'Error al subir las imágenes'
     });
   }
 });
 
 // Eliminar una imagen
-router.delete('/image', async (req, res) => {
+router.delete('/image', authorize('products.update'), async (req, res) => {
   try {
     const { url } = req.body;
-    
+
     if (!url) {
       return res.status(400).json({
         success: false,
@@ -130,16 +119,13 @@ router.delete('/image', async (req, res) => {
       });
     }
 
-    // Construir ruta completa
-    const fs = require('fs').promises;
-    const path = require('path');
     const basePath = path.resolve(path.join(__dirname, '../public'));
     const imagePath = path.resolve(path.join(__dirname, '../public', url));
+
     if (!imagePath.startsWith(basePath + path.sep)) {
       return res.status(400).json({ success: false, message: 'Ruta de imagen inválida' });
     }
-    
-    // Verificar si el archivo existe y eliminarlo
+
     try {
       await fs.unlink(imagePath);
       res.json({
@@ -148,7 +134,6 @@ router.delete('/image', async (req, res) => {
       });
     } catch (error) {
       if (error.code === 'ENOENT') {
-        // El archivo no existe, pero consideramos exitosa la operación
         res.json({
           success: true,
           message: 'Imagen eliminada exitosamente'
@@ -161,8 +146,7 @@ router.delete('/image', async (req, res) => {
     logger.error('Error eliminando imagen:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al eliminar la imagen',
-      error: error.message
+      message: 'Error al eliminar la imagen'
     });
   }
 });
