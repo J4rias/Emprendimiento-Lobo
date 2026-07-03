@@ -289,14 +289,12 @@ const getTransfers = async (req, res, next) => {
     });
 
     res.json({
-      data: {
-        transfers: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
+      data: rows,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit)
       }
     });
 
