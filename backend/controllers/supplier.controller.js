@@ -1,6 +1,7 @@
 const { Supplier, SupplierContact, PurchaseOrder, SupplierPayment, SupplierPaymentAllocation, ExchangeRate } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 // Get all suppliers with pagination and search
 const getAll = async (req, res, next) => {
@@ -134,9 +135,9 @@ const update = async (req, res, next) => {
     const { id } = req.params;
     const { contacts, ...supplierData } = req.body;
 
-    console.log('Update supplier - req.body:', req.body);
-    console.log('Update supplier - supplierData:', supplierData);
-    console.log('Update supplier - contacts:', contacts);
+    logger.info('Update supplier - req.body:', req.body);
+    logger.info('Update supplier - supplierData:', supplierData);
+    logger.info('Update supplier - contacts:', contacts);
 
     const supplier = await Supplier.findByPk(id, { transaction });
     if (!supplier) {
@@ -377,12 +378,12 @@ const getStatement = async (req, res, next) => {
       const amountOrig = parseFloat(pay.amount || 0);
       const payCurrency = pay.currency || 'USD';
 
-      // For payments, we use the exchange_rate stored in the payment if it exists, 
+      // For payments, we use the exchange_rate stored in the payment if it exists,
       // otherwise we fetch it from the system.
       let rateToUSD, rateToCOP;
 
       if (pay.exchange_rate && pay.exchange_rate_from && pay.exchange_rate_to) {
-        // If we have a saved rate, we should use it. 
+        // If we have a saved rate, we should use it.
         // This part gets tricky if the saved rate is VES-USD but we need COP.
         // For now, let's keep it simple and fetch if needed.
         rateToUSD = await ExchangeRate.getRate(payCurrency, 'USD', pay.payment_date);
