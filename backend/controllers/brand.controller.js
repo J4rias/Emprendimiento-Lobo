@@ -3,7 +3,7 @@ const { brandService } = require('../services/brand.service');
 // Get all brands with pagination and search
 const getAll = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search = '' } = req.query;
+    const { page = 1, limit = 25, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
     const where = {

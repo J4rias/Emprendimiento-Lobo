@@ -13,7 +13,7 @@ class ProductController {
     try {
       const {
         page = 1,
-        limit = 20,
+        limit = 25,
         search,
         category_id,
         is_active,
