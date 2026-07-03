@@ -98,7 +98,7 @@ exports.create = async (req, res) => {
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ success: false, message: 'Error al crear pre-pedido', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al crear pre-pedido' });
   }
 };
 
@@ -137,7 +137,7 @@ exports.getAll = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener pre-pedidos', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al obtener pre-pedidos' });
   }
 };
 
@@ -157,7 +157,7 @@ exports.getStats = async (req, res) => {
       data: { pending, approved, today: todayCount }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener estadísticas', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al obtener estadísticas' });
   }
 };
 
@@ -182,7 +182,7 @@ exports.getById = async (req, res) => {
 
     res.json({ success: true, data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener pre-pedido', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al obtener pre-pedido' });
   }
 };
 
@@ -205,7 +205,7 @@ exports.approve = async (req, res) => {
 
     res.json({ success: true, data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al aprobar pre-pedido', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al aprobar pre-pedido' });
   }
 };
 
@@ -228,7 +228,7 @@ exports.reject = async (req, res) => {
 
     res.json({ success: true, data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al rechazar pre-pedido', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al rechazar pre-pedido' });
   }
 };
 
@@ -457,6 +457,6 @@ exports.convert = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ success: false, message: 'Error al convertir pre-pedido', error: error.message });
+    res.status(500).json({ success: false, message: 'Error al convertir pre-pedido' });
   }
 };
