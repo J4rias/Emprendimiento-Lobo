@@ -18,7 +18,6 @@ exports.getAllRoles = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: { roles },
     });
   } catch (error) {
@@ -45,13 +44,11 @@ exports.getRoleById = async (req, res, next) => {
 
     if (!role) {
       return res.status(404).json({
-        success: false,
         message: 'Rol no encontrado',
       });
     }
 
     res.json({
-      success: true,
       data: role,
     });
   } catch (error) {
@@ -90,7 +87,6 @@ exports.createRole = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Rol creado exitosamente',
       data: fullRole,
     });
@@ -111,7 +107,6 @@ exports.updateRole = async (req, res, next) => {
 
     if (!role) {
       return res.status(404).json({
-        success: false,
         message: 'Rol no encontrado',
       });
     }
@@ -140,7 +135,6 @@ exports.updateRole = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Rol actualizado exitosamente',
       data: fullRole,
     });
@@ -160,7 +154,6 @@ exports.deleteRole = async (req, res, next) => {
 
     if (!role) {
       return res.status(404).json({
-        success: false,
         message: 'Rol no encontrado',
       });
     }
@@ -171,7 +164,6 @@ exports.deleteRole = async (req, res, next) => {
 
     if (usersCount > 0) {
       return res.status(400).json({
-        success: false,
         message: `No se puede eliminar el rol porque tiene ${usersCount} usuario(s) asignado(s)`,
       });
     }
@@ -179,7 +171,6 @@ exports.deleteRole = async (req, res, next) => {
     await role.destroy();
 
     res.json({
-      success: true,
       message: 'Rol eliminado exitosamente',
     });
   } catch (error) {
@@ -200,7 +191,6 @@ exports.getAllPermissions = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: { permissions },
     });
   } catch (error) {

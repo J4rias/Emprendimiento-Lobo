@@ -1,6 +1,7 @@
 const { Supplier, SupplierContact, PurchaseOrder, SupplierPayment, SupplierPaymentAllocation, ExchangeRate } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 // Get all suppliers with pagination and search
 const getAll = async (req, res, next) => {
@@ -29,7 +30,6 @@ const getAll = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: suppliers,
       pagination: {
         total: count,
@@ -60,13 +60,11 @@ const getById = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        success: false,
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
     res.json({
-      success: true,
       data: supplier
     });
   } catch (error) {
@@ -84,7 +82,7 @@ const create = async (req, res, next) => {
     // Create supplier
     const supplier = await Supplier.create({
       ...supplierData,
-      created_by: req.userId
+      created_by: req.user.id
     }, { transaction });
 
     // Create contacts if provided
@@ -95,7 +93,7 @@ const create = async (req, res, next) => {
         ...contact,
         supplier_id: supplier.id,
         is_primary: index === 0 && !hasPrimary ? true : contact.is_primary,
-        created_by: req.userId
+        created_by: req.user.id
       }));
 
       await SupplierContact.bulkCreate(contactsToCreate, { transaction });
@@ -116,8 +114,7 @@ const create = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
-      message: 'Supplier created successfully',
+      message: 'Proveedor creado exitosamente',
       data: supplierWithContacts
     });
   } catch (error) {
@@ -134,23 +131,22 @@ const update = async (req, res, next) => {
     const { id } = req.params;
     const { contacts, ...supplierData } = req.body;
 
-    console.log('Update supplier - req.body:', req.body);
-    console.log('Update supplier - supplierData:', supplierData);
-    console.log('Update supplier - contacts:', contacts);
+    logger.info('Update supplier - req.body:', req.body);
+    logger.info('Update supplier - supplierData:', supplierData);
+    logger.info('Update supplier - contacts:', contacts);
 
     const supplier = await Supplier.findByPk(id, { transaction });
     if (!supplier) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
     // Update supplier
     await supplier.update({
       ...supplierData,
-      updated_by: req.userId
+      updated_by: req.user.id
     }, { transaction });
 
     // Handle contacts update
@@ -181,7 +177,7 @@ const update = async (req, res, next) => {
           newContacts.map(contact => ({
             ...contact,
             supplier_id: id,
-            created_by: req.userId
+            created_by: req.user.id
           })),
           { transaction }
         );
@@ -192,7 +188,7 @@ const update = async (req, res, next) => {
         await SupplierContact.update(
           {
             ...contact,
-            updated_by: req.userId
+            updated_by: req.user.id
           },
           {
             where: {
@@ -211,7 +207,7 @@ const update = async (req, res, next) => {
 
       if (contactsToDelete.length > 0) {
         await SupplierContact.update(
-          { is_active: false, updated_by: req.userId },
+          { is_active: false, updated_by: req.user.id },
           {
             where: {
               id: contactsToDelete,
@@ -238,8 +234,7 @@ const update = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
-      message: 'Supplier updated successfully',
+      message: 'Proveedor actualizado exitosamente',
       data: supplierWithContacts
     });
   } catch (error) {
@@ -256,16 +251,14 @@ const deleteSupplier = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        success: false,
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
     await supplier.update({ is_active: false });
 
     res.json({
-      success: true,
-      message: 'Supplier deleted successfully'
+      message: 'Proveedor eliminado exitosamente'
     });
   } catch (error) {
     next(error);
@@ -282,7 +275,6 @@ const getActive = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: suppliers
     });
   } catch (error) {
@@ -298,7 +290,7 @@ const getStatement = async (req, res, next) => {
     // Validate supplier exists
     const supplier = await Supplier.findByPk(id);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Supplier not found' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // 1. Fetch Purchase Orders (Debts/Liabilities) - Excluding cancelled ones
@@ -377,12 +369,12 @@ const getStatement = async (req, res, next) => {
       const amountOrig = parseFloat(pay.amount || 0);
       const payCurrency = pay.currency || 'USD';
 
-      // For payments, we use the exchange_rate stored in the payment if it exists, 
+      // For payments, we use the exchange_rate stored in the payment if it exists,
       // otherwise we fetch it from the system.
       let rateToUSD, rateToCOP;
 
       if (pay.exchange_rate && pay.exchange_rate_from && pay.exchange_rate_to) {
-        // If we have a saved rate, we should use it. 
+        // If we have a saved rate, we should use it.
         // This part gets tricky if the saved rate is VES-USD but we need COP.
         // For now, let's keep it simple and fetch if needed.
         rateToUSD = await ExchangeRate.getRate(payCurrency, 'USD', pay.payment_date);
@@ -437,7 +429,6 @@ const getStatement = async (req, res, next) => {
     ledger.sort((a, b) => a.date - b.date);
 
     res.json({
-      success: true,
       data: {
         supplier: { id: supplier.id, name: supplier.name, company_name: supplier.company_name },
         summary: summary,
@@ -474,7 +465,7 @@ const getLedger = async (req, res, next) => {
 
     const supplier = await Supplier.findByPk(id);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // 1. Get all non-cancelled POs for this supplier
@@ -607,7 +598,6 @@ const getLedger = async (req, res, next) => {
     } catch (e) { /* rate not available */ }
 
     res.json({
-      success: true,
       data: {
         supplier: { id: supplier.id, name: supplier.name },
         bcv_rate: bcvRate,
@@ -638,7 +628,6 @@ const getResumen = async (req, res, next) => {
       let bcvRate = null;
       try { bcvRate = await ExchangeRate.getRate('USD', 'VES'); } catch (e) {}
       return res.json({
-        success: true,
         data: { bcv_rate: bcvRate, totals: { USD: 0, DIVISAS: 0, COP: 0 }, ves_needed: 0, suppliers: [] }
       });
     }
@@ -765,7 +754,6 @@ const getResumen = async (req, res, next) => {
     } catch (e) { /* rate not available */ }
 
     res.json({
-      success: true,
       data: {
         bcv_rate: bcvRate,
         totals,

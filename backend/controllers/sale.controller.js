@@ -1,6 +1,7 @@
 const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, InventoryMovement, Batch, PosReservation, Role, CreditNote, ExchangeRate, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
+const logger = require('../config/logger');
 
 const generateSaleNumber = async () => {
   const today = new Date();
@@ -52,7 +53,6 @@ exports.createSale = async (req, res) => {
       if (!isAdmin && !authorized_by) {
         await transaction.rollback();
         return res.status(403).json({
-          success: false,
           message: 'Venta a crédito requiere autorización de un administrador'
         });
       }
@@ -172,7 +172,6 @@ exports.createSale = async (req, res) => {
       if (available < units_to_deduct) {
         await transaction.rollback();
         return res.status(409).json({
-          success: false,
           conflict: true,
           message: `Stock insuficiente para ${product.name}. Otro vendedor reservó parte del stock.`,
           product_name: product.name,
@@ -244,7 +243,6 @@ exports.createSale = async (req, res) => {
     if (sale_type === 'cash' && paid_amount > 0 && paid_amount < total - 0.05) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: `Pago insuficiente. Total: $${total.toFixed(2)}, Pagado: $${paid_amount.toFixed(2)}`
       });
     }
@@ -262,7 +260,6 @@ exports.createSale = async (req, res) => {
       if (!customer) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -399,15 +396,14 @@ exports.createSale = async (req, res) => {
 
     res.status(201).json({
       message: 'Venta creada exitosamente',
-      sale: createdSale
+      data: createdSale
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating sale:', error);
+    logger.error('Error creating sale:', error);
     res.status(500).json({
-      message: 'Error al crear la venta',
-      error: error.message
+      message: 'Error al crear la venta'
     });
   }
 };
@@ -416,14 +412,14 @@ exports.getSales = async (req, res) => {
   try {
     const {
       page = 1,
-      limit = 10,
+      limit = 25,
       search = '',
       status,
       sale_type,
       customer_id,
       warehouse_id,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -456,17 +452,17 @@ exports.getSales = async (req, res) => {
       where.warehouse_id = warehouse_id;
     }
 
-    if (start_date && end_date) {
+    if (date_from && date_to) {
       where.sale_date = {
-        [Op.between]: [new Date(start_date), new Date(end_date)]
+        [Op.between]: [new Date(date_from), new Date(date_to)]
       };
-    } else if (start_date) {
+    } else if (date_from) {
       where.sale_date = {
-        [Op.gte]: new Date(start_date)
+        [Op.gte]: new Date(date_from)
       };
-    } else if (end_date) {
+    } else if (date_to) {
       where.sale_date = {
-        [Op.lte]: new Date(end_date)
+        [Op.lte]: new Date(date_to)
       };
     }
 
@@ -521,7 +517,7 @@ exports.getSales = async (req, res) => {
     }));
 
     res.json({
-      sales: salesWithCN,
+      data: salesWithCN,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -531,10 +527,9 @@ exports.getSales = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching sales:', error);
+    logger.error('Error fetching sales:', error);
     res.status(500).json({
-      message: 'Error al obtener las ventas',
-      error: error.message
+      message: 'Error al obtener las ventas'
     });
   }
 };
@@ -597,13 +592,12 @@ exports.getSaleById = async (req, res) => {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    res.json({ sale });
+    res.json({ data: sale });
 
   } catch (error) {
-    console.error('Error fetching sale:', error);
+    logger.error('Error fetching sale:', error);
     res.status(500).json({
-      message: 'Error al obtener la venta',
-      error: error.message
+      message: 'Error al obtener la venta'
     });
   }
 };
@@ -642,8 +636,8 @@ exports.getSaleBySaleNumber = async (req, res) => {
     res.json({ data: sale });
 
   } catch (error) {
-    console.error('Error fetching sale by number:', error);
-    res.status(500).json({ message: 'Error al obtener la venta', error: error.message });
+    logger.error('Error fetching sale by number:', error);
+    res.status(500).json({ message: 'Error al obtener la venta' });
   }
 };
 
@@ -686,15 +680,14 @@ exports.updateSale = async (req, res) => {
 
     res.json({
       message: 'Venta actualizada exitosamente',
-      sale: updatedSale
+      data: updatedSale
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error updating sale:', error);
+    logger.error('Error updating sale:', error);
     res.status(500).json({
-      message: 'Error al actualizar la venta',
-      error: error.message
+      message: 'Error al actualizar la venta'
     });
   }
 };
@@ -782,15 +775,14 @@ exports.cancelSale = async (req, res) => {
 
     res.json({
       message: 'Venta cancelada exitosamente',
-      sale
+      data: sale
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling sale:', error);
+    logger.error('Error cancelling sale:', error);
     res.status(500).json({
-      message: 'Error al cancelar la venta',
-      error: error.message
+      message: 'Error al cancelar la venta'
     });
   }
 };
@@ -828,6 +820,19 @@ exports.addPayment = async (req, res) => {
       return res.status(400).json({ message: 'No se enviaron líneas de pago' });
     }
 
+    // Pre-calculate total to validate before creating any records
+    const totalNewlyPaidUSD = payment_lines.reduce((sum, payLine) => {
+      return sum + (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
+    }, 0);
+
+    const remainingBalance = parseFloat(sale.total) - parseFloat(sale.paid_amount);
+    if (totalNewlyPaidUSD > remainingBalance + 0.01) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: 'El pago excede el saldo pendiente de la venta'
+      });
+    }
+
     let newlyPaidUSD = 0;
     const createdPayments = [];
 
@@ -861,7 +866,7 @@ exports.addPayment = async (req, res) => {
       }
     }
 
-    const newPaidAmount = parseFloat(sale.paid_amount) + newlyPaidUSD;
+    const newPaidAmount = Math.min(parseFloat(sale.paid_amount) + newlyPaidUSD, parseFloat(sale.total));
     const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
     const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 
@@ -912,33 +917,31 @@ exports.addPayment = async (req, res) => {
 
     res.json({
       message: 'Pagos registrados exitosamente',
-      payments: createdPayments,
-      sale: updatedSale
+      data: { payments: createdPayments, sale: updatedSale }
     });
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error adding payment:', error);
+    logger.error('Error adding payment:', error);
     res.status(500).json({
-      message: 'Error al registrar el pago',
-      error: error.message
+      message: 'Error al registrar el pago'
     });
   }
 };
 
 exports.getSalesStats = async (req, res) => {
   try {
-    const { start_date, end_date, warehouse_id, summary_only } = req.query;
+    const { date_from, date_to, warehouse_id, summary_only } = req.query;
 
     const where = {};
 
-    if (start_date && end_date) {
+    if (date_from && date_to) {
       where.sale_date = {
-        [Op.between]: [new Date(start_date), new Date(end_date)]
+        [Op.between]: [new Date(date_from), new Date(date_to)]
       };
-    } else if (start_date) {
+    } else if (date_from) {
       where.sale_date = {
-        [Op.gte]: new Date(start_date)
+        [Op.gte]: new Date(date_from)
       };
     }
 
@@ -972,10 +975,10 @@ exports.getSalesStats = async (req, res) => {
       INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
       WHERE s.status IN ('completed', 'pending')
         AND sd.cost_price IS NOT NULL
-        ${start_date && end_date ? 'AND s.sale_date BETWEEN :start_date AND :end_date' : start_date ? 'AND s.sale_date >= :start_date' : ''}
+        ${date_from && date_to ? 'AND s.sale_date BETWEEN :date_from AND :date_to' : date_from ? 'AND s.sale_date >= :date_from' : ''}
         ${warehouse_id ? 'AND s.warehouse_id = :warehouse_id' : ''}
     `, {
-      replacements: { start_date, end_date, warehouse_id },
+      replacements: { date_from, date_to, warehouse_id },
       type: sequelize.QueryTypes.SELECT
     });
     const totalCost = parseFloat(costResult[0]?.total_cost || 0);
@@ -986,7 +989,7 @@ exports.getSalesStats = async (req, res) => {
     // summary_only skips heavy queries (topProducts, salesByType, salesByStatus, salesByCurrency)
     if (summary_only === 'true') {
       return res.json({
-        stats: { totalSales, totalRevenue: revenue, totalRevenueCOP, totalCost, grossProfit, grossMarginPct }
+        data: { totalSales, totalRevenue: revenue, totalRevenueCOP, totalCost, grossProfit, grossMarginPct }
       });
     }
 
@@ -1075,12 +1078,12 @@ exports.getSalesStats = async (req, res) => {
           });
         }
       } catch (e) {
-        console.error('Error fetching salesByCurrency:', e.message);
+        logger.error('Error fetching salesByCurrency:', e.message);
       }
     }
 
     res.json({
-      stats: {
+      data: {
         totalSales,
         totalRevenue: revenue,
         totalRevenueCOP,
@@ -1095,19 +1098,18 @@ exports.getSalesStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching sales stats:', error);
+    logger.error('Error fetching sales stats:', error);
     res.status(500).json({
-      message: 'Error al obtener estadísticas de ventas',
-      error: error.message
+      message: 'Error al obtener estadísticas de ventas'
     });
   }
 };
 
 exports.getDailySeries = async (req, res) => {
   try {
-    const { from, to } = req.query;
-    const dateTo = to || new Date().toISOString().slice(0, 10);
-    const dateFrom = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { date_from, date_to } = req.query;
+    const dateTo = date_to || new Date().toISOString().slice(0, 10);
+    const dateFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const rows = await sequelize.query(`
       SELECT
@@ -1161,26 +1163,25 @@ exports.getDailySeries = async (req, res) => {
 
     res.json({ data });
   } catch (error) {
-    console.error('Error fetching daily series:', error);
+    logger.error('Error fetching daily series:', error);
     res.status(500).json({
-      message: 'Error al obtener serie diaria de ventas',
-      error: error.message
+      message: 'Error al obtener serie diaria de ventas'
     });
   }
 };
 
 exports.getProductSales = async (req, res) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { date_from, date_to } = req.query;
 
     const where = {
       status: { [Op.in]: ['completed', 'pending'] }
     };
 
-    if (start_date && end_date) {
-      where.sale_date = { [Op.between]: [new Date(start_date), new Date(end_date)] };
-    } else if (start_date) {
-      where.sale_date = { [Op.gte]: new Date(start_date) };
+    if (date_from && date_to) {
+      where.sale_date = { [Op.between]: [new Date(date_from), new Date(date_to)] };
+    } else if (date_from) {
+      where.sale_date = { [Op.gte]: new Date(date_from) };
     }
 
     const productSales = await SaleDetail.findAll({
@@ -1216,10 +1217,9 @@ exports.getProductSales = async (req, res) => {
 
     res.json({ data: productSales, count: productSales.length });
   } catch (error) {
-    console.error('Error fetching product sales:', error);
+    logger.error('Error fetching product sales:', error);
     res.status(500).json({
-      message: 'Error al obtener ventas por producto',
-      error: error.message
+      message: 'Error al obtener ventas por producto'
     });
   }
 };
@@ -1373,21 +1373,22 @@ exports.getDailyClosure = async (req, res) => {
     };
 
     res.json({
-      date: startOfDay.toISOString().split('T')[0],
-      totalSalesUSD,
-      totalSalesCOP: Math.round(totalSalesCOP),
-      salesCount,
-      creditTotalUSD,
-      paymentsBreakdown,
-      creditCollectedByCurrency,
-      cashRefunds
+      data: {
+        date: startOfDay.toISOString().split('T')[0],
+        totalSalesUSD,
+        totalSalesCOP: Math.round(totalSalesCOP),
+        salesCount,
+        creditTotalUSD,
+        paymentsBreakdown,
+        creditCollectedByCurrency,
+        cashRefunds
+      }
     });
 
   } catch (error) {
-    console.error('Error generating daily closure:', error);
+    logger.error('Error generating daily closure:', error);
     res.status(500).json({
-      message: 'Error al generar el cierre de caja',
-      error: error.message
+      message: 'Error al generar el cierre de caja'
     });
   }
 };
@@ -1398,7 +1399,7 @@ exports.validateCreditPin = async (req, res) => {
     const { pin } = req.body;
 
     if (!pin || !/^\d{4,6}$/.test(pin)) {
-      return res.status(400).json({ success: false, message: 'PIN debe ser de 4 a 6 dígitos' });
+      return res.status(400).json({ message: 'PIN debe ser de 4 a 6 dígitos' });
     }
 
     // Find admin users with a credit_pin set (raw SQL because credit_pin is not in User model)
@@ -1414,7 +1415,6 @@ exports.validateCreditPin = async (req, res) => {
 
     if (!admins || admins.length === 0) {
       return res.status(400).json({
-        success: false,
         message: 'No hay administradores con PIN configurado'
       });
     }
@@ -1433,7 +1433,6 @@ exports.validateCreditPin = async (req, res) => {
           { replacements: [admin.id] }
         );
         return res.json({
-          success: true,
           admin_id: admin.id,
           admin_name: `${admin.first_name} ${admin.last_name}`
         });
@@ -1466,24 +1465,23 @@ exports.validateCreditPin = async (req, res) => {
     });
 
     return res.status(400).json({
-      success: false,
       message: allLocked
         ? 'PIN bloqueado por demasiados intentos. Intente en 15 minutos.'
         : 'PIN incorrecto'
     });
   } catch (error) {
-    console.error('Error validating credit PIN:', error);
-    res.status(500).json({ success: false, message: 'Error al validar PIN' });
+    logger.error('Error validating credit PIN:', error);
+    res.status(500).json({ message: 'Error al validar PIN' });
   }
 };
 
-// GET /api/sales/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/sales/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
 exports.getSalesSummary = async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const { date_from, date_to } = req.query;
     const today = new Date();
-    const dateFrom = from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    const dateTo = to || dateFrom;
+    const dateFrom = date_from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const dateTo = date_to || dateFrom;
 
     const replacements = { dateFrom, dateTo };
     const statusFilter = "s.status IN ('completed','pending')";
@@ -1593,7 +1591,6 @@ exports.getSalesSummary = async (req, res) => {
     `, { replacements, type: sequelize.QueryTypes.SELECT });
 
     res.json({
-      success: true,
       data: {
         period: { from: dateFrom, to: dateTo },
         summary: {
@@ -1617,7 +1614,7 @@ exports.getSalesSummary = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting sales summary:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener resumen de ventas', error: error.message });
+    logger.error('Error getting sales summary:', error);
+    res.status(500).json({ message: 'Error al obtener resumen de ventas' });
   }
 };

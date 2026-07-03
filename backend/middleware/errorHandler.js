@@ -11,7 +11,6 @@ const errorHandler = (err, req, res, next) => {
   // Sequelize Validation Error
   if (err.name === 'SequelizeValidationError') {
     return res.status(400).json({
-      success: false,
       message: 'Validation error',
       errors: err.errors.map(e => ({
         field: e.path,
@@ -22,12 +21,11 @@ const errorHandler = (err, req, res, next) => {
 
   // Sequelize Unique Constraint Error
   if (err.name === 'SequelizeUniqueConstraintError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Duplicate entry',
+    return res.status(409).json({
+      message: 'Ya existe un registro con ese valor',
       errors: err.errors.map(e => ({
         field: e.path,
-        message: `${e.path} already exists`
+        message: `El campo ${e.path} ya existe`
       }))
     });
   }
@@ -35,7 +33,6 @@ const errorHandler = (err, req, res, next) => {
   // Sequelize Foreign Key Constraint Error
   if (err.name === 'SequelizeForeignKeyConstraintError') {
     return res.status(400).json({
-      success: false,
       message: 'Invalid reference',
       error: 'The referenced record does not exist'
     });
@@ -44,7 +41,6 @@ const errorHandler = (err, req, res, next) => {
   // Sequelize Database Error
   if (err.name === 'SequelizeDatabaseError') {
     return res.status(500).json({
-      success: false,
       message: 'Database error',
       error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
     });
@@ -53,23 +49,27 @@ const errorHandler = (err, req, res, next) => {
   // JWT Errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
-      success: false,
       message: 'Invalid token'
     });
   }
 
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({
-      success: false,
       message: 'Token expired'
     });
   }
 
-  // Default Error
+  // body-parser JSON malformado — evita exponer stack trace al cliente
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      message: 'JSON inválido en el cuerpo de la solicitud'
+    });
+  }
+
+  // Default Error — no exponer err.message ni stack en producción
+  const isProd = process.env.NODE_ENV === 'production';
   res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    message: isProd ? 'Internal server error' : (err.message || 'Internal server error')
   });
 };
 

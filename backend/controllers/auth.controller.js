@@ -20,24 +20,21 @@ class AuthController {
 
       if (!user) {
         return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
+          message: 'Credenciales incorrectas'
         });
       }
 
       // Check if account is locked
       if (user.locked_until && user.locked_until > new Date()) {
         return res.status(401).json({
-          success: false,
-          message: 'Account is temporarily locked. Please try again later.'
+          message: 'Cuenta temporalmente bloqueada. Intente más tarde.'
         });
       }
 
       // Check if user is active
       if (!user.is_active) {
         return res.status(401).json({
-          success: false,
-          message: 'Account is inactive. Please contact administrator.'
+          message: 'Cuenta inactiva. Contacte al administrador.'
         });
       }
 
@@ -54,16 +51,14 @@ class AuthController {
           await user.save();
 
           return res.status(401).json({
-            success: false,
-            message: 'Account locked due to multiple failed login attempts.'
+            message: 'Cuenta bloqueada por múltiples intentos fallidos.'
           });
         }
 
         await user.save();
 
         return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
+          message: 'Credenciales incorrectas'
         });
       }
 
@@ -82,8 +77,7 @@ class AuthController {
 
       // Send response
       res.json({
-        success: true,
-        message: 'Login successful',
+        message: 'Sesión iniciada',
         data: {
           user: user.toJSON(),
           token
@@ -107,7 +101,6 @@ class AuthController {
       });
 
       res.json({
-        success: true,
         data: user
       });
     } catch (error) {
@@ -118,7 +111,7 @@ class AuthController {
   // Change password
   async changePassword(req, res, next) {
     try {
-      const { currentPassword, newPassword } = req.body;
+      const { current_password: currentPassword, new_password: newPassword } = req.body;
 
       const user = await User.findByPk(req.userId);
 
@@ -127,8 +120,7 @@ class AuthController {
 
       if (!isPasswordValid) {
         return res.status(400).json({
-          success: false,
-          message: 'Current password is incorrect'
+          message: 'La contraseña actual es incorrecta'
         });
       }
 
@@ -137,8 +129,7 @@ class AuthController {
       await user.save();
 
       res.json({
-        success: true,
-        message: 'Password changed successfully'
+        message: 'Contraseña cambiada exitosamente'
       });
     } catch (error) {
       next(error);
@@ -152,8 +143,7 @@ class AuthController {
       // or log the logout event for audit purposes
 
       res.json({
-        success: true,
-        message: 'Logout successful'
+        message: 'Sesión cerrada'
       });
     } catch (error) {
       next(error);

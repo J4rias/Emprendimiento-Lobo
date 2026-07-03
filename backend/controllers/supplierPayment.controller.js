@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const {
   SupplierPayment,
   SupplierPaymentAllocation,
@@ -53,8 +54,8 @@ exports.getAllPayments = async (req, res) => {
       supplier_id,
       payment_method,
       currency,
-      start_date,
-      end_date
+      date_from,
+      date_to
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -86,13 +87,13 @@ exports.getAllPayments = async (req, res) => {
     }
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.payment_date = {};
-      if (start_date) {
-        where.payment_date[Op.gte] = start_date;
+      if (date_from) {
+        where.payment_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.payment_date[Op.lte] = end_date;
+      if (date_to) {
+        where.payment_date[Op.lte] = date_to;
       }
     }
 
@@ -139,7 +140,6 @@ exports.getAllPayments = async (req, res) => {
     }));
 
     res.json({
-      success: true,
       data: rows,
       pagination: {
         total: count,
@@ -149,12 +149,8 @@ exports.getAllPayments = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching supplier payments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener los pagos a proveedores',
-      error: error.message
-    });
+    logger.error('Error fetching supplier payments', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -198,22 +194,16 @@ exports.getPaymentById = async (req, res) => {
 
     if (!payment) {
       return res.status(404).json({
-        success: false,
         message: 'Pago no encontrado'
       });
     }
 
     res.json({
-      success: true,
       data: payment
     });
   } catch (error) {
-    console.error('Error fetching payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener el pago',
-      error: error.message
-    });
+    logger.error('Error fetching payment', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -246,7 +236,6 @@ exports.createPayment = async (req, res) => {
     if (!supplier_id || !payment_date || !payment_method || !amount || !currency) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'Faltan campos requeridos: supplier_id, payment_date, payment_method, amount, currency'
       });
     }
@@ -255,7 +244,6 @@ exports.createPayment = async (req, res) => {
     if (parseFloat(amount) <= 0) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'El monto debe ser mayor que cero'
       });
     }
@@ -265,7 +253,6 @@ exports.createPayment = async (req, res) => {
     if (!supplier) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Proveedor no encontrado'
       });
     }
@@ -277,7 +264,6 @@ exports.createPayment = async (req, res) => {
       if (totalAllocated > parseFloat(amount) + 0.01) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: `La suma de las adjudicaciones (${totalAllocated.toFixed(2)}) excede el monto del pago (${parseFloat(amount).toFixed(2)})`
         });
       }
@@ -287,11 +273,11 @@ exports.createPayment = async (req, res) => {
         const po = await PurchaseOrder.findByPk(alloc.purchase_order_id);
         if (!po) {
           await transaction.rollback();
-          return res.status(404).json({ success: false, message: `Orden de compra ${alloc.purchase_order_id} no encontrada` });
+          return res.status(404).json({ message: `Orden de compra ${alloc.purchase_order_id} no encontrada` });
         }
         if (po.supplier_id !== parseInt(supplier_id)) {
           await transaction.rollback();
-          return res.status(400).json({ success: false, message: `La OC ${po.order_number} no pertenece al proveedor seleccionado` });
+          return res.status(400).json({ message: `La OC ${po.order_number} no pertenece al proveedor seleccionado` });
         }
 
         // Validate allocation doesn't exceed remaining PO balance
@@ -343,11 +329,11 @@ exports.createPayment = async (req, res) => {
       const po = await PurchaseOrder.findByPk(purchase_order_id);
       if (!po) {
         await transaction.rollback();
-        return res.status(404).json({ success: false, message: 'Orden de compra no encontrada' });
+        return res.status(404).json({ message: 'Orden de compra no encontrada' });
       }
       if (po.supplier_id !== parseInt(supplier_id)) {
         await transaction.rollback();
-        return res.status(400).json({ success: false, message: 'La orden de compra no pertenece al proveedor seleccionado' });
+        return res.status(400).json({ message: 'La orden de compra no pertenece al proveedor seleccionado' });
       }
 
       const poCurrency = po.currency || 'USD';
@@ -400,7 +386,7 @@ exports.createPayment = async (req, res) => {
 
       if (requestedTotal > totalAvailable + 0.01) {
         await transaction.rollback();
-        return res.status(400).json({ success: false, message: `Saldo a favor insuficiente. Disponible: ${totalAvailable.toFixed(2)} ${currency}` });
+        return res.status(400).json({ message: `Saldo a favor insuficiente. Disponible: ${totalAvailable.toFixed(2)} ${currency}` });
       }
 
       // 2. Consume available credits to fulfill allocations
@@ -439,7 +425,6 @@ exports.createPayment = async (req, res) => {
 
       await transaction.commit();
       return res.status(201).json({
-        success: true,
         message: 'Saldo a favor aplicado exitosamente',
         data: { is_credit_application: true, applied_amount: requestedTotal }
       });
@@ -514,18 +499,13 @@ exports.createPayment = async (req, res) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Pago registrado exitosamente',
       data: createdPayment
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating supplier payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al registrar el pago',
-      error: error.message
-    });
+    logger.error('Error creating supplier payment', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -554,7 +534,6 @@ exports.updatePayment = async (req, res) => {
     if (!payment) {
       await transaction.rollback();
       return res.status(404).json({
-        success: false,
         message: 'Pago no encontrado'
       });
     }
@@ -563,7 +542,6 @@ exports.updatePayment = async (req, res) => {
     if (amount && parseFloat(amount) <= 0) {
       await transaction.rollback();
       return res.status(400).json({
-        success: false,
         message: 'El monto debe ser mayor que cero'
       });
     }
@@ -612,18 +590,13 @@ exports.updatePayment = async (req, res) => {
     });
 
     res.json({
-      success: true,
       message: 'Pago actualizado exitosamente',
       data: updatedPayment
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error updating supplier payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al actualizar el pago',
-      error: error.message
-    });
+    logger.error('Error updating supplier payment', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -642,12 +615,12 @@ exports.deletePayment = async (req, res) => {
     const payment = await SupplierPayment.findByPk(id, { transaction });
     if (!payment) {
       await transaction.rollback();
-      return res.status(404).json({ success: false, message: 'Pago no encontrado' });
+      return res.status(404).json({ message: 'Pago no encontrado' });
     }
 
     if (payment.status === 'cancelled') {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: 'El pago ya está anulado' });
+      return res.status(400).json({ message: 'El pago ya está anulado' });
     }
 
     await payment.update({
@@ -660,18 +633,13 @@ exports.deletePayment = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Pago anulado exitosamente (los registros se conservan para auditoría)',
       data: payment
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al anular el pago',
-      error: error.message
-    });
+    logger.error('Error cancelling payment', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -688,7 +656,6 @@ exports.getPaymentsBySupplier = async (req, res) => {
     const supplier = await Supplier.findByPk(supplierId);
     if (!supplier) {
       return res.status(404).json({
-        success: false,
         message: 'Proveedor no encontrado'
       });
     }
@@ -714,16 +681,11 @@ exports.getPaymentsBySupplier = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: payments
     });
   } catch (error) {
-    console.error('Error fetching payments by supplier:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener los pagos del proveedor',
-      error: error.message
-    });
+    logger.error('Error fetching payments by supplier', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -733,18 +695,18 @@ exports.getPaymentsBySupplier = async (req, res) => {
  */
 exports.getPaymentStats = async (req, res) => {
   try {
-    const { start_date, end_date, supplier_id } = req.query;
+    const { date_from, date_to, supplier_id } = req.query;
 
     const where = {};
 
     // Filter by date range
-    if (start_date || end_date) {
+    if (date_from || date_to) {
       where.payment_date = {};
-      if (start_date) {
-        where.payment_date[Op.gte] = start_date;
+      if (date_from) {
+        where.payment_date[Op.gte] = date_from;
       }
-      if (end_date) {
-        where.payment_date[Op.lte] = end_date;
+      if (date_to) {
+        where.payment_date[Op.lte] = date_to;
       }
     }
 
@@ -793,7 +755,6 @@ exports.getPaymentStats = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: {
         total_payments: totalPayments,
         total_by_currency: totalByCurrency,
@@ -802,12 +763,8 @@ exports.getPaymentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payment stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas de pagos',
-      error: error.message
-    });
+    logger.error('Error fetching payment stats', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -824,7 +781,7 @@ exports.getPaymentsByPO = async (req, res) => {
     });
 
     if (!purchaseOrder) {
-      return res.status(404).json({ success: false, message: 'Orden de compra no encontrada' });
+      return res.status(404).json({ message: 'Orden de compra no encontrada' });
     }
 
     // Use allocations as source of truth for frozen amounts
@@ -850,7 +807,6 @@ exports.getPaymentsByPO = async (req, res) => {
     const saldoPendiente = poTotal - totalPaidInPOCurrency;
 
     res.json({
-      success: true,
       data: {
         purchase_order: {
           id: purchaseOrder.id,
@@ -871,8 +827,8 @@ exports.getPaymentsByPO = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payments by PO:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener pagos de la orden de compra', error: error.message });
+    logger.error('Error fetching payments by PO', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -887,7 +843,7 @@ exports.getPayableBalance = async (req, res) => {
 
     const supplier = await Supplier.findByPk(supplierId);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // Get received POs grouped by currency
@@ -939,7 +895,6 @@ exports.getPayableBalance = async (req, res) => {
     }
 
     res.json({
-      success: true,
       data: {
         supplier: { id: supplier.id, name: supplier.name },
         summary_by_currency: byCurrency,
@@ -947,8 +902,8 @@ exports.getPayableBalance = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payable balance:', error);
-    res.status(500).json({ success: false, message: 'Error al calcular saldo pendiente del proveedor', error: error.message });
+    logger.error('Error fetching payable balance', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -962,7 +917,7 @@ exports.getSupplierCreditBalance = async (req, res) => {
 
     const supplier = await Supplier.findByPk(supplierId);
     if (!supplier) {
-      return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // Fetch all confirmed payments
@@ -997,12 +952,11 @@ exports.getSupplierCreditBalance = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: creditByCurrency
     });
   } catch (error) {
-    console.error('Error fetching credit balance:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener saldo a favor', error: error.message });
+    logger.error('Error fetching credit balance', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -1019,12 +973,12 @@ exports.cancelPayment = async (req, res) => {
     const payment = await SupplierPayment.findByPk(id, { transaction });
     if (!payment) {
       await transaction.rollback();
-      return res.status(404).json({ success: false, message: 'Pago no encontrado' });
+      return res.status(404).json({ message: 'Pago no encontrado' });
     }
 
     if (payment.status === 'cancelled') {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: 'El pago ya está anulado' });
+      return res.status(400).json({ message: 'El pago ya está anulado' });
     }
 
     await payment.update({
@@ -1035,13 +989,12 @@ exports.cancelPayment = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       message: 'Pago anulado exitosamente',
       data: payment
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling payment:', error);
-    res.status(500).json({ success: false, message: 'Error al anular el pago', error: error.message });
+    logger.error('Error cancelling payment', { error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

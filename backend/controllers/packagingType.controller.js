@@ -10,7 +10,6 @@ const getActive = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: packagingTypes
     });
   } catch (error) {

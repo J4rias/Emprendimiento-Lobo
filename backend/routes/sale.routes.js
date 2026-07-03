@@ -64,7 +64,7 @@ router.get('/:id',
   saleController.getSaleById
 );
 
-router.put('/:id',
+router.patch('/:id',
   auth,
   authorize('sales.update'),
   saleController.updateSale

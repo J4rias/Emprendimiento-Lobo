@@ -23,8 +23,8 @@ router.get('/me', auth, authController.me);
 router.post('/change-password',
   auth,
   [
-    body('currentPassword').notEmpty().withMessage('Current password is required'),
-    body('newPassword')
+    body('current_password').notEmpty().withMessage('La contrasena actual es requerida'),
+    body('new_password')
       .isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
       .notEmpty().withMessage('New password is required'),
     validate

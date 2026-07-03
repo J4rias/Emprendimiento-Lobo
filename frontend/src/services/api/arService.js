@@ -2,10 +2,10 @@ import api from './axios';
 
 export const arService = {
   // Resumen general (facturas + aging distribution)
-  getSummary: (params = {}) => api.get('/ar/summary', { params }).then(r => r.data),
+  getSummary: (params = {}) => api.get('/accounts-receivable/summary', { params }).then(r => r.data),
 
   // Clientes con saldo pendiente
-  getCustomers: (params = {}) => api.get('/ar/customers', { params }).then(r => r.data),
+  getCustomers: (params = {}) => api.get('/accounts-receivable/customers', { params }).then(r => r.data),
 
   // Statement completo de un cliente (en COP)
   getCustomerStatement: (customerId) => api.get(`/ar/customers/${customerId}/statement`).then(r => r.data),
@@ -15,9 +15,9 @@ export const arService = {
     api.post(`/ar/payments/${paymentId}/reverse`, { pin }).then(r => r.data),
 
   // PIN de crédito
-  getAdminPinStatus: () => api.get('/ar/admin-pin/status').then(r => r.data),
-  validateAdminPin: (pin) => api.post('/ar/admin-pin/validate', { pin }).then(r => r.data),
-  setAdminPin: (pin) => api.put('/ar/admin-pin', { pin }).then(r => r.data),
+  getAdminPinStatus: () => api.get('/accounts-receivable/admin-pin/status').then(r => r.data),
+  validateAdminPin: (pin) => api.post('/accounts-receivable/admin-pin/validate', { pin }).then(r => r.data),
+  setAdminPin: (pin) => api.put('/accounts-receivable/admin-pin', { pin }).then(r => r.data),
 
   // Exportar CSV
   exportInvoicesCSV: async (params = {}) => {

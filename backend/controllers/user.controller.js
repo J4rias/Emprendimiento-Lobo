@@ -37,8 +37,7 @@ exports.getAllUsers = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
-      data: { users },
+      data: users,
     });
   } catch (error) {
     next(error);
@@ -71,13 +70,11 @@ exports.getUserById = async (req, res, next) => {
 
     if (!user) {
       return res.status(404).json({
-        success: false,
         message: 'Usuario no encontrado',
       });
     }
 
     res.json({
-      success: true,
       data: user,
     });
   } catch (error) {
@@ -100,8 +97,7 @@ exports.createUser = async (req, res, next) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
+      return res.status(409).json({
         message: 'El usuario o email ya existe',
       });
     }
@@ -131,7 +127,6 @@ exports.createUser = async (req, res, next) => {
     });
 
     res.status(201).json({
-      success: true,
       message: 'Usuario creado exitosamente',
       data: fullUser,
     });
@@ -152,7 +147,6 @@ exports.updateUser = async (req, res, next) => {
 
     if (!user) {
       return res.status(404).json({
-        success: false,
         message: 'Usuario no encontrado',
       });
     }
@@ -161,8 +155,7 @@ exports.updateUser = async (req, res, next) => {
     if (email && email !== user.email) {
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
-        return res.status(400).json({
-          success: false,
+        return res.status(409).json({
           message: 'El email ya está en uso',
         });
       }
@@ -198,7 +191,6 @@ exports.updateUser = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       message: 'Usuario actualizado exitosamente',
       data: fullUser,
     });
@@ -218,7 +210,6 @@ exports.deleteUser = async (req, res, next) => {
 
     if (!user) {
       return res.status(404).json({
-        success: false,
         message: 'Usuario no encontrado',
       });
     }
@@ -226,7 +217,6 @@ exports.deleteUser = async (req, res, next) => {
     // No permitir eliminar el propio usuario
     if (user.id === req.user.id) {
       return res.status(400).json({
-        success: false,
         message: 'No puedes eliminar tu propio usuario',
       });
     }
@@ -234,7 +224,6 @@ exports.deleteUser = async (req, res, next) => {
     await user.destroy();
 
     res.json({
-      success: true,
       message: 'Usuario eliminado exitosamente',
     });
   } catch (error) {

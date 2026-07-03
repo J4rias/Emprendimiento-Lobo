@@ -1,5 +1,5 @@
 const { sequelize } = require('../config/database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { User, Role, Permission, RolePermission, Category, Warehouse, Customer, PriceList, Brand, CompanySettings } = require('../models');
 const fs = require('fs');
 const path = require('path');
