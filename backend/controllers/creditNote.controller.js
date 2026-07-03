@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const {
   CreditNote,
   CreditNoteDetail,
@@ -159,11 +160,10 @@ exports.getAllCreditNotes = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching credit notes:', error);
+    logger.error('Error fetching credit notes', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener las notas de crédito',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -241,11 +241,10 @@ exports.getCreditNoteById = async (req, res) => {
       data: creditNote
     });
   } catch (error) {
-    console.error('Error fetching credit note:', error);
+    logger.error('Error fetching credit note', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener la nota de crédito',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -473,11 +472,10 @@ exports.createCreditNote = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating credit note:', error);
+    logger.error('Error creating credit note', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al crear la nota de crédito',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -685,11 +683,10 @@ exports.approveCreditNote = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error approving credit note:', error);
+    logger.error('Error approving credit note', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al aprobar la nota de crédito',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -747,11 +744,10 @@ exports.cancelCreditNote = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling credit note:', error);
+    logger.error('Error cancelling credit note', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al cancelar la nota de crédito',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -820,11 +816,10 @@ exports.getCreditNoteStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching credit note stats:', error);
+    logger.error('Error fetching credit note stats', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
