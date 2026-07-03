@@ -43,7 +43,7 @@ const getById = async (req, res, next) => {
 
     if (!brand) {
       return res.status(404).json({
-        message: 'Brand not found'
+        message: 'Marca no encontrada'
       });
     }
 
@@ -66,7 +66,7 @@ const create = async (req, res, next) => {
     const brand = await Brand.create(brandData);
 
     res.status(201).json({
-      message: 'Brand created successfully',
+      message: 'Marca creada exitosamente',
       data: brand
     });
   } catch (error) {
@@ -83,14 +83,14 @@ const update = async (req, res, next) => {
     const brand = await Brand.findByPk(id);
     if (!brand) {
       return res.status(404).json({
-        message: 'Brand not found'
+        message: 'Marca no encontrada'
       });
     }
 
     await brand.update(updateData);
 
     res.json({
-      message: 'Brand updated successfully',
+      message: 'Marca actualizada exitosamente',
       data: brand
     });
   } catch (error) {
@@ -106,14 +106,14 @@ const deleteBrand = async (req, res, next) => {
 
     if (!brand) {
       return res.status(404).json({
-        message: 'Brand not found'
+        message: 'Marca no encontrada'
       });
     }
 
     await brand.update({ is_active: false });
 
     res.json({
-      message: 'Brand deleted successfully'
+      message: 'Marca desactivada exitosamente'
     });
   } catch (error) {
     next(error);
