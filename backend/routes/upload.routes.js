@@ -3,6 +3,7 @@ const router = express.Router();
 const { uploadSingle, uploadMultiple } = require('../middleware/upload');
 const auth = require('../middleware/auth');
 const multer = require('multer');
+const logger = require('../config/logger');
 
 // Todas las rutas requieren autenticación
 router.use(auth);
@@ -132,8 +133,11 @@ router.delete('/image', async (req, res) => {
     // Construir ruta completa
     const fs = require('fs').promises;
     const path = require('path');
-const logger = require('../config/logger');
-    const imagePath = path.join(__dirname, '../public', url);
+    const basePath = path.resolve(path.join(__dirname, '../public'));
+    const imagePath = path.resolve(path.join(__dirname, '../public', url));
+    if (!imagePath.startsWith(basePath + path.sep)) {
+      return res.status(400).json({ success: false, message: 'Ruta de imagen inválida' });
+    }
     
     // Verificar si el archivo existe y eliminarlo
     try {
