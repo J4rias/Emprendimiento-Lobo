@@ -94,7 +94,7 @@ class CategoryController {
 
       if (existingCategory) {
         const field = existingCategory.name === name.trim() ? 'nombre' : 'código';
-        return res.status(400).json({
+        return res.status(409).json({
           message: `Ya existe una categoría con ese ${field}`
         });
       }
@@ -148,7 +148,7 @@ class CategoryController {
 
         if (existingCategory) {
           const field = existingCategory.name === name?.trim() ? 'nombre' : 'código';
-          return res.status(400).json({
+          return res.status(409).json({
             message: `Ya existe una categoría con ese ${field}`
           });
         }

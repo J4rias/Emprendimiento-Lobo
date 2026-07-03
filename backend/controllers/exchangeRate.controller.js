@@ -165,7 +165,7 @@ class ExchangeRateController {
           // Si existe una pero está inactiva, la eliminamos físicamente para crear la nueva sin conflicto
           await existing.destroy();
         } else {
-          return res.status(400).json({
+          return res.status(409).json({
             message: `Ya existe una tasa de cambio de ${from_currency} a ${to_currency} para la fecha ${effective_date}`
           });
         }
@@ -236,7 +236,7 @@ class ExchangeRateController {
         });
 
         if (existing) {
-          return res.status(400).json({
+          return res.status(409).json({
             message: `Ya existe una tasa de cambio de ${from} a ${to} para la fecha ${date}`
           });
         }

@@ -97,7 +97,7 @@ exports.createUser = async (req, res, next) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         message: 'El usuario o email ya existe',
       });
     }
@@ -155,7 +155,7 @@ exports.updateUser = async (req, res, next) => {
     if (email && email !== user.email) {
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
-        return res.status(400).json({
+        return res.status(409).json({
           message: 'El email ya está en uso',
         });
       }
