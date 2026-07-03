@@ -21,11 +21,11 @@ const errorHandler = (err, req, res, next) => {
 
   // Sequelize Unique Constraint Error
   if (err.name === 'SequelizeUniqueConstraintError') {
-    return res.status(400).json({
-      message: 'Duplicate entry',
+    return res.status(409).json({
+      message: 'Ya existe un registro con ese valor',
       errors: err.errors.map(e => ({
         field: e.path,
-        message: `${e.path} already exists`
+        message: `El campo ${e.path} ya existe`
       }))
     });
   }
