@@ -1,6 +1,7 @@
 const { Sale, SaleDetail, SalePayment, Product, ProductPresentation, Customer, Warehouse, User, Inventory, InventoryMovement, Batch, PosReservation, Role, CreditNote, ExchangeRate, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
+const logger = require('../config/logger');
 
 const generateSaleNumber = async () => {
   const today = new Date();
@@ -404,7 +405,7 @@ exports.createSale = async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating sale:', error);
+    logger.error('Error creating sale:', error);
     res.status(500).json({
       message: 'Error al crear la venta'
     });
@@ -530,7 +531,7 @@ exports.getSales = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching sales:', error);
+    logger.error('Error fetching sales:', error);
     res.status(500).json({
       message: 'Error al obtener las ventas'
     });
@@ -598,7 +599,7 @@ exports.getSaleById = async (req, res) => {
     res.json({ sale });
 
   } catch (error) {
-    console.error('Error fetching sale:', error);
+    logger.error('Error fetching sale:', error);
     res.status(500).json({
       message: 'Error al obtener la venta'
     });
@@ -639,7 +640,7 @@ exports.getSaleBySaleNumber = async (req, res) => {
     res.json({ data: sale });
 
   } catch (error) {
-    console.error('Error fetching sale by number:', error);
+    logger.error('Error fetching sale by number:', error);
     res.status(500).json({ message: 'Error al obtener la venta' });
   }
 };
@@ -688,7 +689,7 @@ exports.updateSale = async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error updating sale:', error);
+    logger.error('Error updating sale:', error);
     res.status(500).json({
       message: 'Error al actualizar la venta'
     });
@@ -783,7 +784,7 @@ exports.cancelSale = async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling sale:', error);
+    logger.error('Error cancelling sale:', error);
     res.status(500).json({
       message: 'Error al cancelar la venta'
     });
@@ -913,7 +914,7 @@ exports.addPayment = async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
-    console.error('Error adding payment:', error);
+    logger.error('Error adding payment:', error);
     res.status(500).json({
       message: 'Error al registrar el pago'
     });
@@ -1069,7 +1070,7 @@ exports.getSalesStats = async (req, res) => {
           });
         }
       } catch (e) {
-        console.error('Error fetching salesByCurrency:', e.message);
+        logger.error('Error fetching salesByCurrency:', e.message);
       }
     }
 
@@ -1089,7 +1090,7 @@ exports.getSalesStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching sales stats:', error);
+    logger.error('Error fetching sales stats:', error);
     res.status(500).json({
       message: 'Error al obtener estadísticas de ventas'
     });
@@ -1154,7 +1155,7 @@ exports.getDailySeries = async (req, res) => {
 
     res.json({ data });
   } catch (error) {
-    console.error('Error fetching daily series:', error);
+    logger.error('Error fetching daily series:', error);
     res.status(500).json({
       message: 'Error al obtener serie diaria de ventas'
     });
@@ -1208,7 +1209,7 @@ exports.getProductSales = async (req, res) => {
 
     res.json({ data: productSales, count: productSales.length });
   } catch (error) {
-    console.error('Error fetching product sales:', error);
+    logger.error('Error fetching product sales:', error);
     res.status(500).json({
       message: 'Error al obtener ventas por producto'
     });
@@ -1375,7 +1376,7 @@ exports.getDailyClosure = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error generating daily closure:', error);
+    logger.error('Error generating daily closure:', error);
     res.status(500).json({
       message: 'Error al generar el cierre de caja'
     });
@@ -1462,7 +1463,7 @@ exports.validateCreditPin = async (req, res) => {
         : 'PIN incorrecto'
     });
   } catch (error) {
-    console.error('Error validating credit PIN:', error);
+    logger.error('Error validating credit PIN:', error);
     res.status(500).json({ success: false, message: 'Error al validar PIN' });
   }
 };
@@ -1607,7 +1608,7 @@ exports.getSalesSummary = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting sales summary:', error);
+    logger.error('Error getting sales summary:', error);
     res.status(500).json({ success: false, message: 'Error al obtener resumen de ventas' });
   }
 };

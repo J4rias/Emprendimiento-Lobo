@@ -558,7 +558,7 @@ class InventoryController {
             convertedAmount: converted
           });
         } catch (error) {
-          console.warn(`No exchange rate found for ${currency} to USD:`, error.message);
+          logger.warn(`No exchange rate found for ${currency} to USD:`, error.message);
           warnings.push({
             currency,
             amount,

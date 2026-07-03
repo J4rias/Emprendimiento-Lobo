@@ -15,6 +15,7 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 class PurchaseOrderController {
   constructor() {
@@ -848,7 +849,7 @@ class PurchaseOrderController {
                   rateDate
                 );
               } catch (conversionError) {
-                console.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
+                logger.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
                 // In case of failure, we will temporarily preserve the raw value to avoid transaction crash,
                 // but the system will log this. Ideally an alert should be triggered.
               }

@@ -10,6 +10,7 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 class PriceListController {
     constructor() {
@@ -230,7 +231,7 @@ class PriceListController {
                                 usdUnitCost = await ExchangeRate.convert(unitCost, item.presentation.purchase_currency, 'USD');
                             } catch (e) {
                                 // Default back or ignore if no rate
-                                console.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
+                                logger.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
                             }
                         }
 
@@ -486,7 +487,7 @@ class PriceListController {
                 try {
                     rateToCop = await ExchangeRate.getRate(priceList.currency, 'COP');
                 } catch (e) {
-                    console.error('Failed to get exchange rate to COP for CSV export', e);
+                    logger.error('Failed to get exchange rate to COP for CSV export', e);
                 }
             }
 
@@ -513,13 +514,13 @@ class PriceListController {
                     try {
                         costInListCurrency = await ExchangeRate.convert(nativeCost, nativeCurrency, priceList.currency);
                         unitCostInListCurrency = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, priceList.currency);
-                    } catch(e) { console.error(e.message); }
+                    } catch(e) { logger.error(e.message); }
                 }
                 if (nativeCurrency !== 'COP') {
                     try {
                         costInCop = await ExchangeRate.convert(nativeCost, nativeCurrency, 'COP');
                         unitCostInCop = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, 'COP');
-                    } catch(e) { console.error(e.message); }
+                    } catch(e) { logger.error(e.message); }
                 }
 
                 const pkgPriceUsd = parseFloat(d.package_price_usd) || 0;

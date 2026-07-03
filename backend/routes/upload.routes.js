@@ -9,7 +9,7 @@ router.use(auth);
 
 // Manejador de errores de multer
 const handleMulterError = (error, req, res, next) => {
-  console.log('Multer error:', error);
+  logger.info('Multer error:', error);
   
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
@@ -47,7 +47,7 @@ const handleMulterError = (error, req, res, next) => {
 
 // Subir una sola imagen
 router.post('/', (req, res, next) => {
-  console.log('Upload route hit');
+  logger.info('Upload route hit');
   next();
 }, ...uploadSingle('image'), handleMulterError, (req, res) => {
   try {
@@ -60,7 +60,7 @@ router.post('/', (req, res, next) => {
 
     const uploadedFile = req.processedFiles[0];
     
-    console.log('Upload successful - response:', {
+    logger.info('Upload successful - response:', {
       url: uploadedFile.url,
       filename: uploadedFile.filename,
       originalName: uploadedFile.originalName,
@@ -78,7 +78,7 @@ router.post('/', (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('Error en upload:', error);
+    logger.error('Error en upload:', error);
     res.status(500).json({
       success: false,
       message: 'Error al subir la imagen',
@@ -108,7 +108,7 @@ router.post('/multiple', ...uploadMultiple('images', 5), handleMulterError, (req
       }))
     });
   } catch (error) {
-    console.error('Error en upload multiple:', error);
+    logger.error('Error en upload multiple:', error);
     res.status(500).json({
       success: false,
       message: 'Error al subir las imágenes',
@@ -132,6 +132,7 @@ router.delete('/image', async (req, res) => {
     // Construir ruta completa
     const fs = require('fs').promises;
     const path = require('path');
+const logger = require('../config/logger');
     const imagePath = path.join(__dirname, '../public', url);
     
     // Verificar si el archivo existe y eliminarlo
@@ -153,7 +154,7 @@ router.delete('/image', async (req, res) => {
       }
     }
   } catch (error) {
-    console.error('Error eliminando imagen:', error);
+    logger.error('Error eliminando imagen:', error);
     res.status(500).json({
       success: false,
       message: 'Error al eliminar la imagen',

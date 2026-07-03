@@ -1,4 +1,5 @@
 const { CompanySettings } = require('../models');
+const logger = require('../config/logger');
 
 /**
  * GET /api/company — público, sin autenticación requerida.
@@ -13,7 +14,7 @@ const getSettings = async (req, res) => {
 
     return res.json({ success: true, data: settings });
   } catch (error) {
-    console.error('Error al obtener configuración de empresa:', error);
+    logger.error('Error al obtener configuración de empresa:', error);
     return res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
@@ -39,7 +40,7 @@ const updateSettings = async (req, res) => {
 
     return res.json({ success: true, data: settings, message: 'Configuración guardada correctamente' });
   } catch (error) {
-    console.error('Error al actualizar configuración de empresa:', error);
+    logger.error('Error al actualizar configuración de empresa:', error);
     return res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
