@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const {
   SupplierPayment,
   SupplierPaymentAllocation,
@@ -149,12 +150,8 @@ exports.getAllPayments = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching supplier payments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener los pagos a proveedores',
-      error: error.message
-    });
+    logger.error('Error fetching supplier payments', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -208,12 +205,8 @@ exports.getPaymentById = async (req, res) => {
       data: payment
     });
   } catch (error) {
-    console.error('Error fetching payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener el pago',
-      error: error.message
-    });
+    logger.error('Error fetching payment', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -520,12 +513,8 @@ exports.createPayment = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating supplier payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al registrar el pago',
-      error: error.message
-    });
+    logger.error('Error creating supplier payment', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -618,12 +607,8 @@ exports.updatePayment = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error updating supplier payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al actualizar el pago',
-      error: error.message
-    });
+    logger.error('Error updating supplier payment', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -666,12 +651,8 @@ exports.deletePayment = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al anular el pago',
-      error: error.message
-    });
+    logger.error('Error cancelling payment', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -718,12 +699,8 @@ exports.getPaymentsBySupplier = async (req, res) => {
       data: payments
     });
   } catch (error) {
-    console.error('Error fetching payments by supplier:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener los pagos del proveedor',
-      error: error.message
-    });
+    logger.error('Error fetching payments by supplier', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -802,12 +779,8 @@ exports.getPaymentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payment stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas de pagos',
-      error: error.message
-    });
+    logger.error('Error fetching payment stats', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -871,8 +844,8 @@ exports.getPaymentsByPO = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payments by PO:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener pagos de la orden de compra', error: error.message });
+    logger.error('Error fetching payments by PO', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -947,8 +920,8 @@ exports.getPayableBalance = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching payable balance:', error);
-    res.status(500).json({ success: false, message: 'Error al calcular saldo pendiente del proveedor', error: error.message });
+    logger.error('Error fetching payable balance', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -1001,8 +974,8 @@ exports.getSupplierCreditBalance = async (req, res) => {
       data: creditByCurrency
     });
   } catch (error) {
-    console.error('Error fetching credit balance:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener saldo a favor', error: error.message });
+    logger.error('Error fetching credit balance', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 
@@ -1041,7 +1014,7 @@ exports.cancelPayment = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling payment:', error);
-    res.status(500).json({ success: false, message: 'Error al anular el pago', error: error.message });
+    logger.error('Error cancelling payment', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
