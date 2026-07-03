@@ -19,8 +19,8 @@ router.get('/export/customers', authenticate, authorize('ar.view'), arController
 router.post('/payments/:paymentId/reverse', authenticate, authorize('ar.view'), arController.reversePayment);
 
 // ─── PIN de admin ─────────────────────────────────────────────────────────────
-router.get('/admin-pin/status',    authenticate, arController.getAdminPinStatus);
-router.post('/admin-pin/validate', authenticate, arController.validateAdminPin);
-router.put('/admin-pin',           authenticate, arController.setAdminPin);
+router.get('/admin-pin/status',    authenticate, authorize('ar.view'), arController.getAdminPinStatus);
+router.post('/admin-pin/validate', authenticate, authorize('ar.view'), arController.validateAdminPin);
+router.put('/admin-pin',           authenticate, authorize('ar.view'), arController.setAdminPin);
 
 module.exports = router;
