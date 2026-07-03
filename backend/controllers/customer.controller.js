@@ -12,8 +12,8 @@ class CustomerController {
         search,
         status,
         type,
-        sortBy = 'created_at',
-        sortOrder = 'DESC'
+        sort_by = 'created_at',
+        sort_dir = 'DESC'
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -53,7 +53,7 @@ class CustomerController {
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()]]
+        order: [[sort_by, sort_dir.toUpperCase()]]
       });
 
       res.json({
