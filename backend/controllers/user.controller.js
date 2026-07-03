@@ -37,7 +37,7 @@ exports.getAllUsers = async (req, res, next) => {
     });
 
     res.json({
-      data: { users },
+      data: users,
     });
   } catch (error) {
     next(error);
