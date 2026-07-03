@@ -152,7 +152,7 @@ app.use('/api/credit-notes', creditNoteRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/price-lists', priceListRoutes);
 app.use('/api/pos', posRoutes);
-app.use('/api/ar', arRoutes);
+app.use('/api/accounts-receivable', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
 app.use('/api/banks', require('./routes/bank.routes'));
 
