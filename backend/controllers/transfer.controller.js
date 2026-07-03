@@ -12,6 +12,8 @@ const {
   Batch
 } = require('../models');
 
+const logger = require('../config/logger');
+
 const generateTransferNumber = async () => {
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
@@ -39,7 +41,7 @@ const createTransfer = async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
   try {
-    console.log('Received transfer request:', JSON.stringify(req.body, null, 2));
+    logger.info('Received transfer request:', JSON.stringify(req.body, null, 2));
     const { origin_warehouse_id, destination_warehouse_id, notes, items } = req.body;
 
     if (!origin_warehouse_id || !destination_warehouse_id) {
