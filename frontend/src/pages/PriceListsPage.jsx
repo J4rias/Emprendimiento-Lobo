@@ -10,7 +10,7 @@ import {
     CheckCircle, AlertCircle, X,
     Package, Printer, Lock, Unlock
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const PriceListsPage = () => {
     useAuth();

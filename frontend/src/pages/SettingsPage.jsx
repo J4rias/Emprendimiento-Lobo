@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2, Printer, Users, Lock, Unlock, Search, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2, Printer, Users, Lock, Unlock, Search } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
+import { Button, Badge, ConfirmDialog, Modal } from '../components/ui';
 
 const SettingsPage = () => {
   const { token, hasPermission } = useAuth();
@@ -15,6 +15,8 @@ const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
+  const [deleteRoleTarget, setDeleteRoleTarget] = useState(null);
+  const [toggleUserTarget, setToggleUserTarget] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -58,7 +60,6 @@ const SettingsPage = () => {
   const [usersLoading, setUsersLoading] = useState(false);
 
   // PIN state
-  const [showPinSetup, setShowPinSetup] = useState(false);
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
@@ -104,9 +105,7 @@ const SettingsPage = () => {
       });
 
       const response = await fetch(`${API_URL}/users?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await response.json();
@@ -128,15 +127,11 @@ const SettingsPage = () => {
         ? `${API_URL}/users/${editingUser.id}`
         : `${API_URL}/users`;
 
-      const method = editingUser ? 'PUT' : 'POST';
-
       const payload = { ...userFormData };
-      if (editingUser && !payload.password) {
-        delete payload.password;
-      }
+      if (editingUser && !payload.password) delete payload.password;
 
       const response = await fetch(url, {
-        method,
+        method: editingUser ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -174,10 +169,13 @@ const SettingsPage = () => {
     setShowUserModal(true);
   };
 
-  const handleUserToggleActive = async (user) => {
-    const action = user.is_active ? 'desactivar' : 'activar';
-    if (!window.confirm(`¿Está seguro de ${action} este usuario?`)) return;
+  const handleUserToggleActive = (user) => {
+    setToggleUserTarget(user);
+  };
 
+  const confirmToggleUser = async () => {
+    const user = toggleUserTarget;
+    setToggleUserTarget(null);
     try {
       const response = await fetch(`${API_URL}/users/${user.id}`, {
         method: 'PUT',
@@ -217,10 +215,7 @@ const SettingsPage = () => {
 
   const userColumns = [
     { header: 'Usuario', accessor: 'username' },
-    {
-      header: 'Nombre',
-      accessor: (row) => `${row.first_name} ${row.last_name}`,
-    },
+    { header: 'Nombre', accessor: (row) => `${row.first_name} ${row.last_name}` },
     { header: 'Email', accessor: 'email' },
     {
       header: 'Rol',
@@ -229,41 +224,29 @@ const SettingsPage = () => {
     {
       header: 'Estado',
       accessor: (row) => (
-        <span className={`px-2 py-1 text-[10px] font-semibold rounded-full ${row.is_active
-          ? 'bg-green-100 text-green-800'
-          : 'bg-gray-100 text-gray-800'
-          }`}>
+        <Badge variant={row.is_active ? 'success' : 'neutral'}>
           {row.is_active ? 'Activo' : 'Inactivo'}
-        </span>
+        </Badge>
       ),
     },
     {
       header: 'Acciones',
       accessor: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
-              <button
-                onClick={() => handleUserEdit(row)}
-                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                title="Editar"
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => handleUserEdit(row)} title="Editar">
                 <Edit className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => handleUserToggleActive(row)}
-                className={`p-1 ${row.is_active
-                  ? 'text-orange-600 hover:bg-orange-50'
-                  : 'text-green-600 hover:bg-green-50'
-                  } rounded`}
                 title={row.is_active ? 'Desactivar' : 'Activar'}
+                className={row.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
               >
-                {row.is_active ? (
-                  <Lock className="h-4 w-4" />
-                ) : (
-                  <Unlock className="h-4 w-4" />
-                )}
-              </button>
+                {row.is_active ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              </Button>
             </>
           )}
         </div>
@@ -275,9 +258,7 @@ const SettingsPage = () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/roles`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await response.json();
@@ -294,9 +275,7 @@ const SettingsPage = () => {
   const fetchPermissions = async () => {
     try {
       const response = await fetch(`${API_URL}/permissions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await response.json();
@@ -325,13 +304,9 @@ const SettingsPage = () => {
   // Load printer settings
   useEffect(() => {
     const saved = localStorage.getItem('pos_printer_settings');
-    if (saved) {
-      setPrinterSettings(JSON.parse(saved));
-    }
+    if (saved) setPrinterSettings(JSON.parse(saved));
     const savedPortable = localStorage.getItem('pos_printer_portable_settings');
-    if (savedPortable) {
-      setPortablePrinterSettings(JSON.parse(savedPortable));
-    }
+    if (savedPortable) setPortablePrinterSettings(JSON.parse(savedPortable));
   }, []);
 
   const handlePrinterSubmit = (e) => {
@@ -381,10 +356,8 @@ const SettingsPage = () => {
         ? `${API_URL}/roles/${editingRole.id}`
         : `${API_URL}/roles`;
 
-      const method = editingRole ? 'PUT' : 'POST';
-
       const response = await fetch(url, {
-        method,
+        method: editingRole ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -398,11 +371,11 @@ const SettingsPage = () => {
         resetForm();
         fetchRoles();
       } else {
-        alert(data.message || 'Error al guardar el rol');
+        toast.error(data.message || 'Error al guardar el rol');
       }
     } catch (error) {
       console.error('Error saving role:', error);
-      alert('Error al guardar el rol');
+      toast.error('Error al guardar el rol');
     }
   };
 
@@ -417,37 +390,34 @@ const SettingsPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Está seguro de eliminar este rol?')) return;
+  const handleDelete = (id) => {
+    setDeleteRoleTarget(id);
+  };
 
+  const confirmDeleteRole = async () => {
+    const id = deleteRoleTarget;
+    setDeleteRoleTarget(null);
     try {
       const response = await fetch(`${API_URL}/roles/${id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await response.json();
       if (data.success) {
         fetchRoles();
       } else {
-        alert(data.message || 'Error al eliminar el rol');
+        toast.error(data.message || 'Error al eliminar el rol');
       }
     } catch (error) {
       console.error('Error deleting role:', error);
-      alert('Error al eliminar el rol');
+      toast.error('Error al eliminar el rol');
     }
   };
 
   const resetForm = () => {
     setEditingRole(null);
-    setFormData({
-      name: '',
-      description: '',
-      is_active: true,
-      permissions: [],
-    });
+    setFormData({ name: '', description: '', is_active: true, permissions: [] });
   };
 
   const togglePermission = (permissionId) => {
@@ -484,41 +454,33 @@ const SettingsPage = () => {
   const roleColumns = [
     { header: 'Nombre', accessor: 'name' },
     { header: 'Descripción', accessor: 'description' },
-    {
-      header: 'Permisos',
-      accessor: (row) => row.permissions?.length || 0,
-    },
+    { header: 'Permisos', accessor: (row) => row.permissions?.length || 0 },
     {
       header: 'Estado',
       accessor: (row) => (
-        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${row.is_active
-          ? 'bg-green-100 text-green-800'
-          : 'bg-gray-100 text-gray-800'
-          }`}>
+        <Badge variant={row.is_active ? 'success' : 'neutral'}>
           {row.is_active ? 'Activo' : 'Inactivo'}
-        </span>
+        </Badge>
       ),
     },
     {
       header: 'Acciones',
       accessor: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {hasPermission('roles.manage') && (
             <>
-              <button
-                onClick={() => handleEdit(row)}
-                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                title="Editar"
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(row)} title="Editar">
                 <Edit className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => handleDelete(row.id)}
-                className="p-1 text-red-600 hover:bg-red-50 rounded"
                 title="Eliminar"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -527,9 +489,7 @@ const SettingsPage = () => {
   ];
 
   const permissionsByModule = permissions.reduce((acc, permission) => {
-    if (!acc[permission.module]) {
-      acc[permission.module] = [];
-    }
+    if (!acc[permission.module]) acc[permission.module] = [];
     acc[permission.module].push(permission);
     return acc;
   }, {});
@@ -606,21 +566,15 @@ const SettingsPage = () => {
         </nav>
       </div>
 
-      {/* Content */}
+      {/* Roles Tab */}
       {activeTab === 'roles' && (
         <div className="space-y-6">
           <div className="flex justify-end">
             {hasPermission('roles.manage') && (
-              <button
-                onClick={() => {
-                  resetForm();
-                  setShowModal(true);
-                }}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus className="h-5 w-5" />
+              <Button onClick={() => { resetForm(); setShowModal(true); }}>
+                <Plus className="h-4 w-4" />
                 Nuevo Rol
-              </button>
+              </Button>
             )}
           </div>
 
@@ -641,7 +595,7 @@ const SettingsPage = () => {
           <div className="flex justify-between items-center">
             <div className="flex-1 max-w-lg flex gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Buscar usuarios..."
@@ -657,23 +611,15 @@ const SettingsPage = () => {
               >
                 <option value="">Todos los roles</option>
                 {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
+                  <option key={role.id} value={role.id}>{role.name}</option>
                 ))}
               </select>
             </div>
             {hasPermission('users.create') && (
-              <button
-                onClick={() => {
-                  resetUserForm();
-                  setShowUserModal(true);
-                }}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus className="h-5 w-5" />
+              <Button onClick={() => { resetUserForm(); setShowUserModal(true); }}>
+                <Plus className="h-4 w-4" />
                 Nuevo Usuario
-              </button>
+              </Button>
             )}
           </div>
 
@@ -753,137 +699,127 @@ const SettingsPage = () => {
               </div>
             </div>
             <div className="pt-4 border-t">
-              <button
-                type="submit"
-                className="btn-primary w-full md:w-auto"
-                disabled={companyLoading}
-              >
-                {companyLoading ? 'Guardando...' : 'Guardar Cambios Empresa'}
-              </button>
+              <Button type="submit" loading={companyLoading}>
+                Guardar Cambios Empresa
+              </Button>
             </div>
           </form>
         </div>
       )}
 
       {/* Printer Tab */}
-      {
-        activeTab === 'impresora' && (
-          <div className="space-y-6 max-w-2xl">
-            {/* Desktop printer */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Desktop — DIG E200L</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Impresora conectada por USB a la PC. Usa el diálogo de impresión del navegador.
-              </p>
+      {activeTab === 'impresora' && (
+        <div className="space-y-6 max-w-2xl">
+          {/* Desktop printer */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Desktop — DIG E200L</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Impresora conectada por USB a la PC. Usa el diálogo de impresión del navegador.
+            </p>
 
-              <form onSubmit={handlePrinterSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
-                    <select
-                      value={printerSettings.width}
-                      onChange={(e) => setPrinterSettings({ ...printerSettings, width: e.target.value })}
-                      className="input w-full"
-                    >
-                      <option value="72mm">72mm (área imprimible real)</option>
-                      <option value="80mm">80mm (ancho total)</option>
-                      <option value="58mm">58mm (pequeñas)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
-                    <select
-                      value={printerSettings.zoom}
-                      onChange={(e) => setPrinterSettings({ ...printerSettings, zoom: e.target.value })}
-                      className="input w-full"
-                    >
-                      <option value="0.8">0.8</option>
-                      <option value="0.9">0.9</option>
-                      <option value="1.0">1.0</option>
-                      <option value="1.1">1.1</option>
-                      <option value="1.2">1.2</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Margen</label>
-                    <select
-                      value={printerSettings.margin}
-                      onChange={(e) => setPrinterSettings({ ...printerSettings, margin: e.target.value })}
-                      className="input w-full"
-                    >
-                      <option value="0mm">0mm</option>
-                      <option value="1mm">1mm</option>
-                      <option value="2mm">2mm</option>
-                      <option value="3mm">3mm</option>
-                      <option value="5mm">5mm</option>
-                    </select>
-                  </div>
+            <form onSubmit={handlePrinterSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
+                  <select
+                    value={printerSettings.width}
+                    onChange={(e) => setPrinterSettings({ ...printerSettings, width: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="72mm">72mm (área imprimible real)</option>
+                    <option value="80mm">80mm (ancho total)</option>
+                    <option value="58mm">58mm (pequeñas)</option>
+                  </select>
                 </div>
 
-                <div className="pt-2">
-                  <button type="submit" className="btn-primary w-full md:w-auto">
-                    Guardar Desktop
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Portable printer */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Portátil — GOOJPRT MP-3 (Bluetooth)</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Impresora Bluetooth 80mm. Imprime vía RawBT enviando imagen del ticket.
-              </p>
-
-              <form onSubmit={handlePortablePrinterSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
-                    <select
-                      value={portablePrinterSettings.width}
-                      onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, width: e.target.value })}
-                      className="input w-full"
-                    >
-                      <option value="72mm">72mm (área imprimible 80mm)</option>
-                      <option value="80mm">80mm (ancho total)</option>
-                      <option value="58mm">58mm</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tamaño de Fuente</label>
-                    <select
-                      value={portablePrinterSettings.fontSize}
-                      onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, fontSize: e.target.value })}
-                      className="input w-full"
-                    >
-                      <option value="11px">11px (Compacto)</option>
-                      <option value="12px">12px (Pequeño)</option>
-                      <option value="13px">13px (Normal)</option>
-                      <option value="14px">14px (Grande)</option>
-                      <option value="15px">15px (Extra Grande)</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
+                  <select
+                    value={printerSettings.zoom}
+                    onChange={(e) => setPrinterSettings({ ...printerSettings, zoom: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="0.8">0.8</option>
+                    <option value="0.9">0.9</option>
+                    <option value="1.0">1.0</option>
+                    <option value="1.1">1.1</option>
+                    <option value="1.2">1.2</option>
+                  </select>
                 </div>
 
-                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded">
-                  <p className="text-sm text-amber-700">
-                    <strong>Requisito:</strong> La app <strong>RawBT</strong> debe estar instalada y configurada con la impresora Bluetooth emparejada.
-                  </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Margen</label>
+                  <select
+                    value={printerSettings.margin}
+                    onChange={(e) => setPrinterSettings({ ...printerSettings, margin: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="0mm">0mm</option>
+                    <option value="1mm">1mm</option>
+                    <option value="2mm">2mm</option>
+                    <option value="3mm">3mm</option>
+                    <option value="5mm">5mm</option>
+                  </select>
                 </div>
+              </div>
 
-                <div className="pt-2">
-                  <button type="submit" className="btn-primary w-full md:w-auto">
-                    Guardar Portátil
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="pt-2">
+                <Button type="submit">Guardar Desktop</Button>
+              </div>
+            </form>
           </div>
-        )
-      }
+
+          {/* Portable printer */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Portátil — GOOJPRT MP-3 (Bluetooth)</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Impresora Bluetooth 80mm. Imprime vía RawBT enviando imagen del ticket.
+            </p>
+
+            <form onSubmit={handlePortablePrinterSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ancho de Papel</label>
+                  <select
+                    value={portablePrinterSettings.width}
+                    onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, width: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="72mm">72mm (área imprimible 80mm)</option>
+                    <option value="80mm">80mm (ancho total)</option>
+                    <option value="58mm">58mm</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tamaño de Fuente</label>
+                  <select
+                    value={portablePrinterSettings.fontSize}
+                    onChange={(e) => setPortablePrinterSettings({ ...portablePrinterSettings, fontSize: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="11px">11px (Compacto)</option>
+                    <option value="12px">12px (Pequeño)</option>
+                    <option value="13px">13px (Normal)</option>
+                    <option value="14px">14px (Grande)</option>
+                    <option value="15px">15px (Extra Grande)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded">
+                <p className="text-sm text-amber-700">
+                  <strong>Requisito:</strong> La app <strong>RawBT</strong> debe estar instalada y configurada con la impresora Bluetooth emparejada.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit">Guardar Portátil</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Seguridad Tab - PIN */}
       {activeTab === 'seguridad' && hasPermission('settings.manage') && (
@@ -943,280 +879,269 @@ const SettingsPage = () => {
             </div>
 
             <div className="pt-2">
-              <button type="submit" disabled={pinLoading} className="btn-primary w-full md:w-auto">
-                {pinLoading ? 'Guardando...' : 'Guardar PIN'}
-              </button>
+              <Button type="submit" loading={pinLoading}>
+                Guardar PIN
+              </Button>
             </div>
           </form>
         </div>
       )}
 
       {/* Create/Edit Role Modal */}
-      {showModal && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-          title={editingRole ? 'Editar Rol' : 'Nuevo Rol'}
-          size="xl"
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Nombre del Rol *
-                </label>
+      <Modal
+        open={showModal}
+        onClose={() => { setShowModal(false); resetForm(); }}
+        title={editingRole ? 'Editar Rol' : 'Nuevo Rol'}
+        size="xl"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Nombre del Rol *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="input w-full"
+                placeholder="Ej: Administrador, Cajero..."
+                required
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Descripción
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="input w-full"
+                rows="1"
+                placeholder="Describe las funciones de este rol..."
+              />
+            </div>
+            <div className="md:col-span-1">
+              <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-50 rounded-md transition-colors">
                 <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="input w-full shadow-sm border-gray-300 focus:ring-primary-500 focus:border-primary-500 rounded-md"
-                  placeholder="Ej: Administrador, Cajero..."
-                  required
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Descripción
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="input w-full shadow-sm border-gray-300 focus:ring-primary-500 focus:border-primary-500 rounded-md"
-                  rows="1"
-                  placeholder="Describe las funciones de este rol..."
-                />
-              </div>
-              <div className="md:col-span-1">
-                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-50 rounded-md transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) =>
-                      setFormData({ ...formData, is_active: e.target.checked })
-                    }
-                    className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-semibold text-gray-700 font-medium">Estado Activo</span>
-                </label>
-              </div>
+                <span className="text-sm font-semibold text-gray-700">Estado Activo</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Permisos del Sistema</h3>
+              <span className="text-xs text-gray-400">Pulsa el cuadro junto al título para marcar todo el bloque</span>
             </div>
 
-            <div className="border-t border-gray-100 pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Permisos del Sistema</h3>
-                <span className="text-xs text-gray-400 font-normal">Pulsa el cuadro junto al título para marcar todo el bloque</span>
-              </div>
+            <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
+                {Object.entries(permissionsByModule).map(([module, perms]) => {
+                  const allSelected = perms.every((p) => formData.permissions.includes(p.id));
 
-              <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
-                  {Object.entries(permissionsByModule).map(([module, perms]) => {
-                    const allSelected = perms.every((p) =>
-                      formData.permissions.includes(p.id)
-                    );
-
-                    return (
-                      <div key={module} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="bg-gray-50/50 border-b border-gray-100 p-4 flex items-center gap-3 rounded-t-xl">
-                          <button
-                            type="button"
-                            onClick={() => toggleModulePermissions(module)}
-                            className="p-1 hover:bg-white rounded-md transition-colors shadow-sm bg-white"
-                            title="Seleccionar todos"
-                          >
-                            {allSelected ? (
-                              <CheckSquare className="h-5 w-5 text-primary-600" />
-                            ) : (
-                              <Square className="h-5 w-5 text-gray-300" />
-                            )}
-                          </button>
-                          <h4 className="font-bold text-gray-900 capitalize text-sm flex-1">
-                            Módulo: {moduleNames[module] || module}
-                          </h4>
-                          <span className="text-[10px] bg-white border border-gray-100 px-2 py-0.5 rounded-full text-gray-400 uppercase tracking-tighter">
-                            {perms.length} perms
-                          </span>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
-                          {perms.map((permission) => (
-                            <label
-                              key={permission.id}
-                              className="flex items-start gap-3 text-sm cursor-pointer group hover:bg-blue-50/50 p-1.5 rounded transition-all"
-                            >
-                              <div className="pt-0.5">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.permissions.includes(permission.id)}
-                                  onChange={() => togglePermission(permission.id)}
-                                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                />
-                              </div>
-                              <span className="text-gray-700 group-hover:text-blue-700 leading-tight">
-                                {permission.description}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
+                  return (
+                    <div key={module} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="bg-gray-50/50 border-b border-gray-100 p-4 flex items-center gap-3 rounded-t-xl">
+                        <button
+                          type="button"
+                          onClick={() => toggleModulePermissions(module)}
+                          className="p-1 hover:bg-white rounded-md transition-colors shadow-sm bg-white"
+                          title="Seleccionar todos"
+                        >
+                          {allSelected ? (
+                            <CheckSquare className="h-5 w-5 text-primary-600" />
+                          ) : (
+                            <Square className="h-5 w-5 text-gray-300" />
+                          )}
+                        </button>
+                        <h4 className="font-bold text-gray-900 capitalize text-sm flex-1">
+                          Módulo: {moduleNames[module] || module}
+                        </h4>
+                        <span className="text-[10px] bg-white border border-gray-100 px-2 py-0.5 rounded-full text-gray-400 uppercase tracking-tighter">
+                          {perms.length} perms
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
+                        {perms.map((permission) => (
+                          <label
+                            key={permission.id}
+                            className="flex items-start gap-3 text-sm cursor-pointer group hover:bg-blue-50/50 p-1.5 rounded transition-all"
+                          >
+                            <div className="pt-0.5">
+                              <input
+                                type="checkbox"
+                                checked={formData.permissions.includes(permission.id)}
+                                onChange={() => togglePermission(permission.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                              />
+                            </div>
+                            <span className="text-gray-700 group-hover:text-blue-700 leading-tight">
+                              {permission.description}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-                className="btn-secondary px-6"
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary px-8">
-                {editingRole ? 'Actualizar' : 'Crear'} Rol
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setShowModal(false); resetForm(); }}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit">
+              {editingRole ? 'Actualizar' : 'Crear'} Rol
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* User Modal */}
-      {showUserModal && (
-        <Modal
-          isOpen={showUserModal}
-          onClose={() => {
-            setShowUserModal(false);
-            resetUserForm();
-          }}
-          title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-          size="md"
-        >
-          <form onSubmit={handleUserSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario *
-                </label>
-                <input
-                  type="text"
-                  value={userFormData.username}
-                  onChange={(e) => setUserFormData({ ...userFormData, username: e.target.value })}
-                  className="input w-full"
-                  required
-                  disabled={!!editingUser}
-                />
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={userFormData.email}
-                  onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
-                  className="input w-full"
-                  required
-                />
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre *
-                </label>
-                <input
-                  type="text"
-                  value={userFormData.first_name}
-                  onChange={(e) => setUserFormData({ ...userFormData, first_name: e.target.value })}
-                  className="input w-full"
-                  required
-                />
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellido *
-                </label>
-                <input
-                  type="text"
-                  value={userFormData.last_name}
-                  onChange={(e) => setUserFormData({ ...userFormData, last_name: e.target.value })}
-                  className="input w-full"
-                  required
-                />
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={userFormData.role_id}
-                  onChange={(e) => setUserFormData({ ...userFormData, role_id: e.target.value })}
-                  className="input w-full"
-                  required
-                >
-                  <option value="">Seleccione rol</option>
-                  {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </div>
-              <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  value={userFormData.phone}
-                  onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
-                  className="input w-full"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contraseña {editingUser && '(Dejar vacío para no cambiar)'}
-                </label>
-                <input
-                  type="password"
-                  value={userFormData.password}
-                  onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
-                  className="input w-full"
-                  required={!editingUser}
-                  placeholder={editingUser ? '••••••••' : 'Contraseña'}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={userFormData.is_active}
-                    onChange={(e) => setUserFormData({ ...userFormData, is_active: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-700">Usuario Activo</span>
-                </label>
-              </div>
+      <Modal
+        open={showUserModal}
+        onClose={() => { setShowUserModal(false); resetUserForm(); }}
+        title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="md"
+      >
+        <form onSubmit={handleUserSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario *</label>
+              <input
+                type="text"
+                value={userFormData.username}
+                onChange={(e) => setUserFormData({ ...userFormData, username: e.target.value })}
+                className="input w-full"
+                required
+                disabled={!!editingUser}
+              />
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => { setShowUserModal(false); resetUserForm(); }}
-                className="btn-secondary"
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                value={userFormData.email}
+                onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+              <input
+                type="text"
+                value={userFormData.first_name}
+                onChange={(e) => setUserFormData({ ...userFormData, first_name: e.target.value })}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
+              <input
+                type="text"
+                value={userFormData.last_name}
+                onChange={(e) => setUserFormData({ ...userFormData, last_name: e.target.value })}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
+              <select
+                value={userFormData.role_id}
+                onChange={(e) => setUserFormData({ ...userFormData, role_id: e.target.value })}
+                className="input w-full"
+                required
               >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary">
-                {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
-              </button>
+                <option value="">Seleccione rol</option>
+                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
             </div>
-          </form>
-        </Modal>
-      )}
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+              <input
+                type="text"
+                value={userFormData.phone}
+                onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
+                className="input w-full"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contraseña {editingUser && '(Dejar vacío para no cambiar)'}
+              </label>
+              <input
+                type="password"
+                value={userFormData.password}
+                onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                className="input w-full"
+                required={!editingUser}
+                placeholder={editingUser ? '••••••••' : 'Contraseña'}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={userFormData.is_active}
+                  onChange={(e) => setUserFormData({ ...userFormData, is_active: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">Usuario Activo</span>
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setShowUserModal(false); resetUserForm(); }}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit">
+              {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Role Confirm */}
+      <ConfirmDialog
+        open={!!deleteRoleTarget}
+        onClose={() => setDeleteRoleTarget(null)}
+        onConfirm={confirmDeleteRole}
+        title="Eliminar rol"
+        description="Esta acción no se puede deshacer. Los usuarios asignados a este rol perderán sus permisos."
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
+
+      {/* Toggle User Confirm */}
+      <ConfirmDialog
+        open={!!toggleUserTarget}
+        onClose={() => setToggleUserTarget(null)}
+        onConfirm={confirmToggleUser}
+        title={`${toggleUserTarget?.is_active ? 'Desactivar' : 'Activar'} usuario`}
+        description={`${toggleUserTarget?.first_name} ${toggleUserTarget?.last_name}`}
+        confirmLabel={toggleUserTarget?.is_active ? 'Desactivar' : 'Activar'}
+        variant="warning"
+      />
     </div>
   );
 };

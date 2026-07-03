@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Receipt, ArrowDownRight, ArrowUpRight, Loader, Info, Repeat, ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
 import { customerService } from '../../services/api/customerService';
 import { saleService } from '../../services/api/saleService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 const formatCurrency = (amount, currency) => {

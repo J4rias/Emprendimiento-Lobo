@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { saleService } from '../services/api/saleService';
 import { inventoryService } from '../services/api/inventoryService';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import {
   FileText,
   Download,

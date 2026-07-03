@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 /**
  * Hook genérico de auto-guardado con debounce, cola por clave y gestión de errores.

@@ -8,7 +8,7 @@ import {
 import { arService } from '../services/api/arService';
 import { saleService } from '../services/api/saleService';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // ─── Utilidades ────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ShoppingBag, RefreshCcw, FileX } from 'lucide-react';
 import { creditNoteService } from '../../services/api/creditNoteService';
 import Modal from '../common/Modal';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
     const [returnItems, setReturnItems] = useState([]);

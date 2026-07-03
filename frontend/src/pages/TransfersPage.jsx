@@ -4,7 +4,7 @@ import { ArrowRightLeft, Plus, Package, X, Check, Ban, Eye } from 'lucide-react'
 import { transferService } from '../services/api/transferService';
 import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import TransferFormModal from '../components/transfers/TransferFormModal';
 
 const TransfersPage = () => {

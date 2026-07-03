@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Package, Search, Check } from 'lucide-react';
 import { warehouseService } from '../../services/api/warehouseService';
 import { inventoryService } from '../../services/api/inventoryService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], sourceWarehouseId = null }) => {
   const [formData, setFormData] = useState({

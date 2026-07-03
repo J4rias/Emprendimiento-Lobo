@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Lock, Unlock } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { Plus, Search, Edit, Lock, Unlock } from 'lucide-react';
+import { toast } from 'sonner';
 import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api/userService';
+import { Button, Badge, ConfirmDialog, Modal } from '../components/ui';
 
 const UsersPage = () => {
   const { hasPermission } = useAuth();
@@ -14,6 +14,7 @@ const UsersPage = () => {
   const [roleFilter, setRoleFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [toggleTarget, setToggleTarget] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -45,9 +46,7 @@ const UsersPage = () => {
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      if (editingUser) {
-        return userService.update(editingUser.id, data);
-      }
+      if (editingUser) return userService.update(editingUser.id, data);
       return userService.create(data);
     },
     onSuccess: () => {
@@ -75,9 +74,7 @@ const UsersPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = { ...formData };
-    if (editingUser && !payload.password) {
-      delete payload.password;
-    }
+    if (editingUser && !payload.password) delete payload.password;
     saveMutation.mutate(payload);
   };
 
@@ -96,9 +93,13 @@ const UsersPage = () => {
     setShowModal(true);
   };
 
-  const handleToggleActive = async (user) => {
-    if (!window.confirm(`¿Está seguro de ${user.is_active ? 'desactivar' : 'activar'} este usuario?`)) return;
-    toggleMutation.mutate(user);
+  const handleToggleActive = (user) => {
+    setToggleTarget(user);
+  };
+
+  const confirmToggle = () => {
+    toggleMutation.mutate(toggleTarget);
+    setToggleTarget(null);
   };
 
   const resetForm = () => {
@@ -117,26 +118,16 @@ const UsersPage = () => {
 
   const columns = [
     { header: 'Usuario', accessor: 'username' },
-    {
-      header: 'Nombre',
-      accessor: (row) => `${row.first_name} ${row.last_name}`,
-    },
+    { header: 'Nombre', accessor: (row) => `${row.first_name} ${row.last_name}` },
     { header: 'Email', accessor: 'email' },
     { header: 'Teléfono', accessor: (row) => row.phone || '-' },
-    {
-      header: 'Rol',
-      accessor: (row) => row.role?.name || '-',
-    },
+    { header: 'Rol', accessor: (row) => row.role?.name || '-' },
     {
       header: 'Estado',
       accessor: (row) => (
-        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-          row.is_active
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
+        <Badge variant={row.is_active ? 'success' : 'neutral'}>
           {row.is_active ? 'Activo' : 'Inactivo'}
-        </span>
+        </Badge>
       ),
     },
     {
@@ -148,31 +139,21 @@ const UsersPage = () => {
     {
       header: 'Acciones',
       accessor: (row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
-              <button
-                onClick={() => handleEdit(row)}
-                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                title="Editar"
-              >
+              <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(row)} title="Editar">
                 <Edit className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => handleToggleActive(row)}
-                className={`p-1 ${
-                  row.is_active
-                    ? 'text-orange-600 hover:bg-orange-50'
-                    : 'text-green-600 hover:bg-green-50'
-                } rounded`}
                 title={row.is_active ? 'Desactivar' : 'Activar'}
+                className={row.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
               >
-                {row.is_active ? (
-                  <Lock className="h-4 w-4" />
-                ) : (
-                  <Unlock className="h-4 w-4" />
-                )}
-              </button>
+                {row.is_active ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              </Button>
             </>
           )}
         </div>
@@ -189,16 +170,10 @@ const UsersPage = () => {
           <p className="text-gray-600 mt-1">Gestiona los usuarios del sistema</p>
         </div>
         {hasPermission('users.create') && (
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-5 w-5" />
+          <Button onClick={() => { resetForm(); setShowModal(true); }}>
+            <Plus className="h-4 w-4" />
             Nuevo Usuario
-          </button>
+          </Button>
         )}
       </div>
 
@@ -206,7 +181,7 @@ const UsersPage = () => {
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Buscar por nombre, usuario, email..."
@@ -222,9 +197,7 @@ const UsersPage = () => {
           >
             <option value="">Todos los roles</option>
             {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
+              <option key={role.id} value={role.id}>{role.name}</option>
             ))}
           </select>
         </div>
@@ -241,155 +214,126 @@ const UsersPage = () => {
       </div>
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-          title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-        >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario *
-                </label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  className="input"
-                  required
-                  disabled={!!editingUser}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre *
-                </label>
-                <input
-                  type="text"
-                  value={formData.first_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, first_name: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellido *
-                </label>
-                <input
-                  type="text"
-                  value={formData.last_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, last_name: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={formData.role_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role_id: e.target.value })
-                  }
-                  className="input"
-                  required
-                >
-                  <option value="">Seleccione un rol</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contraseña {editingUser && '(dejar en blanco para no cambiar)'}
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="input"
-                  required={!editingUser}
-                  placeholder={editingUser ? 'Dejar en blanco para no cambiar' : ''}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) =>
-                      setFormData({ ...formData, is_active: e.target.checked })
-                    }
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Usuario activo</span>
-                </label>
-              </div>
+      <Modal
+        open={showModal}
+        onClose={() => { setShowModal(false); resetForm(); }}
+        title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowModal(false); resetForm(); }}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="user-form" loading={saveMutation.isPending}>
+              {editingUser ? 'Actualizar' : 'Crear'} Usuario
+            </Button>
+          </>
+        }
+      >
+        <form id="user-form" onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario *</label>
+              <input
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                className="input"
+                required
+                disabled={!!editingUser}
+              />
             </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-                className="btn-secondary"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+              <input
+                type="text"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
+              <select
+                value={formData.role_id}
+                onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
+                className="input"
+                required
               >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary">
-                {editingUser ? 'Actualizar' : 'Crear'} Usuario
-              </button>
+                <option value="">Seleccione un rol</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>{role.name}</option>
+                ))}
+              </select>
             </div>
-          </form>
-        </Modal>
-      )}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contraseña {editingUser && '(dejar en blanco para no cambiar)'}
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="input"
+                required={!editingUser}
+                placeholder={editingUser ? 'Dejar en blanco para no cambiar' : ''}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Usuario activo</span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Toggle Active Confirm */}
+      <ConfirmDialog
+        open={!!toggleTarget}
+        onClose={() => setToggleTarget(null)}
+        onConfirm={confirmToggle}
+        title={`${toggleTarget?.is_active ? 'Desactivar' : 'Activar'} usuario`}
+        description={`${toggleTarget?.first_name} ${toggleTarget?.last_name}`}
+        confirmLabel={toggleTarget?.is_active ? 'Desactivar' : 'Activar'}
+        variant="warning"
+      />
     </div>
   );
 };

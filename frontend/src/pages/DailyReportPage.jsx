@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
 import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart, RefreshCcw } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();

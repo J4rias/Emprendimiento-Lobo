@@ -17,7 +17,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { preOrderService } from '../services/api/preOrderService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const PreOrdersPage = () => {
   const queryClient = useQueryClient();

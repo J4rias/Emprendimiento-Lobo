@@ -2,12 +2,158 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   ATLAS ERP — Design System v1.0 — Tokens CSS
+   ============================================================ */
+
 @layer base {
+  :root {
+    /* --- Superficies --- */
+    --color-bg-base:    #F8FAFC;
+    --color-bg-surface: #FFFFFF;
+    --color-bg-subtle:  #F1F5F9;
+    --color-bg-muted:   #E2E8F0;
+    --color-bg-overlay: rgba(15, 23, 42, 0.5);
+
+    /* --- Bordes --- */
+    --color-border-default: #E2E8F0;
+    --color-border-strong:  #CBD5E1;
+    --color-border-focus:   #1D4ED8;
+
+    /* --- Texto --- */
+    --color-text-primary:   #0F172A;
+    --color-text-secondary: #475569;
+    --color-text-muted:     #94A3B8;
+    --color-text-disabled:  #CBD5E1;
+    --color-text-inverse:   #FFFFFF;
+
+    /* --- Brand / Primary --- */
+    --color-primary:        #1D4ED8;
+    --color-primary-hover:  #1E40AF;
+    --color-primary-active: #1E3A8A;
+    --color-primary-subtle: #DBEAFE;
+    --color-primary-text:   #1E40AF;
+
+    /* --- Error --- */
+    --color-error:        #DC2626;
+    --color-error-hover:  #B91C1C;
+    --color-error-subtle: #FEF2F2;
+    --color-error-border: #FCA5A5;
+    --color-error-text:   #991B1B;
+
+    /* --- Warning --- */
+    --color-warning:        #D97706;
+    --color-warning-hover:  #B45309;
+    --color-warning-subtle: #FFFBEB;
+    --color-warning-border: #FCD34D;
+    --color-warning-text:   #92400E;
+
+    /* --- Success --- */
+    --color-success:        #16A34A;
+    --color-success-hover:  #15803D;
+    --color-success-subtle: #F0FDF4;
+    --color-success-border: #86EFAC;
+    --color-success-text:   #166534;
+
+    /* --- Info --- */
+    --color-info:        #0891B2;
+    --color-info-hover:  #0E7490;
+    --color-info-subtle: #ECFEFF;
+    --color-info-border: #67E8F9;
+    --color-info-text:   #155E75;
+
+    /* --- Divisas (Atlas-específico) --- */
+    --color-usd:  #15803D;
+    --color-cop:  #B45309;
+    --color-ves:  #7C3AED;
+    --color-usdt: #0E7490;
+
+    /* --- Radius (documentados; coinciden con Tailwind defaults) --- */
+    --radius-none: 0px;
+    --radius-xs:   2px;
+    --radius-sm:   4px;   /* badges     → rounded */
+    --radius-md:   6px;   /* btn/inputs → rounded-md */
+    --radius-lg:   8px;   /* cards      → rounded-lg */
+    --radius-xl:   12px;  /* modales    → rounded-xl */
+    --radius-full: 9999px;
+
+    /* --- Sombras --- */
+    --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-sm:    0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md:    0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-lg:    0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04);
+    --shadow-modal: 0 25px 50px rgba(0, 0, 0, 0.15), 0 12px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ---- Modo oscuro ---- */
+  [data-theme="dark"] {
+    /* Superficies */
+    --color-bg-base:    #0F172A;
+    --color-bg-surface: #1E293B;
+    --color-bg-subtle:  #334155;
+    --color-bg-muted:   #475569;
+    --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+    /* Bordes */
+    --color-border-default: #334155;
+    --color-border-strong:  #475569;
+    --color-border-focus:   #3B82F6;
+
+    /* Texto */
+    --color-text-primary:   #F8FAFC;
+    --color-text-secondary: #CBD5E1;
+    --color-text-muted:     #64748B;
+    --color-text-disabled:  #334155;
+    --color-text-inverse:   #0F172A;
+
+    /* Brand dark */
+    --color-primary:        #3B82F6;
+    --color-primary-hover:  #2563EB;
+    --color-primary-active: #1D4ED8;
+    --color-primary-subtle: #1E3A8A;
+    --color-primary-text:   #93C5FD;
+
+    /* Error dark */
+    --color-error:        #EF4444;
+    --color-error-hover:  #DC2626;
+    --color-error-subtle: #7F1D1D;
+    --color-error-border: #991B1B;
+    --color-error-text:   #FCA5A5;
+
+    /* Warning dark */
+    --color-warning:        #F59E0B;
+    --color-warning-hover:  #D97706;
+    --color-warning-subtle: #78350F;
+    --color-warning-border: #92400E;
+    --color-warning-text:   #FCD34D;
+
+    /* Success dark */
+    --color-success:        #22C55E;
+    --color-success-hover:  #16A34A;
+    --color-success-subtle: #14532D;
+    --color-success-border: #166534;
+    --color-success-text:   #86EFAC;
+
+    /* Info dark */
+    --color-info:        #22D3EE;
+    --color-info-hover:  #0891B2;
+    --color-info-subtle: #164E63;
+    --color-info-border: #155E75;
+    --color-info-text:   #67E8F9;
+
+    /* Sombras dark (más pronunciadas sobre fondo oscuro) */
+    --shadow-modal: 0 25px 50px rgba(0, 0, 0, 0.4), 0 12px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ---- Base global ---- */
   * {
     @apply border-gray-200;
   }
+
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
+    @apply antialiased;
   }
 }
 

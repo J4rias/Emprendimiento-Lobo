@@ -12,7 +12,7 @@ import {
   Package, Lock, Banknote, CreditCard, Smartphone,
   Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // Icon map for payment methods
 const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone, usdt: Hash };

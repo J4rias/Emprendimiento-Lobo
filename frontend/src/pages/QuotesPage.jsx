@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Eye, FileText } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';

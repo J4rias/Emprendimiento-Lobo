@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { Eye, Search, Filter, Calendar, DollarSign, TrendingUp, ShoppingBag, XCircle, Trash2, Printer, Smartphone, CreditCard, RefreshCcw } from 'lucide-react';
 import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';

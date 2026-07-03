@@ -11,7 +11,7 @@ import { priceListService } from '../services/api/priceListService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import CustomerSearch from '../components/CustomerSearch';
 import Modal from '../components/common/Modal';
 import { printSaleTicket } from '../components/sales/SaleTicket';
