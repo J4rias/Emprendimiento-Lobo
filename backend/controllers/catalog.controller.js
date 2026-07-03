@@ -1,4 +1,5 @@
 const { Product, Category, ProductPresentation, PackagingType, Inventory, PriceList, PriceListDetail, CompanySettings, sequelize } = require('../models');
+const logger = require('../config/logger');
 
 exports.getCatalog = async (req, res) => {
   try {
@@ -108,7 +109,7 @@ exports.getCatalog = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching catalog:', error);
-    res.status(500).json({ message: 'Error al cargar el catálogo', error: error.message });
+    logger.error('Error fetching catalog', { error: error.message });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
