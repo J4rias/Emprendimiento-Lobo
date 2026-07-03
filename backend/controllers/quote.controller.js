@@ -12,7 +12,7 @@ exports.getAllQuotes = async (req, res, next) => {
       limit = 20,
       search = '',
       status = '',
-      customerId = '',
+      customer_id = '',
       date_from = '',
       date_to = ''
     } = req.query;
@@ -33,8 +33,8 @@ exports.getAllQuotes = async (req, res, next) => {
       where.status = status;
     }
 
-    if (customerId) {
-      where.customerId = customerId;
+    if (customer_id) {
+      where.customer_id = customer_id;
     }
 
     if (date_from) {
@@ -162,10 +162,10 @@ exports.createQuote = async (req, res, next) => {
   const t = await sequelize.transaction();
 
   try {
-    const { customerId, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil } = req.body;
+    const { customer_id, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil } = req.body;
 
     // Verificar que el cliente existe
-    const customer = await Customer.findByPk(customerId);
+    const customer = await Customer.findByPk(customer_id);
     if (!customer) {
       await t.rollback();
       return res.status(404).json({
@@ -216,7 +216,7 @@ exports.createQuote = async (req, res, next) => {
 
     // Crear la cotización
     const quote = await Quote.create({
-      customerId,
+      customer_id,
       priceListId,
       userId: req.user.id,
       currency: currency || 'USD',
@@ -286,7 +286,7 @@ exports.updateQuote = async (req, res, next) => {
 
   try {
     const { id } = req.params;
-    const { customerId, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil, status } = req.body;
+    const { customer_id, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil, status } = req.body;
 
     // Buscar la cotización
     const quote = await Quote.findOne({
@@ -379,7 +379,7 @@ exports.updateQuote = async (req, res, next) => {
 
     // Actualizar la cotización
     await quote.update({
-      customerId: customerId || quote.customerId,
+      customer_id: customer_id || quote.customer_id,
       priceListId: priceListId !== undefined ? priceListId : quote.priceListId,
       currency: currency || quote.currency,
       subtotal: details ? subtotal : quote.subtotal,
