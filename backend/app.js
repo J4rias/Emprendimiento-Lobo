@@ -48,16 +48,10 @@ app.use(helmet({
 
 // CORS - Permitir solo localhost
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://localhost:3003',
-  'http://localhost:3004',
-  'http://localhost:3005',
-  'http://localhost:3006',
+  ...(process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : []),
   process.env.FRONTEND_URL,
-  'https://catalogo.atlas-group.cloud',
-  'http://catalogo.atlas-group.cloud'
 ].filter(Boolean);
 
 app.use(cors({
