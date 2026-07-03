@@ -60,7 +60,7 @@ const getById = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
@@ -114,7 +114,7 @@ const create = async (req, res, next) => {
     });
 
     res.status(201).json({
-      message: 'Supplier created successfully',
+      message: 'Proveedor creado exitosamente',
       data: supplierWithContacts
     });
   } catch (error) {
@@ -139,7 +139,7 @@ const update = async (req, res, next) => {
     if (!supplier) {
       await transaction.rollback();
       return res.status(404).json({
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
@@ -234,7 +234,7 @@ const update = async (req, res, next) => {
     });
 
     res.json({
-      message: 'Supplier updated successfully',
+      message: 'Proveedor actualizado exitosamente',
       data: supplierWithContacts
     });
   } catch (error) {
@@ -251,14 +251,14 @@ const deleteSupplier = async (req, res, next) => {
 
     if (!supplier) {
       return res.status(404).json({
-        message: 'Supplier not found'
+        message: 'Proveedor no encontrado'
       });
     }
 
     await supplier.update({ is_active: false });
 
     res.json({
-      message: 'Supplier deleted successfully'
+      message: 'Proveedor eliminado exitosamente'
     });
   } catch (error) {
     next(error);
@@ -290,7 +290,7 @@ const getStatement = async (req, res, next) => {
     // Validate supplier exists
     const supplier = await Supplier.findByPk(id);
     if (!supplier) {
-      return res.status(404).json({ message: 'Supplier not found' });
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     // 1. Fetch Purchase Orders (Debts/Liabilities) - Excluding cancelled ones
