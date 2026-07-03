@@ -53,7 +53,7 @@ router.post('/', authorize('products.update'), ...uploadSingle('image'), handleM
 
     const uploadedFile = req.processedFiles[0];
 
-    res.json({
+    res.status(201).json({
       message: 'Imagen subida exitosamente',
       data: {
         url: uploadedFile.url,
@@ -79,7 +79,7 @@ router.post('/multiple', authorize('products.update'), ...uploadMultiple('images
       });
     }
 
-    res.json({
+    res.status(201).json({
       message: `${req.processedFiles.length} imágenes subidas exitosamente`,
       data: req.processedFiles.map(file => ({
         url: file.url,
