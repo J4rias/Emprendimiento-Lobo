@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const {
   Delivery,
   DeliveryDetail,
@@ -140,11 +141,10 @@ exports.getAllDeliveries = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching deliveries:', error);
+    logger.error('Error fetching deliveries', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener las entregas',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -216,11 +216,10 @@ exports.getDeliveryById = async (req, res) => {
       data: delivery
     });
   } catch (error) {
-    console.error('Error fetching delivery:', error);
+    logger.error('Error fetching delivery', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -375,11 +374,10 @@ exports.createDelivery = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error creating delivery:', error);
+    logger.error('Error creating delivery', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al crear la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -463,11 +461,10 @@ exports.updateDelivery = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error updating delivery:', error);
+    logger.error('Error updating delivery', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al actualizar la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -515,11 +512,10 @@ exports.markAsInTransit = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error marking delivery as in transit:', error);
+    logger.error('Error marking delivery as in transit', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al marcar la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -580,11 +576,10 @@ exports.confirmDelivery = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error confirming delivery:', error);
+    logger.error('Error confirming delivery', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al confirmar la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -642,11 +637,10 @@ exports.cancelDelivery = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error('Error cancelling delivery:', error);
+    logger.error('Error cancelling delivery', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al cancelar la entrega',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
@@ -722,11 +716,10 @@ exports.getDeliveryStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching delivery stats:', error);
+    logger.error('Error fetching delivery stats', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas',
-      error: error.message
+      message: 'Error interno del servidor'
     });
   }
 };
