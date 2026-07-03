@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customerService } from '../services/api/customerService';
 
 interface Pagination {
@@ -39,41 +39,35 @@ interface CustomerListParams {
 }
 
 export const useCustomers = (params?: CustomerListParams) => {
-  return useQuery(['customers', params], () => customerService.getAll(params));
+  return useQuery({ queryKey: ['customers', params], queryFn: () => customerService.getAll(params) });
 };
 
 export const useCustomer = (id: number) => {
-  return useQuery(['customers', id], () => customerService.getById(id));
+  return useQuery({ queryKey: ['customers', id], queryFn: () => customerService.getById(id) });
 };
 
 export const useActiveCustomers = () => {
-  return useQuery(['customers', 'active'], customerService.getActive);
+  return useQuery({ queryKey: ['customers', 'active'], queryFn: customerService.getActive });
 };
 
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
-  return useMutation(customerService.create, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('customers');
-    },
-  });
+  return useMutation({ mutationFn: customerService.create, onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }, });
 };
 
 export const useUpdateCustomer = () => {
   const queryClient = useQueryClient();
-  return useMutation((data: { id: number; customerData: Partial<Customer> }) =>
-    customerService.update(data.id, data.customerData), {
-    onSuccess: () => {
-      queryClient.invalidateQueries('customers');
-    },
-  });
+  return useMutation({ mutationFn: (data: { id: number; customerData: Partial<Customer> }) =>
+    customerService.update(data.id, data.customerData), onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }, });
 };
 
 export const useDeleteCustomer = () => {
   const queryClient = useQueryClient();
-  return useMutation((id: number) => customerService.delete(id), {
-    onSuccess: () => {
-      queryClient.invalidateQueries('customers');
-    },
-  });
+  return useMutation({ mutationFn: (id: number) => customerService.delete(id), onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }, });
 };

@@ -1,32 +1,30 @@
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
 
 export const useInventoryByWarehouse = (warehouseId: number, params?: InventoryListParams) => {
-  return useQuery(['inventory', 'warehouse', warehouseId, params], () => inventoryService.getByWarehouse(warehouseId, params));
+  return useQuery({ queryKey: ['inventory', 'warehouse', warehouseId, params], queryFn: () => inventoryService.getByWarehouse(warehouseId, params) });
 };
 
 export const useInventoryItem = (id: number) => {
-  return useQuery(['inventory', id], () => inventoryService.getById(id));
+  return useQuery({ queryKey: ['inventory', id], queryFn: () => inventoryService.getById(id) });
 };
 
 export const useInventoryByProduct = (productId: number) => {
-  return useQuery(['inventory', 'product', productId], () => inventoryService.getByProduct(productId));
+  return useQuery({ queryKey: ['inventory', 'product', productId], queryFn: () => inventoryService.getByProduct(productId) });
 };
 
 export const useLowStock = (params?: Record<string, unknown>) => {
-  return useQuery(['inventory', 'low-stock', params], () => inventoryService.getLowStock(params));
+  return useQuery({ queryKey: ['inventory', 'low-stock', params], queryFn: () => inventoryService.getLowStock(params) });
 };
 
 export const useInventoryMovements = (params?: Record<string, unknown>) => {
-  return useQuery(['inventory', 'movements', params], () => inventoryService.getMovements(params));
+  return useQuery({ queryKey: ['inventory', 'movements', params], queryFn: () => inventoryService.getMovements(params) });
 };
 
 export const useAdjustInventory = () => {
   const queryClient = useQueryClient();
 
-  return useMutation((data: AdjustData) => inventoryService.adjustInventory(data), {
-    onSuccess: () => {
-      queryClient.invalidateQueries('inventory');
-    },
-  });
+  return useMutation({ mutationFn: (data: AdjustData) => inventoryService.adjustInventory(data), onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    }, });
 };
