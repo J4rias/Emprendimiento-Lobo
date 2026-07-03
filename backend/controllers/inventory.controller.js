@@ -629,7 +629,7 @@ class InventoryController {
         pagination: {
           total: count,
           page: parseInt(page),
-          pages: Math.ceil(count / limit)
+          totalPages: Math.ceil(count / limit)
         }
       });
 

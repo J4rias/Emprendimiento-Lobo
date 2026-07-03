@@ -83,7 +83,7 @@ exports.getAllQuotes = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          pages: Math.ceil(count / limit)
+          totalPages: Math.ceil(count / limit)
         }
       }
     });
