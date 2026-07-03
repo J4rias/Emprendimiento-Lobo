@@ -17,12 +17,12 @@ export const preOrderService = {
   },
 
   approve: async (id) => {
-    const response = await api.put(`/pre-orders/${id}/approve`);
+    const response = await api.post(`/pre-orders/${id}/approve`);
     return response.data;
   },
 
   reject: async (id) => {
-    const response = await api.put(`/pre-orders/${id}/reject`);
+    const response = await api.post(`/pre-orders/${id}/reject`);
     return response.data;
   },
 
