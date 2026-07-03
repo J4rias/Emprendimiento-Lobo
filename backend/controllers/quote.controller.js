@@ -13,8 +13,8 @@ exports.getAllQuotes = async (req, res, next) => {
       search = '',
       status = '',
       customerId = '',
-      dateFrom = '',
-      dateTo = ''
+      date_from = '',
+      date_to = ''
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -37,17 +37,17 @@ exports.getAllQuotes = async (req, res, next) => {
       where.customerId = customerId;
     }
 
-    if (dateFrom) {
+    if (date_from) {
       where.quoteDate = {
         ...where.quoteDate,
-        [Op.gte]: new Date(dateFrom)
+        [Op.gte]: new Date(date_from)
       };
     }
 
-    if (dateTo) {
+    if (date_to) {
       where.quoteDate = {
         ...where.quoteDate,
-        [Op.lte]: new Date(dateTo)
+        [Op.lte]: new Date(date_to)
       };
     }
 
@@ -486,21 +486,21 @@ exports.deleteQuote = async (req, res, next) => {
  */
 exports.getQuoteStats = async (req, res, next) => {
   try {
-    const { dateFrom, dateTo } = req.query;
+    const { date_from, date_to } = req.query;
 
     const where = { isDeleted: false };
 
-    if (dateFrom) {
+    if (date_from) {
       where.quoteDate = {
         ...where.quoteDate,
-        [Op.gte]: new Date(dateFrom)
+        [Op.gte]: new Date(date_from)
       };
     }
 
-    if (dateTo) {
+    if (date_to) {
       where.quoteDate = {
         ...where.quoteDate,
-        [Op.lte]: new Date(dateTo)
+        [Op.lte]: new Date(date_to)
       };
     }
 
