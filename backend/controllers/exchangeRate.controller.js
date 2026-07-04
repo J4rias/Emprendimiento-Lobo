@@ -40,7 +40,7 @@ class ExchangeRateController {
         where,
         include: [
           { model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] },
-          { model: User, as: 'updater', attributes: ['id', 'substring', 'first_name', 'last_name'] }
+          { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] }
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -174,7 +174,7 @@ class ExchangeRateController {
       // Crear la tasa de cambio
       const exchangeRate = await ExchangeRate.create({
         from_currency,
-        to: to_currency,
+        to_currency,
         rate,
         effective_date,
         source,

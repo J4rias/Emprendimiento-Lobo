@@ -1,3 +1,5 @@
+const { Brand } = require('../models');
+const { Op } = require('sequelize');
 const { brandService } = require('../services/brand.service');
 
 // Get all brands with pagination and search

@@ -89,6 +89,12 @@ exports.createUser = async (req, res, next) => {
   try {
     const { username, email, password, first_name, last_name, phone, role_id, is_active } = req.body;
 
+    if (!username || !email || !password || !first_name || !last_name) {
+      return res.status(400).json({
+        message: 'Campos requeridos: username, email, password, first_name, last_name',
+      });
+    }
+
     // Verificar si el usuario ya existe
     const existingUser = await User.findOne({
       where: {

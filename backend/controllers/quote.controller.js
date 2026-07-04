@@ -1,6 +1,6 @@
 const { Quote, QuoteDetail, Customer, Product, ProductPresentation, User, PriceList } = require('../models');
 const { Op } = require('sequelize');
-const sequelize = require('../config/database');
+const { sequelize } = require('../config/database');
 
 /**
  * Obtener todas las cotizaciones con filtros y paginación
@@ -131,7 +131,7 @@ exports.getQuoteById = async (req, res, next) => {
             {
               model: ProductPresentation,
               as: 'presentation',
-              attributes: ['id', 'name', 'unitMultiplier']
+              attributes: ['id', 'name', 'units_per_package']
             }
           ],
           order: [['lineOrder', 'ASC']]
@@ -214,7 +214,7 @@ exports.createQuote = async (req, res, next) => {
 
     // Crear la cotización
     const quote = await Quote.create({
-      customer_id,
+      customerId: customer_id,
       priceListId,
       userId: req.user.id,
       currency: currency || 'USD',
@@ -377,7 +377,7 @@ exports.updateQuote = async (req, res, next) => {
 
     // Actualizar la cotización
     await quote.update({
-      customer_id: customer_id || quote.customer_id,
+      customerId: customer_id || quote.customerId,
       priceListId: priceListId !== undefined ? priceListId : quote.priceListId,
       currency: currency || quote.currency,
       subtotal: details ? subtotal : quote.subtotal,

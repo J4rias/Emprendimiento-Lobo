@@ -79,6 +79,18 @@ const create = async (req, res, next) => {
   try {
     const { contacts, ...supplierData } = req.body;
 
+    // Verificar duplicado por nombre o tax_id
+    if (supplierData.name || supplierData.tax_id) {
+      const orConditions = [];
+      if (supplierData.name) orConditions.push({ name: supplierData.name });
+      if (supplierData.tax_id) orConditions.push({ tax_id: supplierData.tax_id });
+      const existing = await Supplier.findOne({ where: { [Op.or]: orConditions } });
+      if (existing) {
+        await transaction.rollback();
+        return res.status(409).json({ message: 'Ya existe un proveedor con ese nombre o RIF' });
+      }
+    }
+
     // Create supplier
     const supplier = await Supplier.create({
       ...supplierData,
