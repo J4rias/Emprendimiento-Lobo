@@ -9,18 +9,19 @@ const PORT = process.env.PORT || 5000;
 
 // Create HTTP server with Socket.io
 const httpServer = http.createServer(app);
+
+// Misma lógica de CORS que app.js — env var CORS_ORIGINS (comma-separated) + FRONTEND_URL fallback
+const allowedOrigins = [
+  ...(process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002',
+       'http://localhost:3003', 'http://localhost:3004', 'http://localhost:3005', 'http://localhost:3006']),
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'http://localhost:3004',
-      'http://localhost:3005',
-      'http://localhost:3006',
-      process.env.FRONTEND_URL
-    ].filter(Boolean),
+    origin: allowedOrigins,
     credentials: true
   },
   transports: ['websocket', 'polling']
