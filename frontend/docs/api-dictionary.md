@@ -3340,7 +3340,7 @@ El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta e
 
 ### Homogeneidad del Módulo BNK
 | Endpoint | Respuesta con `data` | Mensajes en español | Usa snake_case |
-|----------|-----------------------|---------------------|----------------|
+|----------|-----------------------|---------------------|---------------|
 | Listar Bancos | ✅ | ✅ | ✅ |
 | Crear Banco | ✅ | ✅ | ✅ |
 | Obtener Banco por ID | ✅ | ✅ | ✅ |
@@ -3378,10 +3378,10 @@ El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta e
 
 **Checklist de Conformidad:**
 
-- ❌ Respuesta sin "success" ✅ (No probado)
+- ❌ Respuesta sin "success" ✅ (Conforme)
 - ⚠️ Respuesta con "data" ⚠️ (No probado)
-- ✅ Mensajes en español ⚠️ (No probado)
-- ⚠️ snake_case ⚠️ (No probado)
+- ✅ Mensajes en español ❌ (No conforme)
+- ⚠️ snake_case ⚠️ (Parcial)
 
 ### Homogeneidad del Módulo
 
@@ -4156,7 +4156,7 @@ Host: example.com
         "units_per_package": 12,
         "package_price": "28.86",
         "unit_price": "2.40",
-        "low_stock": 1
+        "low_stock": 0
       },
       {
         "id": 1249,
@@ -4196,6 +4196,7 @@ Host: example.com
 | Código de estado HTTP | ✅ |
 
 <!-- ═══════════════════════════════ -->
+```
 ## Resumen Global de Homogeneidad
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
