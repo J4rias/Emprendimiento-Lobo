@@ -1,0 +1,10 @@
+{"test": "test_get_customers_happy_path", "method": "GET", "path": "/accounts-receivable/customers", "status": 200, "request": null, "response": null}
+{"test": "test_get_customers_no_auth", "method": "GET", "path": "/accounts-receivable/customers", "status": 401, "request": null, "response": null}
+{"test": "test_create_customer_happy_path", "method": "POST", "path": "/accounts-receivable/customers", "status": 404, "request": null, "response": null}
+{"test": "test_create_customer_no_auth", "method": "POST", "path": "/accounts-receivable/customers", "status": 401, "request": null, "response": null}
+{"test": "test_get_customer_happy_path", "method": "GET", "path": "/accounts-receivable/customers/1", "status": 404, "request": null, "response": null}
+{"test": "test_get_customer_no_auth", "method": "GET", "path": "/accounts-receivable/customers/1", "status": 401, "request": null, "response": null}
+{"test": "test_update_customer_happy_path", "method": "PUT", "path": "/accounts-receivable/customers/1", "status": 404, "request": null, "response": null}
+{"test": "test_update_customer_no_auth", "method": "PUT", "path": "/accounts-receivable/customers/1", "status": 401, "request": null, "response": null}
+{"test": "test_delete_customer_happy_path", "method": "DELETE", "path": "/accounts-receivable/customers/1", "status": 404, "request": null, "response": null}
+{"test": "test_delete_customer_no_auth", "method": "DELETE", "path": "/accounts-receivable/customers/1", "status": 401, "request": null, "response": null}

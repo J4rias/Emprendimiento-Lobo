@@ -2229,12 +2229,38 @@ PUT http://localhost:5001/api/purchase-orders/500
 - **Response Shape**:
   ```json
   {
-    "data": [],
+    "data": [
+      {
+        "id": 17,
+        "code": "COT-2026-00017",
+        "customerId": 1,
+        "priceList": null,
+        "date": "2023-10-04T09:27:37.000Z",
+        "expirationDate": "2023-10-19T09:27:37.000Z",
+        "status": "draft",
+        "currency": "USD",
+        "exchangeRate": 1,
+        "subtotal": 20,
+        "discountPercentage": 0,
+        "discountAmount": 0,
+        "taxPercentage": 18,
+        "taxAmount": 3.6,
+        "total": 23.6,
+        "paymentTerms": null,
+        "deliveryTerms": null,
+        "notes": "API_TEST_DELETE_QUOTE_1783135657",
+        "internalNotes": null,
+        "convertedToSaleId": null,
+        "createdAt": "2023-10-04T09:27:37.000Z",
+        "updatedAt": "2023-10-04T09:27:37.000Z"
+      },
+      ...
+    ],
     "pagination": {
-      "total": 0,
+      "total": 5,
       "page": 1,
       "limit": 20,
-      "totalPages": 0
+      "totalPages": 1
     }
   }
   ```
@@ -2299,6 +2325,7 @@ PUT http://localhost:5001/api/purchase-orders/500
 - 200: OK
 - 401: Unauthorized (No token provided. Authentication required.)
 - 400: Bad Request (Validation error)
+```
 ## PRE — Pre-Pedidos (`/api/pre-orders`)
 <!-- ═══════════════════════════════ -->
 
@@ -2856,16 +2883,99 @@ El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta e
 - **Descripción**: Lista todas las notas de crédito
 - **Checklist**:
   - ✅ URL en snake_case
-  - ❌ Mensajes en español
-  - ⚠️ No probado (401)
+  - ⚠️ No probado (200)
 - **Request**:
   ```json
   null
   ```
-- **Response Shape** (Status: 401):
+- **Response Shape** (Status: 200):
   ```json
   {
-    "message": "No token provided. Authentication required."
+    "data": [
+      {
+        "id": 162,
+        "credit_note_number": "NC-20260629-0001",
+        "sale_id": 8422,
+        "customer_id": 500,
+        "warehouse_id": 1,
+        "credit_note_date": "2026-06-29",
+        "reason": "return",
+        "reason_description": null,
+        "type": "partial",
+        "status": "applied",
+        "exchange_rate": "2675.518050",
+        "subtotal": "3.176955",
+        "tax_amount": "0.000000",
+        "total": "3.176955",
+        "refund_method": "credit_balance",
+        "refund_amount": "3.176955",
+        "refund_reference": null,
+        "notes": null,
+        "created_by": 1,
+        "approved_by": 1,
+        "approved_at": "2026-06-26T15:37:04.000Z",
+        "created_at": "2026-06-26T15:37:04.000Z",
+        "updated_at": "2026-06-26T15:37:04.000Z",
+        "sale": {
+          "id": 8116,
+          "sale_number": "VEN-20260626-0029",
+          "sale_date": "2026-06-26T15:29:44.000Z",
+          "total": "69.893006"
+        },
+        "customer": {
+          "id": 270,
+          "firstName": "HECTOR ",
+          "lastName": "MOSQUERA",
+          "businessName": null,
+          "tradeName": null,
+          "type": "natural",
+          "documentType": "V",
+          "documentNumber": "1095792249",
+          "email": null,
+          "phone": null
+        },
+        "warehouse": {
+          "id": 1,
+          "name": "Deposito Principal"
+        },
+        "creator": {
+          "id": 1,
+          "username": "admin",
+          "first_name": "Updated",
+          "last_name": "User"
+        },
+        "approver": {
+          "id": 1,
+          "username": "admin",
+          "first_name": "Updated",
+          "last_name": "User"
+        },
+        "details": [
+          {
+            "id": 180,
+            "credit_note_id": 161,
+            "sale_detail_id": 34980,
+            "product_id": 899,
+            "presentation_id": 725,
+            "batch_id": null,
+            "package_quantity_returned": 1,
+            "loose_units_returned": 0,
+            "unit_price": "3.18",
+            "discount_percent": "0.00",
+            "tax_percent": "0.00",
+            "line_total": "3.18",
+            "return_to_stock": true,
+            "created_at": "2026-06-26T15:37:04.000Z",
+            "updated_at": "2026-06-26T15:37:04.000Z",
+            "presentation": {
+              "id": 725,
+              "units_per_package": 12
+            }
+          }
+        ]
+      },
+      ...
+    ]
   }
   ```
 
@@ -2873,7 +2983,6 @@ El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta e
 - **Descripción**: Crea una nueva nota de crédito
 - **Checklist**:
   - ✅ URL en snake_case
-  - ❌ Mensajes en español
   - ⚠️ No probado (400)
 - **Request**:
   ```json
@@ -2897,14 +3006,14 @@ El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta e
 | Criterio                  | GET `/credit-notes` | POST `/credit-notes` |
 |---------------------------|---------------------|----------------------|
 | URL en snake_case         | ✅                  | ✅                   |
-| Mensajes en español       | ❌                  | ❌                   |
-| Respuestas con "data"     | N/A                 | N/A                  |
-| Respuesta en snake_case   | N/A                 | N/A                  |
+| Mensajes en español       | ⚠️                 | ⚠️                  |
+| Respuestas con "data"     | ✅                  | N/A                  |
+| Respuesta en snake_case   | ✅                  | N/A                  |
 
 ### HTTP Status Codes Observados
 
 - **GET `/credit-notes`**:
-  - 401: No token provided. Authentication required.
+  - 200: Lista de notas de crédito
 
 - **POST `/credit-notes`**:
   - 400: Faltan campos requeridos: sale_id, reason, type, items
