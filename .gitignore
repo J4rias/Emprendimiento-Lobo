@@ -71,8 +71,10 @@ scripts/api_test_orchestrator.py
 # Claude Code
 .claude/
 
-# Markdown
+# Markdown (excepto docs del proyecto)
 *.md
+!frontend/docs/*.md
+!backend/README.md
 # Orchestrator local (groundctl only)
 scripts/orchestrator.py
 tmp/orchestrator-state.json

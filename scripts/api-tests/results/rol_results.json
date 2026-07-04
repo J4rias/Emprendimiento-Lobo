@@ -1,0 +1,51 @@
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/rol_tests.py", line 126, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/rol_tests.py", line 105, in main
+    role_id = test_create_role()
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/rol_tests.py", line 60, in test_create_role
+    response = requests.post(f"{BASE_URL}/roles", headers=headers, json=payload)
+  File "/usr/lib/python3.14/site-packages/requests/api.py", line 134, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 499, in request
+    self.putheader(header, value)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 413, in putheader
+    super().putheader(header, *values)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/http/client.py", line 1340, in putheader
+    values[i] = one_value.encode('latin-1')
+                ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+UnicodeEncodeError: 'latin-1' codec can't encode character '\u0192' in position 9585: ordinal not in range(256)

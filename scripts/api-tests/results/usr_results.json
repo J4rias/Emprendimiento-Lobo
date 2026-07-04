@@ -1,0 +1,20 @@
+{"test": "test_get_all_users", "method": "GET", "path": "/users", "status": 200, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_create_user", "method": "POST", "path": "/users", "status": 201, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_get_user", "method": "GET", "path": "/users/1", "status": 200, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_update_user", "method": "PUT", "path": "/users/1", "status": 200, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_delete_user", "method": "DELETE", "path": "/users/1", "status": 400, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_no_auth", "method": "GET", "path": "/users", "status": 401, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_invalid_data", "method": "POST", "path": "/users", "status": 500, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_not_found", "method": "GET", "path": "/users/99999999", "status": 404, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+{"test": "test_duplicate", "method": "POST", "path": "/users", "status": 409, "request": null, "response": null}
+Exception occurred: name 'response' is not defined
+
+Summary: PASSED=0, FAILED=9
