@@ -4,8 +4,6 @@ const categoryController = require('../controllers/category.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const validate = require('../middleware/validate');
-const logger = require('../config/logger');
-
 const router = express.Router();
 
 // All routes require authentication
@@ -13,13 +11,6 @@ router.use(auth);
 
 // Get all categories with pagination
 router.get('/', categoryController.getAll);
-
-// Get categories with product count
-// DEPRECATED: use GET /api/categories?include=product_count instead
-router.get('/with-count', (req, res, next) => {
-  logger.warn('[DEPRECATED] GET /api/categories/with-count — use GET /api/categories?include=product_count');
-  next();
-}, categoryController.getWithProductCount);
 
 // Get category by ID
 router.get('/:id', categoryController.getById);

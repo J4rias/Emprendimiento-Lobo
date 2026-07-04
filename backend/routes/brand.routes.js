@@ -3,20 +3,12 @@ const router = express.Router();
 const brandController = require('../controllers/brand.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
-const logger = require('../config/logger');
 
 // All routes require authentication
 router.use(auth);
 
 // Get all brands with pagination and search
 router.get('/', authorize('brands.view'), brandController.getAll);
-
-// Get active brands for dropdowns
-// DEPRECATED: use GET /api/brands?is_active=true instead
-router.get('/active', authorize('brands.view'), (req, res, next) => {
-  logger.warn('[DEPRECATED] GET /api/brands/active — use GET /api/brands?is_active=true');
-  next();
-}, brandController.getActive);
 
 // Get brand by ID
 router.get('/:id', authorize('brands.view'), brandController.getById);

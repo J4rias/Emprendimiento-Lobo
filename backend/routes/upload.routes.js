@@ -96,51 +96,6 @@ router.post('/multiple', authorize('products.update'), ...uploadMultiple('images
   }
 });
 
-// Eliminar una imagen (legacy — con URL en body)
-// DEPRECATED: use DELETE /api/uploads/:filename instead
-// NOTE: must be declared BEFORE /:filename to avoid shadowing
-router.delete('/image', authorize('products.update'), (req, res, next) => {
-  logger.warn('[DEPRECATED] DELETE /api/upload/image (body URL) — use DELETE /api/uploads/:filename');
-  next();
-}, async (req, res) => {
-  try {
-    const { url } = req.body;
-
-    if (!url) {
-      return res.status(400).json({
-        message: 'URL de la imagen requerida'
-      });
-    }
-
-    const basePath = path.resolve(path.join(__dirname, '../public'));
-    const imagePath = path.resolve(path.join(__dirname, '../public', url));
-
-    if (!imagePath.startsWith(basePath + path.sep)) {
-      return res.status(400).json({ message: 'Ruta de imagen inválida' });
-    }
-
-    try {
-      await fs.unlink(imagePath);
-      res.json({
-        message: 'Imagen eliminada exitosamente'
-      });
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        res.json({
-          message: 'Imagen eliminada exitosamente'
-        });
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    logger.error('Error eliminando imagen:', error);
-    res.status(500).json({
-      message: 'Error al eliminar la imagen'
-    });
-  }
-});
-
 // Delete image by filename (new normalized endpoint — mounted via /api/uploads/:filename)
 router.delete('/:filename', authorize('products.update'), async (req, res) => {
   try {

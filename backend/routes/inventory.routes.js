@@ -4,8 +4,6 @@ const inventoryController = require('../controllers/inventory.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const validate = require('../middleware/validate');
-const logger = require('../config/logger');
-
 const router = express.Router();
 
 // All routes require authentication
@@ -16,20 +14,6 @@ router.get('/warehouses', inventoryController.getWarehouses);
 
 // Main inventory endpoint — supports ?warehouse_id=X and ?product_id=X
 router.get('/', inventoryController.getByQuery);
-
-// Get inventory by warehouse
-// DEPRECATED: use GET /api/inventory?warehouse_id=X instead
-router.get('/warehouse/:warehouse_id', (req, res, next) => {
-  logger.warn('[DEPRECATED] GET /api/inventory/warehouse/:id — use GET /api/inventory?warehouse_id=X');
-  next();
-}, inventoryController.getByWarehouse);
-
-// Get inventory by product
-// DEPRECATED: use GET /api/inventory?product_id=X instead
-router.get('/product/:product_id', (req, res, next) => {
-  logger.warn('[DEPRECATED] GET /api/inventory/product/:id — use GET /api/inventory?product_id=X');
-  next();
-}, inventoryController.getByProduct);
 
 // Get low stock products
 router.get('/alerts/low-stock', inventoryController.getLowStock);

@@ -135,13 +135,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/sales', saleRoutes);
-app.use('/api/roles', roleRoutes); // ← montado correctamente en /api/roles
-// DEPRECATED alias: /api/permissions → /api/roles/permissions (eliminar tras confirmar cero uso en FE)
-app.get('/api/permissions', (req, res, next) => {
-  logger.warn('[DEPRECATED] GET /api/permissions — use GET /api/roles/permissions');
-  req.url = '/permissions';
-  roleRoutes(req, res, next);
-});
+app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/suppliers', supplierRoutes);

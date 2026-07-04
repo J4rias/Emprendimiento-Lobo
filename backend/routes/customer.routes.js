@@ -3,7 +3,6 @@ const router = express.Router();
 const customerController = require('../controllers/customer.controller');
 const authenticate = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
-const logger = require('../config/logger');
 
 // Get all customers with filters
 router.get(
@@ -11,19 +10,6 @@ router.get(
   authenticate,
   authorize('customers.view'),
   customerController.getAllCustomers
-);
-
-// Get active customers (for dropdowns)
-// DEPRECATED: use GET /api/customers?is_active=true instead
-router.get(
-  '/active',
-  authenticate,
-  authorize('customers.view'),
-  (req, res, next) => {
-    logger.warn('[DEPRECATED] GET /api/customers/active — use GET /api/customers?is_active=true');
-    next();
-  },
-  customerController.getActiveCustomers
 );
 
 // Get customer activity summary (must be before /:id)
