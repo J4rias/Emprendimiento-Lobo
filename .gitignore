@@ -64,6 +64,10 @@ scripts/orchestrator.py
 tmp/orchestrator-state.json
 tmp/orchestrator-report.md
 
+# API test orchestrator state (scripts/api-tests/ sí se sube)
+tmp/api-test-state.json
+scripts/api_test_orchestrator.py
+
 # Claude Code
 .claude/
 
