@@ -3557,6 +3557,10 @@ Inicia sesión y obtiene un token de autenticación.
 - `200 OK`: Listar Bancos, Obtener Banco por ID
 - `201 Created`: Crear Banco
 - `204 No Content`: Actualizar Banco por ID, Eliminar Banco por ID
+
+### Notas Adicionales
+- El endpoint de eliminar banco no incluye `data` en la respuesta, lo cual es una excepción a la especificación.
+```
 ## PKG — Tipos de Empaque (`/api/packaging-types`)
 <!-- ═══════════════════════════════ -->
 
