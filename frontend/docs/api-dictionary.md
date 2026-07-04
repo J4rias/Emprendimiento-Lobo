@@ -1330,12 +1330,13 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### Tabla de Homogeneidad del Módulo
 
-| Endpoint                | Mensajes en Español | Sin "success" | Respuestas con "data" | Snake Case |
-|-------------------------|---------------------|---------------|-----------------------|-----------|
-| Listar ventas           | ✅                  | ❌            | ✅                    | ✅        |
-| Crear venta             | ✅                  | ❌            | ⚠️ Parcial             | ⚠️ Parcial |
-| Obtener venta por ID    | ✅                
-...[truncado]...
+| Endpoint                | Mensajes en Español | Sin "success" | Respuesta con "data" | Snake Case |
+|-------------------------|---------------------|---------------|----------------------|-----------|
+| Listar ventas           | ✅                  | ❌            | ✅                   | ✅        |
+| Crear venta             | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
+| Obtener venta por ID    | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
+| Actualizar venta por ID | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
+| Eliminar venta por ID   | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
 ```
 ## POS — Punto de Venta (`/api/pos`)
 <!-- ═══════════════════════════════ -->
@@ -1359,7 +1360,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - **401 Unauthorized** (⚠️ no probado):
     ```json
     {
-      "message": "Unauthorized"
+      "message": "No token provided. Authentication required."
     }
     ```
 
@@ -1381,10 +1382,33 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     }
     ```
 - **Response Shapes**:
+  - **200 OK** (✅ conforme):
+    ```json
+    {
+      "message": "Reserva actualizada",
+      "data": {
+        "reserved": 5,
+        "available_after": 7,
+        "total_reserved": 5
+      }
+    }
+    ```
+  - **401 Unauthorized** (⚠️ no probado):
+    ```json
+    {
+      "message": "No token provided. Authentication required."
+    }
+    ```
   - **400 Bad Request** (✅ conforme):
     ```json
     {
-      "message": "No hay inventario registrado para este producto"
+      "message": "Faltan parámetros requeridos"
+    }
+    ```
+  - **404 Not Found** (✅ conforme):
+    ```json
+    {
+      "message": "Producto no encontrado"
     }
     ```
 
@@ -2456,35 +2480,157 @@ Inicia sesión y obtiene un token de autenticación.
 
 ```json
 {
-  "message": "Validation error",
-  "errors": [
-    {
-      "field": "to_currency",
-      "message": "ExchangeRate.to_currency cannot be null"
+  "message": "Tasa de cambio creada exitosamente",
+  "data": {
+    "id": 206,
+    "from_currency": "USD",
+    "to_currency": "VES",
+    "rate": "10.500000",
+    "effective_date": "2023-10-01",
+    "source": "API_TEST",
+    "notes": "Test note",
+    "is_active": true,
+    "created_by": 1,
+    "updated_by": 1,
+    "created_at": "2026-07-04T04:01:12.000Z",
+    "updated_at": "2026-07-04T04:01:12.000Z",
+    "creator": {
+      "id": 1,
+      "username": "admin"
     }
-  ]
+  }
 }
 ```
 
 **Conformidad:**
 
 - ✅ URL en snake_case ✅
-- ❌ Respuesta con "data" ❌
+- ✅ Respuesta con "data" ✅
+- ✅ Mensajes en español ✅
+- ✅ Probado
+
+#### GET `/api/exchange-rates/{id}`
+
+**Descripción:** Obtiene una tasa de cambio específica por su ID.
+
+**Request:**
+
+- **Method:** `GET`
+- **Path:** `/api/exchange-rates/206`
+- **Headers:**
+  - `Content-Type: application/json`
+
+**Response Shape (Real):**
+
+```json
+{
+  "status": 200,
+  "data": []
+}
+```
+
+**Conformidad:**
+
+- ✅ URL en snake_case ✅
+- ✅ Respuesta con "data" ✅
 - ❌ Mensajes en español ❌
-- ⚠️ No probado
+- ✅ Probado
+
+#### PUT `/api/exchange-rates/{id}`
+
+**Descripción:** Actualiza una tasa de cambio específica por su ID.
+
+**Request:**
+
+- **Method:** `PUT`
+- **Path:** `/api/exchange-rates/206`
+- **Headers:**
+  - `Content-Type: application/json`
+- **Body:**
+
+```json
+{
+  "rate": 11.5,
+  "notes": "Updated test note"
+}
+```
+
+**Response Shape (Real):**
+
+```json
+{
+  "message": "Tasa de cambio actualizada exitosamente",
+  "data": {
+    "id": 206,
+    "from_currency": "USD",
+    "to_currency": "VES",
+    "rate": "11.500000",
+    "effective_date": "2023-10-01",
+    "source": "API_TEST",
+    "notes": "Updated test note",
+    "is_active": true,
+    "created_by": 1,
+    "updated_by": 1,
+    "created_at": "2026-07-04T04:01:12.000Z",
+    "updated_at": "2026-07-04T04:01:12.000Z",
+    "creator": {
+      "id": 1,
+      "username": "admin"
+    },
+    "updater": {
+      "id": 1,
+      "username": "admin"
+    }
+  }
+}
+```
+
+**Conformidad:**
+
+- ✅ URL en snake_case ✅
+- ✅ Respuesta con "data" ✅
+- ✅ Mensajes en español ✅
+- ✅ Probado
+
+#### DELETE `/api/exchange-rates/{id}`
+
+**Descripción:** Elimina una tasa de cambio específica por su ID.
+
+**Request:**
+
+- **Method:** `DELETE`
+- **Path:** `/api/exchange-rates/206`
+- **Headers:**
+  - `Content-Type: application/json`
+
+**Response Shape (Real):**
+
+```json
+{
+  "status": 200,
+  "data": []
+}
+```
+
+**Conformidad:**
+
+- ✅ URL en snake_case ✅
+- ⚠️ Respuesta con "data" ⚠️
+- ❌ Mensajes en español ❌
+- ✅ Probado
 
 ### Tabla de Homogeneidad del Módulo
 
 | Criterio                     | Conformidad |
 |------------------------------|-------------|
 | URL en snake_case            | ✅           |
-| Respuesta con "data"         | ⚠️          |
-| Mensajes en español          | ❌           |
+| Respuesta con "data"         | ✅           |
+| Mensajes en español          | ⚠️          |
 | HTTP status codes observados | 200, 400    |
 
 ### Notas Adicionales
 
-El endpoint `POST /api/exchange-rates` no pudo ser probado debido a un error de validación (status code 400).
+El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta exitosa con los datos esperados.
 ## AR — Cuentas por Cobrar (`/api/ar`)
 <!-- ═══════════════════════════════ -->
 
