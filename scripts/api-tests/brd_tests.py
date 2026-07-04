@@ -92,7 +92,7 @@ def test_create_duplicate_brand(token):
     url = f"{BASE_URL}/brands"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
-        "name": "API_TEST_DELETE_DUPLICATE",
+        "name": f"API_TEST_DUPE_{int(time.time())}",
         "description": "Test brand description",
         "logo_url": "http://example.com/logo.png",
         "website": "http://example.com",
@@ -101,11 +101,15 @@ def test_create_duplicate_brand(token):
     # Create the first instance
     response = requests.post(url, json=payload, headers=headers)
     if response.status_code != 201:
-        raise Exception(f"Failed to create brand: {response.text}")
+        raise Exception(f"Failed to create brand for duplicate test: {response.text}")
+    dupe_brand_id = response.json()["data"]["id"]
 
     # Try creating a duplicate
     response = requests.post(url, json=payload, headers=headers)
     log_result("test_create_duplicate_brand", "POST", "/brands", response.status_code, payload)
+
+    # Clean up the brand created for this test
+    requests.delete(f"{url}/{dupe_brand_id}", headers=headers)
 
 def test_get_nonexistent_brand(token):
     url = f"{BASE_URL}/brands/99999999"
