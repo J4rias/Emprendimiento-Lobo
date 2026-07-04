@@ -6,21 +6,15 @@ import time
 BASE_URL = "http://localhost:5001/api"
 
 def get_token():
-    url = f"{BASE_URL}/auth/login"
-    payload = {
-        "username": "admin",
-        "password": "141103"
-    }
-    response = requests.post(url, json=payload)
+    r = requests.post(f"{BASE_URL}/auth/login",
+                      json={"username": "admin", "password": "141103"})
+    d = r.json()
+    # post-refactoring: {"data": {"token": "..."}}
+    if "data" in d and isinstance(d["data"], dict) and "token" in d["data"]:
+        return d["data"]["token"]
+    # fallback legacy
+    return d.get("token") or d.get("access_token") or d.get("accessToken")
 
-    if response.status_code == 200:
-        data = response.json()
-        # Handle both old and new response formats
-        token = data.get("token") or data.get("data", {}).get("token")
-        return token
-    else:
-        print(f"Failed to get token: {response.status_code} - {response.text}")
-        sys.exit(1)
 
 def log_result(test, method, path, status, req=None, resp=None):
     result = {
@@ -40,6 +34,7 @@ def test_get_all_users():
     # Happy path
     response = requests.get(url, headers=headers)
     log_result("test_get_all_users", "GET", "/users", response.status_code)
+    return response.status_code
 
 def test_create_user():
     url = f"{BASE_URL}/users"
@@ -62,6 +57,7 @@ def test_create_user():
     # Happy path
     response = requests.post(url, headers=headers, json=payload)
     log_result("test_create_user", "POST", "/users", response.status_code)
+    return response.status_code
 
 def test_get_user():
     url = f"{BASE_URL}/users/1"  # Assuming ID 1 exists for testing
@@ -70,6 +66,7 @@ def test_get_user():
     # Happy path
     response = requests.get(url, headers=headers)
     log_result("test_get_user", "GET", "/users/1", response.status_code)
+    return response.status_code
 
 def test_update_user():
     url = f"{BASE_URL}/users/1"  # Assuming ID 1 exists for testing
@@ -89,6 +86,7 @@ def test_update_user():
     # Happy path
     response = requests.put(url, headers=headers, json=payload)
     log_result("test_update_user", "PUT", "/users/1", response.status_code)
+    return response.status_code
 
 def test_delete_user():
     url = f"{BASE_URL}/users/1"  # Assuming ID 1 exists for testing
@@ -97,6 +95,7 @@ def test_delete_user():
     # Happy path
     response = requests.delete(url, headers=headers)
     log_result("test_delete_user", "DELETE", "/users/1", response.status_code)
+    return response.status_code
 
 def test_no_auth():
     url = f"{BASE_URL}/users"
@@ -104,6 +103,7 @@ def test_no_auth():
     # No auth
     response = requests.get(url)
     log_result("test_no_auth", "GET", "/users", response.status_code)
+    return response.status_code
 
 def test_invalid_data():
     url = f"{BASE_URL}/users"
@@ -120,6 +120,7 @@ def test_invalid_data():
     # Invalid data
     response = requests.post(url, headers=headers, json=payload)
     log_result("test_invalid_data", "POST", "/users", response.status_code)
+    return response.status_code
 
 def test_not_found():
     url = f"{BASE_URL}/users/99999999"
@@ -128,6 +129,7 @@ def test_not_found():
     # Not found
     response = requests.get(url, headers=headers)
     log_result("test_not_found", "GET", "/users/99999999", response.status_code)
+    return response.status_code
 
 def test_duplicate():
     url = f"{BASE_URL}/users"
@@ -149,6 +151,7 @@ def test_duplicate():
     # Duplicate username/email
     response = requests.post(url, headers=headers, json=payload)
     log_result("test_duplicate", "POST", "/users", response.status_code)
+    return response.status_code
 
 def main():
     tests = [
@@ -167,8 +170,8 @@ def main():
 
     for test in tests:
         try:
-            test()
-            if response.status_code >= 400:
+            status_code = test()
+            if status_code >= 400:
                 failures += 1
         except Exception as e:
             print(f"Exception occurred: {e}")

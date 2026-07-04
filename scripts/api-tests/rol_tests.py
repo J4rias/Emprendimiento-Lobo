@@ -6,17 +6,15 @@ import time
 BASE_URL = "http://localhost:5001/api"
 
 def get_token():
-    url = f"{BASE_URL}/auth/login"
-    payload = {
-        "username": "admin",
-        "password": "141103"
-    }
-    response = requests.post(url, json=payload)
+    r = requests.post(f"{BASE_URL}/auth/login",
+                      json={"username": "admin", "password": "141103"})
+    d = r.json()
+    # post-refactoring: {"data": {"token": "..."}}
+    if "data" in d and isinstance(d["data"], dict) and "token" in d["data"]:
+        return d["data"]["token"]
+    # fallback legacy
+    return d.get("token") or d.get("access_token") or d.get("accessToken")
 
-    if 'success' in response.json():
-        return response.json()['data']['token']
-    else:
-        return response.json()['data']
 
 def log_result(test_name, method, path, status_code, request_data=None, response_data=None):
     result = {

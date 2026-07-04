@@ -6,21 +6,15 @@ import time
 BASE_URL = "http://localhost:5001/api"
 
 def get_token():
-    url = f"{BASE_URL}/auth/login"
-    payload = {
-        "username": "admin",
-        "password": "141103"
-    }
-    response = requests.post(url, json=payload)
+    r = requests.post(f"{BASE_URL}/auth/login",
+                      json={"username": "admin", "password": "141103"})
+    d = r.json()
+    # post-refactoring: {"data": {"token": "..."}}
+    if "data" in d and isinstance(d["data"], dict) and "token" in d["data"]:
+        return d["data"]["token"]
+    # fallback legacy
+    return d.get("token") or d.get("access_token") or d.get("accessToken")
 
-    if response.status_code == 200:
-        data = response.json()
-        # Handle both old and new response formats
-        token = data.get("data", {}).get("token") or data.get("token")
-        return token
-    else:
-        print(f"Failed to get token: {response.status_code} - {response.text}")
-        sys.exit(1)
 
 def log_result(test, method, path, status, req=None, resp=None):
     result = {
@@ -52,10 +46,12 @@ def test_login():
     assert response.status_code == 400
 
 def test_logout():
+    token = get_token()
+    headers = {"Authorization": f"Bearer {token}"}
     url = f"{BASE_URL}/auth/logout"
 
     # Happy path
-    response = requests.post(url)
+    response = requests.post(url, headers=headers)
     log_result("test_logout_happy_path", "POST", "/auth/logout", response.status_code, None, response.json())
     assert response.status_code == 200
 
