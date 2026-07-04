@@ -1,0 +1,66 @@
+import api from './axios';
+
+interface ARSummaryResponse { data: { aging_distribution: unknown[]; totals: unknown; invoices: unknown[]; }; }
+interface ARCustomersResponse { data: unknown[]; pagination: { total: number; page: number; limit: number; totalPages: number; }; }
+interface ARStatementResponse { data: unknown; }
+interface AdminPinStatusResponse { data: { has_pin: boolean; is_locked: boolean; }; }
+
+export const arService = {
+  // Resumen general (facturas + aging distribution)
+  getSummary: (params = {}) => api.get('/accounts-receivable/summary', { params }).then(r => r.data),
+
+  // Clientes con saldo pendiente
+  getCustomers: (params = {}) => api.get('/accounts-receivable/customers', { params }).then(r => r.data),
+
+  // Statement completo de un cliente (en COP)
+  getCustomerStatement: (customerId) => api.get(`/accounts-receivable/customers/${customerId}/statement`).then(r => r.data),
+
+  // Revertir un abono (requiere PIN)
+  reversePayment: (paymentId, pin) =>
+    api.post(`/accounts-receivable/payments/${paymentId}/reverse`, { pin }).then(r => r.data),
+
+  // PIN de crédito
+  getAdminPinStatus: () => api.get('/accounts-receivable/admin-pin/status').then(r => r.data),
+  validateAdminPin: (pin) => api.post('/accounts-receivable/admin-pin/validate', { pin }).then(r => r.data),
+  setAdminPin: (pin) => api.put('/accounts-receivable/admin-pin', { pin }).then(r => r.data),
+
+  // Exportar CSV
+  exportInvoicesCSV: async (params = {}) => {
+    try {
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      );
+      const qs = new URLSearchParams(filteredParams).toString();
+      const response = await api.get(`/accounts-receivable/export/invoices${qs ? '?' + qs : ''}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cuentas-por-cobrar-${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exportando CSV:', error);
+    }
+  },
+  exportCustomersCSV: async (params = {}) => {
+    try {
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      );
+      const qs = new URLSearchParams(filteredParams).toString();
+      const response = await api.get(`/accounts-receivable/export/customers${qs ? '?' + qs : ''}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `clientes-cartera-${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exportando CSV:', error);
+    }
+  }
+};

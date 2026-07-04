@@ -22,7 +22,7 @@ export const saleService = {
   },
 
   updateSale: async (id, data) => {
-    const response = await api.put(`/sales/${id}`, data);
+    const response = await api.patch(`/sales/${id}`, data);
     return response.data;
   },
 

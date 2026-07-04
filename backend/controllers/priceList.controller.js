@@ -10,6 +10,7 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 class PriceListController {
     constructor() {
@@ -29,7 +30,7 @@ class PriceListController {
     async getProductsWithStock(req, res, next) {
         try {
             const products = await this._getProductsWithStock();
-            res.json({ success: true, data: products });
+            res.json({ data: products });
         } catch (error) {
             next(error);
         }
@@ -91,7 +92,6 @@ class PriceListController {
             });
 
             res.json({
-                success: true,
                 data: rows,
                 pagination: {
                     total: count,
@@ -122,7 +122,7 @@ class PriceListController {
                 order: [['isDefault', 'DESC'], ['name', 'ASC']]
             });
 
-            res.json({ success: true, data: lists });
+            res.json({ data: lists });
         } catch (error) {
             next(error);
         }
@@ -158,10 +158,10 @@ class PriceListController {
             });
 
             if (!priceList) {
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
-            res.json({ success: true, data: priceList });
+            res.json({ data: priceList });
         } catch (error) {
             next(error);
         }
@@ -178,7 +178,7 @@ class PriceListController {
 
             if (!name || !name.trim()) {
                 await transaction.rollback();
-                return res.status(400).json({ success: false, message: 'El nombre es obligatorio' });
+                return res.status(400).json({ message: 'El nombre es obligatorio' });
             }
 
             // Create the price list header - Always USD
@@ -192,7 +192,7 @@ class PriceListController {
                 validity_days: validity_days || 5,
                 validFrom,
                 status: 'active',
-                updated_by: req.user?.id || req.userId
+                updated_by: req.user.id
             }, { transaction });
 
             // If details provided, create them
@@ -230,7 +230,7 @@ class PriceListController {
                                 usdUnitCost = await ExchangeRate.convert(unitCost, item.presentation.purchase_currency, 'USD');
                             } catch (e) {
                                 // Default back or ignore if no rate
-                                console.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
+                                logger.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
                             }
                         }
 
@@ -268,7 +268,7 @@ class PriceListController {
                 ]
             });
 
-            res.status(201).json({ success: true, data: created });
+            res.status(201).json({ data: created });
         } catch (error) {
             await transaction.rollback();
             next(error);
@@ -292,11 +292,11 @@ class PriceListController {
 
             if (!priceList) {
                 await transaction.rollback();
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
             // Update header
-            const updateData = { updated_by: req.user?.id || req.userId };
+            const updateData = { updated_by: req.user.id };
             if (name !== undefined) updateData.name = name.trim();
             if (description !== undefined) updateData.description = description;
             // currency is hardcoded to USD, so it's not updated here
@@ -349,7 +349,7 @@ class PriceListController {
                 ]
             });
 
-            res.json({ success: true, data: updated });
+            res.json({ data: updated });
         } catch (error) {
             await transaction.rollback();
             next(error);
@@ -370,7 +370,7 @@ class PriceListController {
 
             if (!original) {
                 await transaction.rollback();
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
             const newList = await PriceList.create({
@@ -382,7 +382,7 @@ class PriceListController {
                 validity_days: original.validity_days,
                 validFrom: new Date(),
                 status: 'active',
-                updated_by: req.user?.id || req.userId
+                updated_by: req.user.id
             }, { transaction });
 
             // Copy details
@@ -417,7 +417,7 @@ class PriceListController {
                 ]
             });
 
-            res.status(201).json({ success: true, data: created });
+            res.status(201).json({ data: created });
         } catch (error) {
             await transaction.rollback();
             next(error);
@@ -431,12 +431,12 @@ class PriceListController {
             const priceList = await PriceList.findOne({ where: { id, isDeleted: false } });
 
             if (!priceList) {
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
             await priceList.update({ isDeleted: true, status: 'inactive' });
 
-            res.json({ success: true, message: 'Lista de precios eliminada' });
+            res.json({ message: 'Lista de precios eliminada' });
         } catch (error) {
             next(error);
         }
@@ -460,7 +460,7 @@ class PriceListController {
             });
 
             if (!priceList) {
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
             // Get product IDs to fetch inventory
@@ -486,7 +486,7 @@ class PriceListController {
                 try {
                     rateToCop = await ExchangeRate.getRate(priceList.currency, 'COP');
                 } catch (e) {
-                    console.error('Failed to get exchange rate to COP for CSV export', e);
+                    logger.error('Failed to get exchange rate to COP for CSV export', e);
                 }
             }
 
@@ -513,13 +513,13 @@ class PriceListController {
                     try {
                         costInListCurrency = await ExchangeRate.convert(nativeCost, nativeCurrency, priceList.currency);
                         unitCostInListCurrency = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, priceList.currency);
-                    } catch(e) { console.error(e.message); }
+                    } catch(e) { logger.error(e.message); }
                 }
                 if (nativeCurrency !== 'COP') {
                     try {
                         costInCop = await ExchangeRate.convert(nativeCost, nativeCurrency, 'COP');
                         unitCostInCop = await ExchangeRate.convert(nativeUnitCost, nativeCurrency, 'COP');
-                    } catch(e) { console.error(e.message); }
+                    } catch(e) { logger.error(e.message); }
                 }
 
                 const pkgPriceUsd = parseFloat(d.package_price_usd) || 0;
@@ -578,13 +578,13 @@ class PriceListController {
             } = req.body;
 
             if (!presentation_id || !product_id) {
-                return res.status(400).json({ success: false, message: 'presentation_id y product_id son requeridos' });
+                return res.status(400).json({ message: 'presentation_id y product_id son requeridos' });
             }
 
             // Verificar que la lista existe y no está eliminada
             const priceList = await PriceList.findOne({ where: { id, isDeleted: false } });
             if (!priceList) {
-                return res.status(404).json({ success: false, message: 'Lista de precios no encontrada' });
+                return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
             // Buscar el detail existente para optimistic locking
@@ -598,7 +598,6 @@ class PriceListController {
                 const clientUpdatedAt = new Date(client_updated_at).getTime();
                 if (dbUpdatedAt > clientUpdatedAt) {
                     return res.status(409).json({
-                        success: false,
                         conflict: true,
                         message: 'Otro usuario modificó este precio. Recarga para ver los cambios.',
                         current: existing
@@ -625,7 +624,7 @@ class PriceListController {
             }
             const [detail] = await PriceListDetail.upsert(upsertData, { returning: true });
 
-            res.json({ success: true, data: detail });
+            res.json({ data: detail });
         } catch (error) {
             next(error);
         }

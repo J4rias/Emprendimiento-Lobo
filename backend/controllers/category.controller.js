@@ -43,7 +43,6 @@ class CategoryController {
       );
 
       res.json({
-        success: true,
         data: categoriesWithCount,
         pagination: {
           total: totalCount,
@@ -66,13 +65,11 @@ class CategoryController {
 
       if (!category) {
         return res.status(404).json({
-          success: false,
           message: 'Categoría no encontrada'
         });
       }
 
       res.json({
-        success: true,
         data: category
       });
     } catch (error) {
@@ -97,8 +94,7 @@ class CategoryController {
 
       if (existingCategory) {
         const field = existingCategory.name === name.trim() ? 'nombre' : 'código';
-        return res.status(400).json({
-          success: false,
+        return res.status(409).json({
           message: `Ya existe una categoría con ese ${field}`
         });
       }
@@ -111,7 +107,6 @@ class CategoryController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Categoría creada exitosamente',
         data: category
       });
@@ -130,7 +125,6 @@ class CategoryController {
 
       if (!category) {
         return res.status(404).json({
-          success: false,
           message: 'Categoría no encontrada'
         });
       }
@@ -154,8 +148,7 @@ class CategoryController {
 
         if (existingCategory) {
           const field = existingCategory.name === name?.trim() ? 'nombre' : 'código';
-          return res.status(400).json({
-            success: false,
+          return res.status(409).json({
             message: `Ya existe una categoría con ese ${field}`
           });
         }
@@ -169,7 +162,6 @@ class CategoryController {
       });
 
       res.json({
-        success: true,
         message: 'Categoría actualizada exitosamente',
         data: category
       });
@@ -192,7 +184,6 @@ class CategoryController {
 
       if (!category) {
         return res.status(404).json({
-          success: false,
           message: 'Categoría no encontrada'
         });
       }
@@ -200,7 +191,6 @@ class CategoryController {
       // Check if category has products
       if (category.products && category.products.length > 0) {
         return res.status(400).json({
-          success: false,
           message: 'No se puede eliminar la categoría porque tiene productos asociados'
         });
       }
@@ -208,7 +198,6 @@ class CategoryController {
       await category.destroy();
 
       res.json({
-        success: true,
         message: 'Categoría eliminada exitosamente'
       });
     } catch (error) {
@@ -241,7 +230,6 @@ class CategoryController {
       });
 
       res.json({
-        success: true,
         data: categories
       });
     } catch (error) {

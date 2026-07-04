@@ -158,7 +158,6 @@ async function getSummary(req, res, next) {
     const totalInvoiced = invoices.reduce((s, i) => s + i.total_cop, 0);
 
     res.json({
-      success: true,
       data: {
         aging_distribution: Object.entries(agingDist).map(([bucket, v]) => ({
           bucket, label: bucketLabel(bucket), count: v.count, amount: v.amount,
@@ -313,7 +312,6 @@ async function getCustomers(req, res, next) {
     const totalPendingCOP = customers.reduce((s, c) => s + c.total_adeudado_cop, 0);
 
     res.json({
-      success: true,
       data: {
         totals: { customer_count: customers.length, blocked_count: totalBlockedCount, total_pending_cop: totalPendingCOP },
         customers
@@ -330,10 +328,10 @@ async function getCustomerStatement(req, res, next) {
   try {
     const { id } = req.params;
     const result = await buildCustomerStatement(parseInt(id));
-    if (!result) return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+    if (!result) return res.status(404).json({ message: 'Cliente no encontrado' });
 
     const block = await getCustomerCreditBlock(parseInt(id));
-    res.json({ success: true, data: { ...result, credit_block: block } });
+    res.json({ data: { ...result, credit_block: block } });
   } catch (error) {
     next(error);
   }
@@ -350,7 +348,7 @@ async function reversePayment(req, res, next) {
 
     if (!pin) {
       await t.rollback();
-      return res.status(400).json({ success: false, message: 'PIN requerido' });
+      return res.status(400).json({ message: 'PIN requerido' });
     }
 
     // 1. Validar PIN del admin (con lockout)
@@ -361,12 +359,12 @@ async function reversePayment(req, res, next) {
     const admin = adminRows[0];
     if (!admin?.credit_pin) {
       await t.rollback();
-      return res.status(400).json({ success: false, message: 'No tienes un PIN de crédito configurado' });
+      return res.status(400).json({ message: 'No tienes un PIN de crédito configurado' });
     }
     if (admin.credit_pin_locked_until && new Date() < new Date(admin.credit_pin_locked_until)) {
       await t.rollback();
       const mins = Math.ceil((new Date(admin.credit_pin_locked_until) - new Date()) / 60000);
-      return res.status(403).json({ success: false, message: `PIN bloqueado. Intenta en ${mins} minuto${mins !== 1 ? 's' : ''}` });
+      return res.status(403).json({ message: `PIN bloqueado. Intenta en ${mins} minuto${mins !== 1 ? 's' : ''}` });
     }
 
     const pinOk = await bcrypt.compare(String(pin), admin.credit_pin);
@@ -378,8 +376,8 @@ async function reversePayment(req, res, next) {
         { replacements: [attempts, lockedUntil, adminId], transaction: t }
       );
       await t.commit();
-      if (lockedUntil) return res.status(403).json({ success: false, message: 'PIN incorrecto. Bloqueado por 15 minutos (3 intentos fallidos)' });
-      return res.status(403).json({ success: false, message: `PIN incorrecto. Intentos restantes: ${3 - attempts}` });
+      if (lockedUntil) return res.status(403).json({ message: 'PIN incorrecto. Bloqueado por 15 minutos (3 intentos fallidos)' });
+      return res.status(403).json({ message: `PIN incorrecto. Intentos restantes: ${3 - attempts}` });
     }
 
     // Reset intentos
@@ -398,7 +396,7 @@ async function reversePayment(req, res, next) {
     );
     if (!payRows.length) {
       await t.rollback();
-      return res.status(404).json({ success: false, message: 'Pago no encontrado o ya fue revertido' });
+      return res.status(404).json({ message: 'Pago no encontrado o ya fue revertido' });
     }
     const pay = payRows[0];
 
@@ -420,7 +418,6 @@ async function reversePayment(req, res, next) {
       if (parseInt(laterPayments[0].cnt) > 0) {
         await t.rollback();
         return res.status(409).json({
-          success: false,
           message: 'No se puede revertir: existen pagos posteriores de este cliente'
         });
       }
@@ -457,7 +454,7 @@ async function reversePayment(req, res, next) {
     );
 
     await t.commit();
-    res.json({ success: true, message: 'Abono revertido exitosamente', data: { payment_id: paymentId, new_paid_amount: newPaidUSD, new_status: newStatus } });
+    res.json({ message: 'Abono revertido exitosamente', data: { payment_id: paymentId, new_paid_amount: newPaidUSD, new_status: newStatus } });
   } catch (error) {
     await t.rollback();
     next(error);
@@ -471,11 +468,11 @@ async function setAdminPin(req, res, next) {
     const { pin } = req.body;
 
     if (!req.user?.id) {
-      return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+      return res.status(401).json({ message: 'Usuario no autenticado' });
     }
 
     if (!pin || !/^\d{4,6}$/.test(String(pin))) {
-      return res.status(400).json({ success: false, message: 'El PIN debe ser numérico de 4 a 6 dígitos' });
+      return res.status(400).json({ message: 'El PIN debe ser numérico de 4 a 6 dígitos' });
     }
 
     const hashed = await bcrypt.hash(String(pin), 10);
@@ -484,7 +481,7 @@ async function setAdminPin(req, res, next) {
       { replacements: [hashed, req.user.id] }
     );
 
-    res.json({ success: true, message: 'PIN de crédito configurado exitosamente' });
+    res.json({ message: 'PIN de crédito configurado exitosamente' });
   } catch (error) {
     next(error);
   }
@@ -495,22 +492,22 @@ async function validateAdminPin(req, res, next) {
     const { pin } = req.body;
     const admin = await User.findByPk(req.user.id);
     if (!admin?.credit_pin) {
-      return res.status(400).json({ success: false, message: 'No tienes un PIN configurado', has_pin: false });
+      return res.status(400).json({ message: 'No tienes un PIN configurado', has_pin: false });
     }
     if (admin.credit_pin_locked_until && new Date() < new Date(admin.credit_pin_locked_until)) {
       const mins = Math.ceil((new Date(admin.credit_pin_locked_until) - new Date()) / 60000);
-      return res.status(403).json({ success: false, message: `PIN bloqueado por ${mins} minuto${mins !== 1 ? 's' : ''}` });
+      return res.status(403).json({ message: `PIN bloqueado por ${mins} minuto${mins !== 1 ? 's' : ''}` });
     }
     const ok = await bcrypt.compare(String(pin), admin.credit_pin);
     if (!ok) {
       const attempts = (admin.credit_pin_attempts || 0) + 1;
       const lockedUntil = attempts >= 3 ? new Date(Date.now() + 15 * 60 * 1000) : null;
       await admin.update({ credit_pin_attempts: attempts, credit_pin_locked_until: lockedUntil });
-      if (lockedUntil) return res.status(403).json({ success: false, message: 'PIN bloqueado por 15 minutos' });
-      return res.status(403).json({ success: false, message: `PIN incorrecto. Intentos: ${attempts}/3` });
+      if (lockedUntil) return res.status(403).json({ message: 'PIN bloqueado por 15 minutos' });
+      return res.status(403).json({ message: `PIN incorrecto. Intentos: ${attempts}/3` });
     }
     await admin.update({ credit_pin_attempts: 0, credit_pin_locked_until: null });
-    res.json({ success: true, message: 'PIN válido' });
+    res.json({ message: 'PIN válido' });
   } catch (error) {
     next(error);
   }
@@ -520,7 +517,7 @@ async function getAdminPinStatus(req, res, next) {
   try {
     const admin = await User.findByPk(req.user.id, { attributes: ['credit_pin', 'credit_pin_locked_until'] });
     const locked = admin?.credit_pin_locked_until && new Date() < new Date(admin.credit_pin_locked_until);
-    res.json({ success: true, data: { has_pin: !!admin?.credit_pin, is_locked: !!locked } });
+    res.json({ data: { has_pin: !!admin?.credit_pin, is_locked: !!locked } });
   } catch (error) {
     next(error);
   }

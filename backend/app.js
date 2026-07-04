@@ -48,16 +48,10 @@ app.use(helmet({
 
 // CORS - Permitir solo localhost
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://localhost:3003',
-  'http://localhost:3004',
-  'http://localhost:3005',
-  'http://localhost:3006',
+  ...(process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : []),
   process.env.FRONTEND_URL,
-  'https://catalogo.atlas-group.cloud',
-  'http://catalogo.atlas-group.cloud'
 ].filter(Boolean);
 
 app.use(cors({
@@ -158,14 +152,13 @@ app.use('/api/credit-notes', creditNoteRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/price-lists', priceListRoutes);
 app.use('/api/pos', posRoutes);
-app.use('/api/ar', arRoutes);
+app.use('/api/accounts-receivable', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
 app.use('/api/banks', require('./routes/bank.routes'));
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    success: false,
     message: 'Endpoint not found'
   });
 });

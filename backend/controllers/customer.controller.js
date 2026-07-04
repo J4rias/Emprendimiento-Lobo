@@ -12,8 +12,8 @@ class CustomerController {
         search,
         status,
         type,
-        sortBy = 'created_at',
-        sortOrder = 'DESC'
+        sort_by = 'created_at',
+        sort_dir = 'DESC'
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -53,11 +53,10 @@ class CustomerController {
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()]]
+        order: [[sort_by, sort_dir.toUpperCase()]]
       });
 
       res.json({
-        success: true,
         data: customers,
         pagination: {
           total: count,
@@ -91,7 +90,6 @@ class CustomerController {
       }));
 
       res.json({
-        success: true,
         data: customersWithName
       });
     } catch (error) {
@@ -120,7 +118,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -132,7 +129,6 @@ class CustomerController {
       };
 
       res.json({
-        success: true,
         data: customerData
       });
     } catch (error) {
@@ -169,14 +165,12 @@ class CustomerController {
       // Validate required fields based on type
       if (type === 'juridical' && !businessName) {
         return res.status(400).json({
-          success: false,
           message: 'La razón social es obligatoria para personas jurídicas'
         });
       }
 
       if (type === 'natural' && (!firstName || !lastName)) {
         return res.status(400).json({
-          success: false,
           message: 'El nombre y apellido son obligatorios para personas naturales'
         });
       }
@@ -191,7 +185,6 @@ class CustomerController {
 
       if (existingCustomer) {
         return res.status(400).json({
-          success: false,
           message: `Ya existe un cliente con el documento ${documentNumber}`
         });
       }
@@ -233,7 +226,6 @@ class CustomerController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Cliente creado exitosamente',
         data: {
           ...customer.toJSON(),
@@ -264,7 +256,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -272,7 +263,6 @@ class CustomerController {
       // Validate type-specific required fields
       if (updateData.type === 'juridical' && !updateData.businessName && !customer.businessName) {
         return res.status(400).json({
-          success: false,
           message: 'La razón social es obligatoria para personas jurídicas'
         });
       }
@@ -280,7 +270,6 @@ class CustomerController {
       if (updateData.type === 'natural' &&
         ((!updateData.firstName && !customer.firstName) || (!updateData.lastName && !customer.lastName))) {
         return res.status(400).json({
-          success: false,
           message: 'El nombre y apellido son obligatorios para personas naturales'
         });
       }
@@ -297,7 +286,6 @@ class CustomerController {
 
         if (existing) {
           return res.status(400).json({
-            success: false,
             message: `Ya existe un cliente con el documento ${updateData.documentNumber}`
           });
         }
@@ -318,7 +306,6 @@ class CustomerController {
       });
 
       res.json({
-        success: true,
         message: 'Cliente actualizado exitosamente',
         data: {
           ...customer.toJSON(),
@@ -344,7 +331,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -362,7 +348,6 @@ class CustomerController {
         });
 
         return res.json({
-          success: true,
           message: 'Cliente desactivado exitosamente (tiene ventas asociadas)'
         });
       }
@@ -371,7 +356,6 @@ class CustomerController {
       await customer.destroy();
 
       res.json({
-        success: true,
         message: 'Cliente eliminado exitosamente'
       });
     } catch (error) {
@@ -387,7 +371,6 @@ class CustomerController {
 
       if (!amount || isNaN(amount)) {
         return res.status(400).json({
-          success: false,
           message: 'El monto es requerido para validar el crédito'
         });
       }
@@ -401,7 +384,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -411,7 +393,6 @@ class CustomerController {
 
       // Sin límite de crédito: siempre aprobado
       res.json({
-        success: true,
         data: {
           customerId: id,
           customerName: customer.getFullName(),
@@ -442,7 +423,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -466,7 +446,6 @@ class CustomerController {
       });
 
       res.json({
-        success: true,
         data: {
           customer: {
             id: customer.id,
@@ -514,7 +493,6 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
@@ -553,7 +531,6 @@ class CustomerController {
       const stats = salesStats[0];
 
       res.json({
-        success: true,
         data: {
           customer: {
             id: customer.id,
@@ -627,7 +604,6 @@ class CustomerController {
         .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
       res.json({
-        success: true,
         data: overdueList.map(item => ({
           customer: {
             id: item.customer.id,
@@ -662,7 +638,7 @@ class CustomerController {
       });
 
       if (!customer) {
-        return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+        return res.status(404).json({ message: 'Cliente no encontrado' });
       }
 
       // 1. Fetch Sales (Debts/Invoices) - Excluding cancelled ones
@@ -948,7 +924,6 @@ class CustomerController {
       ledger.sort((a, b) => a.date - b.date);
 
       res.json({
-        success: true,
         data: {
           customer: {
             id: customer.id,
@@ -1001,7 +976,6 @@ class CustomerController {
       const creditBalanceCOP = Math.max(0, totalPaidCOP - totalInvoicedCOP);
 
       res.json({
-        success: true,
         credit_balance_cop: Math.round(creditBalanceCOP),
         credit_balance_usd: 0 // not used, kept for compatibility
       });
@@ -1015,8 +989,8 @@ class CustomerController {
     try {
       const { id } = req.params;
       const {
-        from,
-        to
+        date_from,
+        date_to
       } = req.query;
 
       const customer = await Customer.findOne({
@@ -1026,14 +1000,13 @@ class CustomerController {
 
       if (!customer) {
         return res.status(404).json({
-          success: false,
           message: 'Cliente no encontrado'
         });
       }
 
       const now = new Date();
-      const dateFrom = from ? new Date(from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const dateTo = to ? new Date(to) : now;
+      const dateFrom = date_from ? new Date(date_from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const dateTo = date_to ? new Date(date_to) : now;
 
       const sales = await Sale.findAll({
         where: {
@@ -1086,7 +1059,7 @@ class CustomerController {
         })
       }));
 
-      res.json({ success: true, data });
+      res.json({ data });
     } catch (error) {
       next(error);
     }
@@ -1143,7 +1116,7 @@ class CustomerController {
         avg_days_between_purchases: r.avg_days_between_purchases ? parseFloat(r.avg_days_between_purchases) : null
       }));
 
-      res.json({ success: true, data });
+      res.json({ data });
     } catch (error) {
       next(error);
     }

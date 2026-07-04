@@ -1,10 +1,9 @@
-const { Brand } = require('../models');
-const { Op } = require('sequelize');
+const { brandService } = require('../services/brand.service');
 
 // Get all brands with pagination and search
 const getAll = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search = '' } = req.query;
+    const { page = 1, limit = 25, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
     const where = {
@@ -22,7 +21,6 @@ const getAll = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
       data: brands,
       pagination: {
         total: count,
@@ -40,20 +38,15 @@ const getAll = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const brand = await Brand.findByPk(id);
-
-    if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: 'Brand not found'
-      });
-    }
+    const brand = await brandService.getById(id);
 
     res.json({
-      success: true,
       data: brand
     });
   } catch (error) {
+    if (error.message === 'Marca no encontrada') {
+      return res.status(404).json({ message: error.message });
+    }
     next(error);
   }
 };
@@ -63,17 +56,19 @@ const create = async (req, res, next) => {
   try {
     const brandData = {
       ...req.body,
-      created_by: req.userId
+      created_by: req.user.id
     };
 
-    const brand = await Brand.create(brandData);
+    const brand = await brandService.create(brandData);
 
     res.status(201).json({
-      success: true,
-      message: 'Brand created successfully',
+      message: 'Marca creada exitosamente',
       data: brand
     });
   } catch (error) {
+    if (error.message === 'Marca duplicada') {
+      return res.status(409).json({ message: error.message });
+    }
     next(error);
   }
 };
@@ -82,24 +77,18 @@ const create = async (req, res, next) => {
 const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body, updated_by: req.userId };
+    const updateData = { ...req.body, updated_by: req.user.id };
 
-    const brand = await Brand.findByPk(id);
-    if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: 'Brand not found'
-      });
-    }
-
-    await brand.update(updateData);
+    const brand = await brandService.update(id, updateData);
 
     res.json({
-      success: true,
-      message: 'Brand updated successfully',
+      message: 'Marca actualizada exitosamente',
       data: brand
     });
   } catch (error) {
+    if (error.message === 'Marca no encontrada') {
+      return res.status(404).json({ message: error.message });
+    }
     next(error);
   }
 };
@@ -108,22 +97,15 @@ const update = async (req, res, next) => {
 const deleteBrand = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const brand = await Brand.findByPk(id);
-
-    if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: 'Brand not found'
-      });
-    }
-
-    await brand.update({ is_active: false });
+    await brandService.deactivate(id);
 
     res.json({
-      success: true,
-      message: 'Brand deleted successfully'
+      message: 'Marca desactivada exitosamente'
     });
   } catch (error) {
+    if (error.message === 'Marca no encontrada') {
+      return res.status(404).json({ message: error.message });
+    }
     next(error);
   }
 };
@@ -131,14 +113,9 @@ const deleteBrand = async (req, res, next) => {
 // Get active brands for dropdowns
 const getActive = async (req, res, next) => {
   try {
-    const brands = await Brand.findAll({
-      where: { is_active: true },
-      order: [['name', 'ASC']],
-      attributes: ['id', 'name']
-    });
+    const brands = await brandService.getAll();
 
     res.json({
-      success: true,
       data: brands
     });
   } catch (error) {

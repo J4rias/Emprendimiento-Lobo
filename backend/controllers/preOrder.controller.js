@@ -17,14 +17,14 @@ exports.create = async (req, res) => {
 
     if (!items || items.length === 0) {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: 'El pre-pedido debe tener al menos un producto' });
+      return res.status(400).json({ message: 'El pre-pedido debe tener al menos un producto' });
     }
 
     // Get warehouse (single warehouse system)
     const warehouse = await Warehouse.findOne({ where: { is_active: true }, transaction });
     if (!warehouse) {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: 'No hay almacén activo' });
+      return res.status(400).json({ message: 'No hay almacén activo' });
     }
 
     // Get current exchange rate
@@ -43,7 +43,7 @@ exports.create = async (req, res) => {
       });
       if (!presentation) {
         await transaction.rollback();
-        return res.status(404).json({ success: false, message: `Presentación ${item.presentation_id} no encontrada` });
+        return res.status(404).json({ message: `Presentación ${item.presentation_id} no encontrada` });
       }
 
       const unitPrice = parseFloat(item.unit_price) || parseFloat(presentation.base_price);
@@ -72,7 +72,7 @@ exports.create = async (req, res) => {
       total: subtotal,
       currency,
       exchangeRate: exchangeRate ? 1 / exchangeRate : null, // Store as COP/USD
-      createdBy: req.userId,
+      createdBy: req.user.id,
       warehouseId: warehouse.id
     }, { transaction });
 
@@ -95,10 +95,10 @@ exports.create = async (req, res) => {
       ]
     });
 
-    res.status(201).json({ success: true, data: result });
+    res.status(201).json({ data: result });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ success: false, message: 'Error al crear pre-pedido', error: error.message });
+    res.status(500).json({ message: 'Error al crear pre-pedido' });
   }
 };
 
@@ -128,7 +128,6 @@ exports.getAll = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: rows,
       pagination: {
         total: count,
@@ -137,7 +136,7 @@ exports.getAll = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener pre-pedidos', error: error.message });
+    res.status(500).json({ message: 'Error al obtener pre-pedidos' });
   }
 };
 
@@ -153,11 +152,10 @@ exports.getStats = async (req, res) => {
     });
 
     res.json({
-      success: true,
       data: { pending, approved, today: todayCount }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener estadísticas', error: error.message });
+    res.status(500).json({ message: 'Error al obtener estadísticas' });
   }
 };
 
@@ -177,12 +175,12 @@ exports.getById = async (req, res) => {
     });
 
     if (!preOrder) {
-      return res.status(404).json({ success: false, message: 'Pre-pedido no encontrado' });
+      return res.status(404).json({ message: 'Pre-pedido no encontrado' });
     }
 
-    res.json({ success: true, data: preOrder });
+    res.json({ data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener pre-pedido', error: error.message });
+    res.status(500).json({ message: 'Error al obtener pre-pedido' });
   }
 };
 
@@ -191,21 +189,21 @@ exports.approve = async (req, res) => {
   try {
     const preOrder = await PreOrder.findByPk(req.params.id);
     if (!preOrder) {
-      return res.status(404).json({ success: false, message: 'Pre-pedido no encontrado' });
+      return res.status(404).json({ message: 'Pre-pedido no encontrado' });
     }
     if (!preOrder.canBeApproved()) {
-      return res.status(400).json({ success: false, message: `No se puede aprobar un pre-pedido con estado "${preOrder.status}"` });
+      return res.status(400).json({ message: `No se puede aprobar un pre-pedido con estado "${preOrder.status}"` });
     }
 
     await preOrder.update({
       status: 'approved',
-      approvedBy: req.userId,
+      approvedBy: req.user.id,
       approvedAt: new Date()
     });
 
-    res.json({ success: true, data: preOrder });
+    res.json({ data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al aprobar pre-pedido', error: error.message });
+    res.status(500).json({ message: 'Error al aprobar pre-pedido' });
   }
 };
 
@@ -214,21 +212,21 @@ exports.reject = async (req, res) => {
   try {
     const preOrder = await PreOrder.findByPk(req.params.id);
     if (!preOrder) {
-      return res.status(404).json({ success: false, message: 'Pre-pedido no encontrado' });
+      return res.status(404).json({ message: 'Pre-pedido no encontrado' });
     }
     if (!preOrder.canBeApproved()) {
-      return res.status(400).json({ success: false, message: `No se puede rechazar un pre-pedido con estado "${preOrder.status}"` });
+      return res.status(400).json({ message: `No se puede rechazar un pre-pedido con estado "${preOrder.status}"` });
     }
 
     await preOrder.update({
       status: 'rejected',
-      approvedBy: req.userId,
+      approvedBy: req.user.id,
       approvedAt: new Date()
     });
 
-    res.json({ success: true, data: preOrder });
+    res.json({ data: preOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al rechazar pre-pedido', error: error.message });
+    res.status(500).json({ message: 'Error al rechazar pre-pedido' });
   }
 };
 
@@ -245,11 +243,11 @@ exports.convert = async (req, res) => {
 
     if (!preOrder) {
       await transaction.rollback();
-      return res.status(404).json({ success: false, message: 'Pre-pedido no encontrado' });
+      return res.status(404).json({ message: 'Pre-pedido no encontrado' });
     }
     if (!preOrder.canBeConverted()) {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: `Solo se pueden convertir pre-pedidos aprobados. Estado actual: "${preOrder.status}"` });
+      return res.status(400).json({ message: `Solo se pueden convertir pre-pedidos aprobados. Estado actual: "${preOrder.status}"` });
     }
 
     // Check stock availability before converting
@@ -271,7 +269,6 @@ exports.convert = async (req, res) => {
       if (available < unitsNeeded) {
         await transaction.rollback();
         return res.status(409).json({
-          success: false,
           message: `Stock insuficiente para ${detail.presentation?.name || 'producto'}. Disponible: ${available}, Necesario: ${unitsNeeded}`
         });
       }
@@ -404,8 +401,8 @@ exports.convert = async (req, res) => {
       sale_number,
       customer_id: saleBody.customer_id,
       warehouse_id: saleBody.warehouse_id,
-      user_id: req.userId,
-      created_by: req.userId,
+      user_id: req.user.id,
+      created_by: req.user.id,
       sale_type: saleBody.sale_type,
       currency_mode: saleBody.currency_mode,
       status: 'completed',
@@ -435,7 +432,7 @@ exports.convert = async (req, res) => {
           method: line.method || 'cash',
           exchange_rate: parseFloat(line.exchange_rate) || 1,
           reference: line.reference || null,
-          created_by: req.userId
+          created_by: req.user.id
         }, { transaction });
       }
     }
@@ -449,7 +446,6 @@ exports.convert = async (req, res) => {
     await transaction.commit();
 
     res.json({
-      success: true,
       data: {
         preOrder: { id: preOrder.id, code: preOrder.code, status: 'converted' },
         sale: { id: sale.id, sale_number: sale.sale_number, total: sale.total }
@@ -457,6 +453,6 @@ exports.convert = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ success: false, message: 'Error al convertir pre-pedido', error: error.message });
+    res.status(500).json({ message: 'Error al convertir pre-pedido' });
   }
 };

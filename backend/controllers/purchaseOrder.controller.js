@@ -15,6 +15,7 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
+const logger = require('../config/logger');
 
 class PurchaseOrderController {
   constructor() {
@@ -70,8 +71,8 @@ class PurchaseOrderController {
         warehouse_id,
         date_from,
         date_to,
-        sortBy = 'created_at',
-        sortOrder = 'DESC'
+        sort_by = 'created_at',
+        sort_dir = 'DESC'
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -142,7 +143,7 @@ class PurchaseOrderController {
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()]]
+        order: [[sort_by, sort_dir.toUpperCase()]]
       });
 
       // NEW: Attach last_invoice_number to each order for the list view integration
@@ -171,7 +172,6 @@ class PurchaseOrderController {
       }));
 
       res.json({
-        success: true,
         data: ordersWithInvoice,
         pagination: {
           total: count,
@@ -238,7 +238,6 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -319,7 +318,6 @@ class PurchaseOrderController {
 
 
       res.json({
-        success: true,
         data: orderJson
       });
     } catch (error) {
@@ -347,7 +345,6 @@ class PurchaseOrderController {
       if (!supplier_id || !warehouse_id || !items || items.length === 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Proveedor, almacén y productos son requeridos'
         });
       }
@@ -447,7 +444,6 @@ class PurchaseOrderController {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Orden de compra creada exitosamente',
         data: completeOrder
       });
@@ -479,7 +475,6 @@ class PurchaseOrderController {
       if (!order) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -487,7 +482,6 @@ class PurchaseOrderController {
       if (order.status !== 'draft') {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Solo se pueden editar órdenes en estado borrador'
         });
       }
@@ -588,7 +582,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra actualizada exitosamente',
         data: updatedOrder
       });
@@ -607,14 +600,12 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
 
       if (order.status !== 'draft') {
         return res.status(400).json({
-          success: false,
           message: 'Solo se pueden aprobar órdenes en estado borrador'
         });
       }
@@ -626,7 +617,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra aprobada exitosamente',
         data: order
       });
@@ -645,14 +635,12 @@ class PurchaseOrderController {
 
       if (!order) {
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
 
       if (order.status === 'received') {
         return res.status(400).json({
-          success: false,
           message: 'No se puede cancelar una orden completamente recibida'
         });
       }
@@ -666,7 +654,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Orden de compra cancelada exitosamente',
         data: order
       });
@@ -686,7 +673,6 @@ class PurchaseOrderController {
       if (!received_items || received_items.length === 0) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'Debe especificar los productos recibidos'
         });
       }
@@ -707,7 +693,6 @@ class PurchaseOrderController {
       if (!order) {
         await transaction.rollback();
         return res.status(404).json({
-          success: false,
           message: 'Orden de compra no encontrada'
         });
       }
@@ -715,7 +700,6 @@ class PurchaseOrderController {
       if (!['sent', 'confirmed', 'partially_received'].includes(order.status)) {
         await transaction.rollback();
         return res.status(400).json({
-          success: false,
           message: 'El estado de la orden no permite recibir mercancía'
         });
       }
@@ -727,7 +711,6 @@ class PurchaseOrderController {
         if (!detail) {
           await transaction.rollback();
           return res.status(400).json({
-            success: false,
             message: `Detalle con ID ${receivedItem.detail_id} no encontrado en la orden`
           });
         }
@@ -744,7 +727,6 @@ class PurchaseOrderController {
         if (totalReceivedPackages > totalOrderedPackages || totalReceivedUnits > totalOrderedUnits) {
           await transaction.rollback();
           return res.status(400).json({
-            success: false,
             message: `No se puede recibir más cantidad de la ordenada para ${detail.product.name}`
           });
         }
@@ -848,7 +830,7 @@ class PurchaseOrderController {
                   rateDate
                 );
               } catch (conversionError) {
-                console.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
+                logger.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
                 // In case of failure, we will temporarily preserve the raw value to avoid transaction crash,
                 // but the system will log this. Ideally an alert should be triggered.
               }
@@ -917,7 +899,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         message: 'Mercancía recibida exitosamente',
         data: finalOrder
       });
@@ -974,7 +955,6 @@ class PurchaseOrderController {
       });
 
       res.json({
-        success: true,
         data: {
           total_orders: totalOrders,
           pending_orders: pendingOrders,

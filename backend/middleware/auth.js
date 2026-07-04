@@ -17,12 +17,12 @@ const auth = async (req, res, next) => {
     if (apiKey) {
       const expected = process.env.BOT_API_KEY;
       if (!expected) {
-        return res.status(401).json({ success: false, message: 'API key auth not configured.' });
+        return res.status(401).json({ message: 'API key auth not configured.' });
       }
       const keyBuf = Buffer.from(apiKey);
       const expectedBuf = Buffer.from(expected);
       if (keyBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(keyBuf, expectedBuf)) {
-        return res.status(401).json({ success: false, message: 'Invalid API key.' });
+        return res.status(401).json({ message: 'Invalid API key.' });
       }
       req.user = {
         id: 0,
@@ -43,7 +43,6 @@ const auth = async (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({
-        success: false,
         message: 'No token provided. Authentication required.'
       });
     }
@@ -63,14 +62,12 @@ const auth = async (req, res, next) => {
 
     if (!user) {
       return res.status(401).json({
-        success: false,
         message: 'User not found.'
       });
     }
 
     if (!user.is_active) {
       return res.status(401).json({
-        success: false,
         message: 'User account is inactive.'
       });
     }
@@ -78,7 +75,6 @@ const auth = async (req, res, next) => {
     // Check if account is locked
     if (user.locked_until && user.locked_until > new Date()) {
       return res.status(401).json({
-        success: false,
         message: 'Account is temporarily locked. Please try again later.'
       });
     }
@@ -91,19 +87,16 @@ const auth = async (req, res, next) => {
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
-        success: false,
         message: 'Invalid token.'
       });
     }
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
-        success: false,
         message: 'Token expired.'
       });
     }
 
     res.status(500).json({
-      success: false,
       message: 'Authentication error.',
       error: error.message
     });

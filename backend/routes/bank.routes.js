@@ -10,9 +10,9 @@ router.get('/', auth, async (req, res) => {
     if (req.query.currency) where.currency = req.query.currency;
 
     const banks = await Bank.findAll({ where, order: [['name', 'ASC']] });
-    res.json(banks);
+    res.json({ data: banks });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener bancos', error: error.message });
+    res.status(500).json({ message: 'Error al obtener bancos' });
   }
 });
 

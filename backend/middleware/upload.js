@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
+const logger = require('../config/logger');
 
 // Usar memory storage para procesar después de tener acceso a req.body
 const storage = multer.memoryStorage();
@@ -27,15 +28,15 @@ const upload = multer({
 
 // Middleware para procesar imágenes con Sharp
 const processImages = async (req, res, next) => {
-  console.log('processImages - req.file:', req.file ? 'exists' : 'undefined');
-  console.log('processImages - req.files:', req.files ? req.files.length : 'undefined');
-  console.log('processImages - req.body:', req.body);
+  logger.info('processImages - req.file:', req.file ? 'exists' : 'undefined');
+  logger.info('processImages - req.files:', req.files ? req.files.length : 'undefined');
+  logger.info('processImages - req.body:', req.body);
   
   // Manejar tanto req.file (single) como req.files (multiple)
   const files = req.files || (req.file ? [req.file] : []);
   
   if (files.length === 0) {
-    console.log('processImages - No files found, skipping');
+    logger.info('processImages - No files found, skipping');
     return next();
   }
 
@@ -99,7 +100,7 @@ const processImages = async (req, res, next) => {
     req.processedFiles = processedFiles;
     next();
   } catch (error) {
-    console.error('Error procesando imágenes:', error);
+    logger.error('Error procesando imágenes:', error);
     next(error);
   }
 };
@@ -134,7 +135,7 @@ const cleanupTempImages = async () => {
       }
     }
   } catch (error) {
-    console.error('Error limpiando imágenes temporales:', error);
+    logger.error('Error limpiando imágenes temporales:', error);
   }
 };
 

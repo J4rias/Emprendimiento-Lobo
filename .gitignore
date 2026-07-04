@@ -36,6 +36,7 @@ Thumbs.db
 # Uploads
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/public/uploads/products/image-*
 
 # Test coverage
 coverage/
@@ -57,8 +58,18 @@ temp_diff.txt
 # MCP
 .mcp.json
 
+# Orchestrator local (groundctl only — no subir)
+.env.groundctl
+scripts/orchestrator.py
+tmp/orchestrator-state.json
+tmp/orchestrator-report.md
+
 # Claude Code
 .claude/
 
 # Markdown
 *.md
+# Orchestrator local (groundctl only)
+scripts/orchestrator.py
+tmp/orchestrator-state.json
+tmp/orchestrator-report.md

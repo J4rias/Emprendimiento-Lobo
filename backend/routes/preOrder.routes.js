@@ -28,13 +28,13 @@ router.get('/:id',
   preOrderController.getById
 );
 
-router.put('/:id/approve',
+router.post('/:id/approve',
   auth,
   authorize('pre_orders.approve'),
   preOrderController.approve
 );
 
-router.put('/:id/reject',
+router.post('/:id/reject',
   auth,
   authorize('pre_orders.approve'),
   preOrderController.reject
