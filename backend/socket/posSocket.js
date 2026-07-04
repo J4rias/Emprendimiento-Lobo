@@ -1,6 +1,7 @@
 const { PosReservation } = require('../models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
+const logger = require('../config/logger');
 
 /**
  * Socket.io handlers for POS real-time events
@@ -53,7 +54,7 @@ module.exports = (io) => {
 
         socket.emit('reservations:init', byProduct);
       } catch (err) {
-        console.error('Error fetching reservations:', err);
+        logger.error('Error fetching reservations on pos:join', { error: err.message });
       }
     });
 
@@ -93,7 +94,7 @@ module.exports = (io) => {
             });
           }
         } catch (err) {
-          console.error('Error releasing reservations on disconnect:', err);
+          logger.error('Error releasing reservations on disconnect', { error: err.message });
         }
       }
     });

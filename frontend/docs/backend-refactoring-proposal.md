@@ -10,9 +10,11 @@
 
 ## 1. Resumen ejecutivo
 
-El backend de Atlas ERP **funciona en producción** y el stack base (Node + Express + Sequelize + MySQL) sigue siendo adecuado — no hay urgencia de reescritura. Sin embargo, después de mapear 176 endpoints, correr 63 pruebas reales y auditar el diccionario completo, hay **5 riesgos de seguridad activos** (3 verificados + 2 adicionales), **2 bugs financieros críticos** (BUG-021 credit balance + INV.getValuation false positive), **shape de respuesta caótico** (cada módulo usa wrapper distinto), **controllers con hasta 1155 líneas sin capa de servicio** y **deuda estructural** acumulada (4 políticas de delete, 4 convenciones de date params, modelos mezclando camelCase y snake_case, N+1 queries en 3 módulos críticos).
+El backend de Atlas ERP **funciona en producción** y el stack base (Node + Express + Sequelize + MySQL) sigue siendo adecuado — no hay urgencia de reescritura. Después de mapear 176 endpoints, correr 63 pruebas reales y auditar el diccionario completo, se identificaron riesgos de seguridad, bugs financieros críticos y deuda estructural. **La Fase 0 (todos los P0) está completada (2026-07-04).**
 
-La propuesta prioriza **estabilización sobre modernización**. Cuatro fases incrementalmente seguras, sin reescritura big-bang, sin migrar a TypeScript/Prisma/Fastify (costo prohibitivo para proyecto en producción). La única excepción: Quick wins de seguridad que sí son urgentes.
+**Deuda estructural pendiente (Fases 1-3):** shape de respuesta caótico (cada módulo usa wrapper `success` distinto), controllers con hasta 1155 líneas sin capa de servicio, 4 políticas de delete distintas, 4 convenciones de date params, modelos mezclando camelCase y snake_case, N+1 queries en 3 módulos críticos, 0 TypeScript, 0 CI/CD, 0 backups.
+
+La propuesta prioriza **estabilización sobre modernización**. Cuatro fases incrementalmente seguras, sin reescritura big-bang, sin migrar a TypeScript/Prisma/Fastify de golpe.
 
 **No se recomienda:**
 - Migrar Sequelize → Prisma (44 modelos + raw SQL masiva = semanas de trabajo, alto riesgo)
@@ -20,14 +22,13 @@ La propuesta prioriza **estabilización sobre modernización**. Cuatro fases inc
 - Migrar a TypeScript big-bang (mejor opt-in por módulo nuevo)
 - Saltar a Express 5 / Sequelize 7 sin razón de negocio
 
-**Sí se recomienda (P0, esta semana):**
-- Fix path traversal en UPL `DELETE /image`
-- Ocultar stack traces en errorHandler (body-parser SyntaxError no capturado)
-- `authorize` faltante en AR admin-pin
-- Eliminar `user_id` del body en POS reserve
-- Fix BUG-021: `addPayment` infla `paid_amount` más allá del total de la venta (impacto financiero sistemático)
-- Fix INV.getValuation: silencia errores y devuelve éxito falso
-- CORS hardcoded → variable de entorno
+**Estado actual (2026-07-04):**
+- ✅ Fase 0 completa — 0 riesgos de seguridad activos, 0 bugs financieros críticos conocidos
+- ✅ 27/27 módulos con tests de integración (scripts/api-tests/)
+- ✅ `utils/responseHelpers.js` creado (base para normalización Fase 1)
+- ✅ `console.log` eliminado de socket/posSocket.js → logger
+- ✅ Dead code `void inventory` eliminado de sale.controller.js
+- 🔜 Fase 1 — TypeScript setup + estándares internos (siguiente)
 
 ---
 
@@ -1022,24 +1023,25 @@ Con 27 módulos × 4 tests = 108 tests mínimo. Hoy hay 3.
 
 **Sin cambios visibles para el frontend. TS pasa a ser pilar desde aquí.**
 
-| Tarea                                                   | Esfuerzo   |
-|---------------------------------------------------------|------------|
-| **Setup TypeScript** (tsconfig allowJs, tsx, @types/*) | 1 día      |
-| Helpers `res.ok/created/paginated/fail` en `.ts`       | 1 día      |
-| errorHandler unificado en `.ts` (§5.2)                 | 1 día      |
-| Auth middleware estandarizado `req.userId` en `.ts`    | 1 día      |
-| **Tipar 44 modelos Sequelize con `InferAttributes`**   | 1 semana   |
-| Setup **Zod** + middleware `validate` en `.ts`         | 2 días     |
-| Eliminar `console.log` → winston                       | 1 día      |
-| Quitar `bcrypt` redundante (solo bcryptjs) (§7.4)      | 0.5 día    |
-| Documentar socket.io en `api-dictionary.md`            | 0.5 día    |
-| **Auditoría JWT: TTL, expiración, .env.example (§7.11.1)** | 2 h   |
-| **Auditoría raw SQL: replacements vs interpolación (§7.11.3)** | 1 día |
-| **Mover credit_pin al modelo User Sequelize (§7.11.3)**| 2 h        |
-| **npm audit CI gate + Dependabot (§7.11.4)**           | 30 min     |
-| **Revisión Helmet.js (§7.11.6)**                       | 30 min     |
-| **Audit log — tabla + middleware (§7.11.5)**           | 1 día      |
-| Suite de tests base por módulo (4 tests c/u)           | 2 semanas  |
+| Tarea                                                   | Estado | Esfuerzo   |
+|---------------------------------------------------------|--------|------------|
+| Helpers `res.ok/created/paginated/fail`                | ✅ `utils/responseHelpers.js` | 1 día |
+| Eliminar `console.log` → logger (controllers)          | ✅ posSocket.js; pendiente: revisar otros módulos | — |
+| Dead code `void inventory` eliminado                   | ✅ sale.controller.js:895 | — |
+| Quitar `bcrypt` redundante (solo bcryptjs) (§7.4)      | ✅ solo bcryptjs en package.json | — |
+| Auditoría JWT: TTL en `.env.example` (§7.11.1)         | ✅ `JWT_EXPIRES_IN=24h` documentado | — |
+| Auditoría raw SQL: replacements vs interpolación (§7.11.3) | ✅ todos usan `replacements:` | — |
+| **Setup TypeScript** (tsconfig allowJs, tsx, @types/*) | 🔜 | 1 día |
+| errorHandler unificado en `.ts` (§5.2)                 | 🔜 | 1 día |
+| Auth middleware estandarizado `req.userId` en `.ts`    | 🔜 | 1 día |
+| **Tipar 44 modelos Sequelize con `InferAttributes`**   | 🔜 | 1 semana |
+| Setup **Zod** + middleware `validate` en `.ts`         | 🔜 | 2 días |
+| Documentar socket.io en `api-dictionary.md`            | 🔜 | 0.5 día |
+| **Mover credit_pin al modelo User Sequelize (§7.11.3)**| 🔜 | 2 h |
+| **npm audit CI gate + Dependabot (§7.11.4)**           | 🔜 | 30 min |
+| **Revisión Helmet.js (§7.11.6)**                       | 🔜 | 30 min |
+| **Audit log — tabla + middleware (§7.11.5)**           | 🔜 | 1 día |
+| Suite de tests base por módulo (4 tests c/u)           | 🔜 | 2 semanas |
 
 **Entregable:** backend con contrato interno claro, TS+Zod setup, sin código muerto, sin riesgos de seguridad secundarios. Cobertura TS ~15-20% (helpers, middleware, modelos).
 
@@ -1117,7 +1119,7 @@ Si el backend queda en TS, migrar el frontend también con la misma estrategia `
 | Módulos con shape estándar                        | 0/27                | 0/27            | 27/27           | 27/27           |
 | Endpoints con express-validator/zod               | ~12/176             | 100% nuevos     | 100% nuevos     | 100%            |
 | Tests de integración (scripts/api-tests/)         | 27/27 ✅            | 108+ tests unit | 108+ tests      | 200+ tests      |
-| `console.log` en código                          | 20+                 | 0               | 0               | 0               |
+| `console.log` en código (controllers/socket)      | ~2 (posSocket)      | 0               | 0               | 0               |
 | Bugs financieros críticos activos                 | **0** ✅            | 0               | 0               | 0               |
 | Riesgos de seguridad activos                      | **0** ✅            | 0               | 0               | 0               |
 | Controllers > 500 líneas                          | 3                   | 3               | 1 (SLE)         | 0               |

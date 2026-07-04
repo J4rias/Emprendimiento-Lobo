@@ -892,7 +892,6 @@ exports.addPayment = async (req, res) => {
         });
 
         // No inventory change needed: stock was already reduced when the credit sale was created
-        void inventory;
       }
     }
 
