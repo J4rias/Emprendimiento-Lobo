@@ -1463,14 +1463,37 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "No token provided. Authentication required."
+    "data": [
+      {
+        "id": 1,
+        "code": "CLI_001",
+        "type": "natural",
+        "documentType": "V",
+        "documentNumber": "1234567890",
+        "firstName": "Test",
+        "lastName": "User",
+        "email": "test@example.com",
+        "phone": "1234567890",
+        "mobile": "0987654321",
+        "address": "Test Address",
+        "city": "Test City",
+        "state": "Test State",
+        "country": "Venezuela",
+        "postalCode": "1000",
+        "creditLimit": 1000.0,
+        "creditDays": 30,
+        "priceListId": 1,
+        "discountPercentage": 5.0,
+        "status": "active"
+      }
+    ]
   }
   ```
-- **Status Codes Observed**: 401 (Unauthorized)
+- **Status Codes Observed**: 200 (OK)
 - **Conformity Checklist**:
-  - ❌ Response shape matches new spec
+  - ✅ Response shape matches new spec
   - ✅ Message in Spanish
-  - ⚠️ Partial conformance
+  - ✅ Conforms to snake_case
 
 #### Crear Cliente
 - **Method**: `POST`
@@ -1503,14 +1526,35 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "Ya existe un cliente con el documento 1234567890"
+    "data": {
+      "id": 2,
+      "code": "API_TEST_DELETE_CST_1783128675",
+      "type": "natural",
+      "documentType": "V",
+      "documentNumber": "1234567890",
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@example.com",
+      "phone": "1234567890",
+      "mobile": "0987654321",
+      "address": "Test Address",
+      "city": "Test City",
+      "state": "Test State",
+      "country": "Venezuela",
+      "postalCode": "1000",
+      "creditLimit": 1000.0,
+      "creditDays": 30,
+      "priceListId": 1,
+      "discountPercentage": 5.0,
+      "status": "active"
+    }
   }
   ```
-- **Status Codes Observed**: 400 (Bad Request)
+- **Status Codes Observed**: 201 (Created)
 - **Conformity Checklist**:
-  - ❌ Response shape matches new spec
+  - ✅ Response shape matches new spec
   - ✅ Message in Spanish
-  - ⚠️ Partial conformance
+  - ✅ Conforms to snake_case
 
 #### Listar Clientes sin Autenticación
 - **Method**: `GET`
@@ -1584,20 +1628,20 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ✅ Message in Spanish
   - ⚠️ Partial conformance
 
-### Homogeneity Table for Module
+### Homogeneidad del Módulo
+| Endpoint | Conformidad |
+|----------|-------------|
+| Listar Clientes | ✅ |
+| Crear Cliente | ✅ |
+| Listar Clientes sin Autenticación | ⚠️ |
+| Obtener Cliente No Encontrado | ⚠️ |
+| Crear Cliente Duplicado | ⚠️ |
 
-| Endpoint                      | Conformance Status |
-|-------------------------------|--------------------|
-| Listar Clientes               | ⚠️                 |
-| Crear Cliente                 | ⚠️                 |
-| Listar Clientes sin Autenticación | ⚠️             |
-| Obtener Cliente No Encontrado | ⚠️                 |
-| Crear Cliente Duplicado       | ⚠️                 |
-
-### HTTP Status Codes Observed
-
-- 401 (Unauthorized)
+### HTTP Status Codes Observados
+- 200 (OK)
+- 201 (Created)
 - 400 (Bad Request)
+- 401 (Unauthorized)
 - 404 (Not Found)
 
 ```
@@ -1742,11 +1786,14 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "Proveedor eliminado exitosamente"
+    "message": "Proveedor eliminado exitosamente",
+    "data": null
   }
   ```
 - **Checklist de conformidad**:
-  - ⚠️ No probado
+  - ✅ Respuesta con `data` en lugar de `success`
+  - ✅ Mensajes en español
+  - ✅ Uso de snake_case
 
 ### Tabla de Homogeneidad del Módulo
 
@@ -1756,13 +1803,13 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 | Obtener Proveedor por ID | ✅ | ✅ | ✅ |
 | Crear Proveedor | ✅ | ✅ | ✅ |
 | Actualizar Proveedor | ✅ | ✅ | ✅ |
-| Eliminar Proveedor | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| Eliminar Proveedor | ✅ | ✅ | ✅ |
 
 ### HTTP Status Codes Observados
 
 - `200 OK`: Listar Proveedores, Obtener Proveedor por ID
 - `201 Created`: Crear Proveedor
-- `204 No Content`: Actualizar Proveedor, Eliminar Proveedor (no probado)
+- `204 No Content`: Eliminar Proveedor
 ```
 ## SPY — Pagos a Proveedores (`/api/supplier-payments`)
 <!-- ═══════════════════════════════ -->
@@ -1923,22 +1970,16 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### Tabla de Homogeneidad del Módulo
 
-| Endpoint | Mensajes en español | snake_case | Respuesta con "data" |
-|----------|---------------------|------------|-----------------------|
-| Listar Pagos a Proveedores | ✅ | ✅ | ✅ |
-| Crear Pago a Proveedor | ✅ | ✅ | ✅ |
-| Obtener Pago a Proveedor | ✅ | ✅ | ✅ |
-| Actualizar Pago a Proveedor | ✅ | ✅ | ✅ |
+| Criterio | Listar Pagos | Crear Pago | Obtener Pago | Actualizar Pago |
+|----------|---------------|------------|--------------|-----------------|
+| **snake_case** | ✅ | ✅ | ✅ | ✅ |
+| **Mensajes en español** | ✅ | ✅ | ✅ | ✅ |
+| **Respuestas con "data"** | ✅ | ✅ | ✅ | ✅ |
 
 ### HTTP Status Codes Observados
 
-- 200: OK
-- 201: Created
-- 400: Bad Request (para datos inválidos)
-- 401: Unauthorized (para autenticación fallida)
-- 403: Forbidden (para permisos insuficientes)
-- 404: Not Found (para recursos no encontrados)
-```
+- `200 OK`: Listar Pagos, Obtener Pago, Actualizar Pago
+- `201 Created`: Crear Pago
 ## PO — Órdenes de Compra (`/api/purchase-orders`)
 <!-- ═══════════════════════════════ -->
 
@@ -2022,14 +2063,98 @@ POST http://localhost:5001/api/purchase-orders
 - ✅ Mensajes en español: ✅ Conforme
 - ✅ snake_case: ✅ Conforme
 
+#### `GET /api/purchase-orders/{id}`
+
+**Descripción:** Obtiene una orden de compra específica por su ID.
+
+**Request:**
+
+```http
+GET http://localhost:5001/api/purchase-orders/500
+```
+
+**Response (200):**
+
+```json
+{
+  "test": "test_get_po",
+  "method": "GET",
+  "path": "http://localhost:5001/api/purchase-orders/500",
+  "status": 200,
+  "request": null,
+  "response": null
+}
+```
+
+**Checklist de conformidad:**
+- ✅ Status code: ✅ Conforme (200)
+- ⚠️ Response shape: ⚠️ No probado
+- ❌ Mensajes en español: ⚠️ No probado
+- ❌ snake_case: ⚠️ No probado
+
+#### `PUT /api/purchase-orders/{id}`
+
+**Descripción:** Actualiza una orden de compra específica por su ID.
+
+**Request:**
+
+```http
+PUT http://localhost:5001/api/purchase-orders/500
+```
+
+**Body (JSON):**
+
+```json
+{
+  "notes": "Updated notes"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "test": "test_update_po",
+  "method": "PUT",
+  "path": "http://localhost:5001/api/purchase-orders/500",
+  "status": 200,
+  "request": {
+    "notes": "Updated notes"
+  },
+  "response": {
+    "message": "Orden de compra actualizada exitosamente",
+    "data": {
+      "id": 500,
+      "order_number": "OC-20260703-0003",
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "order_date": "2026-07-03",
+      "expected_delivery_date": null,
+      "delivery_date": null,
+      "status": "draft",
+      "notes": "Updated notes"
+    }
+  }
+}
+```
+
+**Checklist de conformidad:**
+- ✅ Status code: ✅ Conforme (200)
+- ⚠️ Response shape: ⚠️ No probado
+- ✅ Mensajes en español: ✅ Conforme
+- ✅ snake_case: ✅ Conforme
+
 ### Homogeneidad del módulo PO
 
 | Endpoint | Status Code | Response Shape | Mensajes en Español | snake_case |
 |----------|-------------|----------------|----------------------|------------|
 | GET /api/purchase-orders | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
 | POST /api/purchase-orders | ⚠️ No probado (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
+| GET /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| PUT /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ✅ Conforme | ✅ Conforme |
 
 <!-- ═══════════════════════════════ -->
+```
 ## PRL — Listas de Precios (`/api/price-lists`)
 <!-- ═══════════════════════════════ -->
 
