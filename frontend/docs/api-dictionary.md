@@ -3660,9 +3660,7 @@ Obtiene los tipos de presentación activos.
 
 ### Notas Adicionales
 
-- Los campos en snake_case y las fechas en formato ISO son consistentes con la especificación de la API.
-- Se recomienda revisar la documentación para asegurar que todos los endpoints sigan el mismo estándar.
-```
+- Los campos en snake_case y las fechas en formato ISO son consistentes con la especificación, pero se recomienda revisar si es necesario ajustar el formato de las fechas para mayor coherencia.
 ## USR — Usuarios (`/api/users`)
 <!-- ═══════════════════════════════ -->
 
@@ -3703,7 +3701,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_get_user", "method": "GET", "path": "/users/1", "status": 200, "request": null, "response": null}
+  {"test": "test_get_user", "method": "GET", "path": "/users/18", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -3716,7 +3714,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_update_user", "method": "PUT", "path": "/users/1", "status": 200, "request": null, "response": null}
+  {"test": "test_update_user", "method": "PUT", "path": "/users/18", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -3729,9 +3727,9 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_delete_user", "method": "DELETE", "path": "/users/1", "status": 400, "request": null, "response": null}
+  {"test": "test_delete_user", "method": "DELETE", "path": "/users/18", "status": 200, "request": null, "response": null}
   ```
-- **HTTP Status Codes Observados**: 400
+- **HTTP Status Codes Observados**: 200
 
 #### GET `/users` (sin autenticación)
 - **Descripción**: Intento de obtener usuarios sin autenticación.
@@ -3768,7 +3766,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_get_user", "method": "GET", "path": "/users/1", "status": 200, "request": null, "response": null}
+  {"test": "test_not_found", "method": "GET", "path": "/users/999", "status": 404, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 404
 
@@ -3793,6 +3791,11 @@ Obtiene los tipos de presentación activos.
 | GET `/users/{id}` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
 | PUT `/users/{id}` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
 | DELETE `/users/{id}` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
+| GET `/users` (sin autenticación) | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
+| POST `/users` (datos inválidos) | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
+| GET `/users/{id}` (usuario no encontrado) | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
+| POST `/users` (datos duplicados) | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
+
 ```
 ## CMP — Empresa (`/api/company`)
 <!-- ═══════════════════════════════ -->
