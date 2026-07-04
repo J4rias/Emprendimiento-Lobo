@@ -57,7 +57,7 @@ const SupplierLedgerModal = ({ supplier, onClose }) => {
       setLoading(true);
       setError(null);
       const res = await supplierService.getLedger(supplier.id);
-      if (res.success) {
+      if (res.data) {
         setLedgerData(res.data);
         // Auto-select first category with data
         const cats = Object.keys(res.data.categories || {});

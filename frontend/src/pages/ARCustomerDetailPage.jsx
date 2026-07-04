@@ -445,7 +445,7 @@ const ARCustomerDetailPage = () => {
       setError(null);
       try {
         const res = await arService.getCustomerStatement(id);
-        if (res.success) setData(res.data);
+        if (res.data) setData(res.data);
         else setError('No se pudo cargar el estado de cuenta.');
       } catch (err) {
         setError('Error al cargar el estado de cuenta.');

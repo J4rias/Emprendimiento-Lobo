@@ -109,8 +109,8 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
+      if (response.ok) {
+        setUsers(data.data || []);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -140,7 +140,7 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         setShowUserModal(false);
         resetUserForm();
         fetchUsers();
@@ -187,7 +187,7 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         fetchUsers();
         toast.success(`Usuario ${user.is_active ? 'desactivado' : 'activado'}`);
       } else {
@@ -262,8 +262,8 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setRoles(data.data.roles || []);
+      if (response.ok) {
+        setRoles(data.data?.roles || []);
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -279,8 +279,8 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setPermissions(data.data.permissions || []);
+      if (response.ok) {
+        setPermissions(data.data?.permissions || []);
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
@@ -334,7 +334,7 @@ const SettingsPage = () => {
         body: JSON.stringify(companyForm),
       });
       const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         toast.success('Datos de empresa actualizados');
         reloadCompany();
       } else {
@@ -366,7 +366,7 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         setShowModal(false);
         resetForm();
         fetchRoles();
@@ -404,7 +404,7 @@ const SettingsPage = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok) {
         fetchRoles();
       } else {
         toast.error(data.message || 'Error al eliminar el rol');

@@ -19,8 +19,8 @@ const SalesPage = () => {
   const [filters, setFilters] = useState({
     status: '',
     sale_type: '',
-    start_date: '',
-    end_date: ''
+    date_from: '',
+    date_to: ''
   });
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
   const [selectedSale, setSelectedSale] = useState(null);
@@ -59,7 +59,7 @@ const SalesPage = () => {
   // Reset to page 1 when search or filters change
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }));
-  }, [searchTerm, filters.status, filters.sale_type, filters.start_date, filters.end_date]);
+  }, [searchTerm, filters.status, filters.sale_type, filters.date_from, filters.date_to]);
 
   const salesQueryKey = ['sales', pagination.page, searchTerm, filters];
 
@@ -149,7 +149,7 @@ const SalesPage = () => {
     if (sale.customer_id) {
       try {
         const data = await customerService.getCreditBalance(sale.customer_id);
-        if (data.success && data.credit_balance_cop > 0) {
+        if (data.credit_balance_cop > 0) {
           setCustomerCreditBalance({ usd: data.credit_balance_usd, cop: data.credit_balance_cop });
           pendingCOP = Math.max(0, pendingCOP - data.credit_balance_cop);
         }
@@ -394,7 +394,7 @@ const SalesPage = () => {
 
           <button
             onClick={() => {
-              setFilters({ status: '', sale_type: '', start_date: '', end_date: '' });
+              setFilters({ status: '', sale_type: '', date_from: '', date_to: '' });
               setSearchTerm('');
             }}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

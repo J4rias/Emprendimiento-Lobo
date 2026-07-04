@@ -30,7 +30,7 @@ const SupplierStatementModal = ({ supplier, onClose }) => {
             setError(null);
             const data = await supplierService.getStatement(supplier.id);
 
-            if (data.success) {
+            if (data.data) {
                 setStatementData(data.data);
                 // Default to a currency that has data, preferring USD
                 const availableCurrencies = Object.keys(data.data.summary || {});

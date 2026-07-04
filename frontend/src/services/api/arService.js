@@ -8,11 +8,11 @@ export const arService = {
   getCustomers: (params = {}) => api.get('/accounts-receivable/customers', { params }).then(r => r.data),
 
   // Statement completo de un cliente (en COP)
-  getCustomerStatement: (customerId) => api.get(`/ar/customers/${customerId}/statement`).then(r => r.data),
+  getCustomerStatement: (customerId) => api.get(`/accounts-receivable/customers/${customerId}/statement`).then(r => r.data),
 
   // Revertir un abono (requiere PIN)
   reversePayment: (paymentId, pin) =>
-    api.post(`/ar/payments/${paymentId}/reverse`, { pin }).then(r => r.data),
+    api.post(`/accounts-receivable/payments/${paymentId}/reverse`, { pin }).then(r => r.data),
 
   // PIN de crédito
   getAdminPinStatus: () => api.get('/accounts-receivable/admin-pin/status').then(r => r.data),
@@ -26,7 +26,7 @@ export const arService = {
         Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
       );
       const qs = new URLSearchParams(filteredParams).toString();
-      const response = await api.get(`/ar/export/invoices${qs ? '?' + qs : ''}`, { responseType: 'blob' });
+      const response = await api.get(`/accounts-receivable/export/invoices${qs ? '?' + qs : ''}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
@@ -45,7 +45,7 @@ export const arService = {
         Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
       );
       const qs = new URLSearchParams(filteredParams).toString();
-      const response = await api.get(`/ar/export/customers${qs ? '?' + qs : ''}`, { responseType: 'blob' });
+      const response = await api.get(`/accounts-receivable/export/customers${qs ? '?' + qs : ''}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;

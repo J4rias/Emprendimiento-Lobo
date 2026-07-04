@@ -43,8 +43,8 @@ const ReportsPage = () => {
 
   const [reportType, setReportType] = useState(paramType || 'sales');
   const [dateRange, setDateRange] = useState({
-    start_date: paramStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end_date: paramEnd || new Date().toISOString().split('T')[0]
+    date_from: paramStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    date_to: paramEnd || new Date().toISOString().split('T')[0]
   });
 
   // Sales state (independent of mutation)
@@ -75,8 +75,8 @@ const ReportsPage = () => {
   ];
 
   const getAdjustedRange = (range) => ({
-    start_date: range.start_date + 'T00:00:00',
-    end_date: range.end_date + 'T23:59:59'
+    date_from: range.date_from + 'T00:00:00',
+    date_to: range.date_to + 'T23:59:59'
   });
 
   const SALES_STATUS_FILTER = 'completed,pending';
@@ -166,8 +166,8 @@ const ReportsPage = () => {
       switch (type) {
         case 'purchases': {
           const purchaseOrders = await purchaseOrderService.getAll({
-            start_date: range.start_date + 'T00:00:00',
-            end_date: range.end_date + 'T23:59:59',
+            date_from: range.date_from + 'T00:00:00',
+            date_to: range.date_to + 'T23:59:59',
             limit: 1000
           });
           const poList = purchaseOrders.data || purchaseOrders.purchaseOrders || [];
@@ -183,8 +183,8 @@ const ReportsPage = () => {
         }
         case 'top_products': {
           const statsData = await saleService.getSalesStats({
-            start_date: range.start_date + 'T00:00:00',
-            end_date: range.end_date + 'T23:59:59',
+            date_from: range.date_from + 'T00:00:00',
+            date_to: range.date_to + 'T23:59:59',
             top_limit: 50
           });
           const topProducts = (statsData.stats?.topProducts || []).map(tp => ({
@@ -203,8 +203,8 @@ const ReportsPage = () => {
         }
         case 'product_sales': {
           const productSalesData = await saleService.getProductSales({
-            start_date: range.start_date + 'T00:00:00',
-            end_date: range.end_date + 'T23:59:59',
+            date_from: range.date_from + 'T00:00:00',
+            date_to: range.date_to + 'T23:59:59',
           });
           const items = (productSalesData.data || []).map(item => ({
             product: item.product,
@@ -356,7 +356,7 @@ const ReportsPage = () => {
         try {
           const allSales = await fetchAllSalesForExport();
           csvContent = buildSalesCSV(allSales);
-          filename = `reporte_ventas_${dateRange.start_date}_${dateRange.end_date}.csv`;
+          filename = `reporte_ventas_${dateRange.date_from}_${dateRange.date_to}.csv`;
           toast.success(`${allSales.length} ventas exportadas`);
         } catch (e) {
           console.error('Error exporting sales CSV:', e);
@@ -385,15 +385,15 @@ const ReportsPage = () => {
       }
       case 'purchases':
         csvContent = generatePurchasesCSV();
-        filename = `reporte_compras_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        filename = `reporte_compras_${dateRange.date_from}_${dateRange.date_to}.csv`;
         break;
       case 'top_products':
         csvContent = generateTopProductsCSV();
-        filename = `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        filename = `productos_mas_vendidos_${dateRange.date_from}_${dateRange.date_to}.csv`;
         break;
       case 'product_sales':
         csvContent = generateProductSalesCSV();
-        filename = `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}.csv`;
+        filename = `ventas_por_producto_${dateRange.date_from}_${dateRange.date_to}.csv`;
         break;
       case 'low_stock':
         csvContent = generateLowStockCSV();
@@ -813,8 +813,8 @@ const ReportsPage = () => {
                 </label>
                 <input
                   type="date"
-                  value={dateRange.start_date}
-                  onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
+                  value={dateRange.date_from}
+                  onChange={(e) => setDateRange({ ...dateRange, date_from: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -826,8 +826,8 @@ const ReportsPage = () => {
                 </label>
                 <input
                   type="date"
-                  value={dateRange.end_date}
-                  onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+                  value={dateRange.date_to}
+                  onChange={(e) => setDateRange({ ...dateRange, date_to: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

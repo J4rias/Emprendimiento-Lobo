@@ -22,12 +22,12 @@ const Dashboard = () => {
     const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     const todayStart = `${localDate}T00:00:00`;
     const todayEnd = `${localDate}T23:59:59`;
-    const todayStats = await saleService.getSalesStats({ start_date: todayStart, end_date: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenueCOP: 0 } }));
+    const todayStats = await saleService.getSalesStats({ date_from: todayStart, date_to: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenueCOP: 0 } }));
 
     // Stats for MONTH
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
-    const monthStatsData = await saleService.getSalesStats({ start_date: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenueCOP: 0 } }));
+    const monthStatsData = await saleService.getSalesStats({ date_from: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenueCOP: 0 } }));
 
     // Pending sales
     const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));

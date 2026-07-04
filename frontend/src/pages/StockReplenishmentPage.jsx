@@ -58,7 +58,7 @@ const StockReplenishmentPage = () => {
     try {
       const response = await productService.searchByBarcode(code);
 
-      if (response.success && response.data) {
+      if (response.data) {
         setProduct(response.data);
 
         // Load presentations

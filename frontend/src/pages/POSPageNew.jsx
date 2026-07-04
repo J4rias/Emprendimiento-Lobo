@@ -1024,9 +1024,7 @@ function CreditPinModal({ onClose, onValidated }) {
     setError('');
     try {
       const res = await saleService.validateCreditPin(pin);
-      if (res.success) {
-        onValidated(res.admin_id);
-      }
+      onValidated(res.admin_id);
     } catch (err) {
       const msg = err.response?.data?.message || 'Error al validar PIN';
       setError(msg);

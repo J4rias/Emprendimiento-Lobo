@@ -7,8 +7,8 @@ const InventoryMovementsPage = () => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
     movement_type: '',
-    start_date: '',
-    end_date: ''
+    date_from: '',
+    date_to: ''
   });
 
   const { data, isLoading } = useQuery({
@@ -114,8 +114,8 @@ const InventoryMovementsPage = () => {
             <input
               type="date"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              value={filters.start_date}
-              onChange={(e) => handleFilterChange({ ...filters, start_date: e.target.value })}
+              value={filters.date_from}
+              onChange={(e) => handleFilterChange({ ...filters, date_from: e.target.value })}
             />
           </div>
 
@@ -124,8 +124,8 @@ const InventoryMovementsPage = () => {
             <input
               type="date"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              value={filters.end_date}
-              onChange={(e) => handleFilterChange({ ...filters, end_date: e.target.value })}
+              value={filters.date_to}
+              onChange={(e) => handleFilterChange({ ...filters, date_to: e.target.value })}
             />
           </div>
         </div>

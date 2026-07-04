@@ -24,7 +24,7 @@ export const CompanyProvider = ({ children }) => {
 
       const response = await fetch(`${apiUrl}/company`, { headers });
       const data = await response.json();
-      if (data.success && data.data) {
+      if (data.data) {
         setCompanySettings(data.data);
       }
     } catch (error) {

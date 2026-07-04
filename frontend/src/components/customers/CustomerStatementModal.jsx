@@ -279,7 +279,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
             setError(null);
             const data = await customerService.getStatement(customer.id);
 
-            if (data.success) {
+            if (data.data) {
                 setStatementData(data.data);
                 const availableCurrencies = Object.keys(data.data.summary || {});
                 if (availableCurrencies.length > 0 && !availableCurrencies.includes('USD')) {
