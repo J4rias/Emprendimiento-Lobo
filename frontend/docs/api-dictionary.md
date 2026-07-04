@@ -1434,13 +1434,12 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 ### Tabla de Homogeneidad del Módulo
 
 | Endpoint                | Mensajes en Español | Sin "success" | Respuesta con "data" | Snake Case |
-|-------------------------|---------------------|---------------|----------------------|-----------|
-| Listar ventas           | ✅                  | ❌            | ✅                   | ✅        |
-| Crear venta             | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
-| Obtener venta por ID    | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
-| Actualizar venta por ID | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
-| Eliminar venta por ID   | ✅                  | ❌            | ⚠️ Parcial           | ⚠️ Parcial|
-```
+|-------------------------|----------------------|---------------|-----------------------|-----------|
+| Listar ventas           | ✅                   | ❌            | ✅                    | ✅        |
+| Crear venta             | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
+| Obtener venta por ID    | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
+| Actualizar venta por ID | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
+| Eliminar venta por ID   | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
 ## POS — Punto de Venta (`/api/pos`)
 <!-- ═══════════════════════════════ -->
 
@@ -1457,7 +1456,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - **200 OK** (✅ conforme):
     ```json
     {
-      "data": {}
+      "data": {"1187": 5}
     }
     ```
   - **401 Unauthorized** (⚠️ no probado):
@@ -1479,8 +1478,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     {
       "session_id": "test-session-id",
       "tab_id": "test-tab-id",
-      "product_id": 1,
-      "presentation_id": 1,
+      "product_id": 1187,
+      "presentation_id": 1013,
       "units_requested": 5.0
     }
     ```
@@ -1491,12 +1490,23 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       "message": "Reserva actualizada",
       "data": {
         "reserved": 5,
-        "available_after": 7,
+        "available_after": 34450,
         "total_reserved": 5
       }
     }
     ```
-  - **401 Unauthorized** (⚠️ no probado):
+  - **200 OK** (✅ conforme):
+    ```json
+    {
+      "message": "Reserva actualizada",
+      "data": {
+        "reserved": 10,
+        "available_after": 34445,
+        "total_reserved": 10
+      }
+    }
+    ```
+  - **401 Unauthorized** (✅ conforme):
     ```json
     {
       "message": "No token provided. Authentication required."
@@ -1527,15 +1537,19 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     {
       "session_id": "test-session-id",
       "tab_id": "test-tab-id",
-      "presentation_id": 1,
+      "presentation_id": 1013,
       "units_to_release": 5.0
     }
     ```
 - **Response Shapes**:
-  - **404 Not Found** (✅ conforme):
+  - **200 OK** (✅ conforme):
     ```json
     {
-      "message": "Reserva no encontrada"
+      "message": "Reserva liberada",
+      "data": {
+        "remaining_reserved": 5,
+        "total_reserved": 5
+      }
     }
     ```
 
@@ -2737,7 +2751,7 @@ Inicia sesión y obtiene un token de autenticación.
 {
   "message": "Tasa de cambio creada exitosamente",
   "data": {
-    "id": 206,
+    "id": 214,
     "from_currency": "USD",
     "to_currency": "VES",
     "rate": "10.500000",
@@ -2747,8 +2761,8 @@ Inicia sesión y obtiene un token de autenticación.
     "is_active": true,
     "created_by": 1,
     "updated_by": 1,
-    "created_at": "2026-07-04T04:01:12.000Z",
-    "updated_at": "2026-07-04T04:01:12.000Z",
+    "created_at": "2026-07-04T04:41:49.000Z",
+    "updated_at": "2026-07-04T04:41:49.000Z",
     "creator": {
       "id": 1,
       "username": "admin"
@@ -2862,30 +2876,35 @@ Inicia sesión y obtiene un token de autenticación.
 
 ```json
 {
-  "status": 200,
-  "data": []
+  "status": 204,
+  "data": null
 }
 ```
 
 **Conformidad:**
 
 - ✅ URL en snake_case ✅
-- ⚠️ Respuesta con "data" ⚠️
+- ⚠️ Respuesta con "data" parcial ⚠️
 - ❌ Mensajes en español ❌
 - ✅ Probado
 
-### Tabla de Homogeneidad del Módulo
+### Homogeneidad del Módulo
 
-| Criterio                     | Conformidad |
-|------------------------------|-------------|
-| URL en snake_case            | ✅           |
-| Respuesta con "data"         | ✅           |
-| Mensajes en español          | ⚠️          |
-| HTTP status codes observados | 200, 400    |
+| Criterio | Conformidad |
+|----------|-------------|
+| URL snake_case | ✅ |
+| Respuesta con "data" | ⚠️ Parcial ⚠️ |
+| Mensajes en español | ⚠️ Parcial ⚠️ |
 
-### Notas Adicionales
+### HTTP Status Codes Observados
 
-El endpoint `POST /api/exchange-rates` fue probado y se observó una respuesta exitosa con los datos esperados.
+- `200 OK`
+- `201 Created`
+- `204 No Content`
+- `404 Not Found`
+- `409 Conflict`
+
+```
 ## AR — Cuentas por Cobrar (`/api/ar`)
 <!-- ═══════════════════════════════ -->
 

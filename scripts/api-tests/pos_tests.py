@@ -82,12 +82,12 @@ def test_update_pos():
     token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Happy path
+    # Happy path — product_id 1187 (Aceite Agroil Soya) tiene inventario en warehouse 1
     payload = {
         "session_id": "test-session-id",
         "tab_id": "test-tab-id",
-        "product_id": 1,
-        "presentation_id": 1,
+        "product_id": 1187,
+        "presentation_id": 1013,
         "units_requested": 5.0
     }
     response = requests.post(f"{BASE_URL}/pos/reserve", json=payload, headers=headers)
@@ -103,11 +103,11 @@ def test_delete_pos():
     token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Happy path - release reservation
+    # Happy path - release reservation (presentation_id 1013 = Aceite Agroil Soya, same as reserve tests)
     payload = {
         "session_id": "test-session-id",
         "tab_id": "test-tab-id",
-        "presentation_id": 1,
+        "presentation_id": 1013,
         "units_to_release": 5.0
     }
     response = requests.patch(f"{BASE_URL}/pos/reserve", json=payload, headers=headers)

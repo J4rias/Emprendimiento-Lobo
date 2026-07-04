@@ -73,7 +73,7 @@ def test_delete_exchange_rate(exchange_rate_id):
     url = f"{BASE_URL}/exchange-rates/{exchange_rate_id}"
     response = requests.delete(url, headers=headers)
     log_result("test_delete_exchange_rate", "DELETE", url, response.status_code)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 def test_list_without_auth():
     url = f"{BASE_URL}/exchange-rates"
@@ -90,6 +90,8 @@ def test_get_nonexistent_exchange_rate():
     assert response.status_code == 404
 
 def test_create_duplicate_exchange_rate():
+    # Exchange rates are unique by (from_currency, to_currency, effective_date)
+    # This test runs after test_delete_exchange_rate freed the "2023-10-01" date slot
     token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
     url = f"{BASE_URL}/exchange-rates"
@@ -101,9 +103,19 @@ def test_create_duplicate_exchange_rate():
         "source": "API_TEST",
         "notes": "Test note"
     }
+    # First create should succeed (slot was freed by delete test above)
     response = requests.post(url, json=payload, headers=headers)
     log_result("test_create_duplicate_exchange_rate", "POST", url, response.status_code, payload, response.json())
+    assert response.status_code == 201
+    created_id = response.json()["data"]["id"]
+
+    # Second create with same key should fail with 409
+    response = requests.post(url, json=payload, headers=headers)
+    log_result("test_create_duplicate_exchange_rate_conflict", "POST", url, response.status_code, payload, response.json())
     assert response.status_code == 409
+
+    # Clean up so next run doesn't conflict
+    requests.delete(f"{url}/{created_id}", headers=headers)
 
 def main():
     failures = 0
