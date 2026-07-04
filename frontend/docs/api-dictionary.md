@@ -1109,7 +1109,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 ### Crear transferencia `POST /transfers`
 
 **Checklist de conformidad:**
-- ⚠️ No probado
+- ✅ 201 con data en snake_case y mensajes en español
 
 **Request shape:**
 ```json
@@ -1119,8 +1119,9 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   "notes": "API_TEST_DELETE_CREATE",
   "items": [
     {
-      "product_id": 1,
-      "quantity_requested": 10.0
+      "product_id": 1187,
+      "loose_units": 5,
+      "package_quantity": 0
     }
   ]
 }
@@ -1128,24 +1129,65 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 **Response shape:**
 
-*Status: 400*
+*Status: 201*
 ```json
 {
-  "message": "La cantidad total debe ser mayor a cero para el producto Updated Test Product"
+  "data": {
+    "id": 1,
+    "transfer_number": "TRF-20260704-0001",
+    "origin_warehouse_id": 1,
+    "destination_warehouse_id": 2,
+    "transfer_date": "2026-07-04T00:00:00.000Z",
+    "status": "pending",
+    "notes": "API_TEST_DELETE_CREATE",
+    "requested_by": 1,
+    "approved_by": null,
+    "shipped_by": null,
+    "received_by": null,
+    "approval_date": null,
+    "ship_date": null,
+    "received_date": null,
+    "created_at": "2026-07-04T00:00:00.000Z",
+    "updated_at": "2026-07-04T00:00:00.000Z"
+  }
+}
+```
+
+*Status: 401*
+```json
+{
+  "message": "No token provided. Authentication required."
 }
 ```
 
 ### Obtener transferencia `GET /transfers/{id}`
 
 **Checklist de conformidad:**
-- ⚠️ No probado
+- ✅ 200 con data en snake_case
 
 **Response shape:**
 
-*Status: 404*
+*Status: 200*
 ```json
 {
-  "message": "Transferencia no encontrada"
+  "data": {
+    "id": 1,
+    "transfer_number": "TRF-20260704-0001",
+    "origin_warehouse_id": 1,
+    "destination_warehouse_id": 2,
+    "transfer_date": "2026-07-04T00:00:00.000Z",
+    "status": "pending",
+    "notes": "API_TEST_DELETE_CREATE",
+    "requested_by": 1,
+    "approved_by": null,
+    "shipped_by": null,
+    "received_by": null,
+    "approval_date": null,
+    "ship_date": null,
+    "received_date": null,
+    "created_at": "2026-07-04T00:00:00.000Z",
+    "updated_at": "2026-07-04T00:00:00.000Z"
+  }
 }
 ```
 
@@ -1188,9 +1230,9 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 | Endpoint | GET List | GET Item | POST Create | PUT Update | DELETE |
 |----------|-----------|----------|-------------|-----------|--------|
-| Status Codes | ✅ 200, ❌ 401 | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| Data en snake_case | ✅ | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| Mensajes en español | ❌ | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| Status Codes | ✅ 200, ❌ 401 | ✅ 200 | ✅ 201, ❌ 401 | ⚠️ No probado | ⚠️ No probado |
+| Data en snake_case | ✅ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
+| Mensajes en español | ❌ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
 ```
 ## SLE — Ventas (`/api/sales`)
 <!-- ═══════════════════════════════ -->

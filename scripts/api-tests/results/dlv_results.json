@@ -1,0 +1,10 @@
+{"test": "test_list_deliveries", "method": "GET", "path": "/deliveries", "status": 200, "request": null, "response": null}
+{"test": "test_list_deliveries_no_auth", "method": "GET", "path": "/deliveries", "status": 401, "request": null, "response": null}
+{"test": "test_create_delivery", "method": "POST", "path": "/deliveries", "status": 400, "request": null, "response": null}
+{"test": "test_create_delivery_no_auth", "method": "POST", "path": "/deliveries", "status": 401, "request": null, "response": null}
+{"test": "test_get_delivery", "method": "GET", "path": "/deliveries/1", "status": 404, "request": null, "response": null}
+{"test": "test_get_delivery_no_auth", "method": "GET", "path": "/deliveries/1", "status": 401, "request": null, "response": null}
+{"test": "test_update_delivery", "method": "PUT", "path": "/deliveries/1", "status": 404, "request": null, "response": null}
+{"test": "test_update_delivery_no_auth", "method": "PUT", "path": "/deliveries/1", "status": 401, "request": null, "response": null}
+{"test": "test_delete_delivery", "method": "DELETE", "path": "/deliveries/1", "status": 404, "request": null, "response": null}
+{"test": "test_delete_delivery_no_auth", "method": "DELETE", "path": "/deliveries/1", "status": 401, "request": null, "response": null}
