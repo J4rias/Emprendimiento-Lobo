@@ -1049,20 +1049,20 @@ Con 27 módulos × 4 tests = 108 tests mínimo. Hoy hay 3.
 
 **Cambios visibles para el frontend y el atlas-bot. Coordinación explícita requerida.**
 
-| Tarea                                                   | Esfuerzo   |
-|---------------------------------------------------------|------------|
-| **Mapear endpoints del bot en api-dictionary.md (§7.13.1)** | 2 h   |
-| Eliminar `success` wrapper (helpers activados, §5.1)   | 2 semanas  |
-| Migrar date params a `date_from`/`date_to`             | 1 semana   |
-| Migrar `sortBy`/`sortOrder` → `sort_by`/`sort_dir`     | 3 días     |
-| Añadir `sort_by`/`sort_dir` en todos los LIST          | 1 semana   |
-| Path renames (§6.1) con deprecation log                | 2 semanas  |
-| Eliminar paths viejos tras confirmar cero uso (frontend + bot) | 1 semana |
-| **Extraer SaleService como primer servicio (§7.10)**   | 1 semana   |
-| Migrar controllers/routes a TS por módulo (TS-first)   | embebido   |
-| **Fix N+1 queries en PO, CST, INV (§7.12.1)**         | embebido   |
-| Setup **CI/CD** básico (GitHub Actions) (§7.6)         | 1 día      |
-| **Política de transacciones: sequelize.transaction() donde falta (§8.5)** | embebido |
+| Tarea                                                   | Estado | Esfuerzo   |
+|---------------------------------------------------------|--------|------------|
+| **Mapear endpoints del bot en api-dictionary.md (§7.13.1)** | ✅ 2026-07-04 | 2 h |
+| Eliminar `success` wrapper (helpers activados, §5.1)   | ✅ ya ausente en controllers; 6 bugs frontend corregidos 2026-07-04 | — |
+| Migrar date params a `date_from`/`date_to`             | ✅ ya conformes en todos los controllers | — |
+| Migrar `sortBy`/`sortOrder` → `sort_by`/`sort_dir`     | ✅ sin camelCase en controllers | — |
+| Añadir `sort_by`/`sort_dir` en todos los LIST          | ✅ 11 controllers actualizados 2026-07-04 | 1 semana |
+| **Fix N+1 queries en PO, CST, INV (§7.12.1)**         | ✅ PO batch query 2026-07-04; CST/INV ya usaban batch load | embebido |
+| Setup **CI/CD** básico (GitHub Actions) (§7.6)         | ✅ `.github/workflows/ci.yml` — 2026-07-04 | 1 día |
+| **Política de transacciones: sequelize.transaction() (§8.5)** | ✅ auditado: todos los flujos críticos multi-tabla ya tienen transaction() | embebido |
+| Path renames (§6.1) con deprecation log                | ✅ parcial 2026-07-04 — 12 rutas deprecadas, query-params alternativos implementados | 2 semanas  |
+| Eliminar paths viejos tras confirmar cero uso          | 🔜 (coordinar con FE — verificar 0 uso en prod) | 1 semana |
+| **Extraer SaleService como primer servicio (§7.10)**   | ✅ `services/sale.service.ts` — createSale, cancelSale, addPayment extraídos — 2026-07-04 | 1 semana   |
+| Migrar controllers/routes a TS por módulo (TS-first)   | ✅ 25/25 controllers `.ts` — Orq4 commit `4924d30`, 2026-07-04 | embebido   |
 
 **Entregable:** API conforme al estándar documentado, atlas-bot coordinado, service layer iniciada.
 

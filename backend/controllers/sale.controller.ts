@@ -15,377 +15,34 @@ import PosReservation from '../models/PosReservation';
 import Role from '../models/Role';
 import CreditNote from '../models/CreditNote';
 import ExchangeRate from '../models/ExchangeRate';
+import * as saleService from '../services/sale.service';
+import { ServiceError } from '../services/sale.service';
 
 const bcrypt = require('bcryptjs');
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
 
-const generateSaleNumber = async () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-
-  const prefix = `VEN-${year}${month}${day}`;
-
-  const lastSale = await Sale.findOne({
-    where: {
-      sale_number: {
-        [Op.like]: `${prefix}%`
-      }
-    },
-    order: [['sale_number', 'DESC']]
-  }) as any;
-
-  let sequence = 1;
-  if (lastSale) {
-    const lastSequence = parseInt(lastSale.sale_number.split('-').pop());
-    sequence = lastSequence + 1;
-  }
-
-  return `${prefix}-${String(sequence).padStart(4, '0')}`;
-};
+// generateSaleNumber moved to sale.service.ts
 
 export const createSale = async (req: Request, res: Response) => {
-  const transaction = await sequelize.transaction();
-
   try {
-    const {
-      customer_id,
-      warehouse_id,
-      sale_type,
-      currency_mode = 'COP',
-      payment_lines = [],
-      items,
-      discount_amount = 0,
-      notes,
-      quote_id,
-      exchange_rate = 1,
-      authorized_by
-    } = req.body;
+    const { sale, affectedProductIds } = await saleService.createSale(
+      { ...req.body, session_id: req.body.session_id, tab_id: req.body.tab_id },
+      (req as any).user.id,
+      (req as any).user.role?.name
+    );
 
-    // Credit/mixed sales: non-admin users require admin authorization
-    if (sale_type === 'credit' || sale_type === 'mixed') {
-      const isAdmin = (req as any).user.role?.name === 'Administrador';
-      if (!isAdmin && !authorized_by) {
-        await transaction.rollback();
-        return res.status(403).json({
-          message: 'Venta a crédito requiere autorización de un administrador'
-        });
-      }
-    }
-
-    // Separate credit lines from cash/card/transfer lines
-    const cashLines = payment_lines.filter((l: any) => l.method !== 'credit');
-    const creditLines = payment_lines.filter((l: any) => l.method === 'credit');
-
-    // Calculate total paid USD (excluding credit lines and change/vuelto lines)
-    let paid_amount = 0;
-    if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
-      paid_amount = cashLines.reduce((sum: number, line: any) => {
-        const amount = parseFloat(line.amount) || 0;
-        if (amount <= 0) return sum; // Skip change/vuelto lines (negative amounts)
-        const rate = parseFloat(line.exchange_rate) || 1;
-        return sum + (amount / rate);
-      }, 0);
-    }
-
-    // Calculate credit amount (USD equivalent of credit lines)
-    let credit_amount = 0;
-    if ((sale_type === 'credit' || sale_type === 'mixed') && creditLines.length > 0) {
-      credit_amount = creditLines.reduce((sum: number, line: any) => {
-        const amount = parseFloat(line.amount) || 0;
-        const rate = parseFloat(line.exchange_rate) || 1;
-        return sum + (amount / rate);
-      }, 0);
-    }
-
-    if (!items || items.length === 0) {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'La venta debe tener al menos un producto' });
-    }
-
-    if (!warehouse_id) {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'Debe especificar el depósito' });
-    }
-
-    // Extract POS session info once (used inside loop and after commit)
-    const session_id = req.body.session_id;
-    const tab_id = req.body.tab_id;
-
-    const sale_number = await generateSaleNumber();
-
-    let subtotal = 0;
-    let tax_amount = 0;
-    const saleDetails: any[] = [];
-    let vesUsdRate: number | null = null; // Lazy-loaded VES→USD rate for cost conversion
-
-    for (const item of items) {
-      const product = await Product.findByPk(item.product_id) as any;
-      if (!product) {
-        await transaction.rollback();
-        return res.status(404).json({ message: `Producto ${item.product_id} no encontrado` });
-      }
-
-      const presentation = await ProductPresentation.findByPk(item.presentation_id) as any;
-      if (!presentation) {
-        await transaction.rollback();
-        return res.status(404).json({ message: `Presentación ${item.presentation_id} no encontrada` });
-      }
-
-      const inventory = await Inventory.findOne({
-        where: {
-          product_id: item.product_id,
-          warehouse_id: warehouse_id
-        },
-        lock: transaction.LOCK.UPDATE,  // SELECT FOR UPDATE (bloqueo de fila)
-        transaction                     // ← necesario para que el lock sea parte de la transacción
-      }) as any;
-
-      if (!inventory) {
-        await transaction.rollback();
-        return res.status(400).json({
-          message: `No hay registro de inventario para ${product.name}`
-        });
-      }
-
-      const unit_price = item.unit_price || presentation.base_price;
-      const is_unit = item.is_unit || false;
-      const item_subtotal = unit_price * item.quantity;
-      const item_discount = item.discount_percent ? (item_subtotal * item.discount_percent / 100) : 0;
-      const taxable_amount = item_subtotal - item_discount;
-      const item_tax = taxable_amount * (item.tax_percent || 0) / 100;
-      const item_total = taxable_amount + item_tax;
-
-      subtotal += item_subtotal;
-      tax_amount += item_tax;
-
-      // Calculate base units for inventory deduction
-      // If sold as package, multiply quantity by units_per_package
-      const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
-
-      // Validar disponibilidad considerando reservas de OTROS tabs
-      // (las reservas de ESTA tab se liberarán al finalizar la venta)
-      // NOT (session_id = A AND tab_id = B)  ≡  (session_id != A  OR  tab_id != B)
-      // Solo contar reservas no expiradas
-      let reserved_by_others = 0;
-      if (session_id && tab_id) {
-        reserved_by_others = await PosReservation.sum('units_reserved', {
-          where: {
-            product_id: item.product_id,
-            expires_at: { [Op.gte]: new Date() },
-            [Op.or]: [
-              { session_id: { [Op.ne]: session_id } },
-              { tab_id: { [Op.ne]: tab_id } }
-            ]
-          },
-          transaction
-        }) || 0;
-      }
-
-      const available = parseFloat(inventory.quantity) - Number(reserved_by_others);
-
-      if (available < units_to_deduct) {
-        await transaction.rollback();
-        return res.status(409).json({
-          conflict: true,
-          message: `Stock insuficiente para ${product.name}. Otro vendedor reservó parte del stock.`,
-          product_name: product.name,
-          available: Math.max(0, available),
-          requested: units_to_deduct,
-          reserved_by_others: Number(reserved_by_others)
-        });
-      }
-
-      // Calculate cost_price in USD (base currency)
-      const rawCost = parseFloat(is_unit ? presentation.cost : presentation.package_cost) || 0;
-      let costPrice: number | null = null;
-      if (rawCost > 0) {
-        if (presentation.purchase_currency === 'COP' && exchange_rate > 1) {
-          costPrice = rawCost / exchange_rate;
-        } else if (presentation.purchase_currency === 'VES') {
-          if (vesUsdRate === null) {
-            try { vesUsdRate = await (ExchangeRate as any).getRate('VES', 'USD'); }
-            catch (e) { vesUsdRate = 0; }
-          }
-          costPrice = vesUsdRate > 0 ? rawCost * vesUsdRate : null;
-        } else {
-          costPrice = rawCost; // USD - use as-is
-        }
-      }
-
-      saleDetails.push({
-        product_id: item.product_id,
-        presentation_id: item.presentation_id,
-        batch_id: item.batch_id || null,
-        quantity: item.quantity,
-        is_unit: is_unit,
-        unit_price: unit_price,
-        discount_percent: item.discount_percent || 0,
-        discount_amount: item_discount,
-        tax_percent: item.tax_percent || 0,
-        tax_amount: item_tax,
-        subtotal: item_subtotal,
-        total: item_total,
-        cost_price: costPrice,
-        notes: item.notes || null
-      });
-
-      // Both cash and credit reduce physical stock immediately (goods leave warehouse on sale)
-      await inventory.update({
-        quantity: parseFloat(inventory.quantity) - units_to_deduct
-      }, { transaction });
-
-      // Register inventory movement for audit trail
-      await InventoryMovement.create({
-        product_id: item.product_id,
-        warehouse_id,
-        presentation_id: item.presentation_id,
-        movement_type: 'egreso',
-        quantity: units_to_deduct,
-        unit_cost: presentation.cost || null,
-        package_cost: presentation.package_cost || null,
-        currency: presentation.purchase_currency || 'USD',
-        reason: `Venta ${sale_number}`,
-        document_number: sale_number,
-        user_id: (req as any).user.id
-      } as any, { transaction });
-    }
-
-    const total = subtotal - discount_amount + tax_amount;
-    const change_amount = sale_type === 'cash' ? Math.max(0, paid_amount - total) : 0;
-
-    // Validate cash sales have sufficient payment
-    if (sale_type === 'cash' && paid_amount > 0 && paid_amount < total - 0.05) {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: `Pago insuficiente. Total: $${total.toFixed(2)}, Pagado: $${paid_amount.toFixed(2)}`
-      });
-    }
-
-    // For credit/mixed sales: credit_amount is either the full total (credit) or the credit lines (mixed)
-    if (sale_type === 'credit') {
-      credit_amount = total;
-    }
-
-    // Update customer's credit_used for sales with credit component
-    let credit_due_date: Date | null = null;
-    if ((sale_type === 'credit' || sale_type === 'mixed') && customer_id && credit_amount > 0) {
-      const customer = await Customer.findByPk(customer_id, { transaction }) as any;
-
-      if (!customer) {
-        await transaction.rollback();
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      const currentCreditUsed = parseFloat(customer.credit_used || 0);
-      await customer.update({
-        credit_used: currentCreditUsed + credit_amount
-      }, { transaction });
-
-      // Calculate credit due date from customer's credit_days
-      const creditDays = parseInt(customer.credit_days) || 0;
-      if (creditDays > 0) {
-        credit_due_date = new Date();
-        credit_due_date.setDate(credit_due_date.getDate() + creditDays);
-      }
-    }
-
-    const saleDate = new Date();
-    const sale = await Sale.create({
-      sale_number,
-      customer_id: customer_id || null,
-      warehouse_id,
-      user_id: (req as any).user.id,
-      sale_date: saleDate,
-      sale_type,
-      currency_mode,
-      exchange_rate,
-      payment_method: sale_type === 'cash' && cashLines.length > 0 ? cashLines[0].method : null,
-      subtotal,
-      tax_amount,
-      discount_amount,
-      total,
-      credit_amount,
-      credit_due_date,
-      paid_amount: (sale_type === 'cash' || sale_type === 'mixed') ? paid_amount : 0,
-      change_amount,
-      status: sale_type === 'cash' ? 'completed' : 'pending',
-      notes,
-      quote_id: quote_id || null,
-      created_by: (req as any).user.id,
-      authorized_by: (sale_type === 'credit' || sale_type === 'mixed')
-        ? ((req as any).user.role?.name === 'Administrador' ? (req as any).user.id : authorized_by)
-        : null
-    } as any, { transaction }) as any;
-
-    for (const detail of saleDetails) {
-      await SaleDetail.create({
-        sale_id: sale.id,
-        ...detail
-      } as any, { transaction });
-    }
-
-    if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
-      for (const payLine of cashLines) {
-        if (parseFloat(payLine.amount) !== 0) {
-          await SalePayment.create({
-            sale_id: sale.id,
-            payment_date: new Date(),
-            payment_method: payLine.method || 'cash',
-            amount: payLine.amount,
-            currency: payLine.currency || 'USD',
-            exchange_rate: payLine.exchange_rate || 1,
-            reference: payLine.reference || null,
-            bank_id: payLine.bank_id || null,
-            created_by: (req as any).user.id
-          } as any, { transaction });
-
-          // If payment is via credit_balance, deduct it from Customer
-          if (payLine.method === 'credit_balance' && customer_id) {
-            const customer = await Customer.findByPk(customer_id, { transaction }) as any;
-            if (customer) {
-              // The payment amount is in the specified currency, we need to deduct the equivalent in the Customer's base currency (always USD for balance in this system)
-              const amountUSD = parseFloat(payLine.amount) / (parseFloat(payLine.exchange_rate) || 1);
-              const currentBalance = parseFloat(customer.creditBalance || 0);
-              const newBalance = Math.max(0, currentBalance - amountUSD);
-              await customer.update({ creditBalance: newBalance }, { transaction });
-            }
-          }
-        }
-      }
-    }
-
-    await transaction.commit();
-
-    // Release POS reservations for this tab (session_id and tab_id declared above the for loop)
-    const affected_product_ids: any[] = [];
-
+    // Release POS reservations for this tab and emit socket events (controller-level concern)
+    const { session_id, tab_id } = req.body;
     if (session_id && tab_id) {
-      // Get all products affected by this tab's reservations
-      const reservations = await PosReservation.findAll({
-        where: { session_id, tab_id },
-        attributes: ['product_id']
-      }) as any[];
+      await PosReservation.destroy({ where: { session_id, tab_id } });
 
-      affected_product_ids.push(...reservations.map((r: any) => r.product_id));
-
-      // Delete all reservations for this tab
-      await PosReservation.destroy({
-        where: { session_id, tab_id }
-      });
-
-      // Emit Socket.io event to notify clients
       const io = req.app.get('io');
       if (io) {
-        for (const product_id of affected_product_ids) {
+        for (const product_id of affectedProductIds) {
           const totalReserved = await PosReservation.sum('units_reserved', {
             where: { product_id, expires_at: { [Op.gte]: new Date() } }
           }) || 0;
-
           io.to('pos-room').emit('reservation:changed', {
             product_id,
             total_reserved: totalReserved,
@@ -395,38 +52,41 @@ export const createSale = async (req: Request, res: Response) => {
       }
     }
 
-    const createdSale = await Sale.findByPk(sale.id, {
-      include: [
-        {
-          model: SaleDetail,
-          as: 'details',
-          include: [
-            { model: Product, as: 'product' },
-            { model: ProductPresentation, as: 'presentation' }
-          ]
-        },
-        { model: Customer, as: 'customer' },
-        { model: Warehouse, as: 'warehouse' },
-        { model: User, as: 'seller' }
-      ]
-    }) as any;
+    return res.status(201).json({ message: 'Venta creada exitosamente', data: sale });
 
-    res.status(201).json({
-      message: 'Venta creada exitosamente',
-      data: createdSale
-    });
-
-  } catch (error) {
-    await transaction.rollback();
+  } catch (error: any) {
+    if (error instanceof ServiceError) {
+      return res.status(error.status).json({ message: error.message, ...(error.extra || {}) });
+    }
     logger.error('Error creating sale:', error);
-    res.status(500).json({
-      message: 'Error al crear la venta'
-    });
+    return res.status(500).json({ message: 'Error al crear la venta' });
   }
 };
 
 export const getSales = async (req: Request, res: Response) => {
   try {
+    // ?sale_number=X shortcut — delegates to getSaleBySaleNumber logic inline
+    if (req.query.sale_number) {
+      const sale = await Sale.findOne({
+        where: { sale_number: req.query.sale_number as string },
+        include: [
+          { model: SaleDetail, as: 'details', include: [
+            { model: Product, as: 'product', attributes: ['id', 'name', 'sku'] },
+            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name'] },
+            { model: Batch, as: 'batch', attributes: ['id', 'batch_number', 'expiration_date'] }
+          ]},
+          { model: Customer, as: 'customer' },
+          { model: Warehouse, as: 'warehouse' },
+          { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'] },
+          { model: SalePayment, as: 'payments', include: [
+            { model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] }
+          ]}
+        ]
+      }) as any;
+      if (!sale) return res.status(404).json({ message: 'Venta no encontrada' });
+      return res.json({ data: sale });
+    }
+
     const {
       page = 1,
       limit = 25,
@@ -712,238 +372,37 @@ export const updateSale = async (req: Request, res: Response) => {
 };
 
 export const cancelSale = async (req: Request, res: Response) => {
-  const transaction = await sequelize.transaction();
-
   try {
     const { id } = req.params;
     const { reason } = req.body;
-
-    const sale = await Sale.findByPk(id, {
-      include: [{
-        model: SaleDetail,
-        as: 'details',
-        include: [{ model: ProductPresentation, as: 'presentation' }]
-      }]
-    }) as any;
-
-    if (!sale) {
-      await transaction.rollback();
-      return res.status(404).json({ message: 'Venta no encontrada' });
+    const sale = await saleService.cancelSale(parseInt(id), reason, (req as any).user.id);
+    return res.json({ message: 'Venta cancelada exitosamente', data: sale });
+  } catch (error: any) {
+    if (error instanceof ServiceError) {
+      return res.status(error.status).json({ message: error.message });
     }
-
-    if (sale.status === 'cancelled') {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'La venta ya está cancelada' });
-    }
-
-    for (const detail of sale.details) {
-      const inventory = await Inventory.findOne({
-        where: {
-          product_id: detail.product_id,
-          warehouse_id: sale.warehouse_id
-        },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      }) as any;
-
-      if (inventory) {
-        const units_to_return = detail.is_unit ? parseFloat(detail.quantity) : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
-
-        if (sale.status === 'completed' || sale.status === 'pending' || sale.status === 'partial') {
-          // Restore physical stock (goods return to warehouse on cancellation)
-          await inventory.update({
-            quantity: parseFloat(inventory.quantity) + units_to_return
-          }, { transaction });
-
-          // Register inventory movement for audit trail
-          await InventoryMovement.create({
-            product_id: detail.product_id,
-            warehouse_id: sale.warehouse_id,
-            presentation_id: detail.presentation_id,
-            movement_type: 'ingreso',
-            quantity: units_to_return,
-            reason: `Cancelación venta ${sale.sale_number}`,
-            document_number: sale.sale_number,
-            user_id: (req as any).user.id
-          } as any, { transaction });
-        }
-      }
-    }
-
-    // Revert customer credit_used for credit/mixed sales
-    if ((sale.sale_type === 'credit' || sale.sale_type === 'mixed') && sale.customer_id) {
-      const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
-      if (customer) {
-        const currentCreditUsed = parseFloat(customer.credit_used || 0);
-        const creditToRevert = sale.sale_type === 'credit'
-          ? parseFloat(sale.total)
-          : parseFloat(sale.credit_amount || 0);
-        await customer.update({
-          credit_used: Math.max(0, currentCreditUsed - creditToRevert)
-        }, { transaction });
-      }
-    }
-
-    await sale.update({
-      status: 'cancelled',
-      notes: `${sale.notes || ''}\nCANCELADA: ${reason || 'Sin razón especificada'}`,
-      updated_by: (req as any).user.id
-    }, { transaction });
-
-    await transaction.commit();
-
-    res.json({
-      message: 'Venta cancelada exitosamente',
-      data: sale
-    });
-
-  } catch (error) {
-    await transaction.rollback();
     logger.error('Error cancelling sale:', error);
-    res.status(500).json({
-      message: 'Error al cancelar la venta'
-    });
+    return res.status(500).json({ message: 'Error al cancelar la venta' });
   }
 };
 
 export const addPayment = async (req: Request, res: Response) => {
-  const transaction = await sequelize.transaction();
-
   try {
     const { id } = req.params;
-    const { payment_lines = [], notes } = req.body; // Adapt to new multi-payment support
-
-    const sale = await Sale.findByPk(id) as any;
-
-    if (!sale) {
-      await transaction.rollback();
-      return res.status(404).json({ message: 'Venta no encontrada' });
+    const { payment_lines = [], notes } = req.body;
+    const { payments, sale } = await saleService.addPayment(
+      parseInt(id),
+      payment_lines,
+      notes || null,
+      (req as any).user.id
+    );
+    return res.json({ message: 'Pagos registrados exitosamente', data: { payments, sale } });
+  } catch (error: any) {
+    if (error instanceof ServiceError) {
+      return res.status(error.status).json({ message: error.message });
     }
-
-    if (!['credit', 'mixed'].includes(sale.sale_type)) {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: 'Solo se pueden agregar pagos a ventas a crédito o mixtas'
-      });
-    }
-
-    if (sale.status === 'cancelled') {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: 'No se pueden agregar pagos a una venta cancelada'
-      });
-    }
-
-    if (!payment_lines || payment_lines.length === 0) {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'No se enviaron líneas de pago' });
-    }
-
-    // Pre-calculate total to validate before creating any records
-    const totalNewlyPaidUSD = payment_lines.reduce((sum: number, payLine: any) => {
-      return sum + (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
-    }, 0);
-
-    const remainingBalance = parseFloat(sale.total) - parseFloat(sale.paid_amount);
-    if (totalNewlyPaidUSD > remainingBalance + 0.01) {
-      await transaction.rollback();
-      return res.status(400).json({
-        message: 'El pago excede el saldo pendiente de la venta'
-      });
-    }
-
-    let newlyPaidUSD = 0;
-    const createdPayments: any[] = [];
-
-    for (const payLine of payment_lines) {
-      const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
-      newlyPaidUSD += amountUSD;
-
-      const payment = await SalePayment.create({
-        sale_id: sale.id,
-        payment_date: new Date(),
-        payment_method: payLine.method || 'cash',
-        amount: payLine.amount,
-        currency: payLine.currency || 'USD',
-        exchange_rate: payLine.exchange_rate || 1,
-        reference: payLine.reference || null,
-        bank_id: payLine.bank_id || null,
-        notes: notes || null,
-        created_by: (req as any).user.id
-      } as any, { transaction }) as any;
-
-      createdPayments.push(payment);
-
-      // If payment is via credit_balance, deduct it from Customer
-      if (payLine.method === 'credit_balance' && sale.customer_id) {
-        const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
-        if (customer) {
-          const amountUSD2 = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
-          const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - amountUSD2);
-          await customer.update({ creditBalance: newBalance }, { transaction });
-        }
-      }
-    }
-
-    const newPaidAmount = Math.min(parseFloat(sale.paid_amount) + newlyPaidUSD, parseFloat(sale.total));
-    const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
-    const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
-
-    await sale.update({
-      paid_amount: newPaidAmount,
-      credit_amount: newCreditAmount,
-      status: newStatus,
-      updated_by: (req as any).user.id
-    }, { transaction });
-
-    if (newStatus === 'completed') {
-      const saleDetails = await SaleDetail.findAll({
-        where: { sale_id: sale.id },
-        include: [{ model: ProductPresentation, as: 'presentation' }]
-      }) as any[];
-
-      for (const detail of saleDetails) {
-        const inventory = await Inventory.findOne({
-          where: {
-            product_id: detail.product_id,
-            warehouse_id: sale.warehouse_id
-          }
-        }) as any;
-
-        // No inventory change needed: stock was already reduced when the credit sale was created
-      }
-    }
-
-    // Update customer's credit_used to restore available credit
-    if (sale.customer_id) {
-      const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
-      if (customer) {
-        const currentCreditUsed = parseFloat(customer.credit_used || 0);
-        // Ensure credit_used doesn't drop below 0 due to rounding
-        const updatedCreditUsed = Math.max(0, currentCreditUsed - newlyPaidUSD);
-        await customer.update({ credit_used: updatedCreditUsed }, { transaction });
-      }
-    }
-
-    await transaction.commit();
-
-    const updatedSale = await Sale.findByPk(id, {
-      include: [
-        { model: SalePayment, as: 'payments' }
-      ]
-    }) as any;
-
-    res.json({
-      message: 'Pagos registrados exitosamente',
-      data: { payments: createdPayments, sale: updatedSale }
-    });
-
-  } catch (error) {
-    await transaction.rollback();
     logger.error('Error adding payment:', error);
-    res.status(500).json({
-      message: 'Error al registrar el pago'
-    });
+    return res.status(500).json({ message: 'Error al registrar el pago' });
   }
 };
 

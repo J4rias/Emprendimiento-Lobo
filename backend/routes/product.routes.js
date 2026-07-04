@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const validate = require('../middleware/validate');
 const { uploadSingle } = require('../middleware/upload');
+const logger = require('../config/logger');
 
 const router = express.Router();
 
@@ -15,10 +16,18 @@ router.use(auth);
 router.get('/', productController.getAll);
 
 // Export products to CSV
-router.get('/export-csv', productController.exportCSV);
+// DEPRECATED: use GET /api/products?format=csv instead
+router.get('/export-csv', (req, res, next) => {
+  logger.warn('[DEPRECATED] GET /api/products/export-csv — use GET /api/products?format=csv');
+  next();
+}, productController.exportCSV);
 
 // Search by barcode
-router.get('/barcode/:barcode', productController.searchByBarcode);
+// DEPRECATED: use GET /api/products?barcode=X instead
+router.get('/barcode/:barcode', (req, res, next) => {
+  logger.warn('[DEPRECATED] GET /api/products/barcode/:barcode — use GET /api/products?barcode=X');
+  next();
+}, productController.searchByBarcode);
 
 // Get product by ID
 router.get('/:id', productController.getById);

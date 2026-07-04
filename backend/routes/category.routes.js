@@ -4,6 +4,7 @@ const categoryController = require('../controllers/category.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const validate = require('../middleware/validate');
+const logger = require('../config/logger');
 
 const router = express.Router();
 
@@ -14,7 +15,11 @@ router.use(auth);
 router.get('/', categoryController.getAll);
 
 // Get categories with product count
-router.get('/with-count', categoryController.getWithProductCount);
+// DEPRECATED: use GET /api/categories?include=product_count instead
+router.get('/with-count', (req, res, next) => {
+  logger.warn('[DEPRECATED] GET /api/categories/with-count — use GET /api/categories?include=product_count');
+  next();
+}, categoryController.getWithProductCount);
 
 // Get category by ID
 router.get('/:id', categoryController.getById);

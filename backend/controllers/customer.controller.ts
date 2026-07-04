@@ -29,9 +29,15 @@ class CustomerController {
         search,
         status,
         type,
+        is_active,
         sort_by = 'created_at',
         sort_dir = 'DESC'
       } = req.query as Record<string, string>;
+
+      // ?is_active=true → slim list for dropdowns (equivalent to /active endpoint)
+      if (is_active === 'true') {
+        return this.getActiveCustomers(req, res, next);
+      }
 
       const page = parseInt(pageStr, 10);
       const limit = parseInt(limitStr, 10);

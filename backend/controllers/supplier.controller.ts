@@ -18,7 +18,12 @@ const { sequelize } = require('../config/database');
 
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { pageStr = '1', limitStr = '20', search = '', sort_by = 'name', sort_dir = 'ASC' } = req.query as Record<string, string>;
+    const { pageStr = '1', limitStr = '20', search = '', sort_by = 'name', sort_dir = 'ASC', is_active } = req.query as Record<string, string>;
+
+    // ?is_active=true → slim list for dropdowns (equivalent to /active endpoint)
+    if (is_active === 'true') {
+      return getActive(req, res, next);
+    }
     const page = parseInt(pageStr, 10);
     const limit = parseInt(limitStr, 10);
     const offset = (page - 1) * limit;

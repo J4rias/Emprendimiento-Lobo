@@ -177,6 +177,18 @@ class InventoryController {
     }
   }
 
+  // GET /api/inventory?warehouse_id=X or ?product_id=X (new normalized endpoint)
+  async getByQuery(req: Request, res: Response, next: NextFunction) {
+    const { warehouse_id, product_id } = req.query as Record<string, string>;
+    if (product_id) {
+      req.params.product_id = product_id;
+      return this.getByProduct(req, res, next);
+    }
+    // warehouse_id (or 'all') — default to 'all' when neither is provided
+    req.params.warehouse_id = warehouse_id || 'all';
+    return this.getByWarehouse(req, res, next);
+  }
+
   // Get inventory by ID
   async getById(req: Request, res: Response, next: NextFunction) {
     try {

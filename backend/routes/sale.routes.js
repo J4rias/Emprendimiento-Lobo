@@ -3,6 +3,7 @@ const router = express.Router();
 const saleController = require('../controllers/sale.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const logger = require('../config/logger');
 
 router.post('/validate-credit-pin',
   auth,
@@ -52,9 +53,14 @@ router.get('/product-sales',
   saleController.getProductSales
 );
 
+// DEPRECATED: use GET /api/sales?sale_number=X instead
 router.get('/by-number/:saleNumber',
   auth,
   authorize('sales.view'),
+  (req, res, next) => {
+    logger.warn('[DEPRECATED] GET /api/sales/by-number/:saleNumber — use GET /api/sales?sale_number=X');
+    next();
+  },
   saleController.getSaleBySaleNumber
 );
 

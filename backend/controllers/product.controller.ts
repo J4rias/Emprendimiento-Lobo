@@ -32,9 +32,22 @@ class ProductController {
         is_active,
         is_perishable,
         price_list_id,
+        barcode,
+        format,
         sort_by = 'created_at',
         sort_dir = 'DESC'
       } = req.query as Record<string, string>;
+
+      // ?barcode=X exact lookup — delegates to searchByBarcode
+      if (barcode) {
+        req.params.barcode = barcode;
+        return this.searchByBarcode(req, res, next);
+      }
+
+      // ?format=csv — delegates to exportCSV
+      if (format === 'csv') {
+        return this.exportCSV(req, res, next);
+      }
 
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const where: any = {};

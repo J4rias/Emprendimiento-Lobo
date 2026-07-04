@@ -6,12 +6,18 @@ const { brandService } = require('../services/brand.service');
 // Get all brands with pagination and search
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page: pageStr = '1', limit: limitStr = '25', search = '', sort_by = 'name', sort_dir = 'ASC' } = req.query as Record<string, string>;
+    const { page: pageStr = '1', limit: limitStr = '25', search = '', sort_by = 'name', sort_dir = 'ASC', is_active } = req.query as Record<string, string>;
     const page = parseInt(pageStr, 10);
     const limit = parseInt(limitStr, 10);
     const offset = (page - 1) * limit;
 
-    const where = {
+    // If is_active=true is requested, delegate to brandService.getAll() (slim, no pagination)
+    if (is_active === 'true') {
+      const brands = await brandService.getAll();
+      return res.json({ data: brands });
+    }
+
+    const where: any = {
       [Op.or]: [
         { name: { [Op.like]: `%${search}%` } },
         { description: { [Op.like]: `%${search}%` } }

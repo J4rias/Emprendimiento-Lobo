@@ -3,6 +3,7 @@ const router = express.Router();
 const supplierController = require('../controllers/supplier.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const logger = require('../config/logger');
 
 // All routes require authentication
 router.use(auth);
@@ -11,7 +12,11 @@ router.use(auth);
 router.get('/', authorize('suppliers.view'), supplierController.getAll);
 
 // Get active suppliers for dropdowns
-router.get('/active', authorize('suppliers.view'), supplierController.getActive);
+// DEPRECATED: use GET /api/suppliers?is_active=true instead
+router.get('/active', authorize('suppliers.view'), (req, res, next) => {
+  logger.warn('[DEPRECATED] GET /api/suppliers/active — use GET /api/suppliers?is_active=true');
+  next();
+}, supplierController.getActive);
 
 // Resumen de proveedores - saldos por categoría (USD/DIVISAS/COP)
 router.get('/resumen', authorize('suppliers.view'), supplierController.getResumen);
