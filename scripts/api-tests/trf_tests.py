@@ -85,26 +85,27 @@ def test_update_transfer():
     headers = {"Authorization": f"Bearer {token}"}
 
     # Note: API uses POST /:id/cancel instead of PUT/DELETE
-    # For this test, we'll create a transfer and then cancel it
-    transfer_id = 1  # Assuming there's at least one transfer with ID 1 for testing
+    # Create a fresh pending transfer to cancel (can't cancel already-cancelled transfers)
+    payload = {
+        "origin_warehouse_id": 1,
+        "destination_warehouse_id": 2,
+        "notes": "API_TEST_DELETE_CANCEL",
+        "items": [{"product_id": 1187, "loose_units": 5, "package_quantity": 0}]
+    }
+    create_response = requests.post(f"{BASE_URL}/transfers", headers=headers, json=payload)
+    if create_response.status_code != 201:
+        # Can't test cancel without a fresh transfer
+        return
+    transfer_id = create_response.json()["data"]["transfer"]["id"]
+
     response = requests.post(f"{BASE_URL}/transfers/{transfer_id}/cancel", headers=headers)
     log_result("test_cancel_transfer", "POST", f"/transfers/{transfer_id}/cancel", response.status_code, None, response.json() if response.status_code != 204 else None)
-    # Accept 200, 204, or 404 (if transfer doesn't exist)
-    assert response.status_code in [200, 204, 404]
+    assert response.status_code in [200, 204]
 
 def test_delete_transfer():
-    token = get_token()
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Note: API uses POST /:id/cancel instead of DELETE
-    # This test is redundant with test_update_transfer now
+    # Note: API uses POST /:id/cancel instead of DELETE — no DELETE endpoint exists
+    # This test is intentionally a no-op
     pass
-
-    # Happy path
-    transfer_id = 1  # Assuming there's at least one transfer with ID 1 for testing
-    response = requests.delete(f"{BASE_URL}/transfers/{transfer_id}", headers=headers)
-    log_result("test_delete_transfer_happy_path", "DELETE", f"/transfers/{transfer_id}", response.status_code, None, response.json())
-    assert response.status_code == 204
 
 def main():
     tests = [

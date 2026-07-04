@@ -1150,12 +1150,49 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 *Status: 200*
 ```json
 {
-  "data": [],
+  "data": [
+    {
+      "id": 1,
+      "transfer_number": "TRF-20260704-0001",
+      "origin_warehouse_id": 1,
+      "destination_warehouse_id": 2,
+      "transfer_date": "2026-07-04T00:00:00.000Z",
+      "status": "pending",
+      "notes": "API_TEST_DELETE_CREATE",
+      "requested_by": 1,
+      "approved_by": null,
+      "shipped_by": null,
+      "received_by": null,
+      "approval_date": null,
+      "ship_date": null,
+      "received_date": null,
+      "created_at": "2026-07-04T00:00:00.000Z",
+      "updated_at": "2026-07-04T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "transfer_number": "TRF-20260704-0002",
+      "origin_warehouse_id": 1,
+      "destination_warehouse_id": 2,
+      "transfer_date": "2026-07-04T00:00:00.000Z",
+      "status": "cancelled",
+      "notes": "API_TEST_DELETE_CANCEL",
+      "requested_by": 1,
+      "approved_by": null,
+      "shipped_by": null,
+      "received_by": null,
+      "approval_date": null,
+      "ship_date": null,
+      "received_date": null,
+      "created_at": "2026-07-04T00:00:00.000Z",
+      "updated_at": "2026-07-04T00:00:00.000Z"
+    }
+  ],
   "pagination": {
-    "total": 0,
+    "total": 5,
     "page": 1,
     "limit": 20,
-    "totalPages": 0
+    "totalPages": 1
   }
 }
 ```
@@ -1294,7 +1331,6 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 | Status Codes | ✅ 200, ❌ 401 | ✅ 200 | ✅ 201, ❌ 401 | ⚠️ No probado | ⚠️ No probado |
 | Data en snake_case | ✅ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
 | Mensajes en español | ❌ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
-```
 ## SLE — Ventas (`/api/sales`)
 <!-- ═══════════════════════════════ -->
 
