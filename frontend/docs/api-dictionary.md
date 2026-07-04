@@ -2291,12 +2291,13 @@ PUT http://localhost:5001/api/purchase-orders/500
   {
     "data": [
       {
-        "id": 17,
-        "code": "COT-2026-00017",
+        "id": 43,
+        "code": "COT-2026-00043",
         "customerId": 1,
-        "priceList": null,
-        "date": "2023-10-04T09:27:37.000Z",
-        "expirationDate": "2023-10-19T09:27:37.000Z",
+        "priceListId": null,
+        "userId": 1,
+        "quoteDate": "2026-07-04T09:27:37.000Z",
+        "expirationDate": "2026-07-19T09:27:37.000Z",
         "status": "draft",
         "currency": "USD",
         "exchangeRate": 1,
@@ -2308,11 +2309,11 @@ PUT http://localhost:5001/api/purchase-orders/500
         "total": 23.6,
         "paymentTerms": null,
         "deliveryTerms": null,
-        "notes": "API_TEST_DELETE_QUOTE_1783135657",
+        "notes": "API_TEST_DELETE_QUOTE_1783139793",
         "internalNotes": null,
         "convertedToSaleId": null,
-        "createdAt": "2023-10-04T09:27:37.000Z",
-        "updatedAt": "2023-10-04T09:27:37.000Z"
+        "createdAt": "2026-07-04T09:27:37.000Z",
+        "updatedAt": "2026-07-04T09:27:37.000Z"
       },
       ...
     ],
@@ -2968,29 +2969,29 @@ Inicia sesión y obtiene un token de autenticación.
         "reason_description": null,
         "type": "partial",
         "status": "applied",
-        "exchange_rate": "2675.518050",
-        "subtotal": "3.176955",
+        "exchange_rate": "2745.830000",
+        "subtotal": "45.648798",
         "tax_amount": "0.000000",
-        "total": "3.176955",
+        "total": "45.648798",
         "refund_method": "credit_balance",
-        "refund_amount": "3.176955",
+        "refund_amount": "45.648798",
         "refund_reference": null,
         "notes": null,
         "created_by": 1,
         "approved_by": 1,
-        "approved_at": "2026-06-26T15:37:04.000Z",
-        "created_at": "2026-06-26T15:37:04.000Z",
-        "updated_at": "2026-06-26T15:37:04.000Z",
+        "approved_at": "2026-06-25T22:08:05.000Z",
+        "created_at": "2026-06-25T22:08:04.000Z",
+        "updated_at": "2026-06-25T22:08:05.000Z",
         "sale": {
-          "id": 8116,
-          "sale_number": "VEN-20260626-0029",
-          "sale_date": "2026-06-26T15:29:44.000Z",
-          "total": "69.893006"
+          "id": 8075,
+          "sale_number": "VEN-20260625-0014",
+          "sale_date": "2026-06-25T22:03:39.000Z",
+          "total": "128.720000"
         },
         "customer": {
-          "id": 270,
-          "firstName": "HECTOR ",
-          "lastName": "MOSQUERA",
+          "id": 302,
+          "firstName": "JUAN ",
+          "lastName": "PEREZ",
           "businessName": null,
           "tradeName": null,
           "type": "natural",
@@ -3017,24 +3018,24 @@ Inicia sesión y obtiene un token de autenticación.
         },
         "details": [
           {
-            "id": 180,
-            "credit_note_id": 161,
-            "sale_detail_id": 34980,
-            "product_id": 899,
-            "presentation_id": 725,
+            "id": 179,
+            "credit_note_id": 160,
+            "sale_detail_id": 34852,
+            "product_id": 100,
+            "presentation_id": 100,
             "batch_id": null,
             "package_quantity_returned": 1,
             "loose_units_returned": 0,
-            "unit_price": "3.18",
+            "unit_price": "4.97",
             "discount_percent": "0.00",
             "tax_percent": "0.00",
-            "line_total": "3.18",
+            "line_total": "4.97",
             "return_to_stock": true,
-            "created_at": "2026-06-26T15:37:04.000Z",
-            "updated_at": "2026-06-26T15:37:04.000Z",
+            "created_at": "2026-06-25T22:08:04.000Z",
+            "updated_at": "2026-06-25T22:08:04.000Z",
             "presentation": {
-              "id": 725,
-              "units_per_package": 12
+              "id": 100,
+              "units_per_package": 1
             }
           }
         ]
@@ -3055,33 +3056,179 @@ Inicia sesión y obtiene un token de autenticación.
     "sale_id": 1,
     "customer_id": 2,
     "warehouse_id": 3,
-    "status": "pending",
-    "created_by": 4
+    "credit_note_date": "2026-06-29",
+    "reason": "return",
+    "type": "partial",
+    "status": "applied",
+    "exchange_rate": "2745.830000",
+    "subtotal": "45.648798",
+    "tax_amount": "0.000000",
+    "total": "45.648798",
+    "refund_method": "credit_balance",
+    "refund_amount": "45.648798",
+    "notes": null,
+    "created_by": 1,
+    "approved_by": 1
   }
   ```
-- **Response Shape** (Status: 400):
+- **Response Shape** (Status: 201):
   ```json
   {
-    "message": "Faltan campos requeridos: sale_id, reason, type, items"
+    "data": {
+      "id": 163,
+      "credit_note_number": "NC-20260629-0002",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z"
+    }
   }
   ```
 
-### Homogeneidad del Módulo
+#### GET `/credit-notes/{id}`
+- **Descripción**: Obtiene una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (200)
+- **Request**:
+  ```json
+  null
+  ```
+- **Response Shape** (Status: 200):
+  ```json
+  {
+    "data": {
+      "id": 162,
+      "credit_note_number": "NC-20260629-0001",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z"
+    }
+  }
+  ```
 
-| Criterio                  | GET `/credit-notes` | POST `/credit-notes` |
-|---------------------------|---------------------|----------------------|
-| URL en snake_case         | ✅                  | ✅                   |
-| Mensajes en español       | ⚠️                 | ⚠️                  |
-| Respuestas con "data"     | ✅                  | N/A                  |
-| Respuesta en snake_case   | ✅                  | N/A                  |
+#### PUT `/credit-notes/{id}`
+- **Descripción**: Actualiza una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (200)
+- **Request**:
+  ```json
+  {
+    "sale_id": 1,
+    "customer_id": 2,
+    "warehouse_id": 3,
+    "credit_note_date": "2026-06-29",
+    "reason": "return",
+    "type": "partial",
+    "status": "applied",
+    "exchange_rate": "2745.830000",
+    "subtotal": "45.648798",
+    "tax_amount": "0.000000",
+    "total": "45.648798",
+    "refund_method": "credit_balance",
+    "refund_amount": "45.648798",
+    "notes": null,
+    "created_by": 1,
+    "approved_by": 1
+  }
+  ```
+- **Response Shape** (Status: 200):
+  ```json
+  {
+    "data": {
+      "id": 162,
+      "credit_note_number": "NC-20260629-0001",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z"
+    }
+  }
+  ```
 
-### HTTP Status Codes Observados
+#### DELETE `/credit-notes/{id}`
+- **Descripción**: Elimina una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (204)
+- **Request**:
+  ```json
+  null
+  ```
+- **Response Shape** (Status: 204):
+  ```json
+  {
+    "message": "Nota de crédito eliminada exitosamente"
+  }
+  ```
 
-- **GET `/credit-notes`**:
-  - 200: Lista de notas de crédito
+### Tabla de Homogeneidad
 
-- **POST `/credit-notes`**:
-  - 400: Faltan campos requeridos: sale_id, reason, type, items
+| Endpoint | URL en snake_case | Mensajes en español | Estructura de datos consistente |
+|----------|-------------------|--------------------|--------------------------------|
+| GET `/credit-notes` | ✅ | ⚠️ No probado (200) | ✅ |
+| POST `/credit-notes` | ✅ | ⚠️ No probado (400) | ✅ |
+| GET `/credit-notes/{id}` | ✅ | ⚠️ No probado (200) | ✅ |
+| PUT `/credit-notes/{id}` | ✅ | ⚠️ No probado (200) | ✅ |
+| DELETE `/credit-notes/{id}` | ✅ | ⚠️ No probado (204) | ✅ |
+
+### Notas Adicionales
+
+- Los endpoints de `GET`, `POST`, `PUT` y `DELETE` para notas de crédito están documentados con sus respectivos request y response shapes.
+- Se ha mantenido la consistencia en la estructura de datos y se han utilizado URLs en snake_case.
 ```
 ## DLV — Entregas (`/api/deliveries`)
 <!-- ═══════════════════════════════ -->

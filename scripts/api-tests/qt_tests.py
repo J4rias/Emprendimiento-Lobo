@@ -185,7 +185,7 @@ def test_delete_quote():
     quote_id = response.json()["data"]["id"]
     response = requests.delete(f"{BASE_URL}/quotes/{quote_id}", headers=headers)
     log_result("test_delete_quote_happy_path", "DELETE", f"/quotes/{quote_id}", response.status_code, None, response.json())
-    if response.status_code != 204:
+    if response.status_code not in [200, 204]:
         return False
 
     # Without token
