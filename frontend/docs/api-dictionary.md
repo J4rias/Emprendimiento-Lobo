@@ -1693,74 +1693,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Method**: `GET`
 - **Path**: `/customers/99999999`
 - **Auth Required**: Yes
-- **Response Shape**:
-  ```json
-  {
-    "message": "Cliente no encontrado"
-  }
-  ```
-- **Status Codes Observed**: 404 (Not Found)
-- **Conformity Checklist**:
-  - ❌ Response shape matches new spec
-  - ✅ Message in Spanish
-  - ⚠️ Partial conformance
-
-#### Crear Cliente Duplicado
-- **Method**: `POST`
-- **Path**: `/customers`
-- **Auth Required**: Yes
-- **Request Shape**:
-  ```json
-  {
-    "code": "API_TEST_DELETE_CST_1783128675",
-    "type": "natural",
-    "documentType": "V",
-    "documentNumber": "1234567890",
-    "firstName": "Test",
-    "lastName": "User",
-    "email": "test@example.com",
-    "phone": "1234567890",
-    "mobile": "0987654321",
-    "address": "Test Address",
-    "city": "Test City",
-    "state": "Test State",
-    "country": "Venezuela",
-    "postalCode": "1000",
-    "creditLimit": 1000.0,
-    "creditDays": 30,
-    "priceListId": 1,
-    "discountPercentage": 5.0,
-    "status": "active"
-  }
-  ```
-- **Response Shape**:
-  ```json
-  {
-    "message": "Ya existe un cliente con el documento 1234567890"
-  }
-  ```
-- **Status Codes Observed**: 400 (Bad Request)
-- **Conformity Checklist**:
-  - ❌ Response shape matches new spec
-  - ✅ Message in Spanish
-  - ⚠️ Partial conformance
-
-### Homogeneidad del Módulo
-| Endpoint | Conformidad |
-|----------|-------------|
-| Listar Clientes | ✅ |
-| Crear Cliente | ✅ |
-| Listar Clientes sin Autenticación | ⚠️ |
-| Obtener Cliente No Encontrado | ⚠️ |
-| Crear Cliente Duplicado | ⚠️ |
-
-### HTTP Status Codes Observados
-- 200 (OK)
-- 201 (Created)
-- 400 (Bad Request)
-- 401 (Unauthorized)
-- 404 (Not Found)
-
+- *
+...[truncado]...
 ```
 ## SUP — Proveedores (`/api/suppliers`)
 <!-- ═══════════════════════════════ -->
@@ -2083,20 +2017,26 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 #### Eliminar Pago a Proveedor
 - **Method**: `DELETE`
 - **Path**: `/supplier-payments/{id}`
-- **Status Code**: 200 ⚠️ No probado
+- **Status Code**: ⚠️ No probado
 
 ### Tabla de Homogeneidad del Módulo
 
-| Criterio | Listar Pagos | Crear Pago | Obtener Pago | Actualizar Pago |
-|----------|---------------|------------|--------------|-----------------|
-| **snake_case** | ✅ | ✅ | ✅ | ✅ |
-| **Mensajes en español** | ✅ | ✅ | ✅ | ✅ |
-| **Respuestas con "data"** | ✅ | ✅ | ✅ | ✅ |
+| Criterio | Conformidad |
+|----------|-------------|
+| Mensajes en español | ✅ |
+| snake_case | ✅ |
+| Respuestas con "data" | ✅ |
+| Sin "success" | ✅ |
 
 ### HTTP Status Codes Observados
 
-- `200 OK`: Listar Pagos, Obtener Pago, Actualizar Pago
-- `201 Created`: Crear Pago
+- 200: OK
+- 201: Created
+- 400: Bad Request (para datos inválidos)
+- 401: Unauthorized (para autenticación fallida)
+- 403: Forbidden (para autorización fallida)
+- 404: Not Found (para recursos no encontrados)
+```
 ## PO — Órdenes de Compra (`/api/purchase-orders`)
 <!-- ═══════════════════════════════ -->
 
@@ -2258,19 +2198,22 @@ PUT http://localhost:5001/api/purchase-orders/500
 **Checklist de conformidad:**
 - ✅ Status code: ✅ Conforme (200)
 - ⚠️ Response shape: ⚠️ No probado
-- ✅ Mensajes en español: ✅ Conforme
-- ✅ snake_case: ✅ Conforme
+- ❌ Mensajes en español: ⚠️ No probado
+- ❌ snake_case: ⚠️ No probado
 
-### Homogeneidad del módulo PO
+### Tabla de Homogeneidad del Módulo
 
 | Endpoint | Status Code | Response Shape | Mensajes en Español | snake_case |
 |----------|-------------|----------------|----------------------|------------|
 | GET /api/purchase-orders | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| POST /api/purchase-orders | ⚠️ No probado (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
+| POST /api/purchase-orders | ❌ No conforme (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
 | GET /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| PUT /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ✅ Conforme | ✅ Conforme |
+| PUT /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
 
-<!-- ═══════════════════════════════ -->
+### HTTP Status Codes Observados
+
+- 200: OK
+- 400: Bad Request
 ```
 ## PRL — Listas de Precios (`/api/price-lists`)
 <!-- ═══════════════════════════════ -->

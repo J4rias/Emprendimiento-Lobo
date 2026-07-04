@@ -36,9 +36,10 @@ def test_list_suppliers():
 def test_create_supplier():
     url = f"{BASE_URL}/suppliers"
     headers = {"Authorization": f"Bearer {get_token()}"}
+    ts = int(time.time())
     payload = {
-        "name": f"API_TEST_DELETE_{int(time.time())}",
-        "tax_id": "123456789",
+        "name": f"API_TEST_DELETE_{ts}",
+        "tax_id": f"TAX{ts}",  # unique per run to avoid conflicts
         "payment_terms": "30 días",
         "notes": "Test supplier"
     }
@@ -89,21 +90,28 @@ def test_get_supplier_not_found():
 
 def test_create_duplicate_supplier():
     url = f"{BASE_URL}/suppliers"
-    headers = {"Authorization": f"Bearer {get_token()}"}
+    token = get_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    ts = int(time.time())
     payload = {
-        "name": "API_TEST_DUPLICATE",
-        "tax_id": "123456789",
+        "name": f"API_TEST_DUPE_{ts}",
+        "tax_id": f"DUPE{ts}",  # unique per run to avoid dirty-data conflicts
         "payment_terms": "30 días",
         "notes": "Test supplier"
     }
+    # Create the first instance
     response = requests.post(url, json=payload, headers=headers)
     log_result("test_create_duplicate_supplier", "POST", "/suppliers", response.status_code, payload, response.json())
     assert response.status_code == 201
+    dupe_supplier_id = response.json()["data"]["id"]
 
     # Try to create the same supplier again
     response = requests.post(url, json=payload, headers=headers)
     log_result("test_create_duplicate_supplier", "POST", "/suppliers", response.status_code, payload, response.json())
     assert response.status_code == 409
+
+    # Clean up the supplier created for this test
+    requests.delete(f"{url}/{dupe_supplier_id}", headers=headers)
 
 def main():
     failures = 0

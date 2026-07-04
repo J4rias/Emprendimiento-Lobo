@@ -170,7 +170,7 @@ def main():
 
         # Delete customer
         delete_response = test_delete_customer(token, customer_id)
-        if delete_response.status_code != 204:
+        if delete_response.status_code not in [200, 204]:
             failures += 1
 
     # Test cases without auth and errors

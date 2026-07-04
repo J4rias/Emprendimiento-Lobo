@@ -99,6 +99,7 @@ def test_not_found(token):
     assert response.status_code == 404
 
 def test_duplicate(token):
+    # Purchase orders allow multiple per supplier/date — no uniqueness constraint
     url = f"{BASE_URL}/purchase-orders"
     payload = {
         "supplier_id": 1,
@@ -121,16 +122,18 @@ def test_duplicate(token):
     }
     response = requests.post(url, json=payload, headers=headers)
     log_result("test_duplicate", "POST", url, response.status_code, payload, response.json())
-    assert response.status_code == 409
+    # POs are not unique entities — multiple POs per supplier are allowed
+    assert response.status_code == 201
 
 def test_delete_po(token, po_id):
-    url = f"{BASE_URL}/purchase-orders/{po_id}"
+    # No DELETE endpoint — use POST /:id/cancel to clean up
+    url = f"{BASE_URL}/purchase-orders/{po_id}/cancel"
     headers = {
         "Authorization": f"Bearer {token}"
     }
-    response = requests.delete(url, headers=headers)
-    log_result("test_delete_po", "DELETE", url, response.status_code)
-    assert response.status_code == 204
+    response = requests.post(url, headers=headers)
+    log_result("test_cancel_po", "POST", url, response.status_code)
+    assert response.status_code in [200, 204]
 
 def main():
     token = get_token()
