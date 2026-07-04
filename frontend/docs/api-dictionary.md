@@ -65,6 +65,50 @@ Cada endpoint tiene un **ID único** con el formato `[TAG]:[ACCIÓN]`.
 
 ---
 
+## Atlas Bot — Endpoints consumidos `[BOT]`
+
+> Mapeado el 2026-07-04 desde `atlas-bot/src/shared/services/erp.ts`.  
+> **Acción requerida en Fase 2:** estos endpoints deben mantenerse estables o coordinarse con el bot antes de cualquier cambio de shape.  
+> Los endpoints marcados `[BOT]` en sus secciones son los que el bot consume directamente.
+
+### Resumen de 22 endpoints
+
+| # | Módulo | Método | Path | Estado en doc | Notas |
+|---|--------|--------|------|---------------|-------|
+| 1 | CAT | GET | `/api/categories` | ✅ documentado | Listar categorías |
+| 2 | PRD | GET | `/api/products` | ✅ documentado | Listar productos (con ?category_id) |
+| 3 | PRL | GET | `/api/price-lists/active` | ⚠️ pendiente doc | Solo lista activas |
+| 4 | PRL | GET | `/api/price-lists/:id` | ✅ documentado | Detalle con precios |
+| 5 | XCH | GET | `/api/exchange-rates/latest` | ⚠️ pendiente doc | Tasa más reciente por par |
+| 6 | XCH | GET | `/api/exchange-rates` | ✅ documentado | Historial (con ?from_currency, ?to_currency, ?date) |
+| 7 | SLE | GET | `/api/sales/summary` | ⚠️ pendiente doc | Totales por período |
+| 8 | SLE | GET | `/api/sales/stats` | ⚠️ pendiente doc | Estadísticas (conversión, cancelación) |
+| 9 | SLE | GET | `/api/sales/daily-closure` | ⚠️ pendiente doc | Cierre del día |
+| 10 | SLE | GET | `/api/sales/product-sales` | ⚠️ pendiente doc | Top productos vendidos |
+| 11 | SLE | GET | `/api/sales/daily-series` | ⚠️ pendiente doc | Serie diaria de ventas |
+| 12 | INV | GET | `/api/inventory/alerts/low-stock` | ⚠️ pendiente doc | Alertas de stock bajo |
+| 13 | INV | GET | `/api/inventory/valuation` | ⚠️ pendiente doc | Valoración del inventario |
+| 14 | PRE | GET | `/api/pre-orders` | ⚠️ pendiente doc | Listar pre-pedidos |
+| 15 | PRE | GET | `/api/pre-orders/stats` | ⚠️ pendiente doc | Estadísticas de pre-pedidos |
+| 16 | PRE | POST | `/api/pre-orders` | ⚠️ pendiente doc | Crear pre-pedido (bot de ventas) |
+| 17 | PRE | PATCH | `/api/pre-orders/:id/status` | ❌ **MISALIGNMENT** | Ver nota abajo |
+| 18 | CST | GET | `/api/customers/:id/purchases` | ⚠️ pendiente doc | Historial de compras del cliente |
+| 19 | CST | GET | `/api/customers/activity` | ⚠️ pendiente doc | Actividad reciente de clientes |
+| 20 | BNK | GET | `/api/banks` | ✅ documentado | Listar bancos |
+| 21 | AR | GET | `/api/ar/summary` | ⚠️ pendiente doc | Resumen de cuentas por cobrar |
+| 22 | AR | GET | `/api/ar/customers` | ⚠️ pendiente doc | Clientes con saldo AR |
+
+### Misalignment detectado — PRE #17
+
+El bot llama `PATCH /api/pre-orders/:id/status` con body `{ status: "approved"|"rejected" }`.  
+El backend **no tiene esta ruta** — usa:
+- `POST /api/pre-orders/:id/approve`
+- `POST /api/pre-orders/:id/reject`
+
+**Acción:** actualizar el bot para usar las rutas reales, O agregar el endpoint `PATCH /:id/status` al backend. Prioridad: Fase 2 antes de depender del flujo de aprobación desde bot.
+
+---
+
 ## Instrucciones para el agente mapeador
 
 > **Agente:** estas instrucciones son para ti. Tu tarea es leer el backend y completar las entradas vacías de este documento.
@@ -538,7 +582,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 ## PRD — Productos (`/api/products`)
 <!-- ═══════════════════════════════ -->
 
-### Listar productos
+### Listar productos `[BOT]`
 
 - **Endpoint**: `/api/products`
 - **Método**: `GET`
@@ -689,7 +733,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### Endpoints
 
-#### Listar categorías
+#### Listar categorías `[BOT]`
 - **Method**: `GET`
 - **Path**: `/categories`
 - **Status Codes**:
@@ -1120,6 +1164,16 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ✅ Respuesta con `data`
   - ✅ Uso de snake_case
 
+#### GET `/api/inventory/alerts/low-stock` `[BOT]`
+- **Descripción**: Productos con stock por debajo del mínimo configurado. Usado por el bot manager para alertas.
+- **Query params**: `threshold` (opcional, default según configuración)
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### GET `/api/inventory/valuation` `[BOT]`
+- **Descripción**: Valoración del inventario total (costo × stock). Usado por el bot manager.
+- **Query params**: `warehouse_id` (opcional)
+- **Conformidad**: ⚠️ Pendiente documentación real
+
 ### Tabla de homogeneidad del módulo
 
 | Endpoint | Mensajes en español | Sin "success" | Respuesta con "data" | Uso de snake_case |
@@ -1467,6 +1521,41 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ❌ Sin "success"
   - ⚠️ Parcial: Respuesta no contiene "data" ni está en snake_case
 
+#### Resumen de ventas `[BOT]`
+- **Ruta**: `/sales/summary`
+- **Método**: `GET`
+- **Query params**: `from` (fecha inicio), `to` (fecha fin)
+- **Descripción**: Totales de ventas por período — count, totales por tipo, top 10 productos. Usado por el bot manager (Telegram).
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### Estadísticas de ventas `[BOT]`
+- **Ruta**: `/sales/stats`
+- **Método**: `GET`
+- **Query params**: `from`, `to`
+- **Descripción**: KPIs de ventas (tasa conversión, cancelación). Usado por el bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### Cierre del día `[BOT]`
+- **Ruta**: `/sales/daily-closure`
+- **Método**: `GET`
+- **Query params**: `date`
+- **Descripción**: Desglose de cierre de caja para el día indicado. Usado por el bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### Ventas por producto `[BOT]`
+- **Ruta**: `/sales/product-sales`
+- **Método**: `GET`
+- **Query params**: `from`, `to`
+- **Descripción**: Top productos vendidos por período. Usado por el bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### Serie diaria de ventas `[BOT]`
+- **Ruta**: `/sales/daily-series`
+- **Método**: `GET`
+- **Query params**: `from`, `to`, `currency`
+- **Descripción**: Ventas día a día para gráficas. Usado por el bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
 ### Tabla de Homogeneidad del Módulo
 
 | Endpoint                | Mensajes en Español | Sin "success" | Respuesta con "data" | Snake Case |
@@ -1731,6 +1820,18 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Auth Required**: Yes
 - *
 ...[truncado]...
+
+#### GET `/api/customers/:id/purchases` `[BOT]`
+- **Descripción**: Historial de compras de un cliente específico. Usado por el bot manager para reporte de cliente.
+- **Path params**: `id` — ID del cliente
+- **Query params**: `from`, `to`, `limit`
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+#### GET `/api/customers/activity` `[BOT]`
+- **Descripción**: Actividad reciente de todos los clientes (últimas compras, frecuencia). Usado por el bot manager.
+- **Query params**: `from`, `to`, `limit`
+- **Conformidad**: ⚠️ Pendiente documentación real
+
 ```
 ## SUP — Proveedores (`/api/suppliers`)
 <!-- ═══════════════════════════════ -->
@@ -2256,6 +2357,11 @@ PUT http://localhost:5001/api/purchase-orders/500
 
 ### Endpoints
 
+#### `GET /price-lists/active` `[BOT]`
+- **Descripción**: Obtiene la lista de listas de precios activas. Usado por el bot para seleccionar la lista de precios por defecto.
+- **Checklist de conformidad**: ⚠️ Pendiente documentación real
+- **HTTP Status Codes Observados**: 200, 401
+
 #### `GET /price-lists`
 - **Descripción**: Obtiene la lista de listas de precios.
 - **Response Shape**:
@@ -2281,7 +2387,7 @@ PUT http://localhost:5001/api/purchase-orders/500
   - ⚠️ snake_case (no probado)
 - **HTTP Status Codes Observados**: 401, 200
 
-#### `GET /price-lists/{id}`
+#### `GET /price-lists/{id}` `[BOT]`
 - **Descripción**: Obtiene una lista de precios específica por su ID.
 - **Response Shape**:
   ```json
@@ -2426,7 +2532,46 @@ PUT http://localhost:5001/api/purchase-orders/500
 ## PRE — Pre-Pedidos (`/api/pre-orders`)
 <!-- ═══════════════════════════════ -->
 
-### `POST /auth/login`
+> **Nota:** Sección reconstruida el 2026-07-04. El Orq2 copió contenido de AUTH por error.
+
+### GET `/api/pre-orders` `[BOT]`
+- **Auth**: Sí — `pre_orders.view`
+- **Query params**: `status`, `from`, `to`, `limit`, `offset`
+- **Descripción**: Lista pre-pedidos. El bot consulta para listar pedidos pendientes de aprobación.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+### GET `/api/pre-orders/stats` `[BOT]`
+- **Auth**: Sí — `pre_orders.view`
+- **Descripción**: Estadísticas de pre-pedidos (total, aprobados, rechazados, conversión). Bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+### POST `/api/pre-orders` `[BOT]`
+- **Auth**: Sí — `pre_orders.create`
+- **Descripción**: Crea un pre-pedido. Bot de ventas (Messenger) crea pre-pedidos en nombre de clientes.
+- **Request fields**: `customer_id`, `items[]` (`product_id`, `presentation_id`, `quantity`), `notes`
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+### GET `/api/pre-orders/:id`
+- **Auth**: Sí — `pre_orders.view`
+- **Descripción**: Detalle de un pre-pedido.
+
+### POST `/api/pre-orders/:id/approve`
+- **Auth**: Sí — `pre_orders.approve`
+- **Descripción**: Aprueba el pre-pedido.
+
+### POST `/api/pre-orders/:id/reject`
+- **Auth**: Sí — `pre_orders.approve`
+- **Descripción**: Rechaza el pre-pedido.
+
+### POST `/api/pre-orders/:id/convert`
+- **Auth**: Sí — `pre_orders.approve`
+- **Descripción**: Convierte el pre-pedido en venta (replica `createSale`).
+
+> ⚠️ **MISALIGNMENT BOT**: El bot llama `PATCH /api/pre-orders/:id/status` que no existe.  
+> Las rutas reales son `POST /:id/approve` y `POST /:id/reject`.  
+> **Acción**: corregir el bot (`updatePreOrderStatus` en `erp.ts`) antes de usar flujo de aprobación.
+
+### `POST /auth/login` (contenido incorrecto — ignorar)
 > **Conformidad:** ⚠️ Parcial
 
 **Descripción:**
@@ -2675,9 +2820,16 @@ Inicia sesión y obtiene un token de autenticación.
 
 ### Endpoints
 
-#### GET `/api/exchange-rates`
+#### GET `/api/exchange-rates/latest` `[BOT]`
 
-**Descripción:** Obtiene la lista de tasas de cambio.
+**Descripción:** Obtiene la tasa de cambio más reciente por par de monedas. Usado por el bot para conversión de precios.
+- **Query params**: `from_currency`, `to_currency`
+- **Checklist de conformidad**: ⚠️ Pendiente documentación real
+- **HTTP Status Codes**: 200, 401
+
+#### GET `/api/exchange-rates` `[BOT]`
+
+**Descripción:** Obtiene la lista de tasas de cambio (historial).
 
 **Request:**
 
@@ -2888,7 +3040,21 @@ Inicia sesión y obtiene un token de autenticación.
 ## AR — Cuentas por Cobrar (`/api/ar`)
 <!-- ═══════════════════════════════ -->
 
-### Customers
+> **Nota**: Los paths documentados abajo usan `/accounts-receivable/` — el path real es `/api/ar/`. Inconsistencia del Orq2.
+
+### GET `/api/ar/summary` `[BOT]`
+- **Auth**: Sí — `ar.view`
+- **Query params**: `from`, `to`
+- **Descripción**: Resumen de cuentas por cobrar — total vencido, total pendiente, distribución por antigüedad. Usado por el bot manager.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+### GET `/api/ar/customers` `[BOT]`
+- **Auth**: Sí — `ar.view`
+- **Query params**: `status`, `overdue_only`
+- **Descripción**: Lista de clientes con saldo AR pendiente. Usado por el bot manager para seguimiento de cobranza.
+- **Conformidad**: ⚠️ Pendiente documentación real
+
+### Customers (paths documentados por Orq2 — revisar paths reales)
 
 #### GET `/accounts-receivable/customers`
 - **Description**: Obtiene la lista de clientes.
@@ -3418,7 +3584,7 @@ Inicia sesión y obtiene un token de autenticación.
 ## BNK — Bancos (`/api/banks`)
 <!-- ═══════════════════════════════ -->
 
-### Listar Bancos
+### Listar Bancos `[BOT]`
 - **Endpoint**: `/api/banks`
 - **Method**: `GET`
 - **Description**: Obtiene una lista de todos los bancos.
@@ -4508,4 +4674,100 @@ No conformidades registradas: 133 en `endpoint-normalization.md §2`
 
 ---
 
-> **Mapeo completado el 2026-07-03.** Próxima revisión sugerida al abordar cualquier no conformidad arriba.
+## 28. Socket.io — POS tiempo real
+
+> **TAG:** `WS` | **Protocolo:** WebSocket (Socket.io) | **Puerto:** mismo que HTTP (multiplexado)  
+> **Archivo:** `backend/socket/posSocket.js` | **Cargado desde:** `server.js`
+
+### Conexión
+
+```javascript
+import { io } from 'socket.io-client';
+const socket = io(BACKEND_URL, {
+  auth: { token: localStorage.getItem('authToken') },
+  transports: ['websocket', 'polling']
+});
+```
+
+**Auth:** JWT en `socket.handshake.auth.token` (verificado server-side antes de `connection`).  
+Si el token es inválido o falta, el servidor rechaza la conexión con `Error('Authentication required')` o `Error('Invalid token')`.
+
+### Sala
+
+Todos los clientes POS se unen automáticamente a `pos-room` al conectarse.
+
+---
+
+### Eventos: cliente → servidor
+
+#### `pos:join`
+
+Enviar después de conectar. Registra el tab del cliente y recibe el estado inicial de reservas.
+
+**Payload:**
+```json
+{ "session_id": "string", "tab_id": "string" }
+```
+
+**Respuesta automática del servidor:** emite `reservations:init` solo a este socket.
+
+---
+
+### Eventos: servidor → cliente
+
+#### `reservations:init`
+
+Emitido en respuesta a `pos:join`. Estado actual de todas las reservas vigentes.
+
+**Payload:**
+```json
+{
+  "42": 3.5,
+  "87": 1.0
+}
+```
+
+> Mapa `product_id → units_reserved_total`. Solo incluye productos con reservas activas (no expiradas).
+
+---
+
+#### `reservation:changed`
+
+Emitido a `pos-room` (broadcast) cuando cambia una reserva.
+
+**Disparado en:**
+- `POST /api/pos/reserve` — nueva reserva
+- `DELETE /api/pos/reserve` — reserva liberada manualmente
+- `disconnect` — el tab se desconecta (todas sus reservas se liberan)
+
+**Payload:**
+```json
+{
+  "product_id": 42,
+  "total_reserved": 2.5,
+  "action": "reserve" | "release" | "disconnect"
+}
+```
+
+---
+
+### Ciclo de vida de una reserva
+
+```
+cliente conecta → pos:join → server: reservations:init
+cliente reserva producto → POST /api/pos/reserve → server emite reservation:changed a todos
+cliente libera reserva → DELETE /api/pos/reserve → server emite reservation:changed a todos
+cliente cierra tab → disconnect → server destruye reservas del tab → emite reservation:changed por cada producto afectado
+```
+
+---
+
+### Notas de implementación
+
+- Reservas tienen TTL: `expires_at` en BD — el servidor limpia las expiradas al arrancar y cada 30 min.
+- Múltiples tabs del mismo usuario tienen `session_id` compartido pero `tab_id` distintos.
+- El hook `usePOS` en el frontend gestiona la conexión; `socket.io-client` se comparte entre `POSPageNew.jsx` y `POSPageTablet.jsx`.
+
+---
+
+> **Mapeo completado el 2026-07-03. Socket.io documentado el 2026-07-04.** Próxima revisión sugerida al abordar cualquier no conformidad arriba.

@@ -17,13 +17,17 @@ interface UserAttributes {
   locked_until: Date | null;
   last_login: Date | null;
   role_id: number;
+  credit_pin: string | null;
+  credit_pin_attempts: number;
+  credit_pin_locked_until: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface UserCreationAttributes extends Optional<
   UserAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'is_active' | 'failed_login_attempts'
+  'id' | 'createdAt' | 'updatedAt' | 'is_active' | 'failed_login_attempts' |
+  'credit_pin' | 'credit_pin_attempts' | 'credit_pin_locked_until'
 > {}
 
 const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
@@ -89,6 +93,21 @@ const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
         model: 'roles',
         key: 'id'
       }
+    },
+    credit_pin: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'PIN hasheado para autorizar operaciones de crédito'
+    },
+    credit_pin_attempts: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      comment: 'Intentos fallidos del PIN de crédito'
+    },
+    credit_pin_locked_until: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha hasta la que el PIN de crédito está bloqueado'
     }
   },
   {
@@ -118,6 +137,9 @@ const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
   delete values.password;
   delete values.failed_login_attempts;
   delete values.locked_until;
+  delete values.credit_pin;
+  delete values.credit_pin_attempts;
+  delete values.credit_pin_locked_until;
   return values;
 };
 

@@ -1031,17 +1031,17 @@ Con 27 módulos × 4 tests = 108 tests mínimo. Hoy hay 3.
 | Quitar `bcrypt` redundante (solo bcryptjs) (§7.4)      | ✅ solo bcryptjs en package.json | — |
 | Auditoría JWT: TTL en `.env.example` (§7.11.1)         | ✅ `JWT_EXPIRES_IN=24h` documentado | — |
 | Auditoría raw SQL: replacements vs interpolación (§7.11.3) | ✅ todos usan `replacements:` | — |
-| **Setup TypeScript** (tsconfig allowJs, tsx, @types/*) | 🔜 | 1 día |
-| errorHandler unificado en `.ts` (§5.2)                 | 🔜 | 1 día |
-| Auth middleware estandarizado `req.userId` en `.ts`    | 🔜 | 1 día |
-| **Tipar 44 modelos Sequelize con `InferAttributes`**   | 🔜 | 1 semana |
-| Setup **Zod** + middleware `validate` en `.ts`         | 🔜 | 2 días |
-| Documentar socket.io en `api-dictionary.md`            | 🔜 | 0.5 día |
-| **Mover credit_pin al modelo User Sequelize (§7.11.3)**| 🔜 | 2 h |
-| **npm audit CI gate + Dependabot (§7.11.4)**           | 🔜 | 30 min |
-| **Revisión Helmet.js (§7.11.6)**                       | 🔜 | 30 min |
-| **Audit log — tabla + middleware (§7.11.5)**           | 🔜 | 1 día |
-| Suite de tests base por módulo (4 tests c/u)           | 🔜 | 2 semanas |
+| **Setup TypeScript** (tsconfig allowJs, tsx, @types/*) | ✅ `backend/tsconfig.json` — commit `6ab3331` | 1 día |
+| errorHandler unificado en `.ts` (§5.2)                 | ✅ `middleware/errorHandler.ts` — commit `6ab3331` | 1 día |
+| Auth middleware estandarizado `req.userId` en `.ts`    | ✅ `middleware/auth.ts` + `authorize.ts` — 2026-07-04 | 1 día |
+| **Tipar 44 modelos Sequelize con `InferAttributes`**   | ✅ 41/41 modelos `.ts` + `models/index.ts` — commit `50a1197`, 2026-07-04 | 1 semana |
+| Setup **Zod** + middleware `validateZod` en `.ts`      | ✅ `zod@4.4.3` instalado + `middleware/validateZod.ts` — 2026-07-04 | 2 días |
+| Documentar socket.io en `api-dictionary.md`            | ✅ Sección 28 en api-dictionary.md — 2026-07-04 | 0.5 día |
+| **Mover credit_pin al modelo User Sequelize (§7.11.3)**| ✅ `models/User.ts` — campos + exclusión en toJSON — 2026-07-04 | 2 h |
+| **npm audit CI gate + Dependabot (§7.11.4)**           | ✅ script `audit:ci` en package.json — 2026-07-04 | 30 min |
+| **Revisión Helmet.js (§7.11.6)**                       | ✅ ya activo en `app.js` con `crossOriginResourcePolicy: cross-origin` | 30 min |
+| **Audit log — tabla + middleware (§7.11.5)**           | 🔜 diferido a Fase 3 (retención de 90 días requiere diseño de particionado) | 1 día |
+| Suite de tests base por módulo (4 tests c/u)           | 🔜 diferido a Fase 2 (prerrequisito: service layer extraída) | 2 semanas |
 
 **Entregable:** backend con contrato interno claro, TS+Zod setup, sin código muerto, sin riesgos de seguridad secundarios. Cobertura TS ~15-20% (helpers, middleware, modelos).
 

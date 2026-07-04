@@ -81,4 +81,4 @@ const Inventory = sequelize.define<Model<InventoryAttributes, InventoryCreationA
   }
 );
 
-module.exports = Inventory;
+export = Inventory;

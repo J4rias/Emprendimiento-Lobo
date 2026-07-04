@@ -12,7 +12,8 @@
     "test:watch": "jest --watch",
     "test:integration": "jest --testPathPattern=tests/integration",
     "test:e2e": "jest --testPathPattern=tests/e2e",
-    "test:coverage": "jest --coverage --coverageReporters=html"
+    "test:coverage": "jest --coverage --coverageReporters=html",
+    "audit:ci": "pnpm audit --audit-level=high"
   },
   "keywords": [
     "inventory",
@@ -44,7 +45,8 @@
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "winston": "^3.11.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

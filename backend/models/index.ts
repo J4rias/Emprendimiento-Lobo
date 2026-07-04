@@ -1,47 +1,46 @@
-const { sequelize } = require('../config/database');
+import { sequelize } from '../config/database';
 
-// Import models
-const User = require('./User');
-const Role = require('./Role');
-const Permission = require('./Permission');
-const RolePermission = require('./RolePermission');
-const Category = require('./Category');
-const Product = require('./Product');
-const ProductPresentation = require('./ProductPresentation');
-const Barcode = require('./Barcode');
-const Warehouse = require('./Warehouse');
-const Inventory = require('./Inventory');
-const Batch = require('./Batch');
-const Transfer = require('./Transfer');
-const TransferDetail = require('./TransferDetail');
-const Customer = require('./Customer');
-const PriceList = require('./PriceList');
-const PriceListDetail = require('./PriceListDetail');
-const Quote = require('./Quote');
-const QuoteDetail = require('./QuoteDetail');
-const Sale = require('./Sale');
-const SaleDetail = require('./SaleDetail');
-const SalePayment = require('./SalePayment');
-const Supplier = require('./Supplier');
-const SupplierContact = require('./SupplierContact');
-const Brand = require('./Brand');
-const ExchangeRate = require('./ExchangeRate');
-const PackagingType = require('./PackagingType');
-const PresentationType = require('./PresentationType');
-const InventoryMovement = require('./InventoryMovement');
-const PurchaseOrder = require('./PurchaseOrder');
-const PurchaseOrderDetail = require('./PurchaseOrderDetail');
-const SupplierPayment = require('./SupplierPayment');
-const SupplierPaymentAllocation = require('./SupplierPaymentAllocation');
-const CreditNote = require('./CreditNote');
-const CreditNoteDetail = require('./CreditNoteDetail');
-const Delivery = require('./Delivery');
-const DeliveryDetail = require('./DeliveryDetail');
-const CompanySettings = require('./CompanySettings');
-const PosReservation = require('./PosReservation');
-const PreOrder = require('./PreOrder');
-const PreOrderDetail = require('./PreOrderDetail');
-const Bank = require('./Bank');
+import User from './User';
+import Role from './Role';
+import Permission from './Permission';
+import RolePermission from './RolePermission';
+import Category from './Category';
+import Product from './Product';
+import ProductPresentation from './ProductPresentation';
+import Barcode from './Barcode';
+import Warehouse from './Warehouse';
+import Inventory from './Inventory';
+import Batch from './Batch';
+import Transfer from './Transfer';
+import TransferDetail from './TransferDetail';
+import Customer from './Customer';
+import PriceList from './PriceList';
+import PriceListDetail from './PriceListDetail';
+import Quote from './Quote';
+import QuoteDetail from './QuoteDetail';
+import Sale from './Sale';
+import SaleDetail from './SaleDetail';
+import SalePayment from './SalePayment';
+import Supplier from './Supplier';
+import SupplierContact from './SupplierContact';
+import Brand from './Brand';
+import ExchangeRate from './ExchangeRate';
+import PackagingType from './PackagingType';
+import PresentationType from './PresentationType';
+import InventoryMovement from './InventoryMovement';
+import PurchaseOrder from './PurchaseOrder';
+import PurchaseOrderDetail from './PurchaseOrderDetail';
+import SupplierPayment from './SupplierPayment';
+import SupplierPaymentAllocation from './SupplierPaymentAllocation';
+import CreditNote from './CreditNote';
+import CreditNoteDetail from './CreditNoteDetail';
+import Delivery from './Delivery';
+import DeliveryDetail from './DeliveryDetail';
+import CompanySettings from './CompanySettings';
+import PosReservation from './PosReservation';
+import PreOrder from './PreOrder';
+import PreOrderDetail from './PreOrderDetail';
+import Bank from './Bank';
 
 // Define associations
 
@@ -412,8 +411,7 @@ Product.hasMany(PreOrderDetail, { foreignKey: 'product_id', as: 'preOrderDetails
 PreOrderDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
 ProductPresentation.hasMany(PreOrderDetail, { foreignKey: 'presentation_id', as: 'preOrderDetails' });
 
-// Export all models
-module.exports = {
+export {
   sequelize,
   User,
   Role,

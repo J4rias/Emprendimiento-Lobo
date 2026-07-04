@@ -1,5 +1,6 @@
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
 const { jwt: jwtConfig } = require('../config/auth');
 const { User, Role } = require('../models');
 
@@ -10,21 +11,23 @@ const BOT_PERMISSIONS = [
   'sales.view', 'inventory.view', 'ar.view',
 ];
 
-const auth = async (req, res, next) => {
+const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Check for bot API key before JWT
     const apiKey = req.header('X-API-Key');
     if (apiKey) {
       const expected = process.env.BOT_API_KEY;
       if (!expected) {
-        return res.status(401).json({ message: 'API key auth not configured.' });
+        res.status(401).json({ message: 'API key auth not configured.' });
+        return;
       }
       const keyBuf = Buffer.from(apiKey);
       const expectedBuf = Buffer.from(expected);
       if (keyBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(keyBuf, expectedBuf)) {
-        return res.status(401).json({ message: 'Invalid API key.' });
+        res.status(401).json({ message: 'Invalid API key.' });
+        return;
       }
-      req.user = {
+      (req as any).user = {
         id: 0,
         username: 'atlas-bot',
         first_name: 'Atlas',
@@ -34,7 +37,7 @@ const auth = async (req, res, next) => {
           permissions: BOT_PERMISSIONS.map(name => ({ name })),
         },
       };
-      req.userId = 0;
+      (req as any).userId = 0;
       return next();
     }
 
@@ -42,13 +45,12 @@ const auth = async (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({
-        message: 'No token provided. Authentication required.'
-      });
+      res.status(401).json({ message: 'No token provided. Authentication required.' });
+      return;
     }
 
     // Verify token
-    const decoded = jwt.verify(token, jwtConfig.secret);
+    const decoded = jwt.verify(token, jwtConfig.secret) as { id: number };
 
     // Find user
     const user = await User.findByPk(decoded.id, {
@@ -61,46 +63,37 @@ const auth = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(401).json({
-        message: 'User not found.'
-      });
+      res.status(401).json({ message: 'User not found.' });
+      return;
     }
 
-    if (!user.is_active) {
-      return res.status(401).json({
-        message: 'User account is inactive.'
-      });
+    if (!(user as any).is_active) {
+      res.status(401).json({ message: 'User account is inactive.' });
+      return;
     }
 
     // Check if account is locked
-    if (user.locked_until && user.locked_until > new Date()) {
-      return res.status(401).json({
-        message: 'Account is temporarily locked. Please try again later.'
-      });
+    if ((user as any).locked_until && (user as any).locked_until > new Date()) {
+      res.status(401).json({ message: 'Account is temporarily locked. Please try again later.' });
+      return;
     }
 
     // Attach user to request
-    req.user = user;
-    req.userId = user.id;
+    (req as any).user = user;
+    (req as any).userId = (user as any).id;
 
     next();
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        message: 'Invalid token.'
-      });
+      res.status(401).json({ message: 'Invalid token.' });
+      return;
     }
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        message: 'Token expired.'
-      });
+      res.status(401).json({ message: 'Token expired.' });
+      return;
     }
-
-    res.status(500).json({
-      message: 'Authentication error.',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Authentication error.', error: error.message });
   }
 };
 
-module.exports = auth;
+export = auth;
