@@ -729,8 +729,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "code": "TEST_CODE_TEST_1783132389_1783132389",
-    "name": "API_TEST_DELETE_TEST_1783132389_1783132389",
+    "code": "TEST_CODE_TEST_1783137556_1783137556",
+    "name": "API_TEST_DELETE_TEST_1783137556_1783137556",
     "description": "Test category description",
     "color": "#FF0000"
   }
@@ -742,7 +742,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     "errors": [
       {
         "message": "El código no puede exceder 10 caracteres",
-        "value": "TEST_CODE_TEST_1783132389_1783132389"
+        "value": "TEST_CODE_TEST_1783137556_1783137556"
       }
     ]
   }
@@ -820,9 +820,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `500`: Internal Server Error (⚠️ No probado)
-  - `200`: OK
-  - `401`: Unauthorized
+  - `200`: OK ✅
+  - `401`: Unauthorized ⚠️ No probado
 
 ### 2. Obtener todas las marcas activas
 
@@ -845,7 +844,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `200`: OK
+  - `200`: OK ✅
 
 ### 3. Crear una nueva marca
 
@@ -855,7 +854,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "name": "API_TEST_DELETE_1783132409",
+    "name": "API_TEST_DELETE_1783137577",
     "description": "Test brand description",
     "logo_url": "http://example.com/logo.png",
     "website": "http://example.com",
@@ -867,7 +866,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   {
     "data": {
       "id": 1,
-      "name": "API_TEST_DELETE_1783132409",
+      "name": "API_TEST_DELETE_1783137577",
       "description": "Test brand description",
       "logo_url": "http://example.com/logo.png",
       "website": "http://example.com",
@@ -876,8 +875,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `201`: Created
-  - `409`: Conflict (Duplicate Brand)
+  - `201`: Created ✅
+  - `409`: Conflict (Duplicate Brand) ⚠️ No probado
 
 ### 4. Obtener una marca por ID
 
@@ -888,7 +887,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 532,
+      "id": 534,
       "name": "Brand Name",
       "description": "Description of the brand",
       "logo_url": "http://example.com/logo.png",
@@ -898,8 +897,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `200`: OK
-  - `404`: Not Found
+  - `200`: OK ✅
+  - `404`: Not Found ⚠️ No probado
 
 ### 5. Actualizar una marca por ID
 
@@ -917,7 +916,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 532,
+      "id": 534,
       "name": "Brand Name",
       "description": "Updated test brand description",
       "logo_url": "http://example.com/new-logo.png",
@@ -927,7 +926,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `200`: OK
+  - `200`: OK ✅
 
 ### 6. Eliminar una marca por ID
 
@@ -941,44 +940,15 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `200`: OK
+  - `200`: OK ✅
 
-### 7. Obtener todas las marcas sin autenticación
+### Homogeneidad del módulo BRD
 
-- **Endpoint**: `/brands`
-- **Method**: `GET`
-- **Auth Required**: No
-- **Response Shape**:
-  ```json
-  {
-    "message": "Unauthorized"
-  }
-  ```
-- **Status Codes**:
-  - `401`: Unauthorized
-
-### 8. Obtener una marca inexistente por ID
-
-- **Endpoint**: `/brands/{id}`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Response Shape**:
-  ```json
-  {
-    "message": "Brand not found"
-  }
-  ```
-- **Status Codes**:
-  - `404`: Not Found
-
-### Tabla de Homogeneidad del Módulo BRD
-
-| Aspecto | Conformidad |
-|---------|-------------|
-| Response Shape (data) | ✅ |
-| Mensajes en español | ⚠️ Parcial |
-| snake_case | ✅ |
-| Status Codes documentados | ✅ |
+| Criterio | Conformidad |
+|----------|-------------|
+| Respuestas con "data" | ✅ |
+| Mensajes en español | ❌ |
+| snake_case | ❌ |
 
 ```
 ## INV — Inventario (`/api/inventory`)
@@ -1101,11 +1071,10 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### HTTP Status Codes Observados
 
-- 200 OK
-- 201 Created
-- 204 No Content
-- 400 Bad Request
-- 404 Not Found
+- `200 OK`: Para GET, PUT y DELETE exitosos.
+- `201 Created`: Para POST exitoso.
+- `400 Bad Request`: Para solicitudes mal formadas.
+- `404 Not Found`: Para recursos no encontrados.
 ## TRF — Transferencias (`/api/transfers`)
 <!-- ═══════════════════════════════ -->
 
