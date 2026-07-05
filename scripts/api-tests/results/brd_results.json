@@ -1,9 +1,9 @@
 {"test": "test_get_all_brands", "method": "GET", "path": "/brands", "status_code": 200}
 {"test": "test_get_active_brands", "method": "GET", "path": "/brands/active", "status_code": 404}
-{"test": "test_create_brand", "method": "POST", "path": "/brands", "status_code": 201, "request": {"name": "API_TEST_DELETE_1783254004", "description": "Test brand description", "logo_url": "http://example.com/logo.png", "website": "http://example.com", "notes": "Test notes"}}
-{"test": "test_get_brand_by_id", "method": "GET", "path": "/brands/541", "status_code": 200}
-{"test": "test_update_brand", "method": "PUT", "path": "/brands/541", "status_code": 200, "request": {"description": "Updated test brand description", "logo_url": "http://example.com/new-logo.png"}}
-{"test": "test_delete_brand", "method": "DELETE", "path": "/brands/541", "status_code": 200}
+{"test": "test_create_brand", "method": "POST", "path": "/brands", "status_code": 201, "request": {"name": "API_TEST_DELETE_1783265266", "description": "Test brand description", "logo_url": "http://example.com/logo.png", "website": "http://example.com", "notes": "Test notes"}}
+{"test": "test_get_brand_by_id", "method": "GET", "path": "/brands/543", "status_code": 200}
+{"test": "test_update_brand", "method": "PUT", "path": "/brands/543", "status_code": 200, "request": {"description": "Updated test brand description", "logo_url": "http://example.com/new-logo.png"}}
+{"test": "test_delete_brand", "method": "DELETE", "path": "/brands/543", "status_code": 200}
 {"test": "test_get_all_without_auth", "method": "GET", "path": "/brands", "status_code": 401}
-{"test": "test_create_duplicate_brand", "method": "POST", "path": "/brands", "status_code": 409, "request": {"name": "API_TEST_DUPE_1783254004", "description": "Test brand description", "logo_url": "http://example.com/logo.png", "website": "http://example.com", "notes": "Test notes"}}
+{"test": "test_create_duplicate_brand", "method": "POST", "path": "/brands", "status_code": 409, "request": {"name": "API_TEST_DUPE_1783265266", "description": "Test brand description", "logo_url": "http://example.com/logo.png", "website": "http://example.com", "notes": "Test notes"}}
 {"test": "test_get_nonexistent_brand", "method": "GET", "path": "/brands/99999999", "status_code": 404}

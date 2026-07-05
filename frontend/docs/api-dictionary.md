@@ -1110,7 +1110,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "name": "API_TEST_DELETE_1783254004",
+    "name": "API_TEST_DELETE_1783265266",
     "description": "Test brand description",
     "logo_url": "http://example.com/logo.png",
     "website": "http://example.com",
@@ -1122,7 +1122,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   {
     "data": {
       "id": 1,
-      "name": "API_TEST_DELETE_1783254004",
+      "name": "API_TEST_DELETE_1783265266",
       "description": "Test brand description",
       "logo_url": "http://example.com/logo.png",
       "website": "http://example.com",
@@ -1143,7 +1143,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 541,
+      "id": 543,
       "name": "Brand Name",
       "description": "Description of the brand",
       "logo_url": "http://example.com/logo.png",
@@ -1172,7 +1172,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 541,
+      "id": 543,
       "name": "Brand Name",
       "description": "Updated test brand description",
       "logo_url": "http://example.com/new-logo.png",
@@ -1208,16 +1208,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "data": [
-      {
-        "id": 1,
-        "name": "Brand Name",
-        "description": "Description of the brand",
-        "logo_url": "http://example.com/logo.png",
-        "website": "http://example.com",
-        "notes": "Some notes about the brand"
-      }
-    ]
+    "error": "Unauthorized"
   }
   ```
 - **Status Codes**:
@@ -1231,7 +1222,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "name": "API_TEST_DELETE_1783254004",
+    "name": "API_TEST_DUPE_1783265266",
     "description": "Test brand description",
     "logo_url": "http://example.com/logo.png",
     "website": "http://example.com",
@@ -1241,18 +1232,25 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "data": {
-      "id": 1,
-      "name": "API_TEST_DELETE_1783254004",
-      "description": "Test brand description",
-      "logo_url": "http://example.com/logo.png",
-      "website": "http://example.com",
-      "notes": "Test notes"
-    }
+    "error": "Duplicate Brand"
   }
   ```
 - **Status Codes**:
   - `409`: Conflict (Duplicate Brand) ⚠️ No probado
+
+### 9. Obtener una marca inexistente por ID
+
+- **Endpoint**: `/brands/{id}`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Response Shape**:
+  ```json
+  {
+    "error": "Not Found"
+  }
+  ```
+- **Status Codes**:
+  - `404`: Not Found ⚠️ No probado
 
 ### Tabla de Homogeneidad del Módulo
 
@@ -1266,6 +1264,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 | Eliminar una marca por ID | ✅ |
 | Obtener todas las marcas sin autenticación | ⚠️ No probado |
 | Crear una marca duplicada | ⚠️ No probado |
+| Obtener una marca inexistente por ID | ⚠️ No probado |
 
 ```
 ## INV — Inventario (`/api/inventory`)
