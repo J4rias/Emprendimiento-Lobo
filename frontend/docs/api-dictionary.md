@@ -859,11 +859,11 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     "sale_id": 1,
     "customer_id": 270,
     "warehouse_id": 1,
-    "credit_note_date": "2026-06-26",
+    "credit_note_date": "2026-06-29",
     "reason": "return",
     "type": "partial",
     "status": "applied",
-    "exchange_rate": "2672.578570",
+    "exchange_rate": "2745.830000",
     "subtotal": "45.648798",
     "tax_amount": "0.000000",
     "total": "45.648798",
@@ -871,15 +871,15 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     "refund_amount": "45.648798",
     "details": [
       {
-        "sale_detail_id": 34980,
-        "product_id": 899,
-        "presentation_id": 725,
+        "sale_detail_id": 34852,
+        "product_id": 100,
+        "presentation_id": 100,
         "package_quantity_returned": 1,
         "loose_units_returned": 0,
-        "unit_price": "3.18",
+        "unit_price": "4.97",
         "discount_percent": "0.00",
         "tax_percent": "0.00",
-        "line_total": "3.18"
+        "line_total": "4.97"
       }
     ]
   }
@@ -888,8 +888,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 162,
-      "credit_note_number": "NC-20260629-0001",
+      "id": 163,
+      "credit_note_number": "NC-20260629-0002",
       "sale_id": 8422,
       "customer_id": 500,
       "warehouse_id": 1,
@@ -910,64 +910,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       "approved_by": 1,
       "approved_at": "2026-06-25T22:08:05.000Z",
       "created_at": "2026-06-25T22:08:04.000Z",
-      "updated_at": "2026-06-25T22:08:05.000Z",
-      "sale": {
-        "id": 8075,
-        "sale_number": "VEN-20260625-0014",
-        "sale_date": "2026-06-25T22:03:39.000Z",
-        "total": "128.720000"
-      },
-      "customer": {
-        "id": 302,
-        "firstName": "JUAN ",
-        "lastName": "PEREZ",
-        "businessName": null,
-        "tradeName": null,
-        "type": "natural",
-        "documentType": "V",
-        "documentNumber": "1095792249",
-        "email": null,
-        "phone": null
-      },
-      "warehouse": {
-        "id": 1,
-        "name": "Deposito Principal"
-      },
-      "creator": {
-        "id": 1,
-        "username": "admin",
-        "first_name": "Updated",
-        "last_name": "User"
-      },
-      "approver": {
-        "id": 1,
-        "username": "admin",
-        "first_name": "Updated",
-        "last_name": "User"
-      },
-      "details": [
-        {
-          "id": 179,
-          "credit_note_id": 160,
-          "sale_detail_id": 34852,
-          "product_id": 100,
-          "presentation_id": 100,
-          "batch_id": null,
-          "package_quantity_returned": 1,
-          "loose_units_returned": 0,
-          "unit_price": "4.97",
-          "discount_percent": "0.00",
-          "tax_percent": "0.00",
-          "line_total": "4.97",
-          "return_to_stock": true,
-          "created_at": "2026-06-25T22:08:04.000Z",
-          "updated_at": "2026-06-25T22:08:04.000Z",
-          "presentation": {
-            "id": 100,
-            "units_per_package": 1
-          }
-        }
-      ]
+      "updated_at": "2026-06-25T22:08:05.000Z"
     }
   }
   ```
@@ -1007,52 +950,100 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       "approved_by": 1,
       "approved_at": "2026-06-25T22:08:05.000Z",
       "created_at": "2026-06-25T22:08:04.000Z",
-      "updated_at": "2026-06-25T22:08:05.000Z",
-      "sale": {
-        "id": 8075,
-        "sale_number": "VEN-20260625-0014",
-        "sale_date": "2026-06-25T22:03:39.000Z",
-        "total": "128.720000"
-      },
-      "customer": {
-        "id": 302,
-        "firstName": "JUAN ",
-        "lastName": "PEREZ",
-        "businessName": null,
-        "tradeName": null,
-        "type": "natural",
-        "documentType": "V",
-        "documentNumber": "1095792249",
-        "email": null,
-        "phone": null
-      },
-      "warehouse": {
-        "id": 1,
-        "name": "Deposito Principal"
-      },
-      "creator": {
-        "id": 1,
-        "username": "admin",
-        "first_name": "Updated",
-        "last_name": "User"
-      },
-      "approver": {
-        "id": 1,
-        "username": "admin",
-        "first_name": "Updated",
-        "last_name": "User"
-      },
-      "details": [
-        {
-          "id": 179,
-          "credit_note_id": 160,
-          "sale_detail_id": 34852,
-          "product_id": 100,
-          "presentation_id": 100,
-          "batch_id": null,
-          "package_quantity_returned": 1,
-          "loose_units_returned": 0,
-          "unit_price": "
+      "updated_at": "2026-06-25T22:08:05.000Z"
+    }
+  }
+  ```
+
+#### PUT `/credit-notes/{id}`
+- **Descripción**: Actualiza una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (200)
+- **Request**:
+  ```json
+  {
+    "sale_id": 8422,
+    "customer_id": 500,
+    "warehouse_id": 1,
+    "credit_note_date": "2026-06-29",
+    "reason": "return",
+    "type": "partial",
+    "status": "applied",
+    "exchange_rate": "2745.830000",
+    "subtotal": "45.648798",
+    "tax_amount": "0.000000",
+    "total": "45.648798",
+    "refund_method": "credit_balance",
+    "refund_amount": "45.648798",
+    "details": [
+      {
+        "sale_detail_id": 34852,
+        "product_id": 100,
+        "presentation_id": 100,
+        "package_quantity_returned": 1,
+        "loose_units_returned": 0,
+        "unit_price": "4.97",
+        "discount_percent": "0.00",
+        "tax_percent": "0.00",
+        "line_total": "4.97"
+      }
+    ]
+  }
+  ```
+- **Response Shape** (Status: 200):
+  ```json
+  {
+    "data": {
+      "id": 162,
+      "credit_note_number": "NC-20260629-0001",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z"
+    }
+  }
+  ```
+
+#### DELETE `/credit-notes/{id}`
+- **Descripción**: Elimina una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (204)
+- **Request**:
+  ```json
+  null
+  ```
+- **Response Shape** (Status: 204):
+  ```json
+  {
+    "message": "Nota de crédito eliminada exitosamente"
+  }
+  ```
+
+### Tabla de Homogeneidad
+
+| Endpoint | URL en snake_case | Mensajes en español | Estructura JSON consistente |
+|----------|-------------------|----------------------|-----------------------------|
+| GET `/credit-notes` | ✅ | ⚠️ No probado | ✅ |
+| POST `/credit-notes` | ✅ | ⚠
 ## BRD — Marcas (`/api/brands`)
 <!-- ═══════════════════════════════ -->
 
