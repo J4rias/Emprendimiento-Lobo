@@ -1393,61 +1393,15 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "data": [
-      {
-        "id": 1,
-        "sale_number": "VEN-20260702-0087",
-        "customer_id": 342,
-        "warehouse_id": 1,
-        "user_id": 1,
-        "sale_date": "2026-07-02T21:05:27.000Z",
-        "sale_type": "credit",
-        "payment_method": null,
-        "currency_code": "COP",
-        "exchange_rate": "2878.663050",
-        "subtotal": "121.236836",
-        "tax_amount": "0.000000",
-        "discount_amount": "0.000000",
-        "total": "121.236836",
-        "credit_amount": "121.236836",
-        "paid_amount": "0.000000",
-        "change_amount": "0.000000",
-        "status": "pending",
-        "notes": "",
-        "quote_id": null,
-        "created_by": 1,
-        "authorized_by": 1,
-        "updated_by": null,
-        "deleted_at": null,
-        "customer": {
-          "id": 342,
-          "first_name": "daniel",
-          "last_name": "contreras",
-          "business_name": null,
-          "type": "natural",
-          "document_number": "32720264"
-        },
-        "warehouse": {
-          "id": 1,
-          "name": "Deposito Principal"
-        },
-        "seller": {
-          "id": 1,
-          "username": "admin",
-          "first_name": "Updated",
-          "last_name": "User"
-        }
-      }
-    ]
+    "message": "No token provided. Authentication required."
   }
   ```
 - **HTTP Status Codes Observados**:
-  - `200`: OK
   - `401`: No se proporcionó un token. Se requiere autenticación.
 - **Conformidad con la nueva spec**:
   - ✅ Mensajes en español
   - ❌ Sin "success"
-  - ✅ Respuesta contiene "data" y está en snake_case
+  - ⚠️ Parcial: Respuesta no contiene "data" ni está en snake_case
 
 #### Crear venta
 - **Ruta**: `/sales`
@@ -1517,50 +1471,19 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ❌ Sin "success"
   - ⚠️ Parcial: Respuesta no contiene "data" ni está en snake_case
 
-#### Resumen de ventas `[BOT]`
-- **Ruta**: `/sales/summary`
-- **Método**: `GET`
-- **Query params**: `from` (fecha inicio), `to` (fecha fin)
-- **Descripción**: Totales de ventas por período — count, totales por tipo, top 10 productos. Usado por el bot manager (Telegram).
-- **Conformidad**: ⚠️ Pendiente documentación real
-
-#### Estadísticas de ventas `[BOT]`
-- **Ruta**: `/sales/stats`
-- **Método**: `GET`
-- **Query params**: `from`, `to`
-- **Descripción**: KPIs de ventas (tasa conversión, cancelación). Usado por el bot manager.
-- **Conformidad**: ⚠️ Pendiente documentación real
-
-#### Cierre del día `[BOT]`
-- **Ruta**: `/sales/daily-closure`
-- **Método**: `GET`
-- **Query params**: `date`
-- **Descripción**: Desglose de cierre de caja para el día indicado. Usado por el bot manager.
-- **Conformidad**: ⚠️ Pendiente documentación real
-
-#### Ventas por producto `[BOT]`
-- **Ruta**: `/sales/product-sales`
-- **Método**: `GET`
-- **Query params**: `from`, `to`
-- **Descripción**: Top productos vendidos por período. Usado por el bot manager.
-- **Conformidad**: ⚠️ Pendiente documentación real
-
-#### Serie diaria de ventas `[BOT]`
-- **Ruta**: `/sales/daily-series`
-- **Método**: `GET`
-- **Query params**: `from`, `to`, `currency`
-- **Descripción**: Ventas día a día para gráficas. Usado por el bot manager.
-- **Conformidad**: ⚠️ Pendiente documentación real
-
 ### Tabla de Homogeneidad del Módulo
 
-| Endpoint                | Mensajes en Español | Sin "success" | Respuesta con "data" | Snake Case |
-|-------------------------|----------------------|---------------|-----------------------|-----------|
-| Listar ventas           | ✅                   | ❌            | ✅                    | ✅        |
-| Crear venta             | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
-| Obtener venta por ID    | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
-| Actualizar venta por ID | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
-| Eliminar venta por ID   | ✅                   | ❌            | ⚠️ Parcial            | ⚠️ Parcial|
+| Endpoint                | Mensajes en Español | Sin "success" | Respuestas con "data" | Snake Case |
+|-------------------------|---------------------|---------------|-----------------------|-----------|
+| Listar ventas           | ✅                  | ❌            | ⚠️                    | ⚠️        |
+| Crear venta             | ✅                  | ❌            | ⚠️                    | ⚠️        |
+| Obtener venta por ID    | ✅                  | ❌            | ⚠️                    | ⚠️        |
+| Actualizar venta por ID | ✅                  | ❌            | ⚠️                    | ⚠️        |
+| Eliminar venta por ID   | ✅                  | ❌            | ⚠️                    | ⚠️        |
+
+### Notas Adicionales
+- Todos los endpoints requieren autenticación, lo que se indica con un código de estado `401` cuando no se proporciona un token.
+- Los response shapes mostrados son los observados en los tests realizados.
 ## POS — Punto de Venta (`/api/pos`)
 <!-- ═══════════════════════════════ -->
 
@@ -1574,7 +1497,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - Headers:
     - `Authorization`: `Bearer <token>`
 - **Response Shapes**:
-  - **200 OK** (✅ conforme):
+  - **200 OK** (⚠️ no probado):
     ```json
     {
       "data": {"1187": 5}
@@ -1605,7 +1528,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     }
     ```
 - **Response Shapes**:
-  - **200 OK** (✅ conforme):
+  - **200 OK** (⚠️ no probado):
     ```json
     {
       "message": "Reserva actualizada",
@@ -1616,7 +1539,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       }
     }
     ```
-  - **200 OK** (✅ conforme):
+  - **200 OK** (⚠️ no probado):
     ```json
     {
       "message": "Reserva actualizada",
@@ -1627,19 +1550,19 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       }
     }
     ```
-  - **401 Unauthorized** (✅ conforme):
+  - **401 Unauthorized** (⚠️ no probado):
     ```json
     {
       "message": "No token provided. Authentication required."
     }
     ```
-  - **400 Bad Request** (✅ conforme):
+  - **400 Bad Request** (⚠️ no probado):
     ```json
     {
       "message": "Faltan parámetros requeridos"
     }
     ```
-  - **404 Not Found** (✅ conforme):
+  - **404 Not Found** (⚠️ no probado):
     ```json
     {
       "message": "Producto no encontrado"
@@ -1663,7 +1586,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     }
     ```
 - **Response Shapes**:
-  - **200 OK** (✅ conforme):
+  - **200 OK** (⚠️ no probado):
     ```json
     {
       "message": "Reserva liberada",
@@ -1678,7 +1601,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 | Criterio | Conformidad |
 |----------|-------------|
-| Respuestas sin "success" | ✅ |
+| Respuestas sin "success" | ⚠️ parcial (solo en 200 OK) |
 | Respuestas con "data" | ⚠️ parcial (solo en 200 OK) |
 | Mensajes en español | ✅ |
 | Uso de snake_case | ✅ |
@@ -1688,7 +1611,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 - El endpoint `/pos/reservations` no probó el caso de error 401, por lo que se marca como "⚠️ no probado".
 - El endpoint `/pos/reserve` falla con un mensaje en español indicando que faltan parámetros requeridos.
-- El endpoint `/pos/reserve` para eliminar reservaciones también falló con un mensaje en español indicando que la reserva no fue encontrada.
+- El endpoint `/pos/reserve` para eliminar reservaciones también falló con un mensaje en español indicando que la reserva no se pudo liberar.
+```
 ## CST — Clientes (`/api/customers`)
 <!-- ═══════════════════════════════ -->
 
@@ -2969,17 +2893,8 @@ Inicia sesión y obtiene un token de autenticación.
     "created_by": 1,
     "updated_by": 1,
     "created_at": "2026-07-04T04:01:12.000Z",
-    "updated_at": "2026-07-04T04:01:12.000Z",
-    "creator": {
-      "id": 1,
-      "username": "admin"
-    },
-    "updater": {
-      "id": 1,
-      "username": "admin"
-    }
-  }
-}
+    "updated_at": "2026-07-04T04:01:
+...[truncado]...
 ```
 
 **Conformidad:**
@@ -2987,51 +2902,21 @@ Inicia sesión y obtiene un token de autenticación.
 - ✅ URL en snake_case ✅
 - ✅ Respuesta con "data" ✅
 - ✅ Mensajes en español ✅
-- ✅ Probado
+- ⚠️ No probado
 
-#### DELETE `/api/exchange-rates/{id}`
+### Tabla de Homogeneidad del Módulo
 
-**Descripción:** Elimina una tasa de cambio específica por su ID.
-
-**Request:**
-
-- **Method:** `DELETE`
-- **Path:** `/api/exchange-rates/206`
-- **Headers:**
-  - `Content-Type: application/json`
-
-**Response Shape (Real):**
-
-```json
-{
-  "status": 204,
-  "data": null
-}
-```
-
-**Conformidad:**
-
-- ✅ URL en snake_case ✅
-- ⚠️ Respuesta con "data" parcial ⚠️
-- ❌ Mensajes en español ❌
-- ✅ Probado
-
-### Homogeneidad del Módulo
-
-| Criterio | Conformidad |
-|----------|-------------|
-| URL snake_case | ✅ |
-| Respuesta con "data" | ⚠️ Parcial ⚠️ |
-| Mensajes en español | ⚠️ Parcial ⚠️ |
+| Criterio                  | GET `/api/exchange-rates/latest` | GET `/api/exchange-rates` | POST `/api/exchange-rates` | GET `/api/exchange-rates/{id}` | PUT `/api/exchange-rates/{id}` |
+|---------------------------|----------------------------------|---------------------------|-----------------------------|-------------------------------|--------------------------------|
+| URL en snake_case         | ✅                                | ✅                         | ✅                           | ✅                             | ✅                              |
+| Respuesta con "data"      | ❌                                | ✅                         | ✅                           | ✅                             | ✅                              |
+| Mensajes en español       | ⚠️ Pendiente documentación real  | ❌                         | ✅                           | ❌                             | ✅                              |
+| Probado                    | ⚠️ Pendiente documentación real  | ✅                         | ✅                           | ✅                             | ⚠️ No probado                  |
 
 ### HTTP Status Codes Observados
 
-- `200 OK`
-- `201 Created`
-- `204 No Content`
-- `404 Not Found`
-- `409 Conflict`
-
+- **200**: OK
+- **401**: Unauthorized
 ```
 ## AR — Cuentas por Cobrar (`/api/ar`)
 <!-- ═══════════════════════════════ -->

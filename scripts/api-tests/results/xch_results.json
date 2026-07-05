@@ -1,9 +1,99 @@
-{"test": "test_list_exchange_rates", "method": "GET", "path": "http://localhost:5001/api/exchange-rates", "status": 200, "request": null, "response": null}
-{"test": "test_create_exchange_rate", "method": "POST", "path": "http://localhost:5001/api/exchange-rates", "status": 201, "request": {"from_currency": "USD", "to_currency": "VES", "rate": 10.5, "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Test note"}, "response": {"message": "Tasa de cambio creada exitosamente", "data": {"id": 213, "from_currency": "USD", "to_currency": "VES", "rate": "10.500000", "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Test note", "is_active": true, "created_by": 1, "updated_by": 1, "created_at": "2026-07-04T04:41:48.000Z", "updated_at": "2026-07-04T04:41:48.000Z", "creator": {"id": 1, "username": "admin"}}}}
-{"test": "test_get_exchange_rate", "method": "GET", "path": "http://localhost:5001/api/exchange-rates/213", "status": 200, "request": null, "response": null}
-{"test": "test_update_exchange_rate", "method": "PUT", "path": "http://localhost:5001/api/exchange-rates/213", "status": 200, "request": {"rate": 11.5, "notes": "Updated test note"}, "response": {"message": "Tasa de cambio actualizada exitosamente", "data": {"id": 213, "from_currency": "USD", "to_currency": "VES", "rate": "11.500000", "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Updated test note", "is_active": true, "created_by": 1, "updated_by": 1, "created_at": "2026-07-04T04:41:48.000Z", "updated_at": "2026-07-04T04:41:49.000Z", "creator": {"id": 1, "username": "admin"}, "updater": {"id": 1, "username": "admin"}}}}
-{"test": "test_delete_exchange_rate", "method": "DELETE", "path": "http://localhost:5001/api/exchange-rates/213", "status": 200, "request": null, "response": null}
-{"test": "test_list_without_auth", "method": "GET", "path": "http://localhost:5001/api/exchange-rates", "status": 401, "request": null, "response": null}
-{"test": "test_get_nonexistent_exchange_rate", "method": "GET", "path": "http://localhost:5001/api/exchange-rates/99999999", "status": 404, "request": null, "response": null}
-{"test": "test_create_duplicate_exchange_rate", "method": "POST", "path": "http://localhost:5001/api/exchange-rates", "status": 201, "request": {"from_currency": "USD", "to_currency": "VES", "rate": 10.5, "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Test note"}, "response": {"message": "Tasa de cambio creada exitosamente", "data": {"id": 214, "from_currency": "USD", "to_currency": "VES", "rate": "10.500000", "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Test note", "is_active": true, "created_by": 1, "updated_by": 1, "created_at": "2026-07-04T04:41:49.000Z", "updated_at": "2026-07-04T04:41:49.000Z", "creator": {"id": 1, "username": "admin"}}}}
-{"test": "test_create_duplicate_exchange_rate_conflict", "method": "POST", "path": "http://localhost:5001/api/exchange-rates", "status": 409, "request": {"from_currency": "USD", "to_currency": "VES", "rate": 10.5, "effective_date": "2023-10-01", "source": "API_TEST", "notes": "Test note"}, "response": {"message": "Ya existe una tasa de cambio de USD a VES para la fecha 2023-10-01"}}
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/usr/lib/python3.14/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.14/http/client.py", line 1362, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/http/client.py", line 1122, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "/usr/lib/python3.14/http/client.py", line 1066, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.14/site-packages/urllib3/connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=5001): Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/connectionpool.py", line 842, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "/usr/lib/python3.14/site-packages/urllib3/util/retry.py", line 543, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=5001): Max retries exceeded with url: /api/auth/login (Caused by NewConnectionError("HTTPConnection(host='localhost', port=5001): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/xch_tests.py", line 136, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/xch_tests.py", line 123, in main
+    test_list_exchange_rates()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/xch_tests.py", line 26, in test_list_exchange_rates
+    token = get_token()
+  File "/home/joel/Projects/Emprendimiento-Lobo/scripts/api-tests/xch_tests.py", line 11, in get_token
+    response = requests.post(url, json=payload)
+  File "/usr/lib/python3.14/site-packages/requests/api.py", line 134, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "/usr/lib/python3.14/site-packages/requests/adapters.py", line 729, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5001): Max retries exceeded with url: /api/auth/login (Caused by NewConnectionError("HTTPConnection(host='localhost', port=5001): Failed to establish a new connection: [Errno 111] Connection refused"))
