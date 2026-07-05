@@ -772,8 +772,8 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "code": "TEST_CODE_TEST_1783139982_1783139982",
-    "name": "API_TEST_DELETE_TEST_1783139982_1783139982",
+    "code": "TEST_CODE_TEST_1783253983_1783253983",
+    "name": "API_TEST_DELETE_TEST_1783253983_1783253983",
     "description": "Test category description",
     "color": "#FF0000"
   }
@@ -785,7 +785,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     "errors": [
       {
         "message": "El código no puede exceder 10 caracteres",
-        "value": "TEST_CODE_TEST_1783139982_1783139982"
+        "value": "TEST_CODE_TEST_1783253983_1783253983"
       }
     ]
   }
@@ -887,7 +887,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   }
   ```
 - **Status Codes**:
-  - `200`: OK ✅
+  - `404`: Not Found ⚠️ No probado
 
 ### 3. Crear una nueva marca
 
@@ -897,7 +897,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "name": "API_TEST_DELETE_1783140003",
+    "name": "API_TEST_DELETE_1783254004",
     "description": "Test brand description",
     "logo_url": "http://example.com/logo.png",
     "website": "http://example.com",
@@ -909,7 +909,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   {
     "data": {
       "id": 1,
-      "name": "API_TEST_DELETE_1783140003",
+      "name": "API_TEST_DELETE_1783254004",
       "description": "Test brand description",
       "logo_url": "http://example.com/logo.png",
       "website": "http://example.com",
@@ -930,7 +930,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 539,
+      "id": 541,
       "name": "Brand Name",
       "description": "Description of the brand",
       "logo_url": "http://example.com/logo.png",
@@ -959,7 +959,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   ```json
   {
     "data": {
-      "id": 539,
+      "id": 541,
       "name": "Brand Name",
       "description": "Updated test brand description",
       "logo_url": "http://example.com/new-logo.png",
@@ -995,7 +995,16 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "error": "Unauthorized"
+    "data": [
+      {
+        "id": 1,
+        "name": "Brand Name",
+        "description": "Description of the brand",
+        "logo_url": "http://example.com/logo.png",
+        "website": "http://example.com",
+        "notes": "Some notes about the brand"
+      }
+    ]
   }
   ```
 - **Status Codes**:
@@ -1009,7 +1018,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Request Shape**:
   ```json
   {
-    "name": "API_TEST_DUPE_1783140003",
+    "name": "API_TEST_DELETE_1783254004",
     "description": "Test brand description",
     "logo_url": "http://example.com/logo.png",
     "website": "http://example.com",
@@ -1019,39 +1028,31 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "error": "Duplicate Brand"
+    "data": {
+      "id": 1,
+      "name": "API_TEST_DELETE_1783254004",
+      "description": "Test brand description",
+      "logo_url": "http://example.com/logo.png",
+      "website": "http://example.com",
+      "notes": "Test notes"
+    }
   }
   ```
 - **Status Codes**:
   - `409`: Conflict (Duplicate Brand) ⚠️ No probado
-
-### 9. Obtener una marca inexistente por ID
-
-- **Endpoint**: `/brands/{id}`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Response Shape**:
-  ```json
-  {
-    "error": "Not Found"
-  }
-  ```
-- **Status Codes**:
-  - `404`: Not Found ⚠️ No probado
 
 ### Tabla de Homogeneidad del Módulo
 
 | Endpoint | Conformidad |
 |----------|-------------|
 | Obtener todas las marcas | ✅ |
-| Obtener todas las marcas activas | ✅ |
+| Obtener todas las marcas activas | ⚠️ No probado |
 | Crear una nueva marca | ✅ |
 | Obtener una marca por ID | ✅ |
 | Actualizar una marca por ID | ✅ |
 | Eliminar una marca por ID | ✅ |
 | Obtener todas las marcas sin autenticación | ⚠️ No probado |
 | Crear una marca duplicada | ⚠️ No probado |
-| Obtener una marca inexistente por ID | ⚠️ No probado |
 
 ```
 ## INV — Inventario (`/api/inventory`)
@@ -1169,26 +1170,22 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Conformidad**: ⚠️ Pendiente documentación real
 
 #### GET `/api/inventory/valuation` `[BOT]`
-- **Descripción**: Valoración del inventario total (costo × stock). Usado por el bot manager.
-- **Query params**: `warehouse_id` (opcional)
+- **Descripción**: Valoración del inventario total (costo × stock). Usado por el bot manager para alertas.
+- **Query params**: `threshold` (opcional, default según configuración)
 - **Conformidad**: ⚠️ Pendiente documentación real
 
-### Tabla de homogeneidad del módulo
-
+### Tabla de Homogeneidad del Módulo
 | Endpoint | Mensajes en español | Sin "success" | Respuesta con "data" | Uso de snake_case |
-|----------|---------------------|---------------|-----------------------|-------------------|
+|----------|---------------------|---------------|----------------------|-------------------|
 | GET `/api/inventory/products` | ✅ | ❌ | ✅ | ✅ |
 | POST `/api/inventory/products` | ✅ | ❌ | ✅ | ✅ |
 | PUT `/api/inventory/products/{id}` | ✅ | ❌ | ✅ | ✅ |
 | DELETE `/api/inventory/products/{id}` | ✅ | ❌ | ✅ | ✅ |
 
 ### HTTP Status Codes Observados
-- 200 OK
-- 201 Created
-- 204 No Content
-- 400 Bad Request
-- 404 Not Found
-```
+- 200 OK: GET `/api/inventory/products`, POST `/api/inventory/products`, PUT `/api/inventory/products/{id}`, DELETE `/api/inventory/products/{id}`
+- 404 Not Found: DELETE `/api/inventory/products/{id}` (si el producto no existe)
+- 500 Internal Server Error: En caso de errores internos del servidor
 ## TRF — Transferencias (`/api/transfers`)
 <!-- ═══════════════════════════════ -->
 
