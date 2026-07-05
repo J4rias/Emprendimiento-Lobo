@@ -3932,8 +3932,8 @@ Inicia sesión y obtiene un token de autenticación.
 
 ### Homogeneidad del Módulo BNK
 | Endpoint | Respuesta con `data` | Mensajes en español | Usa snake_case |
-|----------|-----------------------|---------------------|---------------|
-| Listar Bancos `[BOT]` | ✅ | ✅ | ✅ |
+|----------|-----------------------|---------------------|----------------|
+| Listar Bancos | ✅ | ✅ | ✅ |
 | Crear Banco | ✅ | ✅ | ✅ |
 | Obtener Banco por ID | ✅ | ✅ | ✅ |
 | Actualizar Banco por ID | ✅ | ✅ | ✅ |
@@ -3943,10 +3943,6 @@ Inicia sesión y obtiene un token de autenticación.
 - `200 OK`: Listar Bancos, Obtener Banco por ID
 - `201 Created`: Crear Banco
 - `204 No Content`: Actualizar Banco por ID, Eliminar Banco por ID
-
-### Notas Adicionales
-- El endpoint de eliminación no incluye `data` en la respuesta, lo cual es una excepción a la nueva especificación.
-```
 ## PKG — Tipos de Empaque (`/api/packaging-types`)
 <!-- ═══════════════════════════════ -->
 
