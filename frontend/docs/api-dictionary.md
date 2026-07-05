@@ -438,7 +438,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 8,
+            "id": 5,
             "name": "suppliers.view",
             "description": "Ver proveedores",
             "module": "suppliers",
@@ -454,7 +454,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 9,
+            "id": 6,
             "name": "suppliers.create",
             "description": "Crear proveedores",
             "module": "suppliers",
@@ -470,7 +470,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 10,
+            "id": 7,
             "name": "suppliers.update",
             "description": "Actualizar proveedores",
             "module": "suppliers",
@@ -486,7 +486,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 11,
+            "id": 8,
             "name": "suppliers.delete",
             "description": "Eliminar proveedores",
             "module": "suppliers",
@@ -502,7 +502,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 12,
+            "id": 9,
             "name": "brands.view",
             "description": "Ver marcas",
             "module": "brands",
@@ -518,7 +518,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 13,
+            "id": 10,
             "name": "brands.create",
             "description": "Crear marcas",
             "module": "brands",
@@ -534,7 +534,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 14,
+            "id": 11,
             "name": "brands.update",
             "description": "Actualizar marcas",
             "module": "brands",
@@ -550,7 +550,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
             }
           },
           {
-            "id": 15,
+            "id": 12,
             "name": "brands.delete",
             "description": "Eliminar marcas",
             "module": "brands",
@@ -564,21 +564,20 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
               "created_at": "2026-02-27T17:59:27.000Z",
               "updated_at": "2026-02-27T17:59:27.000Z"
             }
-          },
-          {
-            "id": 16,
-            "name": "categories.view",
-            "description": "Ver categorías",
-            "module": "categories",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 16,
-              "role_id": 1,
-              "permission_id": 16,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Checklist:**
+
+- [x] La respuesta contiene un mensaje en español.
+- [x] La estructura de la respuesta sigue el formato especificado.
+- [x] Los nombres de los campos están en snake_case.
+```
 ## PRD — Productos (`/api/products`)
 <!-- ═══════════════════════════════ -->
 
@@ -3946,9 +3945,9 @@ Obtiene los tipos de presentación activos.
           },
           {
             "id": 9,
-            "name": "brands.view",
-            "description": "Ver marcas",
-            "module": "brands",
+            "name": "devices.view",
+            "description": "Ver dispositivos",
+            "module": "devices",
             "action": "view",
             "created_at": "2026-02-27T17:59:27.000Z",
             "updated_at": "2026-02-27T17:59:27.000Z"
@@ -4017,6 +4016,52 @@ Obtiene los tipos de presentación activos.
             "updated_at": "2026-02-27T17:59:27.000Z"
           }
         ]
+      },
+      {
+        "id": 2,
+        "name": "Usuario",
+        "description": "Acceso básico al sistema",
+        "is_active": true,
+        "created_at": "2026-02-27T17:59:27.000Z",
+        "updated_at": "2026-02-27T17:59:27.000Z",
+        "permissions": [
+          {
+            "id": 1,
+            "name": "products.view",
+            "description": "Ver productos",
+            "module": "products",
+            "action": "view",
+            "created_at": "2026-02-27T17:59:27.000Z",
+            "updated_at": "2026-02-27T17:59:27.000Z"
+          },
+          {
+            "id": 5,
+            "name": "suppliers.view",
+            "description": "Ver proveedores",
+            "module": "suppliers",
+            "action": "view",
+            "created_at": "2026-02-27T17:59:27.000Z",
+            "updated_at": "2026-02-27T17:59:27.000Z"
+          },
+          {
+            "id": 9,
+            "name": "devices.view",
+            "description": "Ver dispositivos",
+            "module": "devices",
+            "action": "view",
+            "created_at": "2026-02-27T17:59:27.000Z",
+            "updated_at": "2026-02-27T17:59:27.000Z"
+          },
+          {
+            "id": 13,
+            "name": "inventory.view",
+            "description": "Ver inventario",
+            "module": "inventory",
+            "action": "view",
+            "created_at": "2026-02-27T17:59:27.000Z",
+            "updated_at": "2026-02-27T17:59:27.000Z"
+          }
+        ]
       }
     ]
   }
@@ -4027,16 +4072,33 @@ Obtiene los tipos de presentación activos.
 - ✅ Respuesta con `data` y mensaje en español
 - ⚠️ Parcial (campos en snake_case, pero fechas en formato ISO)
 
-### Tabla de Homogeneidad
+#### Obtener un rol por ID (`GET /roles/{id}`)
 
-| Endpoint | Status Code | Mensaje en Español | Campos en Snake Case | Fechas en Formato ISO |
-|----------|-------------|--------------------|---------------------|------------------------|
-| POST /roles | 201 | ✅ | ⚠️ | ⚠️ |
-| GET /roles | 200 | ✅ | ⚠️ | ⚠️ |
+**Response (200):**
 
-### Notas Adicionales
-
-- Los campos en snake_case y las fechas en formato ISO son consistentes con la especificación, pero se recomienda revisar si es necesario ajustar el formato de las fechas para mayor coherencia.
+```json
+{
+  "message": "Rol encontrado exitosamente",
+  "data": {
+    "id": 1,
+    "name": "Administrador",
+    "description": "Acceso total al sistema",
+    "is_active": true,
+    "created_at": "2026-02-27T17:59:27.000Z",
+    "updated_at": "2026-02-27T17:59:27.000Z",
+    "permissions": [
+      {
+        "id": 1,
+        "name": "products.view",
+        "description": "Ver productos",
+        "module": "products",
+        "action": "view",
+        "created_at": "2026-02-27T17:59:27.000Z",
+        "updated_at": "2026-02-27T17:59:27.000Z"
+      },
+      {
+        "id": 2,
+        "name": "products.create
 ## USR — Usuarios (`/api/users`)
 <!-- ═══════════════════════════════ -->
 
@@ -4077,7 +4139,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_get_user", "method": "GET", "path": "/users/18", "status": 200, "request": null, "response": null}
+  {"test": "test_get_user", "method": "GET", "path": "/users/19", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -4090,7 +4152,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_update_user", "method": "PUT", "path": "/users/18", "status": 200, "request": null, "response": null}
+  {"test": "test_update_user", "method": "PUT", "path": "/users/19", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -4103,7 +4165,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_delete_user", "method": "DELETE", "path": "/users/18", "status": 200, "request": null, "response": null}
+  {"test": "test_delete_user", "method": "DELETE", "path": "/users/19", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
