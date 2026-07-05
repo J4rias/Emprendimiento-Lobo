@@ -2925,8 +2925,8 @@ DELETE http://localhost:5001/api/purchase-orders/516
 - **Auth**: Sí — `pre_orders.approve`
 - **Descripción**: Convierte el pre-pedido en venta (replica `createSale`).
 
-> ⚠️ **MISALIGNMENT BOT**: El bot llama `PATCH /api/pre-orders/:id/status` que no existe.  
-> Las rutas reales son `POST /:id/approve` y `POST /:id/reject`.  
+> ⚠️ **MISALIGNMENT BOT**: El bot llama `PATCH /api/pre-orders/:id/status` que no existe.   \
+> Las rutas reales son `POST /:id/approve` y `POST /:id/reject`.   \
 > **Acción**: corregir el bot (`updatePreOrderStatus` en `erp.ts`) antes de usar flujo de aprobación.
 
 ### `POST /auth/login` (contenido incorrecto — ignorar)
@@ -2975,204 +2975,37 @@ Inicia sesión y obtiene un token de autenticación.
             "module": "products",
             "action": "view",
             "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 1,
-              "role_id": 1,
-              "permission_id": 1,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 2,
-            "name": "products.create",
-            "description": "Crear productos",
-            "module": "products",
-            "action": "create",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 2,
-              "role_id": 1,
-              "permission_id": 2,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 3,
-            "name": "products.update",
-            "description": "Actualizar productos",
-            "module": "products",
-            "action": "update",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 3,
-              "role_id": 1,
-              "permission_id": 3,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 4,
-            "name": "products.delete",
-            "description": "Eliminar productos",
-            "module": "products",
-            "action": "delete",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 4,
-              "role_id": 1,
-              "permission_id": 4,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 5,
-            "name": "suppliers.view",
-            "description": "Ver proveedores",
-            "module": "suppliers",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 5,
-              "role_id": 1,
-              "permission_id": 5,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 6,
-            "name": "suppliers.create",
-            "description": "Crear proveedores",
-            "module": "suppliers",
-            "action": "create",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 6,
-              "role_id": 1,
-              "permission_id": 6,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 7,
-            "name": "suppliers.update",
-            "description": "Actualizar proveedores",
-            "module": "suppliers",
-            "action": "update",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 7,
-              "role_id": 1,
-              "permission_id": 7,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 8,
-            "name": "suppliers.delete",
-            "description": "Eliminar proveedores",
-            "module": "suppliers",
-            "action": "delete",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 8,
-              "role_id": 1,
-              "permission_id": 8,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 9,
-            "name": "brands.view",
-            "description": "Ver marcas",
-            "module": "brands",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 9,
-              "role_id": 1,
-              "permission_id": 9,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 10,
-            "name": "brands.create",
-            "description": "Crear marcas",
-            "module": "brands",
-            "action": "create",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 10,
-              "role_id": 1,
-              "permission_id": 10,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 11,
-            "name": "brands.update",
-            "description": "Actualizar marcas",
-            "module": "brands",
-            "action": "update",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 11,
-              "role_id": 1,
-              "permission_id": 11,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 12,
-            "name": "brands.delete",
-            "description": "Eliminar marcas",
-            "module": "brands",
-            "action": "delete",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 12,
-              "role_id": 1,
-              "permission_id": 12,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
-          {
-            "id": 13,
-            "name": "categories.view",
-            "description": "Ver categorías",
-            "module": "categories",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 13,
-              "role_id": 1,
-              "permission_id": 13,
-              "created_at": "2026-02-27T17:59:27
+            "updated_at": "2026-02-2
+...[truncado]...
+
+### Tabla de Homogeneidad del Módulo
+
+| Endpoint | Conformidad |
+|----------|-------------|
+| GET `/api/pre-orders` `[BOT]` | ⚠️ Pendiente documentación real |
+| GET `/api/pre-orders/stats` `[BOT]` | ⚠️ Pendiente documentación real |
+| POST `/api/pre-orders` `[BOT]` | ⚠️ Pendiente documentación real |
+| GET `/api/pre-orders/:id` | ✅ Conforme |
+| POST `/api/pre-orders/:id/approve` | ✅ Conforme |
+| POST `/api/pre-orders/:id/reject` | ✅ Conforme |
+| POST `/api/pre-orders/:id/convert` | ⚠️ Pendiente documentación real |
+
+### HTTP Status Codes Observados
+
+| Endpoint | Status Codes |
+|----------|--------------|
+| GET `/api/pre-orders` `[BOT]` | 200, 401, 403 |
+| GET `/api/pre-orders/stats` `[BOT]` | 200, 401, 403 |
+| POST `/api/pre-orders` `[BOT]` | 201, 400, 401, 403 |
+| GET `/api/pre-orders/:id` | 200, 401, 403, 404 |
+| POST `/api/pre-orders/:id/approve` | 200, 400, 401, 403, 404 |
+| POST `/api/pre-orders/:id/reject` | 200, 400, 401, 403, 404 |
+| POST `/api/pre-orders/:id/convert` | 200, 400, 401, 403, 404 |
+
+### Notas Adicionales
+
+- **MISALIGNMENT BOT**: El bot llama `PATCH /api/pre-orders/:id/status` que no existe. Las rutas reales son `POST /:id/approve` y `POST /:id/reject`. Acción: corregir el bot (`updatePreOrderStatus` en `erp.ts`) antes de usar flujo de aprobación.
+- **Conformidad Parcial**: La sección `POST /auth/login` contiene información incorrecta y debe ser ignorada.
 ## XCH — Tasas de Cambio (`/api/exchange-rates`)
 <!-- ═══════════════════════════════ -->
 
@@ -4753,9 +4586,9 @@ Obtiene los tipos de presentación activos.
           },
           {
             "id": 9,
-            "name": "customers.view",
-            "description": "Ver clientes",
-            "module": "customers",
+            "name": "users.view",
+            "description": "Ver usuarios",
+            "module": "users",
             "action": "view",
             "created_at": "2026-02-27T17:59:27.000Z",
             "updated_at": "2026-02-27T17:59:27.000Z",
@@ -4769,9 +4602,9 @@ Obtiene los tipos de presentación activos.
           },
           {
             "id": 10,
-            "name": "customers.create",
-            "description": "Crear clientes",
-            "module": "customers",
+            "name": "users.create",
+            "description": "Crear usuarios",
+            "module": "users",
             "action": "create",
             "created_at": "2026-02-27T17:59:27.000Z",
             "updated_at": "2026-02-27T17:59:27.000Z",
@@ -4785,9 +4618,9 @@ Obtiene los tipos de presentación activos.
           },
           {
             "id": 11,
-            "name": "customers.update",
-            "description": "Actualizar clientes",
-            "module": "customers",
+            "name": "users.update",
+            "description": "Actualizar usuarios",
+            "module": "users",
             "action": "update",
             "created_at": "2026-02-27T17:59:27.000Z",
             "updated_at": "2026-02-27T17:59:27.000Z",
@@ -4801,9 +4634,9 @@ Obtiene los tipos de presentación activos.
           },
           {
             "id": 12,
-            "name": "customers.delete",
-            "description": "Eliminar clientes",
-            "module": "customers",
+            "name": "users.delete",
+            "description": "Eliminar usuarios",
+            "module": "users",
             "action": "delete",
             "created_at": "2026-02-27T17:59:27.000Z",
             "updated_at": "2026-02-27T17:59:27.000Z",
@@ -4814,23 +4647,22 @@ Obtiene los tipos de presentación activos.
               "created_at": "2026-02-27T17:59:27.000Z",
               "updated_at": "2026-02-27T17:59:27.000Z"
             }
-          },
-          {
-            "id": 13,
-            "name": "orders.view",
-            "description": "Ver pedidos",
-            "module": "orders",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z",
-            "RolePermission": {
-              "id": 13,
-              "role_id": 1,
-              "permission_id": 13,
-              "created_at": "2026-02-27T17:59:27.000Z",
-              "updated_at": "2026-02-27T17:59:27.000Z"
-            }
-          },
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Checklist:**
+
+- [x] La respuesta contiene un mensaje de éxito.
+- [x] La respuesta incluye datos del usuario autenticado.
+- [x] Los permisos del rol están correctamente listados.
+
+**HTTP Status Code:** `200 OK`
+```
 ## UPL — Carga de Archivos (`/api/upload`)
 <!-- ═══════════════════════════════ -->
 
@@ -4907,61 +4739,59 @@ Host: example.com
 
 ```json
 {
-  "data": {
-    "company": {
-      "name": "API_TEST_UPDATE",
-      "address": "Test Address",
-      "phone": "1234567890",
-      "email": "test@example.com",
-      "tax_id": "123456789"
+  "company": {
+    "name": "API_TEST_UPDATE",
+    "address": "Test Address",
+    "phone": "1234567890",
+    "email": "test@example.com",
+    "tax_id": "123456789"
+  },
+  "priceList": {
+    "name": "Precio Publico",
+    "currency": "USD"
+  },
+  "categories": [
+    {
+      "id": 3,
+      "name": "Aceites",
+      "color": "#6B7280",
+      "productCount": 14
     },
-    "priceList": {
-      "name": "Precio Publico",
-      "currency": "USD"
+    {
+      "id": 9,
+      "name": "Animales",
+      "color": "#6B7280",
+      "productCount": 1
     },
-    "categories": [
-      {
-        "id": 3,
-        "name": "Aceites",
-        "color": "#6B7280",
-        "productCount": 14
-      },
-      {
-        "id": 9,
-        "name": "Animales",
-        "color": "#6B7280",
-        "productCount": 1
-      },
-      // ... más categorías ...
-    ],
-    "products": [
-      {
-        "id": 1187,
-        "name": "Aceite Agroil Soya, 800 ml",
-        "image_url": "/uploads/products/image-1782331827151-699777950.jpg",
-        "category_id": 3,
-        "category_name": "Aceites",
-        "packaging": "Bandeja",
-        "units_per_package": 12,
-        "package_price": "28.86",
-        "unit_price": "2.40",
-        "low_stock": 0
-      },
-      {
-        "id": 1249,
-        "name": "Aceite Amacord Soya, 900ml",
-        "image_url": null,
-        "category_id": 3,
-        "category_name": "Aceites",
-        "packaging": "Bandeja",
-        "units_per_package": 12,
-        "package_price": "35.43",
-        "unit_price": "2.95",
-        "low_stock": 0
-      },
-      // ... más productos ...
-    ]
-  }
+    // ... más categorías ...
+  ],
+  "products": [
+    {
+      "id": 1187,
+      "name": "Aceite Agroil Soya, 800 ml",
+      "image_url": "/uploads/products/image-1782331827151-699777950.jpg",
+      "category_id": 3,
+      "category_name": "Aceites",
+      "packaging": "Bandeja",
+      "units_per_package": 12,
+      "package_price": "28.86",
+      "unit_price": "2.40",
+      "low_stock": 0
+    },
+    {
+      "id": 1249,
+      "name": "Aceite Amacord Soya, 900ml",
+      "image_url": null,
+      "category_id": 3,
+      "category_name": "Aceites",
+      "packaging": "Bandeja",
+      "units_per_package": 12,
+      "package_price": "35.43",
+      "unit_price": "2.95",
+      "low_stock": 0
+    },
+    // ... más productos ...
+  ]
 }
 ```
 
