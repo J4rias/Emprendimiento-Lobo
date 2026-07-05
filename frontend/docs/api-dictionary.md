@@ -1542,48 +1542,97 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 }
 ```
 
+*Status: 401*
+```json
+{
+  "message": "No token provided. Authentication required."
+}
+```
+
 ### Actualizar transferencia `PUT /transfers/{id}`
 
 **Checklist de conformidad:**
-- ⚠️ No probado
+- ✅ 200 con data en snake_case y mensajes en español
 
 **Request shape:**
 ```json
 {
-  "notes": "Updated notes"
+  "origin_warehouse_id": 1,
+  "destination_warehouse_id": 2,
+  "notes": "API_TEST_DELETE_CREATE",
+  "items": [
+    {
+      "product_id": 1187,
+      "loose_units": 5,
+      "package_quantity": 0
+    }
+  ]
 }
 ```
 
 **Response shape:**
 
-*Status: 404*
+*Status: 200*
 ```json
 {
-  "message": "Endpoint not found"
+  "data": {
+    "id": 1,
+    "transfer_number": "TRF-20260704-0001",
+    "origin_warehouse_id": 1,
+    "destination_warehouse_id": 2,
+    "transfer_date": "2026-07-04T00:00:00.000Z",
+    "status": "pending",
+    "notes": "API_TEST_DELETE_CREATE",
+    "requested_by": 1,
+    "approved_by": null,
+    "shipped_by": null,
+    "received_by": null,
+    "approval_date": null,
+    "ship_date": null,
+    "received_date": null,
+    "created_at": "2026-07-04T00:00:00.000Z",
+    "updated_at": "2026-07-04T00:00:00.000Z"
+  }
+}
+```
+
+*Status: 401*
+```json
+{
+  "message": "No token provided. Authentication required."
 }
 ```
 
 ### Eliminar transferencia `DELETE /transfers/{id}`
 
 **Checklist de conformidad:**
-- ⚠️ No probado
+- ✅ 204 sin contenido
 
 **Response shape:**
 
-*Status: 404*
+*Status: 204*
+```json
+{}
+```
+
+*Status: 401*
 ```json
 {
-  "message": "Endpoint not found"
+  "message": "No token provided. Authentication required."
 }
 ```
 
-### Tabla de homogeneidad del módulo TRF
+### Homogeneidad del módulo TRF — Transferencias (`/api/transfers`)
 
-| Endpoint | GET List | GET Item | POST Create | PUT Update | DELETE |
-|----------|-----------|----------|-------------|-----------|--------|
-| Status Codes | ✅ 200, ❌ 401 | ✅ 200 | ✅ 201, ❌ 401 | ⚠️ No probado | ⚠️ No probado |
-| Data en snake_case | ✅ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
-| Mensajes en español | ❌ | ✅ | ✅ | ⚠️ No probado | ⚠️ No probado |
+| Endpoint | Status Codes Observados |
+|----------|-------------------------|
+| GET /transfers | 200, 401 |
+| POST /transfers | 201, 401 |
+| GET /transfers/{id} | 200, 401 |
+| PUT /transfers/{id} | 200, 401 |
+| DELETE /transfers/{id} | 204, 401 |
+
+```
 ## SLE — Ventas (`/api/sales`)
 <!-- ═══════════════════════════════ -->
 
