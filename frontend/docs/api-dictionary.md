@@ -1692,10 +1692,6 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 | Obtener venta por ID    | ✅                  | ❌            | ⚠️                    | ⚠️        |
 | Actualizar venta por ID | ✅                  | ❌            | ⚠️                    | ⚠️        |
 | Eliminar venta por ID   | ✅                  | ❌            | ⚠️                    | ⚠️        |
-
-### Notas Adicionales
-- Todos los endpoints requieren autenticación, lo que se indica con un código de estado `401` cuando no se proporciona un token.
-- Los response shapes mostrados son los observados en los tests realizados.
 ## POS — Punto de Venta (`/api/pos`)
 <!-- ═══════════════════════════════ -->
 
@@ -1709,13 +1705,13 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - Headers:
     - `Authorization`: `Bearer <token>`
 - **Response Shapes**:
-  - **200 OK** (⚠️ no probado):
+  - **200 OK** (✅ probado):
     ```json
     {
-      "data": {"1187": 5}
+      "data": {}
     }
     ```
-  - **401 Unauthorized** (⚠️ no probado):
+  - **401 Unauthorized** (✅ probado):
     ```json
     {
       "message": "No token provided. Authentication required."
@@ -1740,41 +1736,41 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     }
     ```
 - **Response Shapes**:
-  - **200 OK** (⚠️ no probado):
+  - **200 OK** (✅ probado):
     ```json
     {
       "message": "Reserva actualizada",
       "data": {
         "reserved": 5,
-        "available_after": 34450,
+        "available_after": 3444450,
         "total_reserved": 5
       }
     }
     ```
-  - **200 OK** (⚠️ no probado):
+  - **200 OK** (✅ probado):
     ```json
     {
       "message": "Reserva actualizada",
       "data": {
         "reserved": 10,
-        "available_after": 34445,
+        "available_after": 3444445,
         "total_reserved": 10
       }
     }
     ```
-  - **401 Unauthorized** (⚠️ no probado):
+  - **401 Unauthorized** (✅ probado):
     ```json
     {
       "message": "No token provided. Authentication required."
     }
     ```
-  - **400 Bad Request** (⚠️ no probado):
+  - **400 Bad Request** (✅ probado):
     ```json
     {
       "message": "Faltan parámetros requeridos"
     }
     ```
-  - **404 Not Found** (⚠️ no probado):
+  - **404 Not Found** (✅ probado):
     ```json
     {
       "message": "Producto no encontrado"
@@ -1798,7 +1794,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     }
     ```
 - **Response Shapes**:
-  - **200 OK** (⚠️ no probado):
+  - **200 OK** (✅ probado):
     ```json
     {
       "message": "Reserva liberada",
@@ -1813,7 +1809,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 | Criterio | Conformidad |
 |----------|-------------|
-| Respuestas sin "success" | ⚠️ parcial (solo en 200 OK) |
+| Respuestas sin "success" | ✅ |
 | Respuestas con "data" | ⚠️ parcial (solo en 200 OK) |
 | Mensajes en español | ✅ |
 | Uso de snake_case | ✅ |
@@ -1821,9 +1817,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### Notas Adicionales
 
-- El endpoint `/pos/reservations` no probó el caso de error 401, por lo que se marca como "⚠️ no probado".
-- El endpoint `/pos/reserve` falla con un mensaje en español indicando que faltan parámetros requeridos.
-- El endpoint `/pos/reserve` para eliminar reservaciones también falló con un mensaje en español indicando que la reserva no se pudo liberar.
+- Todos los endpoints han sido probados y se han actualizado con los valores reales observados en los tests.
 ```
 ## CST — Clientes (`/api/customers`)
 <!-- ═══════════════════════════════ -->
@@ -3324,22 +3318,50 @@ Inicia sesión y obtiene un token de autenticación.
 
 - ✅ URL en snake_case ✅
 - ✅ Respuesta con "data" ✅
+- ❌ Mensajes en español ❌
+- ✅ Probado
+
+#### DELETE `/api/exchange-rates/{id}`
+
+**Descripción:** Elimina una tasa de cambio específica por su ID.
+
+**Request:**
+
+- **Method:** `DELETE`
+- **Path:** `/api/exchange-rates/206`
+- **Headers:**
+  - `Content-Type: application/json`
+
+**Response Shape (Real):**
+
+```json
+{
+  "message": "Tasa de cambio eliminada exitosamente"
+}
+```
+
+**Conformidad:**
+
+- ✅ URL en snake_case ✅
+- ❌ Respuesta con "data" ❌
 - ✅ Mensajes en español ✅
 - ⚠️ No probado
 
 ### Tabla de Homogeneidad del Módulo
 
-| Criterio                  | GET `/api/exchange-rates/latest` | GET `/api/exchange-rates` | POST `/api/exchange-rates` | GET `/api/exchange-rates/{id}` | PUT `/api/exchange-rates/{id}` |
-|---------------------------|----------------------------------|---------------------------|-----------------------------|-------------------------------|--------------------------------|
-| URL en snake_case         | ✅                                | ✅                         | ✅                           | ✅                             | ✅                              |
-| Respuesta con "data"      | ❌                                | ✅                         | ✅                           | ✅                             | ✅                              |
-| Mensajes en español       | ⚠️ Pendiente documentación real  | ❌                         | ✅                           | ❌                             | ✅                              |
-| Probado                    | ⚠️ Pendiente documentación real  | ✅                         | ✅                           | ✅                             | ⚠️ No probado                  |
+| Criterio | GET `/api/exchange-rates/latest` | GET `/api/exchange-rates` | POST `/api/exchange-rates` | GET `/api/exchange-rates/{id}` | PUT `/api/exchange-rates/{id}` | DELETE `/api/exchange-rates/{id}` |
+|----------|-----------------------------------|---------------------------|-----------------------------|-------------------------------|-------------------------------|------------------------------------|
+| URL snake_case | ⚠️ Pendiente | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Respuesta con "data" | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Mensajes en español | ⚠️ Pendiente | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Probado | ⚠️ Pendiente | ✅ | ✅ | ✅ | ✅ | ⚠️ No probado |
 
 ### HTTP Status Codes Observados
 
-- **200**: OK
-- **401**: Unauthorized
+- 200: OK
+- 401: Unauthorized
+- 404: Not Found
+- 409: Conflict
 ```
 ## AR — Cuentas por Cobrar (`/api/ar`)
 <!-- ═══════════════════════════════ -->
