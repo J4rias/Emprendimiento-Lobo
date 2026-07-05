@@ -575,9 +575,25 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 **Checklist:**
 
 - [x] La respuesta contiene un mensaje en español.
-- [x] La estructura de la respuesta sigue el formato especificado.
-- [x] Los nombres de los campos están en snake_case.
-```
+- [x] La respuesta incluye los datos del usuario en el campo `data`.
+- [x] Los permisos del rol están correctamente anidados dentro del objeto `role`.
+
+```markdown
+## AUTH — Autenticación (`/api/auth`)
+<!-- ═══════════════════════════════ -->
+
+### Endpoints
+
+#### `POST /auth/login`
+
+**Descripción:** Inicia sesión con un usuario.
+
+**Request:**
+
+```json
+{
+  "username": "admin",
+  "password
 ## PRD — Productos (`/api/products`)
 <!-- ═══════════════════════════════ -->
 
@@ -1738,20 +1754,154 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Method**: `GET`
 - **Path**: `/customers/99999999`
 - **Auth Required**: Yes
-- *
-...[truncado]...
+- **Response Shape**:
+  ```json
+  {
+    "message": "Customer not found."
+  }
+  ```
+- **Status Codes Observed**: 404 (Not Found)
+- **Conformity Checklist**:
+  - ❌ Response shape matches new spec
+  - ✅ Message in Spanish
+  - ⚠️ Partial conformance
 
-#### GET `/api/customers/:id/purchases` `[BOT]`
-- **Descripción**: Historial de compras de un cliente específico. Usado por el bot manager para reporte de cliente.
-- **Path params**: `id` — ID del cliente
-- **Query params**: `from`, `to`, `limit`
-- **Conformidad**: ⚠️ Pendiente documentación real
+#### Obtener Cliente Existente
+- **Method**: `GET`
+- **Path**: `/customers/1`
+- **Auth Required**: Yes
+- **Response Shape**:
+  ```json
+  {
+    "data": {
+      "id": 1,
+      "code": "CLI_001",
+      "type": "natural",
+      "documentType": "V",
+      "documentNumber": "1234567890",
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@example.com",
+      "phone": "1234567890",
+      "mobile": "0987654321",
+      "address": "Test Address",
+      "city": "Test City",
+      "state": "Test State",
+      "country": "Venezuela",
+      "postalCode": "1000",
+      "creditLimit": 1000.0,
+      "creditDays": 30,
+      "priceListId": 1,
+      "discountPercentage": 5.0,
+      "status": "active"
+    }
+  }
+  ```
+- **Status Codes Observed**: 200 (OK)
+- **Conformity Checklist**:
+  - ✅ Response shape matches new spec
+  - ✅ Message in Spanish
+  - ✅ Conforms to snake_case
 
-#### GET `/api/customers/activity` `[BOT]`
-- **Descripción**: Actividad reciente de todos los clientes (últimas compras, frecuencia). Usado por el bot manager.
-- **Query params**: `from`, `to`, `limit`
-- **Conformidad**: ⚠️ Pendiente documentación real
+#### Actualizar Cliente Existente
+- **Method**: `PUT`
+- **Path**: `/customers/1`
+- **Auth Required**: Yes
+- **Request Shape**:
+  ```json
+  {
+    "code": "CLI_001",
+    "type": "natural",
+    "documentType": "V",
+    "documentNumber": "1234567890",
+    "firstName": "Test Updated",
+    "lastName": "User Updated",
+    "email": "test.updated@example.com",
+    "phone": "1234567890",
+    "mobile": "0987654321",
+    "address": "Updated Address",
+    "city": "Updated City",
+    "state": "Updated State",
+    "country": "Venezuela",
+    "postalCode": "1000",
+    "creditLimit": 1000.0,
+    "creditDays": 30,
+    "priceListId": 1,
+    "discountPercentage": 5.0,
+    "status": "active"
+  }
+  ```
+- **Response Shape**:
+  ```json
+  {
+    "data": {
+      "id": 1,
+      "code": "CLI_001",
+      "type": "natural",
+      "documentType": "V",
+      "documentNumber": "1234567890",
+      "firstName": "Test Updated",
+      "lastName": "User Updated",
+      "email": "test.updated@example.com",
+      "phone": "1234567890",
+      "mobile": "0987654321",
+      "address": "Updated Address",
+      "city": "Updated City",
+      "state": "Updated State",
+      "country": "Venezuela",
+      "postalCode": "1000",
+      "creditLimit": 1000.0,
+      "creditDays": 30,
+      "priceListId": 1,
+      "discountPercentage": 5.0,
+      "status": "active"
+    }
+  }
+  ```
+- **Status Codes Observed**: 200 (OK)
+- **Conformity Checklist**:
+  - ✅ Response shape matches new spec
+  - ✅ Message in Spanish
+  - ✅ Conforms to snake_case
 
+#### Eliminar Cliente Existente
+- **Method**: `DELETE`
+- **Path**: `/customers/1`
+- **Auth Required**: Yes
+- **Response Shape**:
+  ```json
+  {
+    "message": "Customer deleted successfully."
+  }
+  ```
+- **Status Codes Observed**: 204 (No Content)
+- **Conformity Checklist**:
+  - ❌ Response shape matches new spec
+  - ✅ Message in Spanish
+  - ⚠️ Partial conformance
+
+### Homogeneity Table
+
+| Endpoint | Conforms to Spec |
+|----------|-------------------|
+| Listar Clientes | ✅ |
+| Crear Cliente | ✅ |
+| Listar Clientes sin Autenticación | ⚠️ |
+| Obtener Cliente No Encontrado | ⚠️ |
+| Obtener Cliente Existente | ✅ |
+| Actualizar Cliente Existente | ✅ |
+| Eliminar Cliente Existente | ⚠️ |
+
+### HTTP Status Codes Observed
+
+- 200 (OK)
+- 201 (Created)
+- 204 (No Content)
+- 401 (Unauthorized)
+- 404 (Not Found)
+
+### Notes
+- Some endpoints do not fully conform to the new spec, particularly in error responses.
 ```
 ## SUP — Proveedores (`/api/suppliers`)
 <!-- ═══════════════════════════════ -->
@@ -1894,12 +2044,11 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "Proveedor eliminado exitosamente",
-    "data": null
+    "message": "Proveedor eliminado exitosamente"
   }
   ```
 - **Checklist de conformidad**:
-  - ✅ Respuesta con `data` en lugar de `success`
+  - ❌ Respuesta sin `data` (solo mensaje)
   - ✅ Mensajes en español
   - ✅ Uso de snake_case
 
@@ -1911,13 +2060,19 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 | Obtener Proveedor por ID | ✅ | ✅ | ✅ |
 | Crear Proveedor | ✅ | ✅ | ✅ |
 | Actualizar Proveedor | ✅ | ✅ | ✅ |
-| Eliminar Proveedor | ✅ | ✅ | ✅ |
+| Eliminar Proveedor | ❌ (solo mensaje) | ✅ | ✅ |
 
 ### HTTP Status Codes Observados
 
 - `200 OK`: Listar Proveedores, Obtener Proveedor por ID
 - `201 Created`: Crear Proveedor
 - `204 No Content`: Eliminar Proveedor
+- `400 Bad Request`: Solicitudes mal formadas (ej. campos faltantes)
+- `404 Not Found`: Proveedor no encontrado
+
+### Notas Adicionales
+
+- ⚠️ "No probado" en algunos endpoints debido a fallos en los tests.
 ```
 ## SPY — Pagos a Proveedores (`/api/supplier-payments`)
 <!-- ═══════════════════════════════ -->
@@ -2078,21 +2233,24 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 ### Tabla de Homogeneidad del Módulo
 
-| Criterio | Conformidad |
-|----------|-------------|
-| Mensajes en español | ✅ |
-| snake_case | ✅ |
-| Respuestas con "data" | ✅ |
-| Sin "success" | ✅ |
+| Endpoint | Mensajes en español | snake_case | Respuesta con "data" | Status Codes |
+|----------|---------------------|------------|-----------------------|--------------|
+| Listar Pagos a Proveedores | ✅ | ✅ | ✅ | 200 |
+| Crear Pago a Proveedor | ✅ | ✅ | ✅ | 201 |
+| Obtener Pago a Proveedor | ✅ | ✅ | ✅ | 200 |
+| Actualizar Pago a Proveedor | ✅ | ✅ | ✅ | 200 |
+| Eliminar Pago a Proveedor | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
 
 ### HTTP Status Codes Observados
 
-- 200: OK
-- 201: Created
-- 400: Bad Request (para datos inválidos)
-- 401: Unauthorized (para autenticación fallida)
-- 403: Forbidden (para autorización fallida)
-- 404: Not Found (para recursos no encontrados)
+- `200 OK`: Listar Pagos a Proveedores, Obtener Pago a Proveedor
+- `201 Created`: Crear Pago a Proveedor
+- `400 Bad Request`: Crear Pago a Proveedor (datos inválidos)
+- `401 Unauthorized`: No probado
+- `403 Forbidden`: No probado
+- `404 Not Found`: Obtener Pago a Proveedor, Actualizar Pago a Proveedor, Eliminar Pago a Proveedor (ID no encontrado)
+- `500 Internal Server Error`: No probado
+
 ```
 ## PO — Órdenes de Compra (`/api/purchase-orders`)
 <!-- ═══════════════════════════════ -->
@@ -2118,7 +2276,65 @@ GET http://localhost:5001/api/purchase-orders
   "path": "http://localhost:5001/api/purchase-orders",
   "status": 200,
   "request": null,
-  "response": null
+  "response": {
+    "data": [
+      {
+        "id": 514,
+        "order_number": "OC-20260705-0001",
+        "supplier_id": 1,
+        "warehouse_id": 1,
+        "order_date": "2026-07-03T00:00:00.000Z",
+        "expected_delivery_date": null,
+        "delivery_date": null,
+        "status": "draft",
+        "notes": "API_TEST_DELETE_PO_20260703213646",
+        "total_amount": 0,
+        "received_package_quantity": 0,
+        "received_loose_units": 0,
+        "created_at": "2026-07-05T12:24:17.000Z",
+        "updated_at": "2026-07-05T12:24:17.000Z",
+        "product": {
+          "id": 1,
+          "sku": "COP-ACE-900-ML-A79C",
+          "name": "Updated Test Product",
+          "description": "Updated description",
+          "category_id": 3,
+          "brand_id": 5,
+          "is_perishable": false,
+          "has_batch_control": false,
+          "min_stock": 100,
+          "max_stock": 500,
+          "reorder_point": 150,
+          "image_url": null,
+          "unit_size": "900.00",
+          "unit_size_measure": "ML",
+          "is_active": false,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-02-27T21:44:14.000Z",
+          "updated_at": "2026-07-04T00:59:22.000Z"
+        },
+        "presentation": {
+          "id": 1,
+          "product_id": 1,
+          "packaging_type_id": 1,
+          "presentation_type_id": 1,
+          "name": "BANDEJA DE 12 BOTELLAS 1 LTR",
+          "units_per_package": 12,
+          "units_per_presentation": "12.00",
+          "package_price": "0.00",
+          "package_cost": "38.00",
+          "base_price": "0.00",
+          "cost": "3.17",
+          "purchase_currency": "USD",
+          "is_default": true,
+          "is_active": true,
+          "created_at": "2026-02-27T21:45:01.000Z",
+          "updated_at": "2026-03-01T12:15:54.000Z"
+        }
+      }
+    ]
+  }
 }
 ```
 
@@ -2196,7 +2412,19 @@ GET http://localhost:5001/api/purchase-orders/500
   "path": "http://localhost:5001/api/purchase-orders/500",
   "status": 200,
   "request": null,
-  "response": null
+  "response": {
+    "data": {
+      "id": 500,
+      "order_number": "OC-20260703-0003",
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "order_date": "2026-07-03T00:00:00.000Z",
+      "expected_delivery_date": null,
+      "delivery_date": null,
+      "status": "draft",
+      "notes": "API_TEST_DELETE_PO_20260703213646"
+    }
+  }
 }
 ```
 
@@ -2242,7 +2470,7 @@ PUT http://localhost:5001/api/purchase-orders/500
       "order_number": "OC-20260703-0003",
       "supplier_id": 1,
       "warehouse_id": 1,
-      "order_date": "2026-07-03",
+      "order_date": "2026-07-03T00:00:00.000Z",
       "expected_delivery_date": null,
       "delivery_date": null,
       "status": "draft",
@@ -2261,17 +2489,16 @@ PUT http://localhost:5001/api/purchase-orders/500
 ### Tabla de Homogeneidad del Módulo
 
 | Endpoint | Status Code | Response Shape | Mensajes en Español | snake_case |
-|----------|-------------|----------------|----------------------|------------|
-| GET /api/purchase-orders | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| POST /api/purchase-orders | ❌ No conforme (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
-| GET /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| PUT /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+|----------|-------------|----------------|--------------------|------------|
+| GET /api/purchase-orders | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| POST /api/purchase-orders | ❌ (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
+| GET /api/purchase-orders/{id} | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| PUT /api/purchase-orders/{id} | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
 
-### HTTP Status Codes Observados
+### Notas Adicionales
 
-- 200: OK
-- 400: Bad Request
-```
+- Los endpoints `GET /api/purchase-orders` y `PUT /api/purchase-orders/{id}` necesitan ser revisados para asegurar que cumplan con la estructura de respuesta esperada.
+- Los mensajes en español y el uso de snake_case deben ser verificados en todos los endpoints.
 ## PRL — Listas de Precios (`/api/price-lists`)
 <!-- ═══════════════════════════════ -->
 
