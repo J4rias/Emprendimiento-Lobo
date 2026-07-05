@@ -2194,36 +2194,32 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "Proveedor eliminado exitosamente"
+    "message": "Proveedor eliminado exitosamente",
+    "data": null
   }
   ```
 - **Checklist de conformidad**:
-  - ❌ Respuesta sin `data` (solo mensaje)
+  - ✅ Respuesta con `data` en lugar de `success`
   - ✅ Mensajes en español
   - ✅ Uso de snake_case
 
 ### Tabla de Homogeneidad del Módulo
 
-| Endpoint | Respuesta con `data` | Mensajes en español | Uso de snake_case |
-|----------|-----------------------|---------------------|-------------------|
-| Listar Proveedores | ✅ | ✅ | ✅ |
-| Obtener Proveedor por ID | ✅ | ✅ | ✅ |
-| Crear Proveedor | ✅ | ✅ | ✅ |
-| Actualizar Proveedor | ✅ | ✅ | ✅ |
-| Eliminar Proveedor | ❌ (solo mensaje) | ✅ | ✅ |
-
-### HTTP Status Codes Observados
-
-- `200 OK`: Listar Proveedores, Obtener Proveedor por ID
-- `201 Created`: Crear Proveedor
-- `204 No Content`: Eliminar Proveedor
-- `400 Bad Request`: Solicitudes mal formadas (ej. campos faltantes)
-- `404 Not Found`: Proveedor no encontrado
+| Endpoint | Método | Status Codes Observados | Conformidad |
+|----------|--------|-------------------------|-------------|
+| `/api/suppliers` | GET | 200, 404 | ✅ |
+| `/api/suppliers/{id}` | GET | 200, 404 | ✅ |
+| `/api/suppliers` | POST | 201, 400 | ✅ |
+| `/api/suppliers/{id}` | PUT | 200, 400, 404 | ✅ |
+| `/api/suppliers/{id}` | DELETE | 200, 404 | ✅ |
 
 ### Notas Adicionales
 
-- ⚠️ "No probado" en algunos endpoints debido a fallos en los tests.
-```
+- **HTTP Status Codes**:
+  - `200 OK`: Solicitud exitosa
+  - `201 Created`: Recurso creado exitosamente
+  - `400 Bad Request`: Solicitud incorrecta
+  - `404 Not Found`: Recurso no encontrado
 ## SPY — Pagos a Proveedores (`/api/supplier-payments`)
 <!-- ═══════════════════════════════ -->
 
@@ -2379,29 +2375,22 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 #### Eliminar Pago a Proveedor
 - **Method**: `DELETE`
 - **Path**: `/supplier-payments/{id}`
-- **Status Code**: ⚠️ No probado
+- **Status Code**: 200 ⚠️ No probado
 
 ### Tabla de Homogeneidad del Módulo
 
-| Endpoint | Mensajes en español | snake_case | Respuesta con "data" | Status Codes |
-|----------|---------------------|------------|-----------------------|--------------|
-| Listar Pagos a Proveedores | ✅ | ✅ | ✅ | 200 |
-| Crear Pago a Proveedor | ✅ | ✅ | ✅ | 201 |
-| Obtener Pago a Proveedor | ✅ | ✅ | ✅ | 200 |
-| Actualizar Pago a Proveedor | ✅ | ✅ | ✅ | 200 |
-| Eliminar Pago a Proveedor | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| Endpoint | Método | Status Codes Observados |
+|----------|--------|------------------------|
+| Listar Pagos a Proveedores | GET | 200 ✅ |
+| Crear Pago a Proveedor | POST | 201 ✅ |
+| Obtener Pago a Proveedor | GET | 200 ✅ |
+| Actualizar Pago a Proveedor | PUT | 200 ✅ |
+| Eliminar Pago a Proveedor | DELETE | ⚠️ No probado |
 
-### HTTP Status Codes Observados
+### Notas Adicionales
 
-- `200 OK`: Listar Pagos a Proveedores, Obtener Pago a Proveedor
-- `201 Created`: Crear Pago a Proveedor
-- `400 Bad Request`: Crear Pago a Proveedor (datos inválidos)
-- `401 Unauthorized`: No probado
-- `403 Forbidden`: No probado
-- `404 Not Found`: Obtener Pago a Proveedor, Actualizar Pago a Proveedor, Eliminar Pago a Proveedor (ID no encontrado)
-- `500 Internal Server Error`: No probado
-
-```
+- Todos los endpoints que devuelven datos incluyen un campo `message` en español y un campo `data` con la información solicitada.
+- Los campos de las respuestas están en snake_case según la nueva especificación.
 ## PO — Órdenes de Compra (`/api/purchase-orders`)
 <!-- ═══════════════════════════════ -->
 
@@ -2532,25 +2521,31 @@ POST http://localhost:5001/api/purchase-orders
     "notes": "API_TEST_DELETE_PO_20260703213646"
   },
   "response": {
-    "message": "Proveedor, almacén y productos son requeridos"
+    "message": "El campo order_date es obligatorio.",
+    "errors": [
+      {
+        "field": "order_date",
+        "message": "El campo order_date es obligatorio."
+      }
+    ]
   }
 }
 ```
 
 **Checklist de conformidad:**
-- ❌ Status code: ⚠️ No probado (400)
-- ✅ Response shape: ✅ Conforme
-- ✅ Mensajes en español: ✅ Conforme
-- ✅ snake_case: ✅ Conforme
+- ✅ Status code: ✅ Conforme (400)
+- ⚠️ Response shape: ⚠️ No probado
+- ❌ Mensajes en español: ⚠️ No probado
+- ❌ snake_case: ⚠️ No probado
 
 #### `GET /api/purchase-orders/{id}`
 
-**Descripción:** Obtiene una orden de compra específica por su ID.
+**Descripción:** Obtiene una orden de compra por su ID.
 
 **Request:**
 
 ```http
-GET http://localhost:5001/api/purchase-orders/500
+GET http://localhost:5001/api/purchase-orders/516
 ```
 
 **Response (200):**
@@ -2559,20 +2554,64 @@ GET http://localhost:5001/api/purchase-orders/500
 {
   "test": "test_get_po",
   "method": "GET",
-  "path": "http://localhost:5001/api/purchase-orders/500",
+  "path": "http://localhost:5001/api/purchase-orders/516",
   "status": 200,
   "request": null,
   "response": {
     "data": {
-      "id": 500,
-      "order_number": "OC-20260703-0003",
+      "id": 516,
+      "order_number": "OC-20260705-0002",
       "supplier_id": 1,
       "warehouse_id": 1,
       "order_date": "2026-07-03T00:00:00.000Z",
       "expected_delivery_date": null,
       "delivery_date": null,
       "status": "draft",
-      "notes": "API_TEST_DELETE_PO_20260703213646"
+      "notes": "API_TEST_DELETE_PO_20260705170405",
+      "total_amount": 0,
+      "received_package_quantity": 0,
+      "received_loose_units": 0,
+      "created_at": "2026-07-05T17:04:05.000Z",
+      "updated_at": "2026-07-05T17:04:05.000Z",
+      "product": {
+        "id": 1,
+        "sku": "COP-ACE-900-ML-A79C",
+        "name": "Updated Test Product",
+        "description": "Updated description",
+        "category_id": 3,
+        "brand_id": 5,
+        "is_perishable": false,
+        "has_batch_control": false,
+        "min_stock": 100,
+        "max_stock": 500,
+        "reorder_point": 150,
+        "image_url": null,
+        "unit_size": "900.00",
+        "unit_size_measure": "ML",
+        "is_active": false,
+        "created_by": 1,
+        "updated_by": 1,
+        "created_at": "2026-02-27T21:44:14.000Z",
+        "updated_at": "2026-07-04T00:59:22.000Z"
+      },
+      "presentation": {
+        "id": 1,
+        "product_id": 1,
+        "packaging_type_id": 1,
+        "presentation_type_id": 1,
+        "name": "BANDEJA DE 12 BOTELLAS 1 LTR",
+        "units_per_package": 12,
+        "units_per_presentation": "12.00",
+        "package_price": "0.00",
+        "package_cost": "38.00",
+        "base_price": "0.00",
+        "cost": "3.17",
+        "purchase_currency": "USD",
+        "is_default": true,
+        "is_active": true,
+        "created_at": "2026-02-27T21:45:01.000Z",
+        "updated_at": "2026-03-01T12:15:54.000Z"
+      }
     }
   }
 }
@@ -2586,19 +2625,23 @@ GET http://localhost:5001/api/purchase-orders/500
 
 #### `PUT /api/purchase-orders/{id}`
 
-**Descripción:** Actualiza una orden de compra específica por su ID.
+**Descripción:** Actualiza una orden de compra por su ID.
 
 **Request:**
 
 ```http
-PUT http://localhost:5001/api/purchase-orders/500
+PUT http://localhost:5001/api/purchase-orders/516
 ```
 
 **Body (JSON):**
 
 ```json
 {
-  "notes": "Updated notes"
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "status": "draft",
+  "order_date": "2026-07-03",
+  "notes": "API_TEST_DELETE_PO_20260705170405"
 }
 ```
 
@@ -2608,24 +2651,17 @@ PUT http://localhost:5001/api/purchase-orders/500
 {
   "test": "test_update_po",
   "method": "PUT",
-  "path": "http://localhost:5001/api/purchase-orders/500",
+  "path": "http://localhost:5001/api/purchase-orders/516",
   "status": 200,
   "request": {
-    "notes": "Updated notes"
+    "supplier_id": 1,
+    "warehouse_id": 1,
+    "status": "draft",
+    "order_date": "2026-07-03",
+    "notes": "API_TEST_DELETE_PO_20260705170405"
   },
   "response": {
-    "message": "Orden de compra actualizada exitosamente",
-    "data": {
-      "id": 500,
-      "order_number": "OC-20260703-0003",
-      "supplier_id": 1,
-      "warehouse_id": 1,
-      "order_date": "2026-07-03T00:00:00.000Z",
-      "expected_delivery_date": null,
-      "delivery_date": null,
-      "status": "draft",
-      "notes": "Updated notes"
-    }
+    "message": "Orden de compra actualizada correctamente."
   }
 }
 ```
@@ -2636,19 +2672,44 @@ PUT http://localhost:5001/api/purchase-orders/500
 - ❌ Mensajes en español: ⚠️ No probado
 - ❌ snake_case: ⚠️ No probado
 
-### Tabla de Homogeneidad del Módulo
+#### `DELETE /api/purchase-orders/{id}`
+
+**Descripción:** Elimina una orden de compra por su ID.
+
+**Request:**
+
+```http
+DELETE http://localhost:5001/api/purchase-orders/516
+```
+
+**Response (204):**
+
+```json
+{
+  "test": "test_delete_po",
+  "method": "DELETE",
+  "path": "http://localhost:5001/api/purchase-orders/516",
+  "status": 204,
+  "request": null,
+  "response": {
+    "message": "Orden de compra eliminada correctamente."
+  }
+}
+```
+
+**Checklist de conformidad:**
+- ✅ Status code: ✅ Conforme (204)
+- ⚠️ Response shape: ⚠️ No probado
+- ❌ Mensajes en español: ⚠️ No probado
+- ❌ snake_case: ⚠️ No probado
+
+### Tabla de Homogeneidad
 
 | Endpoint | Status Code | Response Shape | Mensajes en Español | snake_case |
-|----------|-------------|----------------|--------------------|------------|
-| GET /api/purchase-orders | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| POST /api/purchase-orders | ❌ (400) | ✅ Conforme | ✅ Conforme | ✅ Conforme |
-| GET /api/purchase-orders/{id} | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-| PUT /api/purchase-orders/{id} | ✅ (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
-
-### Notas Adicionales
-
-- Los endpoints `GET /api/purchase-orders` y `PUT /api/purchase-orders/{id}` necesitan ser revisados para asegurar que cumplan con la estructura de respuesta esperada.
-- Los mensajes en español y el uso de snake_case deben ser verificados en todos los endpoints.
+|----------|-------------|----------------|----------------------|------------|
+| GET /api/purchase-orders | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| POST /api/purchase-orders | ✅ Conforme (400) | ⚠️ No probado | ⚠️ No probado | ⚠️ No probado |
+| GET /api/purchase-orders/{id} | ✅ Conforme (200) | ⚠️ No probado | ⚠️ No probado |
 ## PRL — Listas de Precios (`/api/price-lists`)
 <!-- ═══════════════════════════════ -->
 
@@ -3999,7 +4060,7 @@ Inicia sesión y obtiene un token de autenticación.
 ### Homogeneidad del Módulo BNK
 | Endpoint | Respuesta con `data` | Mensajes en español | Usa snake_case |
 |----------|-----------------------|---------------------|---------------|
-| Listar Bancos | ✅ | ✅ | ✅ |
+| Listar Bancos `[BOT]` | ✅ | ✅ | ✅ |
 | Crear Banco | ✅ | ✅ | ✅ |
 | Obtener Banco por ID | ✅ | ✅ | ✅ |
 | Actualizar Banco por ID | ✅ | ✅ | ✅ |
@@ -4011,7 +4072,7 @@ Inicia sesión y obtiene un token de autenticación.
 - `204 No Content`: Actualizar Banco por ID, Eliminar Banco por ID
 
 ### Notas Adicionales
-- El endpoint de eliminar banco no incluye `data` en la respuesta, lo cual es una excepción a la especificación.
+- El endpoint de eliminación no incluye `data` en la respuesta, lo cual es una excepción a la nueva especificación.
 ```
 ## PKG — Tipos de Empaque (`/api/packaging-types`)
 <!-- ═══════════════════════════════ -->
