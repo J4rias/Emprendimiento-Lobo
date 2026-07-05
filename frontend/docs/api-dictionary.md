@@ -1947,7 +1947,7 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 - **Response Shape**:
   ```json
   {
-    "message": "Customer not found."
+    "message": "Cliente no encontrado."
   }
   ```
 - **Status Codes Observed**: 404 (Not Found)
@@ -1956,57 +1956,20 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ✅ Message in Spanish
   - ⚠️ Partial conformance
 
-#### Obtener Cliente Existente
-- **Method**: `GET`
-- **Path**: `/customers/1`
-- **Auth Required**: Yes
-- **Response Shape**:
-  ```json
-  {
-    "data": {
-      "id": 1,
-      "code": "CLI_001",
-      "type": "natural",
-      "documentType": "V",
-      "documentNumber": "1234567890",
-      "firstName": "Test",
-      "lastName": "User",
-      "email": "test@example.com",
-      "phone": "1234567890",
-      "mobile": "0987654321",
-      "address": "Test Address",
-      "city": "Test City",
-      "state": "Test State",
-      "country": "Venezuela",
-      "postalCode": "1000",
-      "creditLimit": 1000.0,
-      "creditDays": 30,
-      "priceListId": 1,
-      "discountPercentage": 5.0,
-      "status": "active"
-    }
-  }
-  ```
-- **Status Codes Observed**: 200 (OK)
-- **Conformity Checklist**:
-  - ✅ Response shape matches new spec
-  - ✅ Message in Spanish
-  - ✅ Conforms to snake_case
-
-#### Actualizar Cliente Existente
+#### Actualizar Cliente
 - **Method**: `PUT`
-- **Path**: `/customers/1`
+- **Path**: `/customers/{id}`
 - **Auth Required**: Yes
 - **Request Shape**:
   ```json
   {
-    "code": "CLI_001",
+    "code": "API_TEST_UPDATE_CST_1783128675",
     "type": "natural",
     "documentType": "V",
     "documentNumber": "1234567890",
-    "firstName": "Test Updated",
-    "lastName": "User Updated",
-    "email": "test.updated@example.com",
+    "firstName": "Updated",
+    "lastName": "User",
+    "email": "updated@example.com",
     "phone": "1234567890",
     "mobile": "0987654321",
     "address": "Updated Address",
@@ -2014,10 +1977,10 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
     "state": "Updated State",
     "country": "Venezuela",
     "postalCode": "1000",
-    "creditLimit": 1000.0,
+    "creditLimit": 1500.0,
     "creditDays": 30,
-    "priceListId": 1,
-    "discountPercentage": 5.0,
+    "priceListId": 2,
+    "discountPercentage": 7.5,
     "status": "active"
   }
   ```
@@ -2026,13 +1989,13 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   {
     "data": {
       "id": 1,
-      "code": "CLI_001",
+      "code": "API_TEST_UPDATE_CST_1783128675",
       "type": "natural",
       "documentType": "V",
       "documentNumber": "1234567890",
-      "firstName": "Test Updated",
-      "lastName": "User Updated",
-      "email": "test.updated@example.com",
+      "firstName": "Updated",
+      "lastName": "User",
+      "email": "updated@example.com",
       "phone": "1234567890",
       "mobile": "0987654321",
       "address": "Updated Address",
@@ -2040,10 +2003,10 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
       "state": "Updated State",
       "country": "Venezuela",
       "postalCode": "1000",
-      "creditLimit": 1000.0,
+      "creditLimit": 1500.0,
       "creditDays": 30,
-      "priceListId": 1,
-      "discountPercentage": 5.0,
+      "priceListId": 2,
+      "discountPercentage": 7.5,
       "status": "active"
     }
   }
@@ -2054,14 +2017,14 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ✅ Message in Spanish
   - ✅ Conforms to snake_case
 
-#### Eliminar Cliente Existente
+#### Eliminar Cliente
 - **Method**: `DELETE`
-- **Path**: `/customers/1`
+- **Path**: `/customers/{id}`
 - **Auth Required**: Yes
 - **Response Shape**:
   ```json
   {
-    "message": "Customer deleted successfully."
+    "message": "Cliente eliminado correctamente."
   }
   ```
 - **Status Codes Observed**: 204 (No Content)
@@ -2070,28 +2033,25 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
   - ✅ Message in Spanish
   - ⚠️ Partial conformance
 
-### Homogeneity Table
-
-| Endpoint | Conforms to Spec |
-|----------|-------------------|
+### Homogeneidad del Módulo
+| Endpoint | Conformidad |
+|----------|-------------|
 | Listar Clientes | ✅ |
 | Crear Cliente | ✅ |
 | Listar Clientes sin Autenticación | ⚠️ |
 | Obtener Cliente No Encontrado | ⚠️ |
-| Obtener Cliente Existente | ✅ |
-| Actualizar Cliente Existente | ✅ |
-| Eliminar Cliente Existente | ⚠️ |
+| Actualizar Cliente | ✅ |
+| Eliminar Cliente | ⚠️ |
 
-### HTTP Status Codes Observed
-
+### HTTP Status Codes Observados
 - 200 (OK)
 - 201 (Created)
 - 204 (No Content)
 - 401 (Unauthorized)
 - 404 (Not Found)
 
-### Notes
-- Some endpoints do not fully conform to the new spec, particularly in error responses.
+### Notas Adicionales
+- Algunos endpoints no conforman completamente con la nueva especificación, especialmente en cuanto a la estructura de las respuestas.
 ```
 ## SUP — Proveedores (`/api/suppliers`)
 <!-- ═══════════════════════════════ -->
