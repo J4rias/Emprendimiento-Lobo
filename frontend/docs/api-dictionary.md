@@ -2623,7 +2623,7 @@ PUT http://localhost:5001/api/purchase-orders/500
 - **Response Shape**:
   ```json
   {
-    "message": "No token provided. Authentication required."
+    "message": "No se proporcionó un token. Se requiere autenticación."
   }
   ```
 - **Checklist de conformidad**: ❌ No conforme (mensaje en inglés)
@@ -2650,11 +2650,11 @@ PUT http://localhost:5001/api/purchase-orders/500
 - **Response Shape**:
   ```json
   {
-    "message": "Validation error",
+    "message": "Error de validación",
     "errors": [
       {
         "field": "customerId",
-        "message": "Quote.customerId cannot be null"
+        "message": "Quote.customerId no puede ser nulo"
       }
     ]
   }
@@ -2673,8 +2673,8 @@ PUT http://localhost:5001/api/purchase-orders/500
 ### HTTP Status Codes observados
 
 - 200: OK
-- 401: Unauthorized (No token provided. Authentication required.)
-- 400: Bad Request (Validation error)
+- 401: Unauthorized (No se proporcionó un token. Se requiere autenticación.)
+- 400: Bad Request (Error de validación)
 ```
 ## PRE — Pre-Pedidos (`/api/pre-orders`)
 <!-- ═══════════════════════════════ -->
@@ -4125,52 +4125,6 @@ Obtiene los tipos de presentación activos.
             "updated_at": "2026-02-27T17:59:27.000Z"
           }
         ]
-      },
-      {
-        "id": 2,
-        "name": "Usuario",
-        "description": "Acceso básico al sistema",
-        "is_active": true,
-        "created_at": "2026-02-27T17:59:27.000Z",
-        "updated_at": "2026-02-27T17:59:27.000Z",
-        "permissions": [
-          {
-            "id": 1,
-            "name": "products.view",
-            "description": "Ver productos",
-            "module": "products",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z"
-          },
-          {
-            "id": 5,
-            "name": "suppliers.view",
-            "description": "Ver proveedores",
-            "module": "suppliers",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z"
-          },
-          {
-            "id": 9,
-            "name": "devices.view",
-            "description": "Ver dispositivos",
-            "module": "devices",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z"
-          },
-          {
-            "id": 13,
-            "name": "inventory.view",
-            "description": "Ver inventario",
-            "module": "inventory",
-            "action": "view",
-            "created_at": "2026-02-27T17:59:27.000Z",
-            "updated_at": "2026-02-27T17:59:27.000Z"
-          }
-        ]
       }
     ]
   }
@@ -4187,27 +4141,73 @@ Obtiene los tipos de presentación activos.
 
 ```json
 {
-  "message": "Rol encontrado exitosamente",
   "data": {
-    "id": 1,
-    "name": "Administrador",
-    "description": "Acceso total al sistema",
-    "is_active": true,
-    "created_at": "2026-02-27T17:59:27.000Z",
-    "updated_at": "2026-02-27T17:59:27.000Z",
-    "permissions": [
-      {
-        "id": 1,
-        "name": "products.view",
-        "description": "Ver productos",
-        "module": "products",
-        "action": "view",
-        "created_at": "2026-02-27T17:59:27.000Z",
-        "updated_at": "2026-02-27T17:59:27.000Z"
-      },
-      {
-        "id": 2,
-        "name": "products.create
+    "role": {
+      "id": 1,
+      "name": "Administrador",
+      "description": "Acceso total al sistema",
+      "is_active": true,
+      "created_at": "2026-02-27T17:59:27.000Z",
+      "updated_at": "2026-02-27T17:59:27.000Z",
+      "permissions": [
+        {
+          "id": 1,
+          "name": "products.view",
+          "description": "Ver productos",
+          "module": "products",
+          "action": "view",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 2,
+          "name": "products.create",
+          "description": "Crear productos",
+          "module": "products",
+          "action": "create",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 3,
+          "name": "products.update",
+          "description": "Actualizar productos",
+          "module": "products",
+          "action": "update",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 4,
+          "name": "products.delete",
+          "description": "Eliminar productos",
+          "module": "products",
+          "action": "delete",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 5,
+          "name": "suppliers.view",
+          "description": "Ver proveedores",
+          "module": "suppliers",
+          "action": "view",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 6,
+          "name": "suppliers.create",
+          "description": "Crear proveedores",
+          "module": "suppliers",
+          "action": "create",
+          "created_at": "2026-02-27T17:59:27.000Z",
+          "updated_at": "2026-02-27T17:59:27.000Z"
+        },
+        {
+          "id": 7,
+          "name": "suppliers.update",
+          "description":
 ## USR — Usuarios (`/api/users`)
 <!-- ═══════════════════════════════ -->
 
@@ -4248,7 +4248,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_get_user", "method": "GET", "path": "/users/19", "status": 200, "request": null, "response": null}
+  {"test": "test_get_user", "method": "GET", "path": "/users/20", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -4261,7 +4261,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_update_user", "method": "PUT", "path": "/users/19", "status": 200, "request": null, "response": null}
+  {"test": "test_update_user", "method": "PUT", "path": "/users/20", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -4274,7 +4274,7 @@ Obtiene los tipos de presentación activos.
   - ⚠️ snake_case (No probado)
 - **Response Shape**:
   ```json
-  {"test": "test_delete_user", "method": "DELETE", "path": "/users/19", "status": 200, "request": null, "response": null}
+  {"test": "test_delete_user", "method": "DELETE", "path": "/users/20", "status": 200, "request": null, "response": null}
   ```
 - **HTTP Status Codes Observados**: 200
 
@@ -4332,7 +4332,7 @@ Obtiene los tipos de presentación activos.
 
 ### Tabla de Homogeneidad del Módulo
 | Endpoint | Sin "success" | Respuestas con "data" | Mensajes en español | snake_case |
-|----------|---------------|-----------------------|---------------------|------------|
+|----------|----------------|-----------------------|---------------------|------------|
 | GET `/users` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
 | POST `/users` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
 | GET `/users/{id}` | ✅ | ❌ (No probado) | ⚠️ (No probado) | ⚠️ (No probado) |
