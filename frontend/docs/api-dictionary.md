@@ -743,119 +743,316 @@ Usar el template de abajo. Si un campo es desconocido o la lógica es compleja, 
 
 <!-- ═══════════════════════════════ -->
 ```
-## CAT — Categorías (`/api/categories`)
+## CN — Notas de Crédito (`/api/credit-notes`)
 <!-- ═══════════════════════════════ -->
 
 ### Endpoints
 
-#### Listar categorías `[BOT]`
-- **Method**: `GET`
-- **Path**: `/categories`
-- **Status Codes**:
-  - ✅ 200 (OK)
-  - ⚠️ 401 (Unauthorized) — No probado en este endpoint
-- **Response Shape** (200):
+#### GET `/credit-notes`
+- **Descripción**: Lista todas las notas de crédito
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (200)
+- **Request**:
+  ```json
+  null
+  ```
+- **Response Shape** (Status: 200):
   ```json
   {
     "data": [
       {
-        "id": 1,
-        "code": "CAT_CODE_1",
-        "name": "Category Name",
-        "description": "Category Description",
-        "color": "#FF0000"
-      }
+        "id": 162,
+        "credit_note_number": "NC-20260629-0001",
+        "sale_id": 8422,
+        "customer_id": 500,
+        "warehouse_id": 1,
+        "credit_note_date": "2026-06-29",
+        "reason": "return",
+        "reason_description": null,
+        "type": "partial",
+        "status": "applied",
+        "exchange_rate": "2745.830000",
+        "subtotal": "45.648798",
+        "tax_amount": "0.000000",
+        "total": "45.648798",
+        "refund_method": "credit_balance",
+        "refund_amount": "45.648798",
+        "refund_reference": null,
+        "notes": null,
+        "created_by": 1,
+        "approved_by": 1,
+        "approved_at": "2026-06-25T22:08:05.000Z",
+        "created_at": "2026-06-25T22:08:04.000Z",
+        "updated_at": "2026-06-25T22:08:05.000Z",
+        "sale": {
+          "id": 8075,
+          "sale_number": "VEN-20260625-0014",
+          "sale_date": "2026-06-25T22:03:39.000Z",
+          "total": "128.720000"
+        },
+        "customer": {
+          "id": 302,
+          "firstName": "JUAN ",
+          "lastName": "PEREZ",
+          "businessName": null,
+          "tradeName": null,
+          "type": "natural",
+          "documentType": "V",
+          "documentNumber": "1095792249",
+          "email": null,
+          "phone": null
+        },
+        "warehouse": {
+          "id": 1,
+          "name": "Deposito Principal"
+        },
+        "creator": {
+          "id": 1,
+          "username": "admin",
+          "first_name": "Updated",
+          "last_name": "User"
+        },
+        "approver": {
+          "id": 1,
+          "username": "admin",
+          "first_name": "Updated",
+          "last_name": "User"
+        },
+        "details": [
+          {
+            "id": 179,
+            "credit_note_id": 160,
+            "sale_detail_id": 34852,
+            "product_id": 100,
+            "presentation_id": 100,
+            "batch_id": null,
+            "package_quantity_returned": 1,
+            "loose_units_returned": 0,
+            "unit_price": "4.97",
+            "discount_percent": "0.00",
+            "tax_percent": "0.00",
+            "line_total": "4.97",
+            "return_to_stock": true,
+            "created_at": "2026-06-25T22:08:04.000Z",
+            "updated_at": "2026-06-25T22:08:04.000Z",
+            "presentation": {
+              "id": 100,
+              "units_per_package": 1
+            }
+          }
+        ]
+      },
+      ...
     ]
   }
   ```
-- **Response Shape** (401):
-  ```json
-  {
-    "message": "Unauthorized"
-  }
-  ```
-- **Conformidad**:
-  - ✅ Respuesta con `data`
-  - ⚠️ Mensajes en español (no probado)
-  - ✅ snake_case
 
-#### Crear categoría
-- **Method**: `POST`
-- **Path**: `/categories`
-- **Status Codes**:
-  - ✅ 400 (Bad Request)
-  - ⚠️ 401 (Unauthorized) — No probado en este endpoint
-- **Request Shape**:
+#### POST `/credit-notes`
+- **Descripción**: Crea una nueva nota de crédito
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (400)
+- **Request**:
   ```json
   {
-    "code": "TEST_CODE_TEST_1783253983_1783253983",
-    "name": "API_TEST_DELETE_TEST_1783253983_1783253983",
-    "description": "Test category description",
-    "color": "#FF0000"
-  }
-  ```
-- **Response Shape** (400):
-  ```json
-  {
-    "message": "Validation failed",
-    "errors": [
+    "sale_id": 1,
+    "customer_id": 270,
+    "warehouse_id": 1,
+    "credit_note_date": "2026-06-26",
+    "reason": "return",
+    "type": "partial",
+    "status": "applied",
+    "exchange_rate": "2672.578570",
+    "subtotal": "45.648798",
+    "tax_amount": "0.000000",
+    "total": "45.648798",
+    "refund_method": "credit_balance",
+    "refund_amount": "45.648798",
+    "details": [
       {
-        "message": "El código no puede exceder 10 caracteres",
-        "value": "TEST_CODE_TEST_1783253983_1783253983"
+        "sale_detail_id": 34980,
+        "product_id": 899,
+        "presentation_id": 725,
+        "package_quantity_returned": 1,
+        "loose_units_returned": 0,
+        "unit_price": "3.18",
+        "discount_percent": "0.00",
+        "tax_percent": "0.00",
+        "line_total": "3.18"
       }
     ]
   }
   ```
-- **Conformidad**:
-  - ❌ Respuesta con `data` (no probado)
-  - ✅ Mensajes en español
-  - ✅ snake_case
-
-#### Obtener categoría por ID
-- **Method**: `GET`
-- **Path**: `/categories/{id}`
-- **Status Codes**:
-  - ⚠️ 401 (Unauthorized) — No probado en este endpoint
-  - ✅ 404 (Not Found)
-- **Response Shape** (404):
+- **Response Shape** (Status: 201):
   ```json
   {
-    "message": "Category not found"
+    "data": {
+      "id": 162,
+      "credit_note_number": "NC-20260629-0001",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z",
+      "sale": {
+        "id": 8075,
+        "sale_number": "VEN-20260625-0014",
+        "sale_date": "2026-06-25T22:03:39.000Z",
+        "total": "128.720000"
+      },
+      "customer": {
+        "id": 302,
+        "firstName": "JUAN ",
+        "lastName": "PEREZ",
+        "businessName": null,
+        "tradeName": null,
+        "type": "natural",
+        "documentType": "V",
+        "documentNumber": "1095792249",
+        "email": null,
+        "phone": null
+      },
+      "warehouse": {
+        "id": 1,
+        "name": "Deposito Principal"
+      },
+      "creator": {
+        "id": 1,
+        "username": "admin",
+        "first_name": "Updated",
+        "last_name": "User"
+      },
+      "approver": {
+        "id": 1,
+        "username": "admin",
+        "first_name": "Updated",
+        "last_name": "User"
+      },
+      "details": [
+        {
+          "id": 179,
+          "credit_note_id": 160,
+          "sale_detail_id": 34852,
+          "product_id": 100,
+          "presentation_id": 100,
+          "batch_id": null,
+          "package_quantity_returned": 1,
+          "loose_units_returned": 0,
+          "unit_price": "4.97",
+          "discount_percent": "0.00",
+          "tax_percent": "0.00",
+          "line_total": "4.97",
+          "return_to_stock": true,
+          "created_at": "2026-06-25T22:08:04.000Z",
+          "updated_at": "2026-06-25T22:08:04.000Z",
+          "presentation": {
+            "id": 100,
+            "units_per_package": 1
+          }
+        }
+      ]
+    }
   }
   ```
-- **Conformidad**:
-  - ❌ Respuesta con `data` (no probado)
-  - ⚠️ Mensajes en español (no probado)
-  - ✅ snake_case
 
-#### Eliminar categoría por ID
-- **Method**: `DELETE`
-- **Path**: `/categories/{id}`
-- **Status Codes**:
-  - ⚠️ 401 (Unauthorized) — No probado en este endpoint
-  - ✅ 404 (Not Found)
-- **Response Shape** (404):
+#### GET `/credit-notes/{id}`
+- **Descripción**: Obtiene una nota de crédito por su ID
+- **Checklist**:
+  - ✅ URL en snake_case
+  - ⚠️ No probado (200)
+- **Request**:
+  ```json
+  null
+  ```
+- **Response Shape** (Status: 200):
   ```json
   {
-    "message": "Category not found"
-  }
-  ```
-- **Conformidad**:
-  - ❌ Respuesta con `data` (no probado)
-  - ⚠️ Mensajes en español (no probado)
-  - ✅ snake_case
-
-### Homogeneidad del módulo
-| Criterio | Conforme | No conforme | Parcial |
-|----------|----------|-------------|---------|
-| Respuestas con `data` | ❌ | ✅ | ⚠️ |
-| Mensajes en español | ⚠️ | ❌ | ✅ |
-| snake_case | ✅ | ❌ | ⚠️ |
-
-### Notas adicionales
-- Algunos endpoints no fueron probados completamente, lo que afecta la conformidad total del módulo.
-- Los mensajes de error están en español, pero algunos endpoints no tienen respuestas con `data` o no siguen snake_case.
-```
+    "data": {
+      "id": 162,
+      "credit_note_number": "NC-20260629-0001",
+      "sale_id": 8422,
+      "customer_id": 500,
+      "warehouse_id": 1,
+      "credit_note_date": "2026-06-29",
+      "reason": "return",
+      "reason_description": null,
+      "type": "partial",
+      "status": "applied",
+      "exchange_rate": "2745.830000",
+      "subtotal": "45.648798",
+      "tax_amount": "0.000000",
+      "total": "45.648798",
+      "refund_method": "credit_balance",
+      "refund_amount": "45.648798",
+      "refund_reference": null,
+      "notes": null,
+      "created_by": 1,
+      "approved_by": 1,
+      "approved_at": "2026-06-25T22:08:05.000Z",
+      "created_at": "2026-06-25T22:08:04.000Z",
+      "updated_at": "2026-06-25T22:08:05.000Z",
+      "sale": {
+        "id": 8075,
+        "sale_number": "VEN-20260625-0014",
+        "sale_date": "2026-06-25T22:03:39.000Z",
+        "total": "128.720000"
+      },
+      "customer": {
+        "id": 302,
+        "firstName": "JUAN ",
+        "lastName": "PEREZ",
+        "businessName": null,
+        "tradeName": null,
+        "type": "natural",
+        "documentType": "V",
+        "documentNumber": "1095792249",
+        "email": null,
+        "phone": null
+      },
+      "warehouse": {
+        "id": 1,
+        "name": "Deposito Principal"
+      },
+      "creator": {
+        "id": 1,
+        "username": "admin",
+        "first_name": "Updated",
+        "last_name": "User"
+      },
+      "approver": {
+        "id": 1,
+        "username": "admin",
+        "first_name": "Updated",
+        "last_name": "User"
+      },
+      "details": [
+        {
+          "id": 179,
+          "credit_note_id": 160,
+          "sale_detail_id": 34852,
+          "product_id": 100,
+          "presentation_id": 100,
+          "batch_id": null,
+          "package_quantity_returned": 1,
+          "loose_units_returned": 0,
+          "unit_price": "
 ## BRD — Marcas (`/api/brands`)
 <!-- ═══════════════════════════════ -->
 
