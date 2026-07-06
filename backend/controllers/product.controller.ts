@@ -784,44 +784,43 @@ async update(req: Request, res: Response, next: NextFunction) {
   }
 
   async createPresentation(req: Request, res: Response, next: NextFunction) {
+    const { id } = req.params;
+    const {
+      name,
+      packaging_type_id,
+      presentation_type_id,
+      units_per_package,
+      unit_size,
+      unit_size_measure,
+      package_price,
+      package_cost,
+      purchase_currency,
+      is_default,
+      is_active
+    } = req.body;
+
+    // Early validations (before any writes — no transaction needed)
+    const product = await Product.findByPk(id) as any;
+    if (!product) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    let presentationName = name;
+    if (!presentationName || presentationName.trim() === '') {
+      presentationName = `${product.name} - Presentación ${units_per_package || 1} unidades`;
+    }
+
+    if (units_per_package === undefined || units_per_package === null || units_per_package <= 0) {
+      return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
+    }
+
+    const transaction = await sequelize.transaction();
     try {
-      const { id } = req.params;
-      const {
-        name,
-        packaging_type_id,
-        presentation_type_id,
-        units_per_package,
-        unit_size,
-        unit_size_measure,
-        package_price,
-        package_cost,
-        purchase_currency,
-        is_default,
-        is_active
-      } = req.body;
-
-      const product = await Product.findByPk(id) as any;
-      if (!product) {
-        return res.status(404).json({
-          message: 'Producto no encontrado'
-        });
-      }
-
-      // If name is missing, generate one or use a default
-      let presentationName = name;
-      if (!presentationName || presentationName.trim() === '') {
-        presentationName = `${product.name} - Presentación ${units_per_package || 1} unidades`;
-      }
-
-      if (units_per_package === undefined || units_per_package === null || units_per_package <= 0) {
-        return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
-      }
-
       // If this is set as default, unmark all other presentations as default
       if (is_default) {
         await ProductPresentation.update(
           { is_default: false },
-          { where: { product_id: id } }
+          { where: { product_id: id }, transaction }
         );
       }
 
@@ -844,9 +843,11 @@ async update(req: Request, res: Response, next: NextFunction) {
         purchase_currency: purchase_currency || 'USD',
         is_default: is_default || false,
         is_active: is_active !== undefined ? is_active : true
-      }) as any;
+      } as any, { transaction }) as any;
 
-      // Reload with associations
+      await transaction.commit();
+
+      // Reload after commit (read-only, no transaction needed)
       const createdPresentation = await ProductPresentation.findByPk(presentation.id, {
         include: [
           { model: PackagingType, as: 'packagingType' },
@@ -859,6 +860,7 @@ async update(req: Request, res: Response, next: NextFunction) {
         message: 'Presentation created successfully'
       });
     } catch (error) {
+      await transaction.rollback();
       next(error);
     }
   }
