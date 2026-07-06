@@ -19,8 +19,15 @@ import PriceListDetail from '../models/PriceListDetail';
 // Other requires that are not models/sequelize/express → leave as require()
 const skuConfig = require('../config/sku');
 const { sequelize } = require('../config/database');
+const { exportProductsCSV } = require('../services/product.service');
 
 class ProductController {
+  constructor() {
+    this.getAll = this.getAll.bind(this);
+    this.searchByBarcode = this.searchByBarcode.bind(this);
+    this.exportCSV = this.exportCSV.bind(this);
+  }
+
   // Get all products with pagination and filters
   async getAll(req: Request, res: Response, next: NextFunction) {
     try {
@@ -121,7 +128,7 @@ class ProductController {
         if (brandIdx > -1) include.splice(brandIdx, 1);
 
         presentationInclude.attributes = ['id', 'name', 'units_per_package', 'package_price', 'purchase_currency'];
-        presentationInclude.include = presentationInclude.include.filter(i => i.as === 'priceListDetails');
+        presentationInclude.include = presentationInclude.include.filter((i: any) => i.as === 'priceListDetails');
 
         if (inventoryInclude) {
           inventoryInclude.attributes = ['quantity', 'warehouse_id'];
@@ -459,194 +466,208 @@ class ProductController {
   }
 
   // Update product
-  async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const updateData = { ...req.body };
-      delete updateData.sku; // SKU cannot be updated
-      const barcode = updateData.barcode;
-      delete updateData.barcode;
-      delete updateData.created_by;
+async update(req: Request, res: Response, next: NextFunction) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body };
+    delete updateData.sku; // SKU cannot be updated
+    const barcode = updateData.barcode;
+    delete updateData.barcode;
+    delete updateData.created_by;
 
-      // Basic validation for updates
-      if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
-        return res.status(400).json({ message: 'El nombre del producto no puede estar vacío' });
-      }
-      if (updateData.category_id !== undefined && !updateData.category_id) {
-        return res.status(400).json({ message: 'La categoría no puede estar vacía' });
-      }
-      if (updateData.unit_size !== undefined && (updateData.unit_size === null || updateData.unit_size === '')) {
-        return res.status(400).json({ message: 'El tamaño de la unidad no puede estar vacío' });
-      }
+    // Basic validation for updates
+    if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'El nombre del producto no puede estar vacío' });
+    }
+    if (updateData.category_id !== undefined && !updateData.category_id) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'La categoría no puede estar vacía' });
+    }
+    if (updateData.unit_size !== undefined && (updateData.unit_size === null || updateData.unit_size === '')) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'El tamaño de la unidad no puede estar vacío' });
+    }
 
-      // Extract presentation fields (unit_size and unit_size_measure are now product fields)
-      const {
-        packaging_type_id,
-        presentation_type_id,
-        units_per_package,
-        package_price,
-        package_cost,
-        purchase_currency
-      } = updateData;
+    // Extract presentation fields (unit_size and unit_size_measure are now product fields)
+    const {
+      packaging_type_id,
+      presentation_type_id,
+      units_per_package,
+      package_price,
+      package_cost,
+      purchase_currency
+    } = updateData;
 
-      // Remove presentation fields from product update (but keep unit_size and unit_size_measure)
-      delete updateData.packaging_type_id;
-      delete updateData.presentation_type_id;
-      delete updateData.units_per_package;
-      delete updateData.package_price;
-      delete updateData.package_cost;
-      delete updateData.purchase_currency;
+    // Remove presentation fields from product update (but keep unit_size and unit_size_measure)
+    delete updateData.packaging_type_id;
+    delete updateData.presentation_type_id;
+    delete updateData.units_per_package;
+    delete updateData.package_price;
+    delete updateData.package_cost;
+    delete updateData.purchase_currency;
 
-      // Get image URL from processed files if uploaded, or use provided image_url
-      if ((req as any).processedFiles && (req as any).processedFiles.length > 0) {
-        updateData.image_url = (req as any).processedFiles[0].url;
-      }
+    // Get image URL from processed files if uploaded, or use provided image_url
+    if ((req as any).processedFiles && (req as any).processedFiles.length > 0) {
+      updateData.image_url = (req as any).processedFiles[0].url;
+    }
 
-      const product = await Product.findByPk(id) as any;
+    const product = await Product.findByPk(id, { transaction }) as any;
 
-      if (!product) {
-        return res.status(404).json({
-          message: 'Producto no encontrado'
-        });
-      }
-
-      // Update product
-      await product.update({
-        ...updateData,
-        updated_by: (req as any).user.id
+    if (!product) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: 'Producto no encontrado'
       });
+    }
 
-      // Update or create default presentation if presentation data provided
-      if (packaging_type_id !== undefined || presentation_type_id !== undefined || units_per_package !== undefined) {
-        const defaultPresentation = await ProductPresentation.findOne({
-          where: { product_id: product.id, is_default: true }
+    // Update product
+    await product.update({
+      ...updateData,
+      updated_by: (req as any).user.id
+    }, { transaction });
+
+    // Update or create default presentation if presentation data provided
+    if (packaging_type_id !== undefined || presentation_type_id !== undefined || units_per_package !== undefined) {
+      const defaultPresentation = await ProductPresentation.findOne({
+        where: { product_id: product.id, is_default: true },
+        transaction
+      }) as any;
+
+      const unitsPerPkg = parseInt(units_per_package) || 1;
+      const presentationData = {
+        packaging_type_id: packaging_type_id || null,
+        presentation_type_id: presentation_type_id || null,
+        units_per_package: unitsPerPkg,
+        units_per_presentation: unitsPerPkg,
+        package_price: package_price || 0,
+        package_cost: package_cost || 0,
+        base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : (defaultPresentation?.base_price || 0),
+        cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : (defaultPresentation?.cost || 0),
+        purchase_currency: purchase_currency || 'USD'
+      };
+
+      if (defaultPresentation) {
+        await defaultPresentation.update(presentationData, { transaction });
+      } else {
+        // Solo crear si no existen presentaciones para este producto
+        const anyPresentation = await ProductPresentation.findOne({
+          where: { product_id: product.id },
+          order: [['id', 'ASC']],
+          transaction
+        }) as any;
+        if (anyPresentation) {
+          // Ya existen presentaciones — marcar la primera como default en lugar de crear una nueva
+          await anyPresentation.update({ ...presentationData, is_default: true }, { transaction });
+        } else {
+          // Verdaderamente no hay ninguna presentación — crear la estándar
+          await ProductPresentation.create({
+            product_id: product.id,
+            name: `${product.name} - Presentación estándar`,
+            ...presentationData,
+            is_default: true,
+            is_active: true
+          }, { transaction }) as any;
+        }
+      }
+    }
+
+    // Reload with associations
+    await product.reload({
+      include: [
+        { model: Category, as: 'category' },
+        { model: Brand, as: 'brand' },
+        {
+          model: ProductPresentation,
+          as: 'presentations',
+          include: [
+            { model: PackagingType, as: 'packagingType' },
+            { model: PresentationType, as: 'presentationType' }
+          ]
+        },
+        { model: Barcode, as: 'barcodes' }
+      ],
+      transaction
+    });
+
+    // Optional: upsert barcode record
+    if (barcode !== undefined) {
+      const normalizedBarcode = String(barcode || '').trim();
+
+      if (!normalizedBarcode) {
+        // If barcode is cleared, deactivate existing primary barcodes
+        await Barcode.update(
+          { is_active: false, is_primary: false },
+          { where: { product_id: product.id }, transaction }
+        );
+      } else {
+        const existingBarcode = await Barcode.findOne({
+          where: { barcode: normalizedBarcode, is_active: true },
+          transaction
         }) as any;
 
-        const unitsPerPkg = parseInt(units_per_package) || 1;
-        const presentationData = {
-          packaging_type_id: packaging_type_id || null,
-          presentation_type_id: presentation_type_id || null,
-          units_per_package: unitsPerPkg,
-          units_per_presentation: unitsPerPkg,
-          package_price: package_price || 0,
-          package_cost: package_cost || 0,
-          base_price: package_price ? (parseFloat(package_price) / unitsPerPkg) : (defaultPresentation?.base_price || 0),
-          cost: package_cost ? (parseFloat(package_cost) / unitsPerPkg) : (defaultPresentation?.cost || 0),
-          purchase_currency: purchase_currency || 'USD'
-        };
-
-        if (defaultPresentation) {
-          await defaultPresentation.update(presentationData);
-        } else {
-          // Solo crear si no existen presentaciones para este producto
-          const anyPresentation = await ProductPresentation.findOne({
-            where: { product_id: product.id },
-            order: [['id', 'ASC']]
-          }) as any;
-          if (anyPresentation) {
-            // Ya existen presentaciones — marcar la primera como default en lugar de crear una nueva
-            await anyPresentation.update({ ...presentationData, is_default: true });
-          } else {
-            // Verdaderamente no hay ninguna presentación — crear la estándar
-            await ProductPresentation.create({
-              product_id: product.id,
-              name: `${product.name} - Presentación estándar`,
-              ...presentationData,
-              is_default: true,
-              is_active: true
-            }) as any;
-          }
-        }
-      }
-
-      // Reload with associations
-      await product.reload({
-        include: [
-          { model: Category, as: 'category' },
-          { model: Brand, as: 'brand' },
-          {
-            model: ProductPresentation,
-            as: 'presentations',
-            include: [
-              { model: PackagingType, as: 'packagingType' },
-              { model: PresentationType, as: 'presentationType' }
-            ]
-          },
-          { model: Barcode, as: 'barcodes' }
-        ]
-      });
-
-      // Optional: upsert barcode record
-      if (barcode !== undefined) {
-        const normalizedBarcode = String(barcode || '').trim();
-
-        if (!normalizedBarcode) {
-          // If barcode is cleared, deactivate existing primary barcodes
-          await Barcode.update(
-            { is_active: false, is_primary: false },
-            { where: { product_id: product.id } }
-          );
-        } else {
-          const existingBarcode = await Barcode.findOne({
-            where: { barcode: normalizedBarcode, is_active: true }
-          }) as any;
-
-          if (existingBarcode && existingBarcode.product_id !== product.id) {
-            return res.status(400).json({
-              message: 'El código de barras ya está asignado a otro producto'
-            });
-          }
-
-          // Deactivate other barcodes for this product since it's a replacement from the main form
-          await Barcode.update(
-            { is_primary: false, is_active: false },
-            { where: { product_id: product.id } }
-          );
-
-          // Upsert barcode for this product
-          const productBarcode = await Barcode.findOne({
-            where: { product_id: product.id, barcode: normalizedBarcode }
-          }) as any;
-
-          if (productBarcode) {
-            await productBarcode.update({ is_active: true, is_primary: true });
-          } else {
-            await Barcode.create({
-              product_id: product.id,
-              presentation_id: null,
-              barcode: normalizedBarcode,
-              type: 'EAN13',
-              is_primary: true,
-              is_active: true
-            }) as any;
-          }
-
-          await product.reload({
-            include: [
-              { model: Category, as: 'category' },
-              { model: Brand, as: 'brand' },
-              {
-                model: ProductPresentation,
-                as: 'presentations',
-                include: [
-                  { model: PackagingType, as: 'packagingType' },
-                  { model: PresentationType, as: 'presentationType' }
-                ]
-              },
-              { model: Barcode, as: 'barcodes' }
-            ]
+        if (existingBarcode && existingBarcode.product_id !== product.id) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message: 'El código de barras ya está asignado a otro producto'
           });
         }
-      }
 
-      res.json({
-        message: 'Producto actualizado exitosamente',
-        data: product
-      });
-    } catch (error) {
-      next(error);
+        // Deactivate other barcodes for this product since it's a replacement from the main form
+        await Barcode.update(
+          { is_primary: false, is_active: false },
+          { where: { product_id: product.id }, transaction }
+        );
+
+        // Upsert barcode for this product
+        const productBarcode = await Barcode.findOne({
+          where: { product_id: product.id, barcode: normalizedBarcode },
+          transaction
+        }) as any;
+
+        if (productBarcode) {
+          await productBarcode.update({ is_active: true, is_primary: true }, { transaction });
+        } else {
+          await Barcode.create({
+            product_id: product.id,
+            presentation_id: null,
+            barcode: normalizedBarcode,
+            type: 'EAN13',
+            is_primary: true,
+            is_active: true
+          }, { transaction }) as any;
+        }
+
+        await product.reload({
+          include: [
+            { model: Category, as: 'category' },
+            { model: Brand, as: 'brand' },
+            {
+              model: ProductPresentation,
+              as: 'presentations',
+              include: [
+                { model: PackagingType, as: 'packagingType' },
+                { model: PresentationType, as: 'presentationType' }
+              ]
+            },
+            { model: Barcode, as: 'barcodes' }
+          ],
+          transaction
+        });
+      }
     }
+
+    await transaction.commit();
+    res.json({
+      message: 'Producto actualizado exitosamente',
+      data: product
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
+}
 
   // Delete product (soft delete)
   async delete(req: Request, res: Response, next: NextFunction) {
@@ -991,60 +1012,10 @@ class ProductController {
 
   async exportCSV(req: Request, res: Response, next: NextFunction) {
     try {
-      const products = await Product.findAll({
-        where: { is_active: true },
-        include: [
-          {
-            model: ProductPresentation,
-            as: 'presentations',
-            where: { is_default: true },
-            required: false
-          },
-          {
-            model: Barcode,
-            as: 'barcodes',
-            where: { is_active: true },
-            required: false
-          }
-        ]
-      }) as any[];
-
-      // CSV Header
-      let csvContent = 'ID Producto,SKU,Nombre,Descripcion,Tamano Unidad,Medida Unidad,ID Presentación,Unidades por Paquete,Unidades por Presentación,Costo Paquete,Costo Unitario,Moneda,ID Barcode,Codigo de Barras\n';
-
-      products.forEach(product => {
-        const defaultPresentation = product.presentations && product.presentations[0] ? product.presentations[0] : {};
-        const barcodes = product.barcodes || [];
-
-        // If there are multiple barcodes, we could list them all or just the primary one.
-        // User asked for "id and barcode of each product", if there are many we list them separated by semicolon or multiple rows.
-        // Let's go with one row per product and list barcodes separated by semicolon if there are multiple.
-        const barcodeIds = barcodes.map(b => b.id).join('; ');
-        const barcodeStrings = barcodes.map(b => b.barcode).join('; ');
-
-        const row = [
-          product.id,
-          `"${product.sku}"`,
-          `"${product.name}"`,
-          `"${(product.description || '').replace(/"/g, '""')}"`,
-          product.unit_size,
-          `"${product.unit_size_measure || ''}"`,
-          defaultPresentation.id || '',
-          defaultPresentation.units_per_package || '',
-          defaultPresentation.units_per_presentation || '',
-          defaultPresentation.package_cost || '',
-          defaultPresentation.cost || '',
-          defaultPresentation.purchase_currency || '',
-          `"${barcodeIds}"`,
-          `"${barcodeStrings}"`
-        ];
-
-        csvContent += row.join(',') + '\n';
-      });
-
+      const csvContent = await exportProductsCSV();
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=productos_activos.csv');
-      return res.status(200).send('\uFEFF' + csvContent);
+      return res.status(200).send(csvContent);
     } catch (error) {
       next(error);
     }
