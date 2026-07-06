@@ -987,42 +987,47 @@ async deletePresentation(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-  async setDefaultPresentation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { presentationId } = req.params;
+async setDefaultPresentation(req: Request, res: Response, next: NextFunction) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { presentationId } = req.params;
 
-      const presentation = await ProductPresentation.findByPk(presentationId) as any;
-      if (!presentation) {
-        return res.status(404).json({
-          message: 'Presentation not found'
-        });
-      }
-
-      // Unmark all presentations for this product as default
-      await ProductPresentation.update(
-        { is_default: false },
-        { where: { product_id: presentation.product_id } }
-      );
-
-      // Mark this one as default
-      await presentation.update({ is_default: true });
-
-      // Reload with associations
-      const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
-        include: [
-          { model: PackagingType, as: 'packagingType' },
-          { model: PresentationType, as: 'presentationType' }
-        ]
-      }) as any;
-
-      return res.json({
-        data: updatedPresentation,
-        message: 'Default presentation updated successfully'
+    const presentation = await ProductPresentation.findByPk(presentationId, { transaction }) as any;
+    if (!presentation) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: 'Presentation not found'
       });
-    } catch (error) {
-      next(error);
     }
+
+    // Unmark all presentations for this product as default
+    await ProductPresentation.update(
+      { is_default: false },
+      { where: { product_id: presentation.product_id }, transaction }
+    );
+
+    // Mark this one as default
+    await presentation.update({ is_default: true }, { transaction });
+
+    await transaction.commit();
+
+    // Reload with associations after commit (read-only)
+    const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
+      include: [
+        { model: PackagingType, as: 'packagingType' },
+        { model: PresentationType, as: 'presentationType' }
+      ]
+    }) as any;
+
+    return res.json({
+      data: updatedPresentation,
+      message: 'Default presentation updated successfully'
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
+}
 
   async exportCSV(req: Request, res: Response, next: NextFunction) {
     try {
