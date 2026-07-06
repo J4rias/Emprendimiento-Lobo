@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 
 import Category from '../models/Category';
 import Product from '../models/Product';
+const { sequelize } = require('../config/database');
 
 class CategoryController {
   // Get all categories
@@ -32,20 +33,23 @@ class CategoryController {
       const totalCount = await Category.count({ where });
 
       // Count products for each category
-      const categoriesWithCount = await Promise.all(
-        categories.map(async (category) => {
-          const productCount = await Product.count({
-            where: {
-              category_id: category.id,
-              is_active: true
-            }
-          });
-          return {
-            ...category.toJSON(),
-            productCount
-          };
-        })
-      );
+      const categoryIds = categories.map((c: any) => c.id);
+      const productCounts = await Product.findAll({
+        where: { category_id: { [Op.in]: categoryIds }, is_active: true },
+        attributes: ['category_id', [sequelize.fn('COUNT', sequelize.col('id')), 'productCount']],
+        group: ['category_id'],
+        raw: true
+      }) as any[];
+
+      const countByCategoryId: Record<number, number> = {};
+      for (const row of productCounts) {
+        countByCategoryId[row.category_id] = parseInt(row.productCount) || 0;
+      }
+
+      const categoriesWithCount = categories.map((category: any) => ({
+        ...category.toJSON(),
+        productCount: countByCategoryId[category.id] || 0
+      }));
 
       res.json({
         data: categoriesWithCount,
@@ -109,7 +113,7 @@ class CategoryController {
         name: name.trim(),
         description: description?.trim() || null,
         color: color || '#6B7280'
-      }) as any;
+      } as any) as any;
 
       res.status(201).json({
         message: 'Categoría creada exitosamente',
@@ -164,7 +168,7 @@ class CategoryController {
         name: name ? name.trim() : category.name,
         description: description !== undefined ? description?.trim() || null : category.description,
         color: color || category.color
-      });
+      } as any);
 
       res.json({
         message: 'Categoría actualizada exitosamente',
@@ -243,4 +247,4 @@ class CategoryController {
   }
 }
 
-export default new CategoryController();
+export = new CategoryController();
