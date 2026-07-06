@@ -934,51 +934,58 @@ async updatePresentation(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-  async deletePresentation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { presentationId } = req.params;
+async deletePresentation(req: Request, res: Response, next: NextFunction) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { presentationId } = req.params;
 
-      const presentation = await ProductPresentation.findByPk(presentationId) as any;
-      if (!presentation) {
-        return res.status(404).json({
-          message: 'Presentation not found'
-        });
-      }
-
-      // Check if this is the last presentation for the product
-      const presentationCount = await ProductPresentation.count({
-        where: { product_id: presentation.product_id }
+    const presentation = await ProductPresentation.findByPk(presentationId, { transaction }) as any;
+    if (!presentation) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: 'Presentation not found'
       });
-
-      if (presentationCount <= 1) {
-        return res.status(400).json({
-          message: 'Cannot delete the last presentation. A product must have at least one presentation.'
-        });
-      }
-
-      // If this is the default presentation, set another one as default
-      if (presentation.is_default) {
-        const anotherPresentation = await ProductPresentation.findOne({
-          where: {
-            product_id: presentation.product_id,
-            id: { [Op.ne]: presentationId }
-          }
-        }) as any;
-
-        if (anotherPresentation) {
-          await anotherPresentation.update({ is_default: true });
-        }
-      }
-
-      await presentation.destroy();
-
-      return res.json({
-        message: 'Presentation deleted successfully'
-      });
-    } catch (error) {
-      next(error);
     }
+
+    // Check if this is the last presentation for the product
+    const presentationCount = await ProductPresentation.count({
+      where: { product_id: presentation.product_id },
+      transaction
+    });
+
+    if (presentationCount <= 1) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: 'Cannot delete the last presentation. A product must have at least one presentation.'
+      });
+    }
+
+    // If this is the default presentation, set another one as default
+    if (presentation.is_default) {
+      const anotherPresentation = await ProductPresentation.findOne({
+        where: {
+          product_id: presentation.product_id,
+          id: { [Op.ne]: presentationId }
+        },
+        transaction
+      }) as any;
+
+      if (anotherPresentation) {
+        await anotherPresentation.update({ is_default: true }, { transaction });
+      }
+    }
+
+    await presentation.destroy({ transaction });
+
+    await transaction.commit();
+    return res.json({
+      message: 'Presentation deleted successfully'
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
+}
 
   async setDefaultPresentation(req: Request, res: Response, next: NextFunction) {
     try {
