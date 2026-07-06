@@ -863,69 +863,76 @@ async update(req: Request, res: Response, next: NextFunction) {
     }
   }
 
-  async updatePresentation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { presentationId } = req.params;
-      const updateData = req.body;
+async updatePresentation(req: Request, res: Response, next: NextFunction) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { presentationId } = req.params;
+    const updateData = req.body;
 
-      const presentation = await ProductPresentation.findByPk(presentationId) as any;
-      if (!presentation) {
-        return res.status(404).json({
-          message: 'Presentation not found'
-        });
-      }
-
-      // Validaciones básicas para edición
-      if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
-        return res.status(400).json({ message: 'El nombre de la presentación no puede estar vacío' });
-      }
-
-      if (updateData.units_per_package !== undefined && (updateData.units_per_package === null || updateData.units_per_package <= 0)) {
-        return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
-      }
-
-      // Update units_per_presentation if units_per_package is updated
-      if (updateData.units_per_package !== undefined) {
-        updateData.units_per_presentation = updateData.units_per_package;
-      }
-
-      // Si se está marcando como default, desmarcar las demás presentaciones del producto
-      if (updateData.is_default === true) {
-        await ProductPresentation.update(
-          { is_default: false },
-          { where: { product_id: presentation.product_id } }
-        );
-      }
-
-      // Recalcular costo unitario y precio base cuando cambian los valores del paquete
-      const finalUnitsPerPkg = parseInt(updateData.units_per_package ?? presentation.units_per_package) || 1;
-      const finalPackageCost = parseFloat(updateData.package_cost ?? presentation.package_cost) || 0;
-      const finalPackagePrice = parseFloat(updateData.package_price ?? presentation.package_price) || 0;
-
-      // Siempre recalcular si alguno de los 3 campos relevantes cambia
-      if (updateData.package_cost !== undefined || updateData.package_price !== undefined || updateData.units_per_package !== undefined) {
-        updateData.cost = finalPackageCost / finalUnitsPerPkg;
-        updateData.base_price = finalPackagePrice / finalUnitsPerPkg;
-      }
-
-      await presentation.update(updateData);
-
-      // Reload with associations
-      const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
-        include: [
-          { model: PackagingType, as: 'packagingType' },
-          { model: PresentationType, as: 'presentationType' }
-        ]
-      }) as any;
-
-      return res.json({
-        data: updatedPresentation,
-        message: 'Presentation updated successfully'
+    const presentation = await ProductPresentation.findByPk(presentationId, { transaction }) as any;
+    if (!presentation) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: 'Presentation not found'
       });
-    } catch (error) {
-      next(error);
     }
+
+    // Validaciones básicas para edición
+    if (updateData.name !== undefined && (!updateData.name || updateData.name.trim() === '')) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'El nombre de la presentación no puede estar vacío' });
+    }
+
+    if (updateData.units_per_package !== undefined && (updateData.units_per_package === null || updateData.units_per_package <= 0)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'La cantidad de unidades por paquete debe ser mayor a 0' });
+    }
+
+    // Update units_per_presentation if units_per_package is updated
+    if (updateData.units_per_package !== undefined) {
+      updateData.units_per_presentation = updateData.units_per_package;
+    }
+
+    // Si se está marcando como default, desmarcar las demás presentaciones del producto
+    if (updateData.is_default === true) {
+      await ProductPresentation.update(
+        { is_default: false },
+        { where: { product_id: presentation.product_id }, transaction }
+      );
+    }
+
+    // Recalcular costo unitario y precio base cuando cambian los valores del paquete
+    const finalUnitsPerPkg = parseInt(updateData.units_per_package ?? presentation.units_per_package) || 1;
+    const finalPackageCost = parseFloat(updateData.package_cost ?? presentation.package_cost) || 0;
+    const finalPackagePrice = parseFloat(updateData.package_price ?? presentation.package_price) || 0;
+
+    // Siempre recalcular si alguno de los 3 campos relevantes cambia
+    if (updateData.package_cost !== undefined || updateData.package_price !== undefined || updateData.units_per_package !== undefined) {
+      updateData.cost = finalPackageCost / finalUnitsPerPkg;
+      updateData.base_price = finalPackagePrice / finalUnitsPerPkg;
+    }
+
+    await presentation.update(updateData, { transaction });
+
+    await transaction.commit();
+
+    // Reload with associations
+    const updatedPresentation = await ProductPresentation.findByPk(presentationId, {
+      include: [
+        { model: PackagingType, as: 'packagingType' },
+        { model: PresentationType, as: 'presentationType' }
+      ]
+    }) as any;
+
+    return res.json({
+      data: updatedPresentation,
+      message: 'Presentation updated successfully'
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
+}
 
   async deletePresentation(req: Request, res: Response, next: NextFunction) {
     try {
