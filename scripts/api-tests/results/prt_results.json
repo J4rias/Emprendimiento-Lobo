@@ -1,5 +1,0 @@
-{"test": "test_get_active_presentation_types_happy_path", "method": "GET", "path": "/presentation-types/active", "status": 200}
-{"test": "test_get_active_presentation_types_no_auth", "method": "GET", "path": "/presentation-types/active", "status": 401}
-
-=== TEST SUMMARY ===
-PASSED: test_get_active_presentation_types
