@@ -57,7 +57,7 @@ const PriceListsPage = () => {
                 toast.error('Error al cargar la lista de precios');
             }
         })();
-    }, [ratesData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [ratesData]);  
 
     // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(
@@ -65,8 +65,8 @@ const PriceListsPage = () => {
         []
     );
     const autoSaveOnConflict = useCallback(() => {
-        if (editingListRef.current) openEditor(editingListRef.current); // eslint-disable-line react-hooks/exhaustive-deps
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        if (editingListRef.current) openEditor(editingListRef.current);  
+    }, []);  
 
     const { save: autoSaveDetail, status: autoSaveStatus, errorKeys: autoSaveErrorKeys } = useAutoSave({
         saveFn: autoSaveFn,

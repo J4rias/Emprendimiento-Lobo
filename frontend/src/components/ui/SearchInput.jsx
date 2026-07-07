@@ -67,7 +67,7 @@ export function SearchInput({
       lastEmitted.current = localValue
     }, delay)
     return () => clearTimeout(timer)
-  }, [localValue]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localValue])  
 
   const handleClear = () => {
     setLocalValue('')

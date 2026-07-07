@@ -43,7 +43,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
 
     setLocalPresentations(updatedPresentations);
     onChange(updatedPresentations);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [productUnitSize, productUnitMeasure]);
 
   const addPresentation = () => {

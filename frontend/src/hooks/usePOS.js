@@ -426,7 +426,7 @@ export function usePOS() {
     if (Object.keys(priceMap).length > 0) {
       recalculateCartPrices(activeTabId, priceMap);
     }
-  }, [displayCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayCurrency]);  
 
   // ============= STOCK HELPERS =============
   const getProductStockDetails = useCallback((product, presentation) => {
