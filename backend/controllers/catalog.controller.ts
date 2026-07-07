@@ -4,7 +4,18 @@ import { Product, Category, ProductPresentation, PackagingType, Inventory, Price
 
 const logger = require('../config/logger');
 
+// Simple in-memory cache — 5 min TTL
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let catalogCache: { data: any; expiresAt: number } | null = null;
+
+export const invalidateCatalogCache = () => { catalogCache = null; };
+
 export const getCatalog = async (req: Request, res: Response) => {
+  // Serve from cache if still valid
+  if (catalogCache && Date.now() < catalogCache.expiresAt) {
+    return res.json(catalogCache.data);
+  }
+
   try {
     // 1. Company info
     const company = await CompanySettings.findOne({
@@ -13,7 +24,7 @@ export const getCatalog = async (req: Request, res: Response) => {
 
     // 2. Default active price list
     const priceList = await PriceList.findOne({
-      where: { isDefault: true, status: 'active', isDeleted: false },
+      where: { is_default: true, status: 'active' },
       attributes: ['id', 'name', 'currency']
     }) as any;
 
@@ -105,14 +116,17 @@ export const getCatalog = async (req: Request, res: Response) => {
       return rest;
     });
 
-    res.json({
+    const responseData = {
       company,
       priceList: { name: priceList.name, currency: priceList.currency },
       categories,
       products: cleanProducts,
       topProducts,
       newArrivals
-    });
+    };
+
+    catalogCache = { data: responseData, expiresAt: Date.now() + CACHE_TTL_MS };
+    res.json(responseData);
 
   } catch (error) {
     logger.error('Error fetching catalog', { error: (error as Error).message });

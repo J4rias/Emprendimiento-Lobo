@@ -8,22 +8,22 @@ interface PriceListAttributes {
   name: string;
   description: string | null;
   currency: 'USD' | 'COP' | 'VES';
-  basePercentage: number;
-  isDefault: boolean;
+  base_percentage: number;
+  is_default: boolean;
   status: 'active' | 'inactive';
   validity_days: number;
-  validFrom: Date | null;
-  validUntil: Date | null;
-  isDeleted: boolean;
+  valid_from: Date | null;
+  valid_until: Date | null;
   updated_by: number | null;
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date | null;
 }
 
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface PriceListCreationAttributes extends Optional<
   PriceListAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'currency' | 'basePercentage' | 'isDefault' | 'status' | 'validity_days' | 'isDeleted'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'currency' | 'base_percentage' | 'is_default' | 'status' | 'validity_days'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -56,13 +56,13 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
       defaultValue: 'USD',
       comment: 'Moneda de la lista de precios'
     },
-    basePercentage: {
+    base_percentage: {
       type: DataTypes.DECIMAL(12, 4),
       allowNull: false,
       defaultValue: 0,
       comment: 'Porcentaje base de ajuste sobre el costo (+/-)'
     },
-    isDefault: {
+    is_default: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
@@ -77,22 +77,17 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 5,
-      comment: 'Vigencia en días a partir de validFrom'
+      comment: 'Vigencia en días a partir de valid_from'
     },
-    validFrom: {
+    valid_from: {
       type: DataTypes.DATE,
       allowNull: true,
       comment: 'Fecha de inicio de vigencia'
     },
-    validUntil: {
+    valid_until: {
       type: DataTypes.DATE,
       allowNull: true,
       comment: 'Fecha de fin de vigencia'
-    },
-    isDeleted: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
     },
     updated_by: {
       type: DataTypes.INTEGER,
@@ -105,7 +100,7 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
     tableName: 'price_lists',
     timestamps: true,
     underscored: true,
-    paranoid: false,
+    paranoid: true,
     indexes: [
       {
         fields: ['code']
@@ -130,25 +125,25 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
       },
       beforeSave: async (priceList: any, options: any) => {
         // Si se marca como default, desmarcar las demás
-        if (priceList.isDefault && priceList.changed('isDefault')) {
+        if (priceList.is_default && priceList.changed('is_default')) {
           await PriceList.update(
-            { isDefault: false },
+            { is_default: false },
             {
               where: priceList.id ? {
-                isDefault: true,
+                is_default: true,
                 id: { [Op.ne]: priceList.id }
               } : {
-                isDefault: true
+                is_default: true
               },
               transaction: options.transaction
             }
           );
         }
-        // Auto-calculate validUntil from validFrom + validity_days
-        if (priceList.validFrom && priceList.validity_days) {
-          const from = new Date(priceList.validFrom);
+        // Auto-calculate valid_until from valid_from + validity_days
+        if (priceList.valid_from && priceList.validity_days) {
+          const from = new Date(priceList.valid_from);
           from.setDate(from.getDate() + priceList.validity_days);
-          priceList.validUntil = from;
+          priceList.valid_until = from;
         }
       }
     }
@@ -159,11 +154,11 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
 (PriceList as any).prototype.isValid = function () {
   const now = new Date();
 
-  if (this.validFrom && now < this.validFrom) {
+  if (this.valid_from && now < this.valid_from) {
     return false;
   }
 
-  if (this.validUntil && now > this.validUntil) {
+  if (this.valid_until && now > this.valid_until) {
     return false;
   }
 
@@ -173,7 +168,6 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
 // Personalizar JSON
 (PriceList as any).prototype.toJSON = function () {
   const values = { ...this.get() };
-  delete values.isDeleted;
   return values;
 };
 

@@ -41,7 +41,8 @@ const PresentationType = sequelize.define<Model<PresentationTypeAttributes, Pres
   {
     tableName: 'presentation_types',
     timestamps: true,
-    underscored: true
+    underscored: true,
+    paranoid: true
   }
 );
 

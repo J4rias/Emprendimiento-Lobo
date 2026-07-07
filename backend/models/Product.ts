@@ -123,7 +123,8 @@ const Product = sequelize.define<Model<ProductAttributes, ProductCreationAttribu
   },
   {
     tableName: 'products',
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   }
 );
 

@@ -22,10 +22,10 @@ import ExchangeRate from '../models/ExchangeRate';
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const { generateOrderNumber, getPurchaseOrderStats: _getPOStats } = require('../services/purchaseOrder.service');
 
 class PurchaseOrderController {
   constructor() {
-    this.generateOrderNumber = this.generateOrderNumber.bind(this);
     this.getAllPurchaseOrders = this.getAllPurchaseOrders.bind(this);
     this.getPurchaseOrderById = this.getPurchaseOrderById.bind(this);
     this.createPurchaseOrder = this.createPurchaseOrder.bind(this);
@@ -37,33 +37,7 @@ class PurchaseOrderController {
   }
 
   // Generate unique order number (with transaction lock to prevent collisions)
-  async generateOrderNumber(transaction: any) {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const prefix = `OC-${year}${month}${day}`;
-
-    // Find the last order of the day with exclusive lock
-    const lastOrder = await PurchaseOrder.findOne({
-      where: {
-        order_number: {
-          [Op.like]: `${prefix}%`
-        }
-      },
-      order: [['order_number', 'DESC']],
-      lock: transaction.LOCK.UPDATE,
-      transaction
-    }) as any;
-
-    let sequence = 1;
-    if (lastOrder) {
-      const lastSequence = parseInt(lastOrder.order_number.split('-').pop());
-      sequence = lastSequence + 1;
-    }
-
-    return `${prefix}-${String(sequence).padStart(4, '0')}`;
-  }
+  // generateOrderNumber delegated to purchaseOrder.service
 
   // Get all purchase orders with filters
   async getAllPurchaseOrders(req: Request, res: Response, next: NextFunction) {
@@ -153,13 +127,13 @@ class PurchaseOrderController {
       }) as any;
 
       // Batch: last invoice number + payment allocations (evita N+1)
-      const orderNumbers = orders.map(o => o.order_number);
-      const orderIds = orders.map(o => o.id);
+      const orderNumbers = orders.map((o: any) => o.order_number);
+      const orderIds = orders.map((o: any) => o.id);
 
       const [allMovements, allAllocs] = await Promise.all([
         InventoryMovement.findAll({
           where: {
-            reason: { [Op.or]: orderNumbers.map(n => ({ [Op.like]: `OC ${n}%` })) },
+            reason: { [Op.or]: orderNumbers.map((n: any) => ({ [Op.like]: `OC ${n}%` })) },
             document_number: { [Op.notIn]: orderNumbers }
           },
           order: [['created_at', 'DESC']],
@@ -189,12 +163,12 @@ class PurchaseOrderController {
         allocsByOrder[oid].push(alloc);
       }
 
-      const ordersWithInvoice = orders.map(order => {
+      const ordersWithInvoice = orders.map((order: any) => {
         const orderJson = order.toJSON();
         orderJson.last_invoice_number = lastInvoiceByOrder[order.order_number] || '';
 
         const allocs = allocsByOrder[order.id] || [];
-        const totalPaid = allocs.reduce((sum, a) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0);
+        const totalPaid = allocs.reduce((sum: any, a: any) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0);
         orderJson.payment_status = totalPaid >= parseFloat(order.total) - 0.01 ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
 
         return orderJson;
@@ -378,14 +352,14 @@ class PurchaseOrderController {
       }
 
       // Generate order number
-      const order_number = await this.generateOrderNumber(transaction);
+      const order_number = await generateOrderNumber(transaction);
 
       // Calculate totals
       let subtotal = 0;
       let tax_amount = 0;
       let discount_amount = 0;
 
-      items.forEach(item => {
+      items.forEach((item: any) => {
         const packageTotal = (item.package_quantity || 0) * (item.package_cost || 0);
         const unitsTotal = (item.loose_units || 0) * (item.unit_cost || 0);
         const itemSubtotal = packageTotal + unitsTotal;
@@ -520,7 +494,7 @@ class PurchaseOrderController {
       let discount_amount = 0;
 
       if (items && items.length > 0) {
-        items.forEach(item => {
+        items.forEach((item: any) => {
           const packageTotal = (item.package_quantity || 0) * (item.package_cost || 0);
           const unitsTotal = (item.loose_units || 0) * (item.unit_cost || 0);
           const itemSubtotal = packageTotal + unitsTotal;
@@ -734,7 +708,7 @@ class PurchaseOrderController {
 
       // Process each received item
       for (const receivedItem of received_items) {
-        const detail = order.details.find(d => d.id === receivedItem.detail_id);
+        const detail = order.details.find((d: any) => d.id === receivedItem.detail_id);
 
         if (!detail) {
           await transaction.rollback();
@@ -781,7 +755,7 @@ class PurchaseOrderController {
             },
             defaults: {
               quantity: 0
-            },
+            } as any,
             transaction
           }) as any;
 
@@ -822,7 +796,7 @@ class PurchaseOrderController {
                 manufacturing_date: receivedItem.manufacture_date || null,
                 expiration_date: receivedItem.expiry_date || null,
                 cost: detail.unit_cost
-              },
+              } as any,
               { transaction }
             ) as any;
           }
@@ -881,14 +855,14 @@ class PurchaseOrderController {
         transaction
       }) as any;
 
-      const allReceived = updatedOrder.details.every(detail => {
+      const allReceived = updatedOrder.details.every((detail: any) => {
         return (
           detail.received_package_quantity >= detail.package_quantity &&
           detail.received_loose_units >= detail.loose_units
         );
       });
 
-      const anyReceived = updatedOrder.details.some(detail => {
+      const anyReceived = updatedOrder.details.some((detail: any) => {
         return detail.received_package_quantity > 0 || detail.received_loose_units > 0;
       });
 
@@ -939,57 +913,9 @@ class PurchaseOrderController {
   // Get purchase order statistics
   async getPurchaseOrderStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const { date_from, date_to, supplier_id } = req.query;
-      const where: any = {};
-
-      if (supplier_id) {
-        where.supplier_id = supplier_id;
-      }
-
-      if (date_from && date_to) {
-        where.order_date = {
-          [Op.between]: [date_from, date_to]
-        };
-      }
-
-      const totalOrders = await PurchaseOrder.count({ where });
-
-      const ordersByStatus = await PurchaseOrder.findAll({
-        where,
-        attributes: [
-          'status',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('total')), 'total_amount']
-        ],
-        group: ['status']
-      }) as any[];
-
-      const valueByCurrency = await PurchaseOrder.findAll({
-        where,
-        attributes: [
-          'currency',
-          [sequelize.fn('SUM', sequelize.col('total')), 'total']
-        ],
-        group: ['currency']
-      }) as any[];
-
-      const pendingOrders = await PurchaseOrder.count({
-        where: {
-          ...where,
-          status: {
-            [Op.in]: ['draft', 'sent', 'confirmed', 'partially_received']
-          }
-        }
-      });
-
-      res.json({
-        data: {
-          total_orders: totalOrders,
-          pending_orders: pendingOrders,
-          value_by_currency: valueByCurrency,
-          by_status: ordersByStatus
-        }
-      });
+      const { date_from, date_to, supplier_id } = req.query as Record<string, string>;
+      const data = await _getPOStats({ date_from, date_to, supplier_id });
+      res.json({ data });
     } catch (error) {
       next(error);
     }

@@ -55,8 +55,8 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
       data: brand
     });
   } catch (error) {
-    if (error.message === 'Marca no encontrada') {
-      return res.status(404).json({ message: error.message });
+    if ((error as Error).message === 'Marca no encontrada') {
+      return res.status(404).json({ message: (error as Error).message });
     }
     next(error);
   }
@@ -77,8 +77,8 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       data: brand
     });
   } catch (error) {
-    if (error.message === 'Marca duplicada') {
-      return res.status(409).json({ message: error.message });
+    if ((error as Error).message === 'Marca duplicada') {
+      return res.status(409).json({ message: (error as Error).message });
     }
     next(error);
   }
@@ -97,8 +97,8 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
       data: brand
     });
   } catch (error) {
-    if (error.message === 'Marca no encontrada') {
-      return res.status(404).json({ message: error.message });
+    if ((error as Error).message === 'Marca no encontrada') {
+      return res.status(404).json({ message: (error as Error).message });
     }
     next(error);
   }
@@ -114,8 +114,8 @@ export const deleteBrand = async (req: Request, res: Response, next: NextFunctio
       message: 'Marca desactivada exitosamente'
     });
   } catch (error) {
-    if (error.message === 'Marca no encontrada') {
-      return res.status(404).json({ message: error.message });
+    if ((error as Error).message === 'Marca no encontrada') {
+      return res.status(404).json({ message: (error as Error).message });
     }
     next(error);
   }

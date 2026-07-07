@@ -1,94 +1,65 @@
-// Express type imports (ALWAYS at the top)
 import { Request, Response, NextFunction } from 'express';
-
-// Sequelize imports (only what is used in the controller)
 import { Op } from 'sequelize';
-
-// Model imports (esModuleInterop — require with export = in the .ts files)
 import Customer from '../models/Customer';
 import PriceList from '../models/PriceList';
 import Sale from '../models/Sale';
-import SaleDetail from '../models/SaleDetail';
 import SalePayment from '../models/SalePayment';
-import CreditNote from '../models/CreditNote';
-import ExchangeRate from '../models/ExchangeRate';
-import Product from '../models/Product';
-import ProductPresentation from '../models/ProductPresentation';
 
-// Other requires that are not models/sequelize/express → leave as require()
-const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const {
+  getCustomerStats,
+  getOverdueCustomers,
+  getCustomerStatement,
+  getCustomerCreditBalance,
+  getCustomerPurchases,
+  getCustomerActivity
+} = require('../services/customer.service');
 
 class CustomerController {
+  constructor() {
+    this.getAllCustomers = this.getAllCustomers.bind(this);
+    this.getActiveCustomers = this.getActiveCustomers.bind(this);
+  }
+
   // Get all customers with filters
   async getAllCustomers(req: Request, res: Response, next: NextFunction) {
     try {
       const {
-        pageStr = '1',
-        limitStr = '50',
-        search,
-        status,
-        type,
-        is_active,
-        sort_by = 'created_at',
-        sort_dir = 'DESC'
+        pageStr = '1', limitStr = '50', search, status, type, is_active,
+        sort_by = 'created_at', sort_dir = 'DESC'
       } = req.query as Record<string, string>;
 
-      // ?is_active=true → slim list for dropdowns (equivalent to /active endpoint)
-      if (is_active === 'true') {
-        return this.getActiveCustomers(req, res, next);
-      }
+      if (is_active === 'true') return this.getActiveCustomers(req, res, next);
 
       const page = parseInt(pageStr, 10);
       const limit = parseInt(limitStr, 10);
       const offset = (page - 1) * limit;
-      const where: any = { isDeleted: false };
+      const where: any = {};
 
-      // Search filter
       if (search) {
         where[Op.or] = [
           { code: { [Op.like]: `%${search}%` } },
-          { businessName: { [Op.like]: `%${search}%` } },
-          { tradeName: { [Op.like]: `%${search}%` } },
-          { firstName: { [Op.like]: `%${search}%` } },
-          { lastName: { [Op.like]: `%${search}%` } },
-          { documentNumber: { [Op.like]: `%${search}%` } },
+          { business_name: { [Op.like]: `%${search}%` } },
+          { trade_name: { [Op.like]: `%${search}%` } },
+          { first_name: { [Op.like]: `%${search}%` } },
+          { last_name: { [Op.like]: `%${search}%` } },
+          { document_number: { [Op.like]: `%${search}%` } },
           { email: { [Op.like]: `%${search}%` } }
         ];
       }
-
-      // Status filter
-      if (status) {
-        where.status = status;
-      }
-
-      // Type filter
-      if (type) {
-        where.type = type;
-      }
+      if (status) where.status = status;
+      if (type) where.type = type;
 
       const { rows: customers, count } = await Customer.findAndCountAll({
         where,
-        include: [
-          {
-            model: PriceList,
-            as: 'priceList',
-            attributes: ['id', 'code', 'name', 'currency']
-          }
-        ],
-        limit,
-        offset,
+        include: [{ model: PriceList, as: 'priceList', attributes: ['id', 'code', 'name', 'currency'] }],
+        limit, offset,
         order: [[sort_by, sort_dir.toUpperCase()] as [string, string]]
       }) as any;
 
       res.json({
         data: customers,
-        pagination: {
-          total: count,
-          page,
-          limit,
-          totalPages: Math.ceil(count / limit)
-        }
+        pagination: { total: count, page, limit, totalPages: Math.ceil(count / limit) }
       });
     } catch (error) {
       next(error);
@@ -99,24 +70,14 @@ class CustomerController {
   async getActiveCustomers(req: Request, res: Response, next: NextFunction) {
     try {
       const customers = await Customer.findAll({
-        where: {
-          status: 'active',
-          isDeleted: false
-        },
-        attributes: ['id', 'code', 'firstName', 'lastName', 'businessName', 'tradeName', 'type', 'creditLimit', 'discountPercentage', 'priceListId'],
+        where: { status: 'active' },
+        attributes: ['id', 'code', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'credit_limit', 'discount_percentage', 'price_list_id'],
         order: [['code', 'ASC']],
         limit: 500
       }) as any[];
 
-      // Add computed fullName
-      const customersWithName = customers.map(c => ({
-        ...c.toJSON(),
-        fullName: c.getFullName()
-      }));
-
-      res.json({
-        data: customersWithName
-      });
+      const customersWithName = customers.map((c: any) => ({ ...c.toJSON(), fullName: c.getFullName() }));
+      res.json({ data: customersWithName });
     } catch (error) {
       next(error);
     }
@@ -126,36 +87,13 @@ class CustomerController {
   async getCustomerById(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-
       const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        },
-        include: [
-          {
-            model: PriceList,
-            as: 'priceList',
-            attributes: ['id', 'code', 'name', 'currency', 'basePercentage']
-          }
-        ]
+        where: { id },
+        include: [{ model: PriceList, as: 'priceList', attributes: ['id', 'code', 'name', 'currency', 'base_percentage'] }]
       }) as any;
 
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      // Add computed fullName
-      const customerData = {
-        ...customer.toJSON(),
-        fullName: customer.getFullName()
-      };
-
-      res.json({
-        data: customerData
-      });
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
+      res.json({ data: { ...customer.toJSON(), fullName: customer.getFullName() } });
     } catch (error) {
       next(error);
     }
@@ -165,97 +103,37 @@ class CustomerController {
   async createCustomer(req: Request, res: Response, next: NextFunction) {
     try {
       const {
-        type,
-        documentType,
-        documentNumber,
-        businessName,
-        tradeName,
-        firstName,
-        lastName,
-        email,
-        phone,
-        mobile,
-        address,
-        city,
-        state,
-        country,
-        postalCode,
-        creditLimit,
-        creditDays,
-        priceListId,
-        discountPercentage,
-        notes
+        type, document_type, document_number, business_name, trade_name, first_name, last_name,
+        email, phone, mobile, address, city, state, country, postal_code,
+        credit_limit, credit_days, price_list_id, discount_percentage, notes
       } = req.body;
 
-      // Validate required fields based on type
-      if (type === 'juridical' && !businessName) {
-        return res.status(400).json({
-          message: 'La razón social es obligatoria para personas jurídicas'
-        });
+      if (type === 'juridical' && !business_name) {
+        return res.status(400).json({ message: 'La razón social es obligatoria para personas jurídicas' });
+      }
+      if (type === 'natural' && (!first_name || !last_name)) {
+        return res.status(400).json({ message: 'El nombre y apellido son obligatorios para personas naturales' });
       }
 
-      if (type === 'natural' && (!firstName || !lastName)) {
-        return res.status(400).json({
-          message: 'El nombre y apellido son obligatorios para personas naturales'
-        });
-      }
-
-      // Check if document number already exists
-      const existingCustomer = await Customer.findOne({
-        where: {
-          documentNumber,
-          isDeleted: false
-        }
-      }) as any;
-
+      const existingCustomer = await Customer.findOne({ where: { document_number } }) as any;
       if (existingCustomer) {
-        return res.status(400).json({
-          message: `Ya existe un cliente con el documento ${documentNumber}`
-        });
+        return res.status(400).json({ message: `Ya existe un cliente con el documento ${document_number}` });
       }
 
-      // Create customer
       const customer = await Customer.create({
-        type,
-        documentType,
-        documentNumber,
-        businessName,
-        tradeName,
-        firstName,
-        lastName,
-        email,
-        phone,
-        mobile,
-        address,
-        city,
-        state,
-        country: country || 'Venezuela',
-        postalCode,
-        creditLimit: creditLimit || 0,
-        creditDays: creditDays || 0,
-        priceListId,
-        discountPercentage: discountPercentage || 0,
-        notes,
-        status: 'active'
-      }) as any;
+        type, document_type, document_number, business_name, trade_name, first_name, last_name,
+        email, phone, mobile, address, city, state, country: country || 'Venezuela', postal_code,
+        credit_limit: credit_limit || 0, credit_days: credit_days || 0, price_list_id,
+        discount_percentage: discount_percentage || 0, notes, status: 'active'
+      } as any) as any;
 
-      // Reload with associations
       await customer.reload({
-        include: [
-          {
-            model: PriceList,
-            as: 'priceList',
-            attributes: ['id', 'code', 'name', 'currency']
-          }
-        ]
+        include: [{ model: PriceList, as: 'priceList', attributes: ['id', 'code', 'name', 'currency'] }]
       });
 
       res.status(201).json({
         message: 'Cliente creado exitosamente',
-        data: {
-          ...customer.toJSON(),
-          fullName: customer.getFullName()
-        }
+        data: { ...customer.toJSON(), fullName: customer.getFullName() }
       });
     } catch (error) {
       next(error);
@@ -267,122 +145,53 @@ class CustomerController {
     try {
       const { id } = req.params;
       const updateData = { ...req.body };
-
-      // Don't allow updating these fields
       delete updateData.code;
-      delete updateData.isDeleted;
 
-      const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        }
-      }) as any;
+      const customer = await Customer.findOne({ where: { id } }) as any;
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
+      if (updateData.type === 'juridical' && !updateData.business_name && !customer.business_name) {
+        return res.status(400).json({ message: 'La razón social es obligatoria para personas jurídicas' });
       }
-
-      // Validate type-specific required fields
-      if (updateData.type === 'juridical' && !updateData.businessName && !customer.businessName) {
-        return res.status(400).json({
-          message: 'La razón social es obligatoria para personas jurídicas'
-        });
-      }
-
       if (updateData.type === 'natural' &&
-        ((!updateData.firstName && !customer.firstName) || (!updateData.lastName && !customer.lastName))) {
-        return res.status(400).json({
-          message: 'El nombre y apellido son obligatorios para personas naturales'
-        });
+        ((!updateData.first_name && !customer.first_name) || (!updateData.last_name && !customer.last_name))) {
+        return res.status(400).json({ message: 'El nombre y apellido son obligatorios para personas naturales' });
       }
 
-      // If changing document number, check uniqueness
-      if (updateData.documentNumber && updateData.documentNumber !== customer.documentNumber) {
+      if (updateData.document_number && updateData.document_number !== customer.document_number) {
         const existing = await Customer.findOne({
-          where: {
-            documentNumber: updateData.documentNumber,
-            id: { [Op.ne]: id },
-            isDeleted: false
-          }
+          where: { document_number: updateData.document_number, id: { [Op.ne]: id } }
         }) as any;
-
         if (existing) {
-          return res.status(400).json({
-            message: `Ya existe un cliente con el documento ${updateData.documentNumber}`
-          });
+          return res.status(400).json({ message: `Ya existe un cliente con el documento ${updateData.document_number}` });
         }
       }
 
-      // Update customer
       await customer.update(updateData);
-
-      // Reload with associations
       await customer.reload({
-        include: [
-          {
-            model: PriceList,
-            as: 'priceList',
-            attributes: ['id', 'code', 'name', 'currency']
-          }
-        ]
+        include: [{ model: PriceList, as: 'priceList', attributes: ['id', 'code', 'name', 'currency'] }]
       });
 
-      res.json({
-        message: 'Cliente actualizado exitosamente',
-        data: {
-          ...customer.toJSON(),
-          fullName: customer.getFullName()
-        }
-      });
+      res.json({ message: 'Cliente actualizado exitosamente', data: { ...customer.toJSON(), fullName: customer.getFullName() } });
     } catch (error) {
       next(error);
     }
   }
 
-  // Delete customer (soft delete)
+  // Delete customer (soft delete via paranoid)
   async deleteCustomer(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
+      const customer = await Customer.findByPk(id) as any;
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
-      const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        }
-      }) as any;
-
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      // Check if customer has sales
-      const salesCount = await Sale.count({
-        where: { customer_id: id }
-      });
-
-      if (salesCount > 0) {
-        // Soft delete
-        await customer.update({
-          isDeleted: true,
-          status: 'inactive'
-        });
-
-        return res.json({
-          message: 'Cliente desactivado exitosamente (tiene ventas asociadas)'
-        });
-      }
-
-      // Hard delete if no sales
+      const salesCount = await Sale.count({ where: { customer_id: id } });
       await customer.destroy();
 
-      res.json({
-        message: 'Cliente eliminado exitosamente'
-      });
+      const message = salesCount > 0
+        ? 'Cliente desactivado exitosamente (tiene ventas asociadas)'
+        : 'Cliente eliminado exitosamente';
+      res.json({ message });
     } catch (error) {
       next(error);
     }
@@ -395,38 +204,25 @@ class CustomerController {
       const { amount } = req.query as Record<string, string>;
 
       if (!amount || isNaN(parseFloat(amount))) {
-        return res.status(400).json({
-          message: 'El monto es requerido para validar el crédito'
-        });
+        return res.status(400).json({ message: 'El monto es requerido para validar el crédito' });
       }
 
-      const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        }
-      }) as any;
+      const customer = await Customer.findByPk(id) as any;
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      const creditUsed = parseFloat(customer.creditUsed || 0);
+      const creditLimit = parseFloat(customer.credit_limit || 0);
+      const creditUsed = parseFloat(customer.credit_used || 0);
       const requestedAmount = parseFloat(amount);
+      const hasLimit = creditLimit > 0;
+      const availableCredit = hasLimit ? Math.max(0, creditLimit - creditUsed) : Infinity;
+      const hasAvailableCredit = !hasLimit || (creditUsed + requestedAmount) <= creditLimit;
 
-      // Sin límite de crédito: siempre aprobado
       res.json({
         data: {
-          customerId: id,
-          customerName: customer.getFullName(),
-          creditLimit: 0,
-          currentBalance: creditUsed,
-          availableCredit: Infinity,
-          requestedAmount,
-          hasAvailableCredit: true,
-          creditStatus: 'approved'
+          customerId: id, customerName: customer.getFullName(), creditLimit,
+          currentBalance: creditUsed, availableCredit: hasLimit ? availableCredit : null,
+          requestedAmount, hasAvailableCredit,
+          creditStatus: hasAvailableCredit ? 'approved' : 'rejected'
         }
       });
     } catch (error) {
@@ -438,26 +234,14 @@ class CustomerController {
   async getCreditSummary(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
+      const customer = await Customer.findByPk(id) as any;
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
-      const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        }
-      }) as any;
-
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      const creditLimit = parseFloat(customer.creditLimit || 0);
-      const creditUsed = parseFloat(customer.creditUsed || 0);
+      const creditLimit = parseFloat(customer.credit_limit || 0);
+      const creditUsed = parseFloat(customer.credit_used || 0);
       const availableCredit = Math.max(0, creditLimit - creditUsed);
       const creditUsagePercent = creditLimit > 0 ? (creditUsed / creditLimit) * 100 : 0;
 
-      // Get pending credit sales with payment detail
       const pendingSales = await Sale.findAll({
         where: {
           customer_id: id,
@@ -472,28 +256,13 @@ class CustomerController {
 
       res.json({
         data: {
-          customer: {
-            id: customer.id,
-            code: customer.code,
-            name: customer.getFullName(),
-            creditLimit,
-            creditDays: customer.creditDays
-          },
-          credit: {
-            limit: creditLimit,
-            used: creditUsed,
-            available: availableCredit,
-            usagePercent: parseFloat(creditUsagePercent.toFixed(2))
-          },
-          pendingSales: pendingSales.map(s => {
-            const paid = (s.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
+          customer: { id: customer.id, code: customer.code, name: customer.getFullName(), creditLimit, creditDays: customer.credit_days },
+          credit: { limit: creditLimit, used: creditUsed, available: availableCredit, usagePercent: parseFloat(creditUsagePercent.toFixed(2)) },
+          pendingSales: pendingSales.map((s: any) => {
+            const paid = (s.payments || []).reduce((sum: any, p: any) => sum + parseFloat(p.amount), 0);
             return {
-              id: s.id,
-              sale_number: s.sale_number,
-              sale_date: s.sale_date,
-              total: parseFloat(s.total),
-              paid,
-              balance: parseFloat(s.total) - paid,
+              id: s.id, sale_number: s.sale_number, sale_date: s.sale_date,
+              total: parseFloat(s.total), paid, balance: parseFloat(s.total) - paid,
               payment_status: s.payment_status
             };
           })
@@ -504,649 +273,74 @@ class CustomerController {
     }
   }
 
-  // Get customer statistics
+  // ─── Analytics (delegated to customer.service) ─────────────────────────────
+
   async getCustomerStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-
-      const customer = await Customer.findOne({
-        where: {
-          id,
-          isDeleted: false
-        }
-      }) as any;
-
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
-
-      // Get sales statistics
-      const salesStats = await Sale.findAll({
-        where: { customer_id: id },
-        attributes: [
-          [sequelize.fn('COUNT', sequelize.col('id')), 'totalSales'],
-          [sequelize.fn('SUM', sequelize.col('total')), 'totalAmount'],
-          [sequelize.fn('AVG', sequelize.col('total')), 'averageAmount']
-        ],
-        raw: true
-      }) as any[];
-
-      // Get recent sales
-      const recentSales = await Sale.findAll({
-        where: { customer_id: id },
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'payment_status'],
-        order: [['sale_date', 'DESC']],
-        limit: 5
-      }) as any[];
-
-      // Get payment summary
-      const paymentSummary = await Sale.findAll({
-        where: { customer_id: id },
-        attributes: [
-          'payment_status',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('total')), 'amount']
-        ],
-        group: ['payment_status'],
-        raw: true
-      }) as any[];
-
-      const stats = salesStats[0];
-
-      res.json({
-        data: {
-          customer: {
-            id: customer.id,
-            code: customer.code,
-            name: customer.getFullName()
-          },
-          sales: {
-            total: parseInt(stats.totalSales) || 0,
-            totalAmount: parseFloat(stats.totalAmount) || 0,
-            averageAmount: parseFloat(stats.averageAmount) || 0
-          },
-          paymentSummary: paymentSummary.map(p => ({
-            status: p.payment_status,
-            count: parseInt(p.count),
-            amount: parseFloat(p.amount)
-          })),
-          recentSales: recentSales.map(s => ({
-            ...s.toJSON(),
-            total: parseFloat(s.total)
-          }))
-        }
-      });
+      const data = await getCustomerStats(req.params.id);
+      if (!data) return res.status(404).json({ message: 'Cliente no encontrado' });
+      res.json({ data });
     } catch (error) {
       next(error);
     }
   }
 
-  // Get customers with overdue credit balances
   async getOverdueCustomers(req: Request, res: Response, next: NextFunction) {
     try {
-      const today = new Date();
-
-      // Find credit sales that are past due (sale_date + creditDays < today)
-      const overdueSales = await Sale.findAll({
-        where: {
-          sale_type: 'credit',
-          payment_status: { [Op.in]: ['pending', 'partial'] }
-        } as any,
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'customer_id', 'payment_status'],
-        include: [
-          {
-            model: Customer,
-            as: 'customer',
-            attributes: ['id', 'code', 'first_name', 'last_name', 'business_name', 'type', 'phone', 'mobile', 'credit_days', 'credit_limit', 'credit_used'],
-            where: { isDeleted: false }
-          },
-          {
-            model: SalePayment,
-            as: 'payments',
-            attributes: ['amount'],
-            required: false
-          }
-        ]
-      }) as any[];
-
-      // Filter and calculate overdue
-      const overdueList = overdueSales
-        .map(sale => {
-          const customer = sale.customer;
-          const creditDays = customer?.credit_days || 0;
-          const dueDate = new Date(sale.sale_date);
-          dueDate.setDate(dueDate.getDate() + creditDays);
-
-          const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-          const paid = (sale.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
-          const balance = parseFloat(sale.total) - paid;
-
-          return { sale, customer, dueDate, daysOverdue, balance };
-        })
-        .filter(item => item.daysOverdue > 0 && item.balance > 0)
-        .sort((a, b) => b.daysOverdue - a.daysOverdue);
-
-      res.json({
-        data: overdueList.map(item => ({
-          customer: {
-            id: item.customer.id,
-            code: item.customer.code,
-            name: item.customer.getFullName ? item.customer.getFullName() : (item.customer.businessName || `${item.customer.firstName} ${item.customer.lastName}`),
-            phone: item.customer.phone || item.customer.mobile
-          },
-          sale: {
-            id: item.sale.id,
-            sale_number: item.sale.sale_number,
-            sale_date: item.sale.sale_date,
-            total: parseFloat(item.sale.total),
-            balance: item.balance,
-            due_date: item.dueDate,
-            days_overdue: item.daysOverdue
-          },
-          aging_bucket: item.daysOverdue <= 30 ? '0-30' : item.daysOverdue <= 60 ? '31-60' : item.daysOverdue <= 90 ? '61-90' : '+90'
-        }))
-      });
+      const data = await getOverdueCustomers();
+      res.json({ data });
     } catch (error) {
       next(error);
     }
   }
 
-  // Get unified statement (ledger) for a single customer
   async getStatement(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-
-      const customer = await Customer.findOne({
-        where: { id, isDeleted: false }
-      }) as any;
-
-      if (!customer) {
-        return res.status(404).json({ message: 'Cliente no encontrado' });
-      }
-
-      // 1. Fetch Sales (Debts/Invoices) - Excluding cancelled ones
-      const sales = await Sale.findAll({
-        where: {
-          customer_id: id,
-          status: { [Op.notIn]: ['cancelled'] },
-          sale_type: 'credit' // Usually we only care about credit sales for statements, or all sales? Let's include all to be thorough, but distinguish cash vs credit.
-        },
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status']
-      }) as any[];
-
-      // 2. Fetch Payments (Credits/Assets) — only for credit sales
-      const payments = await SalePayment.findAll({
-        include: [{
-          model: Sale,
-          as: 'sale',
-          where: { customer_id: id, sale_type: 'credit' },
-          attributes: ['id', 'sale_number', 'exchange_rate']
-        }],
-        attributes: ['id', 'payment_date', 'payment_method', 'amount', 'currency', 'exchange_rate', 'reference']
-      }) as any[];
-
-      // 3. Fetch Credit Notes (Refunds/Assets)
-      let creditNotes = [];
-      try {
-        if (CreditNote) {
-          creditNotes = await CreditNote.findAll({
-            where: {
-              customer_id: id,
-              status: { [Op.in]: ['approved', 'applied'] }
-            },
-            attributes: ['id', 'credit_note_number', 'credit_note_date', 'total', 'refund_method', 'type', 'exchange_rate', 'sale_id'],
-            include: [{
-              model: Sale,
-              as: 'sale',
-              attributes: ['exchange_rate'],
-              required: false
-            }]
-          }) as any[];
-        }
-      } catch (e) { /* ignore if CreditNote is not fully migrated visually yet */ }
-
-      // Build credit-note totals per sale_id so sale rows can show net debt
-      const cnBySaleId = {};
-      for (const note of creditNotes) {
-        const saleId = note.sale_id;
-        if (!saleId) continue;
-        const noteUSD = parseFloat(note.total || 0);
-        const noteRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
-        if (!cnBySaleId[saleId]) cnBySaleId[saleId] = { usd: 0, cop: 0, notes: [] };
-        cnBySaleId[saleId].usd += noteUSD;
-        cnBySaleId[saleId].cop += Math.round(noteUSD * noteRate);
-        cnBySaleId[saleId].notes.push({
-          id: note.id,
-          number: note.credit_note_number,
-          date: note.credit_note_date,
-          total_usd: noteUSD,
-          total_cop: Math.round(noteUSD * noteRate),
-          refund_method: note.refund_method
-        });
-      }
-
-      // Unify data into Ledger
-      const ledger = [];
-      const summary = {};
-
-      const allSales = sales; // solo ventas a crédito generan cuentas por cobrar
-
-      // Process Sales (Charges)
-      for (const sale of allSales) {
-        const amountOrig = parseFloat(sale.total || 0);
-        const saleCurrency = 'USD'; // Assuming sales totals are in USD in database (common pattern in this app)
-        const rate = parseFloat(sale.exchange_rate || 1);
-
-        const amtUSD = amountOrig; // If total is USD
-        const amtCOP = amountOrig * rate;
-
-        const cnData = cnBySaleId[sale.id] || { usd: 0, cop: 0, notes: [] };
-        const saleJson = sale.toJSON ? sale.toJSON() : sale;
-        const enrichedSale = {
-          ...saleJson,
-          cn_amount_usd: cnData.usd,
-          cn_amount_cop: cnData.cop,
-          applied_credit_notes: cnData.notes
-        };
-
-        // Record in USD
-        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) };
-        if (sale.sale_type === 'credit') summary['USD'].total_invoiced += amtUSD;
-        ledger.push({
-          id: `sale_${sale.id}_usd`,
-          type: 'charge',
-          date: new Date(sale.sale_date),
-          reference: sale.sale_number,
-          amount: amtUSD,
-          currency: 'USD',
-          description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
-          original_amount: amountOrig,
-          original_currency: saleCurrency,
-          original_data: enrichedSale
-        });
-
-        // Record in COP
-        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
-        if (sale.sale_type === 'credit') summary['COP'].total_invoiced += amtCOP;
-        ledger.push({
-          id: `sale_${sale.id}_cop`,
-          type: 'charge',
-          date: new Date(sale.sale_date),
-          reference: sale.sale_number,
-          amount: amtCOP,
-          currency: 'COP',
-          description: `Venta ${sale.sale_type === 'cash' ? '(Contado)' : '(Crédito)'}`,
-          original_amount: amountOrig,
-          original_currency: saleCurrency,
-          original_data: enrichedSale
-        });
-      }
-
-      // Process Payments (Credits)
-      for (const pay of payments) {
-        const payCurrency = pay.currency || 'USD';
-        const amountOrig = parseFloat(pay.amount || 0);
-        // Use payment's own exchange_rate; if it's 1 (legacy USD records stored with rate=1), fall back to the sale's rate
-        const rate = parseFloat(
-          (pay.exchange_rate && parseFloat(pay.exchange_rate) !== 1) ? pay.exchange_rate : (pay.sale?.exchange_rate || 1)
-        );
-
-        let amtUSD, amtCOP;
-        if (payCurrency === 'USD') {
-          amtUSD = amountOrig;
-          amtCOP = amountOrig * rate;
-        } else if (payCurrency === 'COP') {
-          amtCOP = amountOrig;
-          amtUSD = amountOrig / rate;
-        } else {
-          amtUSD = amountOrig; // Simplified
-          amtCOP = amountOrig * rate;
-        }
-
-        // Record in USD
-        if (!summary['USD']) summary['USD'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 };
-        summary['USD'].total_paid += amtUSD;
-        ledger.push({
-          id: `pay_${pay.id}_usd`,
-          type: pay.payment_method === 'credit_balance' ? 'internal_transfer' : 'payment',
-          date: new Date(pay.payment_date),
-          reference: `PAGO-${pay.id}`,
-          amount: amtUSD,
-          currency: 'USD',
-          description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
-          isInternal: pay.payment_method === 'credit_balance',
-          original_amount: amountOrig,
-          original_currency: payCurrency,
-          original_data: pay
-        });
-
-        // Record in COP
-        if (!summary['COP']) summary['COP'] = { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: parseFloat(customer.creditBalance || 0) * rate };
-        summary['COP'].total_paid += amtCOP;
-        ledger.push({
-          id: `pay_${pay.id}_cop`,
-          type: pay.payment_method === 'credit_balance' ? 'internal_transfer' : 'payment',
-          date: new Date(pay.payment_date),
-          reference: `PAGO-${pay.id}`,
-          amount: amtCOP,
-          currency: 'COP',
-          description: `Abono a Venta ${pay.sale?.sale_number} (${pay.payment_method})`,
-          isInternal: pay.payment_method === 'credit_balance',
-          original_amount: amountOrig,
-          original_currency: payCurrency,
-          original_data: pay
-        });
-      }
-
-      // Process Credit Notes (Credits)
-      for (const note of creditNotes) {
-        const amountUSD = parseFloat(note.total || 0);
-        const rate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
-        const amountCOP = Math.round(amountUSD * rate);
-
-        ledger.push({
-          id: `cn_${note.id}_usd`,
-          type: 'credit',
-          date: new Date(note.credit_note_date),
-          reference: note.credit_note_number,
-          amount: amountUSD,
-          currency: 'USD',
-          description: `Nota de Crédito (${note.refund_method})`,
-          isInternal: false,
-          original_data: note
-        });
-
-        ledger.push({
-          id: `cn_${note.id}_cop`,
-          type: 'credit',
-          date: new Date(note.credit_note_date),
-          reference: note.credit_note_number,
-          amount: amountCOP,
-          currency: 'COP',
-          description: `Nota de Crédito (${note.refund_method})`,
-          isInternal: false,
-          original_data: note
-        });
-      }
-
-      // Calculate Final Balances — per-sale para evitar double-counting con available_credit
-      // balance = suma de pendientes reales por venta (total - paid_amount - CN aplicadas)
-      let truePendingUSD = 0;
-      let truePendingCOP = 0;
-      for (const sale of sales) {
-        const totalUSD = parseFloat(sale.total || 0);
-        const paidUSD = parseFloat(sale.paid_amount || 0);
-        const cnUSD = cnBySaleId[sale.id]?.usd || 0;
-        const rate = parseFloat(sale.exchange_rate || 1);
-        const pendingUSD = Math.max(0, totalUSD - paidUSD - cnUSD);
-        truePendingUSD += pendingUSD;
-        truePendingCOP += pendingUSD * rate;
-      }
-      if (summary['USD']) summary['USD'].balance = truePendingUSD;
-      if (summary['COP']) summary['COP'].balance = Math.round(truePendingCOP);
-
-      // Calculate saldo a favor (two-step approach):
-      // Step 1: Compute overpayment from credit sales with REAL (non-credit_balance) payments
-      const realPaymentsBySale = {};
-      for (const pay of payments) {
-        if (pay.payment_method === 'credit_balance') continue;
-        const saleId = pay.sale?.id;
-        if (!saleId) continue;
-        if (!realPaymentsBySale[saleId]) realPaymentsBySale[saleId] = [];
-        realPaymentsBySale[saleId].push(pay);
-      }
-      let totalRealPaidCOP = 0;
-      let totalInvoicedForReallyPaidCOP = 0;
-      for (const sale of sales) {
-        const saleRate = parseFloat(sale.exchange_rate || 1);
-        const saleRealPays = realPaymentsBySale[sale.id] || [];
-        if (saleRealPays.length === 0) continue;
-        const paidCOP = saleRealPays.reduce((sum, p) => {
-          if (p.currency === 'COP') return sum + parseFloat(p.amount);
-          const payRate = parseFloat(p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : saleRate);
-          return sum + parseFloat(p.amount) * payRate;
-        }, 0);
-        totalInvoicedForReallyPaidCOP += parseFloat(sale.total) * saleRate;
-        totalRealPaidCOP += paidCOP;
-      }
-      const overpaymentCOP = Math.max(0, totalRealPaidCOP - totalInvoicedForReallyPaidCOP);
-
-      // Step 2: Subtract ALL credit_balance payments already used (any sale type)
-      const allCBPayments = await SalePayment.findAll({
-        include: [{
-          model: Sale,
-          as: 'sale',
-          where: { customer_id: id },
-          attributes: ['id', 'exchange_rate']
-        }],
-        where: { payment_method: 'credit_balance' },
-        attributes: ['amount', 'currency', 'exchange_rate']
-      }) as any[];
-      let creditBalanceUsedCOP = 0;
-      for (const p of allCBPayments) {
-        const rate = parseFloat((p.exchange_rate && parseFloat(p.exchange_rate) !== 1 ? p.exchange_rate : p.sale?.exchange_rate) || 1);
-        creditBalanceUsedCOP += p.currency === 'COP' ? parseFloat(p.amount) : parseFloat(p.amount) * rate;
-      }
-      // Step 3: Add credit notes with credit_balance refund method (devolutions credited to wallet)
-      let creditNotesCreditBalanceCOP = 0;
-      for (const note of creditNotes) {
-        if (note.refund_method === 'credit_balance') {
-          const noteUSD = parseFloat(note.total || 0);
-          // Prefer exchange_rate stored on the note (precise); fall back to sale's rate
-          const noteRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
-          creditNotesCreditBalanceCOP += Math.round(noteUSD * noteRate);
-        }
-      }
-
-      const availableCreditCOP = Math.max(0, overpaymentCOP + creditNotesCreditBalanceCOP - creditBalanceUsedCOP);
-
-      if (summary['COP']) summary['COP'].available_credit = Math.round(availableCreditCOP);
-      if (summary['USD']) summary['USD'].available_credit = 0;
-
-      // Sort Ledger chronologically
-      ledger.sort((a, b) => a.date - b.date);
-
-      res.json({
-        data: {
-          customer: {
-            id: customer.id,
-            name: customer.getFullName ? customer.getFullName() : customer.firstName + ' ' + customer.lastName,
-            documentNumber: customer.documentNumber,
-            credit_limit: parseFloat(customer.credit_limit || 0),
-            credit_used: parseFloat(customer.credit_used || 0)
-          },
-          summary: summary,
-          ledger: ledger
-        }
-      });
-
+      const result = await getCustomerStatement(req.params.id);
+      if (!result) return res.status(404).json({ message: 'Cliente no encontrado' });
+      res.json({ data: result });
     } catch (error) {
       next(error);
     }
   }
 
-  // Get customer credit balance (overpayment / saldo a favor)
-  // Calculated in original COP amounts to avoid exchange rate drift
   async getCreditBalance(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-
-      const sales = await Sale.findAll({
-        where: { customer_id: id, sale_type: 'credit', status: { [Op.notIn]: ['cancelled'] } },
-        attributes: ['id', 'total', 'exchange_rate'],
-        include: [{ model: SalePayment, as: 'payments', attributes: ['amount', 'currency', 'exchange_rate', 'payment_method'] }]
-      }) as any[];
-
-      // Aggregate approach: credit = total_paid - total_invoiced
-      // Only include sales that have at least one payment (exclude pure pending/untouched)
-      // Exclude credit_balance payments to avoid double-counting (they come from prior overpayments)
-      let totalInvoicedCOP = 0;
-      let totalPaidCOP = 0;
-      for (const s of sales) {
-        const saleRate = parseFloat(s.exchange_rate || 1);
-        const realPayments = (s.payments || []).filter(p => p.payment_method !== 'credit_balance');
-        const hasPaid = (s.payments || []).length > 0; // include sales paid via credit_balance
-        const paidCOP = realPayments.reduce((pSum, p) => {
-          if (p.currency === 'COP') return pSum + parseFloat(p.amount);
-          return pSum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);
-        }, 0);
-        // Include in invoiced if: sale has payments OR is the one being checked (completed/partial)
-        if (hasPaid) {
-          totalInvoicedCOP += parseFloat(s.total) * saleRate;
-          totalPaidCOP += paidCOP;
-        }
-      }
-      const creditBalanceCOP = Math.max(0, totalPaidCOP - totalInvoicedCOP);
-
-      res.json({
-        credit_balance_cop: Math.round(creditBalanceCOP),
-        credit_balance_usd: 0 // not used, kept for compatibility
-      });
+      const result = await getCustomerCreditBalance(req.params.id);
+      res.json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  // Get purchase history for a specific customer
   async getCustomerPurchases(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const {
-        date_from,
-        date_to
-      } = req.query as Record<string, string>;
+      const { date_from, date_to } = req.query as Record<string, string>;
 
-      const customer = await Customer.findOne({
-        where: { id, isDeleted: false },
-        attributes: ['id']
-      }) as any;
-
-      if (!customer) {
-        return res.status(404).json({
-          message: 'Cliente no encontrado'
-        });
-      }
+      const customer = await Customer.findByPk(id, { attributes: ['id'] }) as any;
+      if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
       const now = new Date();
       const dateFrom = date_from ? new Date(date_from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
       const dateTo = date_to ? new Date(date_to) : now;
 
-      const sales = await Sale.findAll({
-        where: {
-          customer_id: id,
-          status: { [Op.ne]: 'cancelled' },
-          sale_date: { [Op.between]: [dateFrom, dateTo] }
-        },
-        include: [
-          {
-            model: SaleDetail,
-            as: 'details',
-            attributes: ['product_id', 'quantity', 'unit_price', 'total', 'is_unit'],
-            include: [
-              {
-                model: Product,
-                as: 'product',
-                attributes: ['id', 'name']
-              },
-              {
-                model: ProductPresentation,
-                as: 'presentation',
-                attributes: ['id', 'units_per_package']
-              }
-            ]
-          }
-        ],
-        order: [['sale_date', 'DESC']]
-      }) as any[];
-
-      const data = sales.map(sale => ({
-        sale_id: sale.id,
-        date: sale.sale_date,
-        total_usd: parseFloat(sale.total),
-        total_cop: sale.currency_mode === 'COP'
-          ? Math.round(parseFloat(sale.total))
-          : Math.round(parseFloat(sale.total) * parseFloat(sale.exchange_rate)),
-        payment_type: sale.sale_type,
-        items: (sale.details || []).map(d => {
-          const qty = parseFloat(d.quantity);
-          const upp = d.presentation ? parseInt(d.presentation.units_per_package) || 1 : 1;
-          const normalizedQty = d.is_unit ? qty : qty * upp;
-          return {
-            product_id: d.product_id,
-            product_name: d.product ? d.product.name : null,
-            quantity: normalizedQty,
-            units_per_package: upp,
-            unit_price: parseFloat(d.unit_price),
-            total: parseFloat(d.total)
-          };
-        })
-      }));
-
+      const data = await getCustomerPurchases(id, dateFrom, dateTo);
       res.json({ data });
     } catch (error) {
       next(error);
     }
   }
 
-  // Get customer activity summary
   async getCustomerActivity(req: Request, res: Response, next: NextFunction) {
     try {
-      const {
-        days = '90',
-        min_purchases = '1'
-      } = req.query as Record<string, string>;
-
-      const daysInt = parseInt(days);
-      const minPurchases = parseInt(min_purchases);
-      const dateFrom = new Date(Date.now() - daysInt * 24 * 60 * 60 * 1000);
-
-      const results = await sequelize.query(`
-        SELECT
-          c.id AS customer_id,
-          COALESCE(c.business_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name,
-          COALESCE(c.phone, c.mobile) AS customer_phone,
-          COUNT(s.id) AS total_purchases,
-          ROUND(SUM(s.total), 2) AS total_spent_usd,
-          MIN(DATE(s.sale_date)) AS first_purchase,
-          MAX(DATE(s.sale_date)) AS last_purchase,
-          CASE
-            WHEN COUNT(s.id) > 1
-            THEN ROUND(DATEDIFF(MAX(s.sale_date), MIN(s.sale_date)) / (COUNT(s.id) - 1), 1)
-            ELSE NULL
-          END AS avg_days_between_purchases
-        FROM customers c
-        INNER JOIN sales s ON s.customer_id = c.id
-        WHERE s.status != 'cancelled'
-          AND s.deleted_at IS NULL
-          AND s.sale_date >= :dateFrom
-          AND c.is_deleted = 0
-        GROUP BY c.id
-        HAVING total_purchases >= :minPurchases
-        ORDER BY total_purchases DESC
-      `, {
-        replacements: { dateFrom, minPurchases },
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      const data = results.map(r => ({
-        customer_id: r.customer_id,
-        customer_name: r.customer_name,
-        customer_phone: r.customer_phone,
-        total_purchases: parseInt(r.total_purchases),
-        total_spent_usd: parseFloat(r.total_spent_usd),
-        first_purchase: r.first_purchase,
-        last_purchase: r.last_purchase,
-        avg_days_between_purchases: r.avg_days_between_purchases ? parseFloat(r.avg_days_between_purchases) : null
-      }));
-
+      const { days = '90', min_purchases = '1' } = req.query as Record<string, string>;
+      const data = await getCustomerActivity(parseInt(days), parseInt(min_purchases));
       res.json({ data });
     } catch (error) {
       next(error);
     }
   }
-
 }
 
 export = new CustomerController();

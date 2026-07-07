@@ -4,37 +4,37 @@ import { sequelize } from '../config/database';
 interface QuoteAttributes {
   id: number;
   code: string;
-  customerId: number;
-  priceListId: number | null;
-  userId: number;
-  quoteDate: Date;
-  validUntil: Date;
+  customer_id: number;
+  price_list_id: number | null;
+  user_id: number;
+  quote_date: Date;
+  valid_until: Date;
   status: 'draft' | 'sent' | 'approved' | 'rejected' | 'converted' | 'expired';
   currency: 'USD' | 'COP' | 'VES';
-  exchangeRate: number;
+  exchange_rate: number;
   subtotal: number;
-  discountPercentage: number;
-  discountAmount: number;
-  taxPercentage: number;
-  taxAmount: number;
+  discount_percentage: number;
+  discount_amount: number;
+  tax_percentage: number;
+  tax_amount: number;
   total: number;
-  paymentTerms: string | null;
-  deliveryTerms: string | null;
+  payment_terms: string | null;
+  delivery_terms: string | null;
   notes: string | null;
-  internalNotes: string | null;
-  convertedToSaleId: number | null;
-  convertedAt: Date | null;
-  isDeleted: boolean;
+  internal_notes: string | null;
+  converted_to_sale_id: number | null;
+  converted_at: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  deletedAt?: Date | null;
 }
 
 interface QuoteCreationAttributes extends Optional<
   QuoteAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'priceListId' | 'quoteDate' | 'status' | 'currency' |
-  'exchangeRate' | 'subtotal' | 'discountPercentage' | 'discountAmount' | 'taxPercentage' |
-  'taxAmount' | 'total' | 'paymentTerms' | 'deliveryTerms' | 'notes' | 'internalNotes' |
-  'convertedToSaleId' | 'convertedAt' | 'isDeleted'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'price_list_id' | 'quote_date' | 'status' | 'currency' |
+  'exchange_rate' | 'subtotal' | 'discount_percentage' | 'discount_amount' | 'tax_percentage' |
+  'tax_amount' | 'total' | 'payment_terms' | 'delivery_terms' | 'notes' | 'internal_notes' |
+  'converted_to_sale_id' | 'converted_at'
 > {}
 
 const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
@@ -51,28 +51,28 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
       allowNull: false,
       comment: 'Código único de la cotización (ej: COT-2025-0001)'
     },
-    customerId: {
+    customer_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID del cliente'
     },
-    priceListId: {
+    price_list_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'ID de la lista de precios utilizada'
     },
-    userId: {
+    user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID del usuario que creó la cotización'
     },
-    quoteDate: {
+    quote_date: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
       comment: 'Fecha de emisión de la cotización'
     },
-    validUntil: {
+    valid_until: {
       type: DataTypes.DATE,
       allowNull: false,
       comment: 'Fecha de vencimiento de la cotización'
@@ -89,7 +89,7 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
       defaultValue: 'USD',
       comment: 'Moneda de la cotización'
     },
-    exchangeRate: {
+    exchange_rate: {
       type: DataTypes.DECIMAL(12, 4),
       allowNull: false,
       defaultValue: 1,
@@ -101,25 +101,25 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
       defaultValue: 0,
       comment: 'Subtotal sin impuestos ni descuentos'
     },
-    discountPercentage: {
+    discount_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Porcentaje de descuento general'
     },
-    discountAmount: {
+    discount_amount: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Monto del descuento'
     },
-    taxPercentage: {
+    tax_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 18,
       comment: 'Porcentaje de impuesto (IVA)'
     },
-    taxAmount: {
+    tax_amount: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
@@ -131,12 +131,12 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
       defaultValue: 0,
       comment: 'Total final de la cotización'
     },
-    paymentTerms: {
+    payment_terms: {
       type: DataTypes.STRING(200),
       allowNull: true,
       comment: 'Términos de pago'
     },
-    deliveryTerms: {
+    delivery_terms: {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Términos de entrega'
@@ -146,32 +146,27 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
       allowNull: true,
       comment: 'Notas adicionales'
     },
-    internalNotes: {
+    internal_notes: {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Notas internas (no visibles para el cliente)'
     },
-    convertedToSaleId: {
+    converted_to_sale_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'ID de la venta si fue convertida'
     },
-    convertedAt: {
+    converted_at: {
       type: DataTypes.DATE,
       allowNull: true,
       comment: 'Fecha de conversión a venta'
     },
-    isDeleted: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    }
   },
   {
     tableName: 'quotes',
     timestamps: true,
     underscored: true,
-    paranoid: false,
+    paranoid: true,
     indexes: [
       {
         fields: ['code']
@@ -205,24 +200,24 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
         }
 
         // Calcular fecha de vencimiento por defecto (15 días)
-        if (!quote.validUntil) {
-          const validUntil = new Date(quote.quoteDate || new Date());
+        if (!quote.valid_until) {
+          const validUntil = new Date(quote.quote_date || new Date());
           validUntil.setDate(validUntil.getDate() + 15);
-          quote.validUntil = validUntil;
+          quote.valid_until = validUntil;
         }
       },
       beforeSave: (quote: any) => {
         // Calcular descuento
-        if (quote.discountPercentage > 0) {
-          quote.discountAmount = (quote.subtotal * quote.discountPercentage) / 100;
+        if (quote.discount_percentage > 0) {
+          quote.discount_amount = (quote.subtotal * quote.discount_percentage) / 100;
         }
 
         // Calcular impuesto
-        const baseAmount = quote.subtotal - quote.discountAmount;
-        quote.taxAmount = (baseAmount * quote.taxPercentage) / 100;
+        const baseAmount = quote.subtotal - quote.discount_amount;
+        quote.tax_amount = (baseAmount * quote.tax_percentage) / 100;
 
         // Calcular total
-        quote.total = baseAmount + quote.taxAmount;
+        quote.total = baseAmount + quote.tax_amount;
       }
     }
   }
@@ -232,7 +227,7 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
 (Quote as any).prototype.isExpired = function() {
   return this.status !== 'converted' &&
          this.status !== 'rejected' &&
-         new Date() > new Date(this.validUntil);
+         new Date() > new Date(this.valid_until);
 };
 
 // Método para verificar si puede ser editada
@@ -248,7 +243,6 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
 // Personalizar JSON
 (Quote as any).prototype.toJSON = function() {
   const values = { ...this.get() };
-  delete values.isDeleted;
   return values;
 };
 

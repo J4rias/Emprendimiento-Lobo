@@ -42,7 +42,8 @@ const Role = sequelize.define<Model<RoleAttributes, RoleCreationAttributes>>(
   },
   {
     tableName: 'roles',
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   }
 );
 

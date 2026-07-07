@@ -151,7 +151,7 @@ export const getSales = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'documentNumber']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'document_number']
         },
         {
           model: Warehouse,
@@ -605,7 +605,7 @@ export const getDailySeries = async (req: Request, res: Response) => {
         FROM sales s
         WHERE s.status IN ('completed', 'pending')
           AND s.deleted_at IS NULL
-          AND DATE(s.sale_date) BETWEEN :dateFrom AND :dateTo
+          AND s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)
         GROUP BY DATE(s.sale_date)
       ) ds
       LEFT JOIN (
@@ -620,7 +620,7 @@ export const getDailySeries = async (req: Request, res: Response) => {
         INNER JOIN sales s ON s.id = sd.sale_id
           AND s.status IN ('completed', 'pending')
           AND s.deleted_at IS NULL
-          AND DATE(s.sale_date) BETWEEN :dateFrom AND :dateTo
+          AND s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)
         GROUP BY DATE(s.sale_date)
       ) dc ON dc.date = ds.date
       ORDER BY ds.date ASC
@@ -962,7 +962,7 @@ export const getSalesSummary = async (req: Request, res: Response) => {
 
     const replacements = { dateFrom, dateTo };
     const statusFilter = "s.status IN ('completed','pending')";
-    const dateFilter = "DATE(s.sale_date) >= :dateFrom AND DATE(s.sale_date) <= :dateTo";
+    const dateFilter = "s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)";
 
     // --- Summary + sales_by_type ---
     const [summaryRow] = await sequelize.query(`

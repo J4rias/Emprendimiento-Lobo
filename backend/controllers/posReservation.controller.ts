@@ -304,7 +304,7 @@ export const getAll = async (req: Request, res: Response, next: NextFunction) =>
     }) as any[];
 
     // Agrupar por product_id para devolver el total reservado por producto
-    const byProduct = {};
+    const byProduct: any = {};
     reservations.forEach(r => {
       if (!byProduct[r.product_id]) {
         byProduct[r.product_id] = 0;

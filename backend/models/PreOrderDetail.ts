@@ -3,12 +3,12 @@ import { sequelize } from '../config/database';
 
 interface PreOrderDetailAttributes {
   id: number;
-  preOrderId: number;
-  productId: number;
-  presentationId: number;
+  pre_order_id: number;
+  product_id: number;
+  presentation_id: number;
   quantity: number; // DECIMAL(10, 2) → number
-  isUnit: boolean;
-  unitPrice: number; // DECIMAL(18, 2) → number
+  is_unit: boolean;
+  unit_price: number; // DECIMAL(18, 2) → number
   total: number; // DECIMAL(18, 2) → number
   notes: string | null; // allowNull: true → T | null
   createdAt?: Date;
@@ -17,7 +17,7 @@ interface PreOrderDetailAttributes {
 
 interface PreOrderDetailCreationAttributes extends Optional<
   PreOrderDetailAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'isUnit'
+  'id' | 'createdAt' | 'updatedAt' | 'is_unit'
 > {}
 
 const PreOrderDetail = sequelize.define<Model<PreOrderDetailAttributes, PreOrderDetailCreationAttributes>>(
@@ -28,15 +28,15 @@ const PreOrderDetail = sequelize.define<Model<PreOrderDetailAttributes, PreOrder
       primaryKey: true,
       autoIncrement: true
     },
-    preOrderId: {
+    pre_order_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    productId: {
+    product_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    presentationId: {
+    presentation_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
@@ -44,12 +44,12 @@ const PreOrderDetail = sequelize.define<Model<PreOrderDetailAttributes, PreOrder
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false
     },
-    isUnit: {
+    is_unit: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false
     },
-    unitPrice: {
+    unit_price: {
       type: DataTypes.DECIMAL(18, 2),
       allowNull: false
     },
@@ -68,7 +68,7 @@ const PreOrderDetail = sequelize.define<Model<PreOrderDetailAttributes, PreOrder
     underscored: true,
     hooks: {
       beforeSave: (detail: any) => {
-        detail.total = detail.quantity * detail.unitPrice;
+        detail.total = detail.quantity * detail.unit_price;
       }
     }
   }

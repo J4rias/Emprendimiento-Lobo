@@ -53,7 +53,7 @@ export async function getProductsWithStock() {
 
 export async function exportPriceListCSV(priceListId: string | number): Promise<{ csv: string; filename: string } | null> {
   const priceList = await PriceList.findOne({
-    where: { id: priceListId, isDeleted: false },
+    where: { id: priceListId },
     include: [{
       model: PriceListDetail, as: 'details',
       include: [

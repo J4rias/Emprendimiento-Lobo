@@ -85,6 +85,7 @@ const ExchangeRate = sequelize.define<Model<ExchangeRateAttributes, ExchangeRate
     tableName: 'exchange_rates',
     timestamps: true,
     underscored: true,
+    paranoid: true,
     indexes: [
       {
         unique: true,

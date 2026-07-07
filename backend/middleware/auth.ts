@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import { auditStorage } from './auditContext';
 const { jwt: jwtConfig } = require('../config/auth');
 const { User, Role } = require('../models');
 
@@ -38,7 +39,7 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
         },
       };
       (req as any).userId = 0;
-      return next();
+      return auditStorage.run({ userId: 0, ip: req.ip || '' }, next);
     }
 
     // Get token from header
@@ -82,7 +83,7 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     (req as any).user = user;
     (req as any).userId = (user as any).id;
 
-    next();
+    auditStorage.run({ userId: (user as any).id, ip: req.ip || '' }, next);
   } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
       res.status(401).json({ message: 'Invalid token.' });

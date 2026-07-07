@@ -113,6 +113,7 @@ const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
   {
     tableName: 'users',
     timestamps: true,
+    paranoid: true,
     hooks: {
       beforeCreate: async (user: any) => {
         if (user.password) {
@@ -128,7 +129,7 @@ const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
   }
 );
 
-(User.prototype as any).comparePassword = async function(password) {
+(User.prototype as any).comparePassword = async function(password: any) {
   return bcrypt.compare(password, this.password);
 };
 

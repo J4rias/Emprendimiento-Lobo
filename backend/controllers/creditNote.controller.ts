@@ -21,6 +21,7 @@ import User from '../models/User';
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const { getCreditNoteStats: _getCNStats } = require('../services/creditNote.service');
 
 /**
  * Generate unique credit note number
@@ -120,7 +121,7 @@ export const getAllCreditNotes = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'firstName', 'lastName', 'businessName', 'tradeName', 'type', 'documentType', 'documentNumber', 'email', 'phone']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'document_type', 'document_number', 'email', 'phone']
         },
         {
           model: Warehouse,
@@ -167,7 +168,7 @@ export const getAllCreditNotes = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    logger.error('Error fetching credit notes', { error: error.message });
+    logger.error('Error fetching credit notes', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });
@@ -192,7 +193,7 @@ export const getCreditNoteById = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'firstName', 'lastName', 'businessName', 'tradeName', 'type', 'email', 'phone', 'address']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'email', 'phone', 'address']
         },
         {
           model: Warehouse,
@@ -245,7 +246,7 @@ export const getCreditNoteById = async (req: Request, res: Response) => {
       data: creditNote
     });
   } catch (error) {
-    logger.error('Error fetching credit note', { error: error.message });
+    logger.error('Error fetching credit note', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });
@@ -325,7 +326,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
     const creditNoteDetails: any[] = [];
 
     for (const item of items) {
-      const saleDetail = sale.details.find(d => d.id === item.sale_detail_id);
+      const saleDetail = sale.details.find((d: any) => d.id === item.sale_detail_id);
 
       if (!saleDetail) {
         await transaction.rollback();
@@ -442,7 +443,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'email']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         },
         {
           model: CreditNoteDetail,
@@ -469,7 +470,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error creating credit note', { error: error.message });
+    logger.error('Error creating credit note', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });
@@ -563,7 +564,7 @@ export const approveCreditNote = async (req: Request, res: Response) => {
             product_id: detail.product_id,
             warehouse_id: creditNote.warehouse_id,
             quantity: 0
-          }, { transaction }) as any;
+          } as any, { transaction }) as any;
         }
 
         // Update inventory - ADD returned quantity
@@ -644,7 +645,7 @@ export const approveCreditNote = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'firstName', 'lastName', 'businessName', 'type', 'email']
+          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         },
         {
           model: User,
@@ -676,7 +677,7 @@ export const approveCreditNote = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error approving credit note', { error: error.message });
+    logger.error('Error approving credit note', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });
@@ -732,7 +733,7 @@ export const cancelCreditNote = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error cancelling credit note', { error: error.message });
+    logger.error('Error cancelling credit note', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });
@@ -746,63 +747,10 @@ export const cancelCreditNote = async (req: Request, res: Response) => {
 export const getCreditNoteStats = async (req: Request, res: Response) => {
   try {
     const { date_from, date_to } = req.query as Record<string, string>;
-
-    const where: any = {};
-
-    // Filter by date range
-    if (date_from || date_to) {
-      where.credit_note_date = {};
-      if (date_from) {
-        where.credit_note_date[Op.gte] = date_from;
-      }
-      if (date_to) {
-        where.credit_note_date[Op.lte] = date_to;
-      }
-    }
-
-    // Total credit notes
-    const totalCreditNotes = await CreditNote.count({ where });
-
-    // Credit notes by status
-    const creditNotesByStatus = await CreditNote.findAll({
-      where,
-      attributes: [
-        'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('total')), 'total_amount']
-      ],
-      group: ['status']
-    }) as any[];
-
-    // Credit notes by reason
-    const creditNotesByReason = await CreditNote.findAll({
-      where,
-      attributes: [
-        'reason',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('total')), 'total_amount']
-      ],
-      group: ['reason']
-    }) as any[];
-
-    // Total refunded amount
-    const totalRefunded = await CreditNote.sum('refund_amount', {
-      where: {
-        ...where,
-        status: 'applied'
-      }
-    });
-
-    res.json({
-      data: {
-        total_credit_notes: totalCreditNotes,
-        credit_notes_by_status: creditNotesByStatus,
-        credit_notes_by_reason: creditNotesByReason,
-        total_refunded: totalRefunded || 0
-      }
-    });
+    const data = await _getCNStats({ date_from, date_to });
+    res.json({ data });
   } catch (error) {
-    logger.error('Error fetching credit note stats', { error: error.message });
+    logger.error('Error fetching credit note stats', { error: (error as Error).message });
     res.status(500).json({
       message: 'Error interno del servidor'
     });

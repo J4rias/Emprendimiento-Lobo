@@ -4,22 +4,22 @@ import { sequelize } from '../config/database';
 interface PreOrderAttributes {
   id: number;
   code: string;
-  customerId: number | null;
-  customerName: string | null;
-  customerPhone: string | null;
+  customer_id: number | null;
+  customer_name: string | null;
+  customer_phone: string | null;
   channel: 'messenger' | 'telegram' | 'web';
   status: 'pending' | 'approved' | 'rejected' | 'converted' | 'expired';
   notes: string | null;
   subtotal: number;
   total: number;
   currency: string;
-  exchangeRate: number | null;
-  convertedSaleId: number | null;
-  approvedBy: number | null;
-  approvedAt: Date | null;
-  expiresAt: Date | null;
-  createdBy: number | null;
-  warehouseId: number;
+  exchange_rate: number | null;
+  converted_sale_id: number | null;
+  approved_by: number | null;
+  approved_at: Date | null;
+  expires_at: Date | null;
+  created_by: number | null;
+  warehouse_id: number;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date | null;
@@ -43,15 +43,15 @@ const PreOrder = sequelize.define<Model<PreOrderAttributes, PreOrderCreationAttr
       unique: true,
       allowNull: false
     },
-    customerId: {
+    customer_id: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    customerName: {
+    customer_name: {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    customerPhone: {
+    customer_phone: {
       type: DataTypes.STRING(50),
       allowNull: true
     },
@@ -84,31 +84,31 @@ const PreOrder = sequelize.define<Model<PreOrderAttributes, PreOrderCreationAttr
       allowNull: false,
       defaultValue: 'USD'
     },
-    exchangeRate: {
+    exchange_rate: {
       type: DataTypes.DECIMAL(18, 6),
       allowNull: true
     },
-    convertedSaleId: {
+    converted_sale_id: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    approvedBy: {
+    approved_by: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    approvedAt: {
+    approved_at: {
       type: DataTypes.DATE,
       allowNull: true
     },
-    expiresAt: {
+    expires_at: {
       type: DataTypes.DATE,
       allowNull: true
     },
-    createdBy: {
+    created_by: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    warehouseId: {
+    warehouse_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     }
@@ -147,10 +147,10 @@ const PreOrder = sequelize.define<Model<PreOrderAttributes, PreOrderCreationAttr
         }
 
         // Default expiration: 24 hours
-        if (!preOrder.expiresAt) {
+        if (!preOrder.expires_at) {
           const expires = new Date();
           expires.setHours(expires.getHours() + 24);
-          preOrder.expiresAt = expires;
+          preOrder.expires_at = expires;
         }
       }
     }

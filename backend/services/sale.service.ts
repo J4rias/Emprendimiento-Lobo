@@ -146,29 +146,68 @@ export async function createSale(
 
     const sale_number = await generateSaleNumber();
 
+    // Batch pre-fetch to eliminate N+1 queries in the item loop
+    const productIds = [...new Set<number>(items.map((i: any) => i.product_id))];
+    const presentationIds = [...new Set<number>(items.map((i: any) => i.presentation_id))];
+
+    const [productRows, presentationRows, inventoryRows] = await Promise.all([
+      Product.findAll({ where: { id: { [Op.in]: productIds } } }),
+      ProductPresentation.findAll({ where: { id: { [Op.in]: presentationIds } } }),
+      Inventory.findAll({
+        where: { product_id: { [Op.in]: productIds }, warehouse_id },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+    ]);
+
+    const productMap = new Map<number, any>((productRows as any[]).map((p: any) => [p.id, p]));
+    const presentationMap = new Map<number, any>((presentationRows as any[]).map((p: any) => [p.id, p]));
+    const inventoryMap = new Map<number, any>((inventoryRows as any[]).map((i: any) => [i.product_id, i]));
+
+    const reservationMap = new Map<number, number>();
+    if (session_id && tab_id) {
+      const reservRows = await (PosReservation as any).findAll({
+        attributes: [
+          'product_id',
+          [sequelize.fn('SUM', sequelize.col('units_reserved')), 'total']
+        ],
+        where: {
+          product_id: { [Op.in]: productIds },
+          expires_at: { [Op.gte]: new Date() },
+          [Op.or]: [
+            { session_id: { [Op.ne]: session_id } },
+            { tab_id: { [Op.ne]: tab_id } }
+          ]
+        },
+        group: ['product_id'],
+        raw: true,
+        transaction
+      }) as any[];
+      for (const row of reservRows) {
+        reservationMap.set(Number(row.product_id), Number(row.total) || 0);
+      }
+    }
+
     let subtotal = 0;
     let tax_amount = 0;
     const saleDetails: any[] = [];
+    const inventoryMovements: any[] = [];
     let vesUsdRate: number | null = null;
 
     for (const item of items) {
-      const product = await Product.findByPk(item.product_id) as any;
+      const product = productMap.get(item.product_id);
       if (!product) {
         await transaction.rollback();
         throw new ServiceError(404, `Producto ${item.product_id} no encontrado`);
       }
 
-      const presentation = await ProductPresentation.findByPk(item.presentation_id) as any;
+      const presentation = presentationMap.get(item.presentation_id);
       if (!presentation) {
         await transaction.rollback();
         throw new ServiceError(404, `Presentación ${item.presentation_id} no encontrada`);
       }
 
-      const inventory = await Inventory.findOne({
-        where: { product_id: item.product_id, warehouse_id },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      }) as any;
+      const inventory = inventoryMap.get(item.product_id);
 
       if (!inventory) {
         await transaction.rollback();
@@ -188,21 +227,8 @@ export async function createSale(
 
       const units_to_deduct = is_unit ? item.quantity : (item.quantity * (presentation.units_per_package || 1));
 
-      // Validate stock considering OTHER tabs' reservations only
-      let reserved_by_others = 0;
-      if (session_id && tab_id) {
-        reserved_by_others = await PosReservation.sum('units_reserved', {
-          where: {
-            product_id: item.product_id,
-            expires_at: { [Op.gte]: new Date() },
-            [Op.or]: [
-              { session_id: { [Op.ne]: session_id } },
-              { tab_id: { [Op.ne]: tab_id } }
-            ]
-          },
-          transaction
-        }) || 0;
-      }
+      // Validate stock considering OTHER tabs' reservations only (pre-fetched in batch above)
+      const reserved_by_others = reservationMap.get(item.product_id) ?? 0;
 
       const available = parseFloat(inventory.quantity) - Number(reserved_by_others);
 
@@ -228,7 +254,7 @@ export async function createSale(
             try { vesUsdRate = await (ExchangeRate as any).getRate('VES', 'USD'); }
             catch (e) { vesUsdRate = 0; }
           }
-          costPrice = vesUsdRate > 0 ? rawCost * vesUsdRate : null;
+          costPrice = vesUsdRate! > 0 ? rawCost * vesUsdRate! : null;
         } else {
           costPrice = rawCost;
         }
@@ -253,7 +279,7 @@ export async function createSale(
 
       await inventory.update({ quantity: parseFloat(inventory.quantity) - units_to_deduct }, { transaction });
 
-      await InventoryMovement.create({
+      inventoryMovements.push({
         product_id: item.product_id,
         warehouse_id,
         presentation_id: item.presentation_id,
@@ -265,7 +291,11 @@ export async function createSale(
         reason: `Venta ${sale_number}`,
         document_number: sale_number,
         user_id: userId
-      } as any, { transaction });
+      });
+    }
+
+    if (inventoryMovements.length > 0) {
+      await InventoryMovement.bulkCreate(inventoryMovements as any[], { transaction });
     }
 
     const total = subtotal - discount_amount + tax_amount;
@@ -326,33 +356,44 @@ export async function createSale(
         : null
     } as any, { transaction }) as any;
 
-    for (const detail of saleDetails) {
-      await SaleDetail.create({ sale_id: sale.id, ...detail } as any, { transaction });
+    if (saleDetails.length > 0) {
+      await SaleDetail.bulkCreate(
+        saleDetails.map((d: any) => ({ sale_id: sale.id, ...d })) as any[],
+        { transaction }
+      );
     }
 
     if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
-      for (const payLine of cashLines) {
-        if (parseFloat(payLine.amount) !== 0) {
-          await SalePayment.create({
-            sale_id: sale.id,
-            payment_date: new Date(),
-            payment_method: payLine.method || 'cash',
-            amount: payLine.amount,
-            currency: payLine.currency || 'USD',
-            exchange_rate: payLine.exchange_rate || 1,
-            reference: payLine.reference || null,
-            bank_id: payLine.bank_id || null,
-            created_by: userId
-          } as any, { transaction });
+      const paymentBatch: any[] = [];
+      let creditBalanceDeductionUSD = 0;
 
-          if (payLine.method === 'credit_balance' && customer_id) {
-            const customer = await Customer.findByPk(customer_id, { transaction }) as any;
-            if (customer) {
-              const amountUSD = parseFloat(payLine.amount) / (parseFloat(payLine.exchange_rate) || 1);
-              const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - amountUSD);
-              await customer.update({ creditBalance: newBalance }, { transaction });
-            }
-          }
+      for (const payLine of cashLines) {
+        if (parseFloat(payLine.amount) === 0) continue;
+        paymentBatch.push({
+          sale_id: sale.id,
+          payment_date: new Date(),
+          payment_method: payLine.method || 'cash',
+          amount: payLine.amount,
+          currency: payLine.currency || 'USD',
+          exchange_rate: payLine.exchange_rate || 1,
+          reference: payLine.reference || null,
+          bank_id: payLine.bank_id || null,
+          created_by: userId
+        });
+        if (payLine.method === 'credit_balance' && customer_id) {
+          creditBalanceDeductionUSD += parseFloat(payLine.amount) / (parseFloat(payLine.exchange_rate) || 1);
+        }
+      }
+
+      if (paymentBatch.length > 0) {
+        await SalePayment.bulkCreate(paymentBatch as any[], { transaction });
+      }
+
+      if (creditBalanceDeductionUSD > 0 && customer_id) {
+        const customer = await Customer.findByPk(customer_id, { transaction }) as any;
+        if (customer) {
+          const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - creditBalanceDeductionUSD);
+          await customer.update({ creditBalance: newBalance }, { transaction });
         }
       }
     }
@@ -416,12 +457,18 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
       throw new ServiceError(400, 'La venta ya está cancelada');
     }
 
+    // Batch pre-fetch inventories with row-level locks
+    const cancelProductIds = [...new Set<number>(sale.details.map((d: any) => d.product_id))];
+    const cancelInvRows = await Inventory.findAll({
+      where: { product_id: { [Op.in]: cancelProductIds }, warehouse_id: sale.warehouse_id },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    }) as any[];
+    const cancelInvMap = new Map<number, any>(cancelInvRows.map((i: any) => [i.product_id, i]));
+    const cancelMovements: any[] = [];
+
     for (const detail of sale.details) {
-      const inventory = await Inventory.findOne({
-        where: { product_id: detail.product_id, warehouse_id: sale.warehouse_id },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      }) as any;
+      const inventory = cancelInvMap.get(detail.product_id);
 
       if (inventory) {
         const units_to_return = detail.is_unit
@@ -433,7 +480,7 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
             quantity: parseFloat(inventory.quantity) + units_to_return
           }, { transaction });
 
-          await InventoryMovement.create({
+          cancelMovements.push({
             product_id: detail.product_id,
             warehouse_id: sale.warehouse_id,
             presentation_id: detail.presentation_id,
@@ -442,9 +489,13 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
             reason: `Cancelación venta ${sale.sale_number}`,
             document_number: sale.sale_number,
             user_id: userId
-          } as any, { transaction });
+          });
         }
       }
+    }
+
+    if (cancelMovements.length > 0) {
+      await InventoryMovement.bulkCreate(cancelMovements as any[], { transaction });
     }
 
     if ((sale.sale_type === 'credit' || sale.sale_type === 'mixed') && sale.customer_id) {
@@ -529,6 +580,7 @@ export async function addPayment(
 
     let newlyPaidUSD = 0;
     const createdPayments: any[] = [];
+    let addPayCreditBalanceUSD = 0;
 
     for (const payLine of payment_lines) {
       const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
@@ -550,12 +602,7 @@ export async function addPayment(
       createdPayments.push(payment);
 
       if (payLine.method === 'credit_balance' && sale.customer_id) {
-        const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
-        if (customer) {
-          const amountUSD2 = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
-          const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - amountUSD2);
-          await customer.update({ creditBalance: newBalance }, { transaction });
-        }
+        addPayCreditBalanceUSD += amountUSD;
       }
     }
 
@@ -570,14 +617,17 @@ export async function addPayment(
       updated_by: userId
     }, { transaction });
 
-    // Update customer's credit_used
+    // Update customer's credit_used and creditBalance in a single fetch
     if (sale.customer_id) {
       const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
       if (customer) {
-        const currentCreditUsed = parseFloat(customer.credit_used || 0);
-        await customer.update({
-          credit_used: Math.max(0, currentCreditUsed - newlyPaidUSD)
-        }, { transaction });
+        const updates: any = {
+          credit_used: Math.max(0, parseFloat(customer.credit_used || 0) - newlyPaidUSD)
+        };
+        if (addPayCreditBalanceUSD > 0) {
+          updates.creditBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - addPayCreditBalanceUSD);
+        }
+        await customer.update(updates, { transaction });
       }
     }
 

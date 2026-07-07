@@ -9,14 +9,13 @@ import PriceList from '../models/PriceList';
 import PriceListDetail from '../models/PriceListDetail';
 import Product from '../models/Product';
 import ProductPresentation from '../models/ProductPresentation';
-import Inventory from '../models/Inventory';
-import Permission from '../models/Permission';
 import User from '../models/User';
 import ExchangeRate from '../models/ExchangeRate';
 
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const { getProductsWithStock: _getProductsWithStock, exportPriceListCSV } = require('../services/priceList.service');
 
 class PriceListController {
     constructor() {
@@ -35,7 +34,7 @@ class PriceListController {
     // GET /api/price-lists/products-with-stock
     async getProductsWithStock(req: Request, res: Response, next: NextFunction) {
         try {
-            const products = await this._getProductsWithStock();
+            const products = await _getProductsWithStock();
             res.json({ data: products });
         } catch (error) {
             next(error);
@@ -46,7 +45,7 @@ class PriceListController {
     async getAll(req: Request, res: Response, next: NextFunction) {
         try {
             const { search, status, page = '1', limit = '20', sort_by = 'updated_at', sort_dir = 'DESC' } = req.query as Record<string, string>;
-            const where: any = { isDeleted: false };
+            const where: any = {};
             const andConditions = [];
 
             // Search filter
@@ -64,8 +63,8 @@ class PriceListController {
                 where.status = 'active';
                 andConditions.push({
                     [Op.or]: [
-                        { validUntil: null },
-                        { validUntil: { [Op.gte]: new Date() } }
+                        { valid_until: null },
+                        { valid_until: { [Op.gte]: new Date() } }
                     ]
                 });
             } else if (status === 'inactive') {
@@ -73,7 +72,7 @@ class PriceListController {
             } else if (status === 'expired') {
                 where.status = 'active';
                 andConditions.push({
-                    validUntil: {
+                    valid_until: {
                         [Op.and]: [
                             { [Op.ne]: null },
                             { [Op.lt]: new Date() }
@@ -117,15 +116,14 @@ class PriceListController {
             const now = new Date();
             const lists = await PriceList.findAll({
                 where: {
-                    isDeleted: false,
                     status: 'active',
                     [Op.or]: [
-                        { validUntil: null },
-                        { validUntil: { [Op.gte]: now } }
+                        { valid_until: null },
+                        { valid_until: { [Op.gte]: now } }
                     ]
                 },
-                attributes: ['id', 'code', 'name', 'currency', 'isDefault', 'validFrom', 'validUntil', 'validity_days'],
-                order: [['isDefault', 'DESC'], ['name', 'ASC']]
+                attributes: ['id', 'code', 'name', 'currency', 'is_default', 'valid_from', 'valid_until', 'validity_days'],
+                order: [['is_default', 'DESC'], ['name', 'ASC']]
             }) as any[];
 
             res.json({ data: lists });
@@ -140,7 +138,7 @@ class PriceListController {
             const { id } = req.params;
 
             const priceList = await PriceList.findOne({
-                where: { id, isDeleted: false },
+                where: { id },
                 include: [
                     { model: User, as: 'updater', attributes: ['id', 'username', 'first_name', 'last_name'] },
                     {
@@ -178,8 +176,8 @@ class PriceListController {
         const transaction = await sequelize.transaction();
         try {
             const {
-                name, description, basePercentage,
-                isDefault, validity_days, details
+                name, description, base_percentage,
+                is_default, validity_days, details
             } = req.body;
 
             if (!name || !name.trim()) {
@@ -188,22 +186,22 @@ class PriceListController {
             }
 
             // Create the price list header - Always USD
-            const validFrom = new Date();
+            const valid_from = new Date();
             const priceList = await PriceList.create({
                 name: name.trim(),
                 description: description || null,
                 currency: 'USD',
-                basePercentage: basePercentage || 0,
-                isDefault: isDefault || false,
+                base_percentage: base_percentage || 0,
+                is_default: is_default || false,
                 validity_days: validity_days || 5,
-                validFrom,
+                valid_from,
                 status: 'active',
                 updated_by: (req as any).user.id
-            }, { transaction }) as any;
+            } as any, { transaction }) as any;
 
             // If details provided, create them
             if (details && details.length > 0) {
-                const detailRecords = details.map(d => ({
+                const detailRecords = details.map((d: any) => ({
                     price_list_id: priceList.id,
                     product_id: d.product_id,
                     presentation_id: d.presentation_id,
@@ -218,10 +216,10 @@ class PriceListController {
                 }));
                 await PriceListDetail.bulkCreate(detailRecords, { transaction });
             } else {
-                // Auto-generate from products with stock using basePercentage
-                const productsWithStock = await this._getProductsWithStock();
+                // Auto-generate from products with stock using base_percentage
+                const productsWithStock = await _getProductsWithStock();
                 if (productsWithStock.length > 0) {
-                    const marginPct = parseFloat(basePercentage) || 0;
+                    const marginPct = parseFloat(base_percentage) || 0;
                     const autoDetails = [];
                     for (const item of productsWithStock) {
                         const pkgCost = parseFloat(item.presentation.package_cost) || 0;
@@ -236,7 +234,7 @@ class PriceListController {
                                 usdUnitCost = await (ExchangeRate as any).convert(unitCost, item.presentation.purchase_currency, 'USD');
                             } catch (e) {
                                 // Default back or ignore if no rate
-                                logger.error(`Failed to convert cost for ${item.product_id} to USD`, e.message);
+                                logger.error(`Failed to convert cost for ${item.product_id} to USD`, (e as Error).message);
                             }
                         }
 
@@ -287,12 +285,12 @@ class PriceListController {
         try {
             const { id } = req.params;
             const {
-                name, description, basePercentage,
-                isDefault, validity_days, status, details, renewValidity
+                name, description, base_percentage,
+                is_default, validity_days, status, details, renewValidity
             } = req.body;
 
             const priceList = await PriceList.findOne({
-                where: { id, isDeleted: false },
+                where: { id },
                 transaction
             }) as any;
 
@@ -306,14 +304,14 @@ class PriceListController {
             if (name !== undefined) updateData.name = name.trim();
             if (description !== undefined) updateData.description = description;
             // currency is hardcoded to USD, so it's not updated here
-            if (basePercentage !== undefined) updateData.basePercentage = basePercentage;
-            if (isDefault !== undefined) updateData.isDefault = isDefault;
+            if (base_percentage !== undefined) updateData.base_percentage = base_percentage;
+            if (is_default !== undefined) updateData.is_default = is_default;
             if (validity_days !== undefined) updateData.validity_days = validity_days;
             if (status !== undefined) updateData.status = status;
 
             // Renew validity on update
             if (renewValidity || status === 'active') {
-                updateData.validFrom = new Date();
+                updateData.valid_from = new Date();
                 updateData.validity_days = validity_days || priceList.validity_days;
             }
 
@@ -323,7 +321,7 @@ class PriceListController {
             if (details && details.length > 0) {
                 // Delete existing details and recreate
                 await PriceListDetail.destroy({ where: { price_list_id: id }, transaction });
-                const detailRecords = details.map(d => ({
+                const detailRecords = details.map((d: any) => ({
                     price_list_id: parseInt(id),
                     product_id: d.product_id,
                     presentation_id: d.presentation_id,
@@ -370,7 +368,7 @@ class PriceListController {
             const { name } = req.body;
 
             const original = await PriceList.findOne({
-                where: { id, isDeleted: false },
+                where: { id },
                 include: [{ model: PriceListDetail, as: 'details' }]
             }) as any;
 
@@ -383,17 +381,17 @@ class PriceListController {
                 name: name || `${original.name} (Copia)`,
                 description: original.description,
                 currency: 'USD',
-                basePercentage: original.basePercentage,
-                isDefault: false,
+                base_percentage: original.base_percentage,
+                is_default: false,
                 validity_days: original.validity_days,
-                validFrom: new Date(),
+                valid_from: new Date(),
                 status: 'active',
                 updated_by: (req as any).user.id
-            }, { transaction }) as any;
+            } as any, { transaction }) as any;
 
             // Copy details
             if (original.details && original.details.length > 0) {
-                const copiedDetails = original.details.map(d => ({
+                const copiedDetails = original.details.map((d: any) => ({
                     price_list_id: newList.id,
                     product_id: d.product_id,
                     presentation_id: d.presentation_id,
@@ -434,13 +432,13 @@ class PriceListController {
     async delete(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const priceList = await PriceList.findOne({ where: { id, isDeleted: false } }) as any;
+            const priceList = await PriceList.findByPk(id) as any;
 
             if (!priceList) {
                 return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
-            await priceList.update({ isDeleted: true, status: 'inactive' });
+            await priceList.destroy();
 
             res.json({ message: 'Lista de precios eliminada' });
         } catch (error) {
@@ -452,113 +450,12 @@ class PriceListController {
     async exportCSV(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const priceList = await PriceList.findOne({
-                where: { id, isDeleted: false },
-                include: [
-                    {
-                        model: PriceListDetail, as: 'details',
-                        include: [
-                            { model: Product, as: 'product', attributes: ['id', 'sku', 'name'] },
-                            { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] }
-                        ]
-                    }
-                ]
-            }) as any;
-
-            if (!priceList) {
-                return res.status(404).json({ message: 'Lista de precios no encontrada' });
-            }
-
-            // Get product IDs to fetch inventory
-            const productIds = priceList.details.map(d => d.product?.id).filter(Boolean);
-
-            // Fetch total inventory per product
-            let inventoryByProduct = {};
-            if (productIds.length > 0) {
-                const inventories = await Inventory.findAll({
-                    where: { product_id: productIds },
-                    attributes: ['product_id', [sequelize.fn('SUM', sequelize.col('quantity')), 'total_quantity']],
-                    group: ['product_id']
-                }) as any[];
-
-                inventories.forEach(inv => {
-                    inventoryByProduct[inv.product_id] = parseFloat(inv.get('total_quantity')) || 0;
-                });
-            }
-
-            // Convert to COP if needed
-            let rateToCop = 1;
-            if (priceList.currency && priceList.currency !== 'COP') {
-                try {
-                    rateToCop = await (ExchangeRate as any).getRate(priceList.currency, 'COP');
-                } catch (e) {
-                    logger.error('Failed to get exchange rate to COP for CSV export', e);
-                }
-            }
-
-            // Build CSV
-            const headers = ['SKU', 'Producto', 'Presentación', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', `Costo/Paquete (${priceList.currency})`, `Costo/Paquete (COP)`, `Costo Unitario (${priceList.currency})`, `Costo Unitario (COP)`, `Precio/Paquete (${priceList.currency})`, `Precio/Paquete (COP)`, 'Precio/Paquete (USD directo)', `Precio Unitario (${priceList.currency})`, `Precio Unitario (COP)`, 'Margen COP %', 'Margen USD %'];
-
-            const rows = await Promise.all(priceList.details.map(async d => {
-                const unitsPerPackage = d.presentation?.units_per_package || 1;
-                const totalLooseUnits = inventoryByProduct[d.product?.id] || 0;
-
-                const stockPackages = Math.floor(totalLooseUnits / unitsPerPackage);
-                const stockRemainingUnits = totalLooseUnits % unitsPerPackage;
-
-                let nativeCost = parseFloat(d.package_cost) || 0;
-                let nativeUnitCost = parseFloat(d.unit_cost) || 0;
-                let nativeCurrency = d.presentation?.purchase_currency || 'USD';
-
-                let costInListCurrency = nativeCost;
-                let costInCop = nativeCost;
-                let unitCostInListCurrency = nativeUnitCost;
-                let unitCostInCop = nativeUnitCost;
-
-                if (nativeCurrency !== priceList.currency) {
-                    try {
-                        costInListCurrency = await (ExchangeRate as any).convert(nativeCost, nativeCurrency, priceList.currency);
-                        unitCostInListCurrency = await (ExchangeRate as any).convert(nativeUnitCost, nativeCurrency, priceList.currency);
-                    } catch(e) { logger.error(e.message); }
-                }
-                if (nativeCurrency !== 'COP') {
-                    try {
-                        costInCop = await (ExchangeRate as any).convert(nativeCost, nativeCurrency, 'COP');
-                        unitCostInCop = await (ExchangeRate as any).convert(nativeUnitCost, nativeCurrency, 'COP');
-                    } catch(e) { logger.error(e.message); }
-                }
-
-                const pkgPriceUsd = parseFloat(d.package_price_usd) || 0;
-                const costUsd = costInListCurrency; // list currency is USD
-                const marginCop = parseFloat(d.margin_percentage) || 0;
-                const marginUsd = costUsd > 0 ? ((pkgPriceUsd - costUsd) / costUsd * 100) : 0;
-
-                return [
-                    d.product?.sku || '',
-                    `"${(d.product?.name || '').replace(/"/g, '""')}"`,
-                    `"${(d.presentation?.name || '').replace(/"/g, '""')}"`,
-                    stockPackages,
-                    stockRemainingUnits,
-                    unitsPerPackage,
-                    costInListCurrency.toFixed(2),
-                    costInCop.toFixed(2),
-                    unitCostInListCurrency.toFixed(2),
-                    unitCostInCop.toFixed(2),
-                    parseFloat(d.package_price).toFixed(2),
-                    (parseFloat(d.package_price) * rateToCop).toFixed(2),
-                    pkgPriceUsd.toFixed(2),
-                    parseFloat(d.unit_price).toFixed(2),
-                    (parseFloat(d.unit_price) * rateToCop).toFixed(2),
-                    marginCop.toFixed(1),
-                    marginUsd.toFixed(1)
-                ].join(',');
-            }));
-
-            const csv = [headers.join(','), ...rows].join('\n');
+            const result = await exportPriceListCSV(id);
+            if (!result) return res.status(404).json({ message: 'Lista de precios no encontrada' });
 
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-            res.setHeader('Content-Disposition', `attachment; filename="lista-precios-${priceList.code}.csv"`);
-            res.send('\uFEFF' + csv); // BOM for Excel UTF-8
+            res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+            return res.send(result.csv);
         } catch (error) {
             next(error);
         }
@@ -588,7 +485,7 @@ class PriceListController {
             }
 
             // Verificar que la lista existe y no está eliminada
-            const priceList = await PriceList.findOne({ where: { id, isDeleted: false } }) as any;
+            const priceList = await PriceList.findByPk(id) as any;
             if (!priceList) {
                 return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
@@ -636,55 +533,6 @@ class PriceListController {
         }
     }
 
-    // Helper: Get products with stock
-    async _getProductsWithStock() {
-        const inventories = await Inventory.findAll({
-            where: { quantity: { [Op.gt]: 0 } },
-            attributes: ['product_id'],
-            include: [
-                {
-                    model: Product,
-                    as: 'product',
-                    where: { is_active: true },
-                    attributes: ['id', 'sku', 'name']
-                }
-            ],
-            group: ['product_id']
-        }) as any[];
-
-        // For each product with inventory, get its presentations
-        const results = [];
-        const seenPresentations = new Set();
-
-        for (const inv of inventories) {
-            const presentations = await ProductPresentation.findAll({
-                where: {
-                    product_id: inv.product_id,
-                    is_active: true
-                },
-                attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency']
-            }) as any[];
-
-            for (const p of presentations) {
-                const key = `${inv.product_id}-${p.id}`;
-                if (!seenPresentations.has(key)) {
-                    seenPresentations.add(key);
-
-                    results.push({
-                        product_id: inv.product_id,
-                        product: inv.product,
-                        presentation: {
-                            ...p.get(), // Get plain data from Sequelize instance
-                            package_cost: p.package_cost,
-                            cost: p.cost
-                        }
-                    });
-                }
-            }
-        }
-
-        return results;
-    }
 }
 
 export = new PriceListController();

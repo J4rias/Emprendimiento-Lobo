@@ -13,6 +13,7 @@ import User from '../models/User';
 
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const { getDeliveryStats: _getDeliveryStats } = require('../services/delivery.service');
 
 /**
  * Generate unique delivery number
@@ -631,69 +632,9 @@ export const cancelDelivery = async (req: Request, res: Response) => {
  */
 export const getDeliveryStats = async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to } = req.query;
-
-    const where: any = {};
-
-    // Filter by date range
-    if (date_from || date_to) {
-      where.scheduled_date = {};
-      if (date_from) {
-        where.scheduled_date[Op.gte] = date_from;
-      }
-      if (date_to) {
-        where.scheduled_date[Op.lte] = date_to;
-      }
-    }
-
-    // Total deliveries
-    const totalDeliveries = await Delivery.count({ where });
-
-    // Deliveries by status
-    const deliveriesByStatus = await Delivery.findAll({
-      where,
-      attributes: [
-        'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['status']
-    });
-
-    // Deliveries by method
-    const deliveriesByMethod = await Delivery.findAll({
-      where,
-      attributes: [
-        'delivery_method',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-      ],
-      group: ['delivery_method']
-    });
-
-    // Pending deliveries
-    const pendingDeliveries = await Delivery.count({
-      where: {
-        ...where,
-        status: 'pending'
-      }
-    });
-
-    // In transit deliveries
-    const inTransitDeliveries = await Delivery.count({
-      where: {
-        ...where,
-        status: 'in_transit'
-      }
-    });
-
-    res.json({
-      data: {
-        total_deliveries: totalDeliveries,
-        pending_deliveries: pendingDeliveries,
-        in_transit_deliveries: inTransitDeliveries,
-        deliveries_by_status: deliveriesByStatus,
-        deliveries_by_method: deliveriesByMethod
-      }
-    });
+    const { date_from, date_to } = req.query as Record<string, string>;
+    const data = await _getDeliveryStats({ date_from, date_to });
+    res.json({ data });
   } catch (error) {
     logger.error('Error fetching delivery stats', { error: (error as Error).message });
     res.status(500).json({

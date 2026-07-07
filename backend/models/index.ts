@@ -41,6 +41,9 @@ import PosReservation from './PosReservation';
 import PreOrder from './PreOrder';
 import PreOrderDetail from './PreOrderDetail';
 import Bank from './Bank';
+import AuditLog from './AuditLog';
+
+import { registerAuditHooks } from '../utils/auditHooks';
 
 // Define associations
 
@@ -144,8 +147,8 @@ TransferDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', a
 ProductPresentation.hasMany(TransferDetail, { foreignKey: 'presentation_id', as: 'transferDetails' });
 
 // Customer - PriceList (Many to One)
-Customer.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
-PriceList.hasMany(Customer, { foreignKey: 'priceListId', as: 'customers' });
+Customer.belongsTo(PriceList, { foreignKey: 'price_list_id', as: 'priceList' });
+PriceList.hasMany(Customer, { foreignKey: 'price_list_id', as: 'customers' });
 
 // PriceList - User (Updated by)
 PriceList.belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
@@ -163,28 +166,28 @@ PriceListDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', 
 ProductPresentation.hasMany(PriceListDetail, { foreignKey: 'presentation_id', as: 'priceListDetails' });
 
 // Quote - Customer (Many to One)
-Quote.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
-Customer.hasMany(Quote, { foreignKey: 'customerId', as: 'quotes' });
+Quote.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Customer.hasMany(Quote, { foreignKey: 'customer_id', as: 'quotes' });
 
 // Quote - PriceList (Many to One)
-Quote.belongsTo(PriceList, { foreignKey: 'priceListId', as: 'priceList' });
-PriceList.hasMany(Quote, { foreignKey: 'priceListId', as: 'quotes' });
+Quote.belongsTo(PriceList, { foreignKey: 'price_list_id', as: 'priceList' });
+PriceList.hasMany(Quote, { foreignKey: 'price_list_id', as: 'quotes' });
 
 // Quote - User (Many to One)
-Quote.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-User.hasMany(Quote, { foreignKey: 'userId', as: 'quotes' });
+Quote.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Quote, { foreignKey: 'user_id', as: 'quotes' });
 
 // QuoteDetail - Quote (Many to One)
-QuoteDetail.belongsTo(Quote, { foreignKey: 'quoteId', as: 'quote' });
-Quote.hasMany(QuoteDetail, { foreignKey: 'quoteId', as: 'details' });
+QuoteDetail.belongsTo(Quote, { foreignKey: 'quote_id', as: 'quote' });
+Quote.hasMany(QuoteDetail, { foreignKey: 'quote_id', as: 'details' });
 
 // QuoteDetail - Product (Many to One)
-QuoteDetail.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
-Product.hasMany(QuoteDetail, { foreignKey: 'productId', as: 'quoteDetails' });
+QuoteDetail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(QuoteDetail, { foreignKey: 'product_id', as: 'quoteDetails' });
 
 // QuoteDetail - ProductPresentation (Many to One)
-QuoteDetail.belongsTo(ProductPresentation, { foreignKey: 'productPresentationId', as: 'presentation' });
-ProductPresentation.hasMany(QuoteDetail, { foreignKey: 'productPresentationId', as: 'quoteDetails' });
+QuoteDetail.belongsTo(ProductPresentation, { foreignKey: 'product_presentation_id', as: 'presentation' });
+ProductPresentation.hasMany(QuoteDetail, { foreignKey: 'product_presentation_id', as: 'quoteDetails' });
 
 // Sale - Customer (Many to One)
 Sale.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
@@ -411,6 +414,9 @@ Product.hasMany(PreOrderDetail, { foreignKey: 'product_id', as: 'preOrderDetails
 PreOrderDetail.belongsTo(ProductPresentation, { foreignKey: 'presentation_id', as: 'presentation' });
 ProductPresentation.hasMany(PreOrderDetail, { foreignKey: 'presentation_id', as: 'preOrderDetails' });
 
+// Register audit hooks after all associations
+registerAuditHooks({ Sale, ExchangeRate, User, Product, ProductPresentation });
+
 export {
   sequelize,
   User,
@@ -454,4 +460,5 @@ export {
   PreOrder,
   PreOrderDetail,
   Bank,
+  AuditLog,
 };

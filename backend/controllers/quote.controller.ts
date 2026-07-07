@@ -38,7 +38,7 @@ export const getAllQuotes = async (req: Request, res: Response, next: NextFuncti
     const offset = (page - 1) * limit;
 
     // Construir condiciones de búsqueda
-    const where: any = { isDeleted: false };
+    const where: any = {};
 
     if (search) {
       where[Op.or] = [
@@ -56,15 +56,15 @@ export const getAllQuotes = async (req: Request, res: Response, next: NextFuncti
     }
 
     if (date_from) {
-      where.quoteDate = {
-        ...where.quoteDate,
+      where.quote_date = {
+        ...where.quote_date,
         [Op.gte]: new Date(date_from)
       };
     }
 
     if (date_to) {
-      where.quoteDate = {
-        ...where.quoteDate,
+      where.quote_date = {
+        ...where.quote_date,
         [Op.lte]: new Date(date_to)
       };
     }
@@ -76,7 +76,7 @@ export const getAllQuotes = async (req: Request, res: Response, next: NextFuncti
         {
           model: Customer,
           as: 'customer',
-          attributes: ['id', 'code', 'firstName', 'lastName', 'businessName', 'tradeName', 'type']
+          attributes: ['id', 'code', 'first_name', 'last_name', 'business_name', 'trade_name', 'type']
         },
         {
           model: User,
@@ -116,7 +116,7 @@ export const getQuoteById = async (req: Request, res: Response, next: NextFuncti
     const { id } = req.params;
 
     const quote = await Quote.findOne({
-      where: { id, isDeleted: false },
+      where: { id },
       include: [
         {
           model: Customer,
@@ -152,7 +152,7 @@ export const getQuoteById = async (req: Request, res: Response, next: NextFuncti
               attributes: ['id', 'name', 'units_per_package']
             }
           ],
-          order: [['lineOrder', 'ASC']]
+          order: [['line_order', 'ASC']]
         }
       ]
     }) as any;
@@ -178,7 +178,7 @@ export const createQuote = async (req: Request, res: Response, next: NextFunctio
   const t = await sequelize.transaction();
 
   try {
-    const { customer_id, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil } = req.body;
+    const { customer_id, price_list_id, currency, details, notes, internal_notes, payment_terms, delivery_terms, valid_until } = req.body;
 
     // Verificar que el cliente existe
     const customer = await Customer.findByPk(customer_id) as any;
@@ -197,57 +197,57 @@ export const createQuote = async (req: Request, res: Response, next: NextFunctio
       const detail = details[i];
 
       // Verificar que el producto existe
-      const product = await Product.findByPk(detail.productId) as any;
+      const product = await Product.findByPk(detail.product_id) as any;
       if (!product) {
         await t.rollback();
         return res.status(404).json({
-          message: `Producto con ID ${detail.productId} no encontrado`
+          message: `Producto con ID ${detail.product_id} no encontrado`
         });
       }
 
-      const lineSubtotal = detail.quantity * detail.unitPrice;
-      const lineDiscountAmount = (lineSubtotal * (detail.discountPercentage || 0)) / 100;
+      const lineSubtotal = detail.quantity * detail.unit_price;
+      const lineDiscountAmount = (lineSubtotal * (detail.discount_percentage || 0)) / 100;
       const lineBaseAmount = lineSubtotal - lineDiscountAmount;
-      const lineTaxAmount = (lineBaseAmount * (detail.taxPercentage || 18)) / 100;
+      const lineTaxAmount = (lineBaseAmount * (detail.tax_percentage || 18)) / 100;
       const lineTotal = lineBaseAmount + lineTaxAmount;
 
       subtotal += lineSubtotal;
 
       detailsData.push({
-        productId: detail.productId,
-        productPresentationId: detail.productPresentationId,
+        product_id: detail.product_id,
+        product_presentation_id: detail.product_presentation_id,
         description: detail.description || product.name,
         quantity: detail.quantity,
-        unitPrice: detail.unitPrice,
-        discountPercentage: detail.discountPercentage || 0,
-        discountAmount: lineDiscountAmount,
-        taxPercentage: detail.taxPercentage || 18,
-        taxAmount: lineTaxAmount,
+        unit_price: detail.unit_price,
+        discount_percentage: detail.discount_percentage || 0,
+        discount_amount: lineDiscountAmount,
+        tax_percentage: detail.tax_percentage || 18,
+        tax_amount: lineTaxAmount,
         subtotal: lineSubtotal,
         total: lineTotal,
         notes: detail.notes,
-        lineOrder: i + 1
+        line_order: i + 1
       });
     }
 
     // Crear la cotización
     const quote = await Quote.create({
-      customerId: customer_id,
-      priceListId,
-      userId: (req as any).user.id,
+      customer_id,
+      price_list_id,
+      user_id: (req as any).user.id,
       currency: currency || 'USD',
       subtotal,
       notes,
-      internalNotes,
-      paymentTerms,
-      deliveryTerms,
-      validUntil
-    }, { transaction: t }) as any;
+      internal_notes,
+      payment_terms,
+      delivery_terms,
+      valid_until
+    } as any, { transaction: t }) as any;
 
     // Crear los detalles de la cotización
     for (const detailData of detailsData) {
       await QuoteDetail.create({
-        quoteId: quote.id,
+        quote_id: quote.id,
         ...detailData
       }, { transaction: t }) as any;
     }
@@ -302,11 +302,11 @@ export const updateQuote = async (req: Request, res: Response, next: NextFunctio
 
   try {
     const { id } = req.params;
-    const { customer_id, priceListId, currency, details, notes, internalNotes, paymentTerms, deliveryTerms, validUntil, status } = req.body;
+    const { customer_id, price_list_id, currency, details, notes, internal_notes, payment_terms, delivery_terms, valid_until, status } = req.body;
 
     // Buscar la cotización
     const quote = await Quote.findOne({
-      where: { id, isDeleted: false }
+      where: { id }
     }) as any;
 
     if (!quote) {
@@ -341,7 +341,7 @@ export const updateQuote = async (req: Request, res: Response, next: NextFunctio
     if (details && details.length > 0) {
       // Eliminar detalles anteriores
       await QuoteDetail.destroy({
-        where: { quoteId: id },
+        where: { quote_id: id },
         transaction: t
       });
 
@@ -351,59 +351,59 @@ export const updateQuote = async (req: Request, res: Response, next: NextFunctio
       for (let i = 0; i < details.length; i++) {
         const detail = details[i];
 
-        const product = await Product.findByPk(detail.productId) as any;
+        const product = await Product.findByPk(detail.product_id) as any;
         if (!product) {
           await t.rollback();
           return res.status(404).json({
-            message: `Producto con ID ${detail.productId} no encontrado`
+            message: `Producto con ID ${detail.product_id} no encontrado`
           });
         }
 
-        const lineSubtotal = detail.quantity * detail.unitPrice;
-        const lineDiscountAmount = (lineSubtotal * (detail.discountPercentage || 0)) / 100;
+        const lineSubtotal = detail.quantity * detail.unit_price;
+        const lineDiscountAmount = (lineSubtotal * (detail.discount_percentage || 0)) / 100;
         const lineBaseAmount = lineSubtotal - lineDiscountAmount;
-        const lineTaxAmount = (lineBaseAmount * (detail.taxPercentage || 18)) / 100;
+        const lineTaxAmount = (lineBaseAmount * (detail.tax_percentage || 18)) / 100;
         const lineTotal = lineBaseAmount + lineTaxAmount;
 
         subtotal += lineSubtotal;
 
         detailsData.push({
-          productId: detail.productId,
-          productPresentationId: detail.productPresentationId,
+          product_id: detail.product_id,
+          product_presentation_id: detail.product_presentation_id,
           description: detail.description || product.name,
           quantity: detail.quantity,
-          unitPrice: detail.unitPrice,
-          discountPercentage: detail.discountPercentage || 0,
-          discountAmount: lineDiscountAmount,
-          taxPercentage: detail.taxPercentage || 18,
-          taxAmount: lineTaxAmount,
+          unit_price: detail.unit_price,
+          discount_percentage: detail.discount_percentage || 0,
+          discount_amount: lineDiscountAmount,
+          tax_percentage: detail.tax_percentage || 18,
+          tax_amount: lineTaxAmount,
           subtotal: lineSubtotal,
           total: lineTotal,
           notes: detail.notes,
-          lineOrder: i + 1
+          line_order: i + 1
         });
       }
 
       // Crear los nuevos detalles
       for (const detailData of detailsData) {
         await QuoteDetail.create({
-          quoteId: id,
+          quote_id: parseInt(id as string),
           ...detailData
-        }, { transaction: t }) as any;
+        } as any, { transaction: t }) as any;
       }
     }
 
     // Actualizar la cotización
     await quote.update({
-      customerId: customer_id || quote.customerId,
-      priceListId: priceListId !== undefined ? priceListId : quote.priceListId,
+      customer_id: customer_id || quote.customer_id,
+      price_list_id: price_list_id !== undefined ? price_list_id : quote.price_list_id,
       currency: currency || quote.currency,
       subtotal: details ? subtotal : quote.subtotal,
       notes: notes !== undefined ? notes : quote.notes,
-      internalNotes: internalNotes !== undefined ? internalNotes : quote.internalNotes,
-      paymentTerms: paymentTerms !== undefined ? paymentTerms : quote.paymentTerms,
-      deliveryTerms: deliveryTerms !== undefined ? deliveryTerms : quote.deliveryTerms,
-      validUntil: validUntil || quote.validUntil,
+      internal_notes: internal_notes !== undefined ? internal_notes : quote.internal_notes,
+      payment_terms: payment_terms !== undefined ? payment_terms : quote.payment_terms,
+      delivery_terms: delivery_terms !== undefined ? delivery_terms : quote.delivery_terms,
+      valid_until: valid_until || quote.valid_until,
       status: status || quote.status
     }, { transaction: t });
 
@@ -457,7 +457,7 @@ export const deleteQuote = async (req: Request, res: Response, next: NextFunctio
     const { id } = req.params;
 
     const quote = await Quote.findOne({
-      where: { id, isDeleted: false }
+      where: { id }
     }) as any;
 
     if (!quote) {
@@ -473,7 +473,7 @@ export const deleteQuote = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    await quote.update({ isDeleted: true });
+    await quote.destroy();
 
     res.json({
       message: 'Cotización eliminada exitosamente'
@@ -490,18 +490,18 @@ export const getQuoteStats = async (req: Request, res: Response, next: NextFunct
   try {
     const { date_from, date_to } = req.query;
 
-    const where: any = { isDeleted: false };
+    const where: any = {};
 
     if (date_from) {
-      where.quoteDate = {
-        ...where.quoteDate,
+      where.quote_date = {
+        ...where.quote_date,
         [Op.gte]: new Date(date_from as string)
       };
     }
 
     if (date_to) {
-      where.quoteDate = {
-        ...where.quoteDate,
+      where.quote_date = {
+        ...where.quote_date,
         [Op.lte]: new Date(date_to as string)
       };
     }

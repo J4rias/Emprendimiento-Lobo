@@ -332,7 +332,7 @@ class ExchangeRateController {
         }
       });
     } catch (error) {
-      logger.error('Error al convertir monto', { error: error.message });
+      logger.error('Error al convertir monto', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }

@@ -1,0 +1,5 @@
+allowBuilds:
+  '@scarf/scarf': false
+  bcrypt: true
+  esbuild: true
+  sharp: true

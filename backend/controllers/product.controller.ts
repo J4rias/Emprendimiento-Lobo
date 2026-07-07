@@ -693,8 +693,8 @@ async update(req: Request, res: Response, next: NextFunction) {
         });
       }
 
-      // Soft delete
-      await product.update({ is_active: false });
+      // Soft delete via paranoid
+      await product.destroy();
 
       res.json({
         message: 'Producto eliminado exitosamente'

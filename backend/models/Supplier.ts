@@ -71,7 +71,8 @@ const Supplier = sequelize.define<Model<SupplierAttributes, SupplierCreationAttr
   },
   {
     tableName: 'suppliers',
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   }
 );
 

@@ -6,12 +6,12 @@ interface CustomerAttributes {
   id: number;
   code: string;
   type: 'natural' | 'juridical';
-  documentType: 'V' | 'E' | 'J' | 'G' | 'P';
-  documentNumber: string;
-  businessName: string | null;
-  tradeName: string | null;
-  firstName: string | null;
-  lastName: string | null;
+  document_type: 'V' | 'E' | 'J' | 'G' | 'P';
+  document_number: string;
+  business_name: string | null;
+  trade_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
   phone: string | null;
   mobile: string | null;
@@ -19,15 +19,14 @@ interface CustomerAttributes {
   city: string | null;
   state: string | null;
   country: string | null;
-  postalCode: string | null;
-  creditLimit: number;
-  creditUsed: number;
-  creditDays: number;
-  priceListId: number | null;
-  discountPercentage: number;
+  postal_code: string | null;
+  credit_limit: number;
+  credit_used: number;
+  credit_days: number;
+  price_list_id: number | null;
+  discount_percentage: number;
   status: 'active' | 'inactive' | 'blocked';
   notes: string | null;
-  isDeleted: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date | null;
@@ -36,7 +35,7 @@ interface CustomerAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface CustomerCreationAttributes extends Optional<
   CustomerAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'type' | 'documentType' | 'country' | 'creditLimit' | 'creditUsed' | 'creditDays' | 'discountPercentage' | 'status' | 'isDeleted'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'type' | 'document_type' | 'country' | 'credit_limit' | 'credit_used' | 'credit_days' | 'discount_percentage' | 'status'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -60,34 +59,34 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
       defaultValue: 'natural',
       comment: 'Tipo de cliente: natural o jurídica'
     },
-    documentType: {
+    document_type: {
       type: DataTypes.ENUM('V', 'E', 'J', 'G', 'P'),
       allowNull: false,
       defaultValue: 'V',
       comment: 'Tipo de documento venezolano: V (venezolano), E (extranjero), J (jurídico/RIF), G (gubernamental), P (pasaporte)'
     },
-    documentNumber: {
+    document_number: {
       type: DataTypes.STRING(20),
       allowNull: false,
       unique: true,
       comment: 'Número de documento'
     },
-    businessName: {
+    business_name: {
       type: DataTypes.STRING(200),
       allowNull: true,
       comment: 'Razón social (para personas jurídicas)'
     },
-    tradeName: {
+    trade_name: {
       type: DataTypes.STRING(200),
       allowNull: true,
       comment: 'Nombre comercial'
     },
-    firstName: {
+    first_name: {
       type: DataTypes.STRING(100),
       allowNull: true,
       comment: 'Nombre (para personas naturales)'
     },
-    lastName: {
+    last_name: {
       type: DataTypes.STRING(100),
       allowNull: true,
       comment: 'Apellido (para personas naturales)'
@@ -124,34 +123,34 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
       allowNull: true,
       defaultValue: 'Venezuela'
     },
-    postalCode: {
+    postal_code: {
       type: DataTypes.STRING(10),
       allowNull: true
     },
-    creditLimit: {
+    credit_limit: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Límite de crédito en moneda local'
     },
-    creditUsed: {
+    credit_used: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Crédito actualmente usado por el cliente'
     },
-    creditDays: {
+    credit_days: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
       comment: 'Días de crédito permitidos'
     },
-    priceListId: {
+    price_list_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'Lista de precios asignada al cliente'
     },
-    discountPercentage: {
+    discount_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 0,
@@ -166,16 +165,11 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
       type: DataTypes.TEXT,
       allowNull: true
     },
-    isDeleted: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    }
   }, {
     tableName: 'customers',
     timestamps: true,
     underscored: true,
-    paranoid: false,
+    paranoid: true,
     indexes: [
       {
         fields: ['code']
@@ -189,8 +183,8 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
         // Convert empty strings to null for optional fields
         const optionalFields = [
           'email', 'phone', 'mutable', 'address', 'city', 'state',
-          'postalCode', 'businessName', 'tradeName', 'firstName',
-          'lastName', 'notes'
+          'postal_code', 'business_name', 'trade_name', 'first_name',
+          'last_name', 'notes'
         ];
 
         optionalFields.forEach(field => {
@@ -218,21 +212,20 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
 // Método para obtener el nombre completo
 (Customer as any).prototype.getFullName = function () {
   if (this.type === 'juridical') {
-    return this.businessName || this.tradeName;
+    return this.business_name || this.trade_name;
   }
-  return `${this.firstName} ${this.lastName}`.trim();
+  return `${this.first_name} ${this.last_name}`.trim();
 };
 
 // Método para verificar disponibilidad de crédito
-(Customer as any).prototype.hasAvailableCredit = function (amount) {
-  const availableCredit = parseFloat(this.creditLimit) - parseFloat(this.creditUsed || 0);
+(Customer as any).prototype.hasAvailableCredit = function (amount: any) {
+  const availableCredit = parseFloat(this.credit_limit) - parseFloat(this.credit_used || 0);
   return availableCredit >= amount;
 };
 
 // Personalizar JSON para excluir campos sensibles
 (Customer as any).prototype.toJSON = function () {
   const values = { ...this.get() };
-  delete values.isDeleted;
   return values;
 };
 

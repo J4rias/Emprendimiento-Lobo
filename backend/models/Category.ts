@@ -59,7 +59,8 @@ const Category = sequelize.define<Model<CategoryAttributes, CategoryCreationAttr
   },
   {
     tableName: 'categories',
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   }
 );
 

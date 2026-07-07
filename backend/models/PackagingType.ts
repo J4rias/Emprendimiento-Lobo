@@ -41,7 +41,8 @@ const PackagingType = sequelize.define<Model<PackagingTypeAttributes, PackagingT
   {
     tableName: 'packaging_types',
     timestamps: true,
-    underscored: true
+    underscored: true,
+    paranoid: true
   }
 );
 

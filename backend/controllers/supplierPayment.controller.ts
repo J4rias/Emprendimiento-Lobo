@@ -15,37 +15,13 @@ import ExchangeRate from '../models/ExchangeRate';
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
-
-/**
- * Generate unique payment number
- * Format: PP-YYYYMMDD-####
- */
-const generatePaymentNumber = async () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const dateStr = `${year}${month}${day}`;
-  const prefix = `PP-${dateStr}`;
-
-  // Find the last payment number for today
-  const lastPayment = await SupplierPayment.findOne({
-    where: {
-      payment_number: {
-        [Op.like]: `${prefix}%`
-      }
-    },
-    order: [['payment_number', 'DESC']]
-  }) as any;
-
-  let sequence = 1;
-  if (lastPayment) {
-    const lastSequence = parseInt(lastPayment.payment_number.split('-')[2]);
-    sequence = lastSequence + 1;
-  }
-
-  return `${prefix}-${String(sequence).padStart(4, '0')}`;
-};
+const {
+  generatePaymentNumber,
+  getPaymentStats: _getPaymentStats,
+  getPaymentsByPO: _getPaymentsByPO,
+  getPayableBalance: _getPayableBalance,
+  getSupplierCreditBalance: _getSupplierCreditBalance
+} = require('../services/supplierPayment.service');
 
 /**
  * Get all supplier payments with filters
@@ -128,11 +104,11 @@ export const getAllPayments = async (req: Request, res: Response) => {
       creatorIds.length ? User.findAll({ where: { id: creatorIds }, attributes: ['id', 'username', 'first_name', 'last_name'] }) : []
     ]);
 
-    const supplierMap = Object.fromEntries(suppliers.map(s => [s.id, s.toJSON()]));
-    const poMap = Object.fromEntries(purchaseOrders.map(po => [po.id, po.toJSON()]));
-    const creatorMap = Object.fromEntries(creators.map(u => [u.id, u.toJSON()]));
+    const supplierMap = Object.fromEntries((suppliers as any[]).map(s => [s.id, s.toJSON()]));
+    const poMap = Object.fromEntries((purchaseOrders as any[]).map(po => [po.id, po.toJSON()]));
+    const creatorMap = Object.fromEntries((creators as any[]).map(u => [u.id, u.toJSON()]));
     const allocsByPayment: any = {};
-    for (const a of allocations) {
+    for (const a of (allocations as any[])) {
       if (!allocsByPayment[a.payment_id]) allocsByPayment[a.payment_id] = [];
       allocsByPayment[a.payment_id].push(a.toJSON());
     }
@@ -155,7 +131,7 @@ export const getAllPayments = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    logger.error('Error fetching supplier payments', { error: error.message });
+    logger.error('Error fetching supplier payments', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -208,7 +184,7 @@ export const getPaymentById = async (req: Request, res: Response) => {
       data: payment
     });
   } catch (error) {
-    logger.error('Error fetching payment', { error: error.message });
+    logger.error('Error fetching payment', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -266,7 +242,7 @@ export const createPayment = async (req: Request, res: Response) => {
     // Validate allocations total doesn't exceed payment amount
     const allocationsList = allocations || [];
     if (allocationsList.length > 0) {
-      const totalAllocated = allocationsList.reduce((sum, a) => sum + parseFloat(a.allocated_amount || 0), 0);
+      const totalAllocated = allocationsList.reduce((sum: any, a: any) => sum + parseFloat(a.allocated_amount || 0), 0);
       if (totalAllocated > parseFloat(amount) + 0.01) {
         await transaction.rollback();
         return res.status(400).json({
@@ -380,7 +356,7 @@ export const createPayment = async (req: Request, res: Response) => {
       }) as any[];
 
       const availableCredits = allPayments.map(p => {
-        const allocSum = p.allocations.reduce((sum, a) => sum + parseFloat(a.allocated_amount), 0);
+        const allocSum = p.allocations.reduce((sum: any, a: any) => sum + parseFloat(a.allocated_amount), 0);
         return {
           id: p.id,
           available: parseFloat(p.amount) - allocSum
@@ -510,7 +486,7 @@ export const createPayment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error creating supplier payment', { error: error.message });
+    logger.error('Error creating supplier payment', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -601,7 +577,7 @@ export const updatePayment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error updating supplier payment', { error: error.message });
+    logger.error('Error updating supplier payment', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -644,7 +620,7 @@ export const deletePayment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error cancelling payment', { error: error.message });
+    logger.error('Error cancelling payment', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -690,7 +666,7 @@ export const getPaymentsBySupplier = async (req: Request, res: Response) => {
       data: payments
     });
   } catch (error) {
-    logger.error('Error fetching payments by supplier', { error: error.message });
+    logger.error('Error fetching payments by supplier', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -702,74 +678,10 @@ export const getPaymentsBySupplier = async (req: Request, res: Response) => {
 export const getPaymentStats = async (req: Request, res: Response) => {
   try {
     const { date_from, date_to, supplier_id } = req.query as Record<string, string>;
-
-    const where: any = {};
-
-    // Filter by date range
-    if (date_from || date_to) {
-      where.payment_date = {};
-      if (date_from) {
-        where.payment_date[Op.gte] = date_from;
-      }
-      if (date_to) {
-        where.payment_date[Op.lte] = date_to;
-      }
-    }
-
-    // Filter by supplier
-    if (supplier_id) {
-      where.supplier_id = supplier_id;
-    }
-
-    // Total payments count
-    const totalPayments = await SupplierPayment.count({ where });
-
-    // Total amount by currency
-    const totalByCurrency = await SupplierPayment.findAll({
-      where,
-      attributes: [
-        'currency',
-        [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'payment_count']
-      ],
-      group: ['currency']
-    }) as any[];
-
-    // Payments by method
-    const paymentsByMethod = await SupplierPayment.findAll({
-      where,
-      attributes: [
-        'payment_method',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('amount')), 'total']
-      ],
-      group: ['payment_method']
-    }) as any[];
-
-    // Recent payments (last 5)
-    const recentPayments = await SupplierPayment.findAll({
-      where,
-      include: [
-        {
-          model: Supplier,
-          as: 'supplier',
-          attributes: ['id', 'name', 'tax_id']
-        }
-      ],
-      order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
-      limit: 5
-    }) as any[];
-
-    res.json({
-      data: {
-        total_payments: totalPayments,
-        total_by_currency: totalByCurrency,
-        payments_by_method: paymentsByMethod,
-        recent_payments: recentPayments
-      }
-    });
+    const data = await _getPaymentStats({ date_from, date_to, supplier_id });
+    res.json({ data });
   } catch (error) {
-    logger.error('Error fetching payment stats', { error: error.message });
+    logger.error('Error fetching payment stats', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -780,60 +692,11 @@ export const getPaymentStats = async (req: Request, res: Response) => {
  */
 export const getPaymentsByPO = async (req: Request, res: Response) => {
   try {
-    const { poId } = req.params;
-
-    const purchaseOrder = await PurchaseOrder.findByPk(poId, {
-      include: [{ model: Supplier, as: 'supplier', attributes: ['id', 'name'] }]
-    }) as any;
-
-    if (!purchaseOrder) {
-      return res.status(404).json({ message: 'Orden de compra no encontrada' });
-    }
-
-    // Use allocations as source of truth for frozen amounts
-    const allocations = await SupplierPaymentAllocation.findAll({
-      where: { purchase_order_id: poId },
-      include: [{
-        model: SupplierPayment,
-        as: 'payment',
-        where: { status: { [Op.ne]: 'cancelled' } },
-        include: [
-          { model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] }
-        ]
-      }],
-      order: [['created_at', 'DESC']]
-    }) as any[];
-
-    // Frozen balance calculation — never reconverts
-    const totalPaidInPOCurrency = allocations.reduce(
-      (sum, a) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0
-    );
-
-    const poTotal = parseFloat(purchaseOrder.total || 0);
-    const saldoPendiente = poTotal - totalPaidInPOCurrency;
-
-    res.json({
-      data: {
-        purchase_order: {
-          id: purchaseOrder.id,
-          order_number: purchaseOrder.order_number,
-          total: purchaseOrder.total,
-          currency: purchaseOrder.currency || 'USD',
-          status: purchaseOrder.status,
-          supplier: purchaseOrder.supplier
-        },
-        allocations,
-        summary: {
-          total_pagado: totalPaidInPOCurrency,
-          total_pagado_currency: purchaseOrder.currency || 'USD',
-          saldo_pendiente: saldoPendiente,
-          saldo_pendiente_currency: purchaseOrder.currency || 'USD',
-          esta_pagada_completa: saldoPendiente <= 0.01
-        }
-      }
-    });
+    const result = await _getPaymentsByPO(req.params.poId);
+    if (!result) return res.status(404).json({ message: 'Orden de compra no encontrada' });
+    res.json({ data: result });
   } catch (error) {
-    logger.error('Error fetching payments by PO', { error: error.message });
+    logger.error('Error fetching payments by PO', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -846,69 +709,11 @@ export const getPaymentsByPO = async (req: Request, res: Response) => {
 export const getPayableBalance = async (req: Request, res: Response) => {
   try {
     const supplierId = req.params.supplierId || req.params.id;
-
-    const supplier = await Supplier.findByPk(supplierId) as any;
-    if (!supplier) {
-      return res.status(404).json({ message: 'Proveedor no encontrado' });
-    }
-
-    // Get received POs grouped by currency
-    const receivedPOs = await PurchaseOrder.findAll({
-      where: {
-        supplier_id: supplierId,
-        status: { [Op.in]: ['received', 'partially_received'] }
-      },
-      attributes: ['id', 'order_number', 'total', 'currency', 'status']
-    }) as any[];
-
-    // Use allocations (frozen amounts) for balance calculation
-    const posWithBalance = await Promise.all(receivedPOs.map(async (po) => {
-      const allocations = await SupplierPaymentAllocation.findAll({
-        where: { purchase_order_id: po.id },
-        include: [{
-          model: SupplierPayment,
-          as: 'payment',
-          where: { status: { [Op.ne]: 'cancelled' } },
-          attributes: []
-        }]
-      }) as any[];
-
-      const totalPaid = allocations.reduce(
-        (sum, a) => sum + parseFloat(a.allocated_amount_po_currency || 0), 0
-      );
-
-      const poTotal = parseFloat(po.total || 0);
-      return {
-        id: po.id,
-        order_number: po.order_number,
-        total: poTotal,
-        currency: po.currency || 'USD',
-        status: po.status,
-        total_paid: totalPaid,
-        balance: poTotal - totalPaid
-      };
-    }));
-
-    // Group totals by currency
-    const byCurrency = {};
-    for (const po of posWithBalance) {
-      if (!byCurrency[po.currency]) {
-        byCurrency[po.currency] = { total_ocs: 0, total_paid: 0, balance: 0 };
-      }
-      byCurrency[po.currency].total_ocs += po.total;
-      byCurrency[po.currency].total_paid += po.total_paid;
-      byCurrency[po.currency].balance += po.balance;
-    }
-
-    res.json({
-      data: {
-        supplier: { id: supplier.id, name: supplier.name },
-        summary_by_currency: byCurrency,
-        purchase_orders: posWithBalance
-      }
-    });
+    const result = await _getPayableBalance(supplierId);
+    if (!result) return res.status(404).json({ message: 'Proveedor no encontrado' });
+    res.json({ data: result });
   } catch (error) {
-    logger.error('Error fetching payable balance', { error: error.message });
+    logger.error('Error fetching payable balance', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -919,49 +724,11 @@ export const getPayableBalance = async (req: Request, res: Response) => {
  */
 export const getSupplierCreditBalance = async (req: Request, res: Response) => {
   try {
-    const supplierId = req.params.supplierId;
-
-    const supplier = await Supplier.findByPk(supplierId) as any;
-    if (!supplier) {
-      return res.status(404).json({ message: 'Proveedor no encontrado' });
-    }
-
-    // Fetch all confirmed payments
-    const payments = await SupplierPayment.findAll({
-      where: {
-        supplier_id: supplierId,
-        status: { [Op.ne]: 'cancelled' }
-      },
-      include: [{
-        model: SupplierPaymentAllocation,
-        as: 'allocations'
-      }]
-    }) as any[];
-
-    const creditByCurrency = {};
-
-    payments.forEach(p => {
-      const cur = p.currency || 'USD';
-      if (!creditByCurrency[cur]) {
-        creditByCurrency[cur] = { total_payments: 0, total_allocated: 0, available_credit: 0 };
-      }
-
-      const allocSum = p.allocations.reduce((sum, a) => sum + parseFloat(a.allocated_amount || 0), 0);
-      const unallocated = parseFloat(p.amount) - allocSum;
-
-      creditByCurrency[cur].total_payments += parseFloat(p.amount);
-      creditByCurrency[cur].total_allocated += allocSum;
-
-      if (unallocated > 0.001) {
-        creditByCurrency[cur].available_credit += unallocated;
-      }
-    });
-
-    res.json({
-      data: creditByCurrency
-    });
+    const result = await _getSupplierCreditBalance(req.params.supplierId);
+    if (!result) return res.status(404).json({ message: 'Proveedor no encontrado' });
+    res.json({ data: result });
   } catch (error) {
-    logger.error('Error fetching credit balance', { error: error.message });
+    logger.error('Error fetching credit balance', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -1000,7 +767,7 @@ export const cancelPayment = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await transaction.rollback();
-    logger.error('Error cancelling payment', { error: error.message });
+    logger.error('Error cancelling payment', { error: (error as Error).message });
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

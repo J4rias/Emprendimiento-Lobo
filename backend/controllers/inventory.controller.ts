@@ -19,8 +19,15 @@ import Barcode from '../models/Barcode';
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
+const { getLowStock: _getLowStock, getExpiringProducts: _getExpiringProducts, getInventoryValuation } = require('../services/inventory.service');
 
 class InventoryController {
+  constructor() {
+    this.getByQuery = this.getByQuery.bind(this);
+    this.getByWarehouse = this.getByWarehouse.bind(this);
+    this.getByProduct = this.getByProduct.bind(this);
+  }
+
   // Get inventory by warehouse
   async getByWarehouse(req: Request, res: Response, next: NextFunction) {
     try {
@@ -138,7 +145,7 @@ class InventoryController {
       }) as any;
 
       // Load presentations separately for each product
-      const productIds = [...new Set(inventory.map(item => item.product_id))];
+      const productIds = [...new Set(inventory.map((item: any) => item.product_id))];
       const presentations = await ProductPresentation.findAll({
         where: { product_id: productIds } as any,
         attributes: ['id', 'product_id', 'name', 'units_per_package', 'package_price', 'package_cost', 'purchase_currency', 'is_default', 'is_active']
@@ -154,7 +161,7 @@ class InventoryController {
       });
 
       // Convert to plain JSON and attach presentations
-      const inventoryWithPresentations = inventory.map(item => {
+      const inventoryWithPresentations = inventory.map((item: any) => {
         const plainItem = item.toJSON();
         if (plainItem.product) {
           plainItem.product.presentations = presentationsByProduct[item.product_id] || [];
@@ -172,7 +179,7 @@ class InventoryController {
         }
       });
     } catch (error) {
-      logger.error('Error in getByWarehouse', { error: error.message });
+      logger.error('Error in getByWarehouse', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -223,7 +230,7 @@ class InventoryController {
         data: inventory
       });
     } catch (error) {
-      logger.error('Error in getById', { error: error.message });
+      logger.error('Error in getById', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -262,7 +269,7 @@ class InventoryController {
         }
       });
     } catch (error) {
-      logger.error('Error in getByProduct', { error: error.message });
+      logger.error('Error in getByProduct', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -270,38 +277,11 @@ class InventoryController {
   // Get low stock products
   async getLowStock(req: Request, res: Response, next: NextFunction) {
     try {
-      const { warehouse_id } = req.query;
-      const where: any = {};
-
-      if (warehouse_id) {
-        where.warehouse_id = warehouse_id;
-      }
-
-      const inventory = await Inventory.findAll({
-        where,
-        include: [{
-          model: Product,
-          as: 'product',
-          where: { is_active: true },
-          include: [{ model: Category, as: 'category' }]
-        }, {
-          model: Warehouse,
-          as: 'warehouse'
-        }],
-        order: [[{ model: Product, as: 'product' }, 'name', 'ASC']]
-      }) as any[];
-
-      // Filter low stock items in JavaScript
-      const lowStockItems = inventory.filter(item =>
-        parseFloat(item.quantity) <= parseFloat(item.product.reorder_point)
-      );
-
-      res.json({
-        data: lowStockItems,
-        count: lowStockItems.length
-      });
+      const { warehouse_id } = req.query as Record<string, string>;
+      const data = await _getLowStock(warehouse_id);
+      res.json({ data, count: data.length });
     } catch (error) {
-      logger.error('Error in getLowStock', { error: error.message });
+      logger.error('Error in getLowStock', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -374,7 +354,7 @@ class InventoryController {
           warehouse_id,
           quantity: 0,
           reserved_quantity: 0
-        },
+        } as any,
         transaction
       }) as any;
 
@@ -442,7 +422,7 @@ class InventoryController {
       });
     } catch (error) {
       await transaction.rollback();
-      logger.error('Error in adjustInventory', { error: error.message });
+      logger.error('Error in adjustInventory', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -451,44 +431,10 @@ class InventoryController {
   async getExpiringProducts(req: Request, res: Response, next: NextFunction) {
     try {
       const { days = '30', warehouse_id } = req.query as Record<string, string>;
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + parseInt(days));
-
-      const where: any = {
-        expiration_date: {
-          [Op.lte]: expirationDate,
-          [Op.gte]: new Date()
-        },
-        quantity: { [Op.gt]: 0 }
-      };
-
-      if (warehouse_id) {
-        where.warehouse_id = warehouse_id;
-      }
-
-      const batches = await Batch.findAll({
-        where,
-        include: [
-          {
-            model: Product,
-            as: 'product',
-            where: { is_active: true },
-            include: [{ model: Category, as: 'category' }]
-          },
-          {
-            model: Warehouse,
-            as: 'warehouse'
-          }
-        ],
-        order: [['expiration_date', 'ASC']]
-      }) as any[];
-
-      res.json({
-        data: batches,
-        count: batches.length
-      });
+      const data = await _getExpiringProducts(parseInt(days), warehouse_id);
+      res.json({ data, count: data.length });
     } catch (error) {
-      logger.error('Error in getExpiringProducts', { error: error.message });
+      logger.error('Error in getExpiringProducts', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -496,119 +442,11 @@ class InventoryController {
   // Get inventory valuation
   async getValuation(req: Request, res: Response, next: NextFunction) {
     try {
-      const { warehouse_id } = req.query;
-      const where: any = {};
-
-      if (warehouse_id) {
-        where.warehouse_id = warehouse_id;
-      }
-
-      const inventory = await Inventory.findAll({
-        where,
-        include: [{
-          model: Product,
-          as: 'product',
-          where: { is_active: true },
-          include: [{
-            model: ProductPresentation,
-            as: 'presentations'
-          }]
-        }]
-      }) as any[];
-
-      const totalsByCurrency: any = {
-        USD: 0,
-        COP: 0,
-        VES: 0
-      };
-
-      const valuedItems = inventory.map(inv => {
-        // Get default presentation or first available
-        const defaultPresentation = inv.product?.presentations?.find(p => p.is_default) || inv.product?.presentations?.[0];
-
-        // Use unit cost, or calculate from package cost as fallback
-        let cost = parseFloat(defaultPresentation?.cost || 0);
-        const unitsPerPkg = parseInt(defaultPresentation?.units_per_package) || 1;
-        const packageCost = parseFloat(defaultPresentation?.package_cost || 0);
-
-        if (cost === 0 && packageCost > 0) {
-          cost = packageCost / unitsPerPkg;
-        }
-
-        const currency = defaultPresentation?.purchase_currency || 'USD';
-        const quantity = parseFloat(inv.quantity) || 0;
-        const value = quantity * cost;
-
-        // Sum by currency
-        if (totalsByCurrency.hasOwnProperty(currency)) {
-          totalsByCurrency[currency] += value;
-        }
-
-        return {
-          product: inv.product,
-          quantity: inv.quantity,
-          cost,
-          currency,
-          value
-        };
-      });
-
-      // Convert all currencies to USD
-      let totalValueUSD = totalsByCurrency.USD;
-      const conversions: any[] = [];
-      const warnings: any[] = [];
-
-      // Process each non-USD currency
-      for (const [currency, amount] of Object.entries(totalsByCurrency)) {
-        if (currency === 'USD' || amount === 0) continue;
-
-        try {
-          // Convert amount to USD
-          const converted = await (ExchangeRate as any).convert(amount, currency, 'USD');
-          const rate = await (ExchangeRate as any).getRate(currency, 'USD');
-
-          totalValueUSD += converted;
-          conversions.push({
-            currency,
-            originalAmount: amount,
-            rate: rate || 0,
-            convertedAmount: converted
-          });
-        } catch (error) {
-          logger.warn(`No exchange rate found for ${currency} to USD:`, error.message);
-          warnings.push({
-            currency,
-            amount,
-            message: `No se encontró tasa de cambio de ${currency} a USD. Este monto no está incluido en el total.`
-          });
-        }
-      }
-
-      // Convert all currencies to COP
-      let totalValueCOP = totalsByCurrency.COP;
-      for (const [currency, amount] of Object.entries(totalsByCurrency)) {
-        if (currency === 'COP' || amount === 0) continue;
-        try {
-          totalValueCOP += await (ExchangeRate as any).convert(amount, currency, 'COP');
-        } catch (e) { /* already warned above */ }
-      }
-
-      const productsWithStock = new Set(inventory.filter(inv => parseFloat(inv.quantity) > 0).map(inv => inv.product_id)).size;
-
-      res.json({
-        data: {
-          items: valuedItems,
-          totalValue: totalValueUSD,  // Total converted to USD
-          totalValueCOP,  // Total converted to COP
-          totalsByCurrency,  // Original breakdown by currency
-          conversions,  // Conversion details
-          warnings,  // Warnings for missing rates
-          currency: 'USD',
-          productsWithStock
-        }
-      });
+      const { warehouse_id } = req.query as Record<string, string>;
+      const data = await getInventoryValuation(warehouse_id);
+      res.json({ data });
     } catch (error) {
-      logger.error('Error in getValuation', { error: error.message });
+      logger.error('Error in getValuation', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -663,7 +501,7 @@ class InventoryController {
       });
 
     } catch (error) {
-      logger.error('Error in getMovements', { error: error.message });
+      logger.error('Error in getMovements', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
@@ -681,7 +519,7 @@ class InventoryController {
       });
 
     } catch (error) {
-      logger.error('Error in getWarehouses', { error: error.message });
+      logger.error('Error in getWarehouses', { error: (error as Error).message });
       res.status(500).json({ message: 'Error interno del servidor' });
     }
   }

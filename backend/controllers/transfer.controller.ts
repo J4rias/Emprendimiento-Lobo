@@ -172,7 +172,7 @@ export const createTransfer = async (req: Request, res: Response, next: NextFunc
         reason: `Transferencia a ${destinationWarehouse.name}`,
         batch_id,
         user_id: (req as any).user.id
-      }, { transaction }) as any;
+      } as any, { transaction }) as any;
     }
 
     const transfer = await Transfer.create({
@@ -401,7 +401,7 @@ export const receiveTransfer = async (req: Request, res: Response, next: NextFun
           product_id: detail.product_id,
           warehouse_id: transfer.destination_warehouse_id,
           quantity: 0
-        }, { transaction }) as any;
+        } as any, { transaction }) as any;
       }
 
       const oldQuantity = inventory.quantity;
@@ -428,7 +428,7 @@ export const receiveTransfer = async (req: Request, res: Response, next: NextFun
         reason: `Transferencia desde ${transfer.originWarehouse.name}`,
         batch_id: detail.batch_id,
         user_id: (req as any).user.id
-      }, { transaction }) as any;
+      } as any, { transaction }) as any;
 
       detail.quantity_received = totalUnits;
       await detail.save({ transaction });
@@ -526,7 +526,7 @@ export const cancelTransfer = async (req: Request, res: Response, next: NextFunc
           product_id: detail.product_id,
           warehouse_id: transfer.origin_warehouse_id,
           quantity: 0
-        }, { transaction }) as any;
+        } as any, { transaction }) as any;
       }
 
       const oldQuantity = inventory.quantity;
@@ -553,7 +553,7 @@ export const cancelTransfer = async (req: Request, res: Response, next: NextFunc
         reason: reason || `Cancelación de transferencia ${transfer.transfer_number}`,
         batch_id: detail.batch_id,
         user_id: (req as any).user.id
-      }, { transaction }) as any;
+      } as any, { transaction }) as any;
     }
 
     transfer.status = 'cancelled';

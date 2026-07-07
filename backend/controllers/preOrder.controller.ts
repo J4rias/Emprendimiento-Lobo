@@ -70,33 +70,33 @@ export const create = async (req: Request, res: Response) => {
       subtotal += lineTotal;
 
       details.push({
-        productId: presentation.product_id,
-        presentationId: item.presentation_id,
+        product_id: presentation.product_id,
+        presentation_id: item.presentation_id,
         quantity,
-        isUnit: item.is_unit || false,
-        unitPrice,
+        is_unit: item.is_unit || false,
+        unit_price: unitPrice,
         total: lineTotal,
         notes: item.notes || null
       });
     }
 
     const preOrder = await PreOrder.create({
-      customerId: customer_id || null,
-      customerName: customer_name || null,
-      customerPhone: customer_phone || null,
+      customer_id: customer_id || null,
+      customer_name: customer_name || null,
+      customer_phone: customer_phone || null,
       channel,
       notes,
       subtotal,
       total: subtotal,
       currency,
-      exchangeRate: exchangeRate ? 1 / exchangeRate : null, // Store as COP/USD
-      createdBy: (req as any).user.id,
-      warehouseId: warehouse.id
-    }, { transaction }) as any;
+      exchange_rate: exchangeRate ? 1 / exchangeRate : null, // Store as COP/USD
+      created_by: (req as any).user.id,
+      warehouse_id: warehouse.id
+    } as any, { transaction }) as any;
 
     for (const detail of details) {
       await PreOrderDetail.create({
-        preOrderId: preOrder.id,
+        pre_order_id: preOrder.id,
         ...detail
       }, { transaction }) as any;
     }
@@ -109,7 +109,7 @@ export const create = async (req: Request, res: Response) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone'] }
+        { model: Customer, as: 'customer', attributes: ['id', 'first_name', 'last_name', 'business_name', 'phone'] }
       ]
     }) as any;
 
@@ -137,7 +137,7 @@ export const getAll = async (req: Request, res: Response) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone'] },
+        { model: Customer, as: 'customer', attributes: ['id', 'first_name', 'last_name', 'business_name', 'phone'] },
         { model: User, as: 'approver', attributes: ['id', 'first_name', 'last_name'] }
       ],
       order: [[sort_by, sort_dir.toUpperCase()] as [string, string]],
@@ -186,7 +186,7 @@ export const getById = async (req: Request, res: Response) => {
           { model: Product, as: 'product', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'base_price'] }
         ]},
-        { model: Customer, as: 'customer', attributes: ['id', 'firstName', 'lastName', 'businessName', 'phone', 'email'] },
+        { model: Customer, as: 'customer', attributes: ['id', 'first_name', 'last_name', 'business_name', 'phone', 'email'] },
         { model: User, as: 'approver', attributes: ['id', 'first_name', 'last_name'] },
         { model: Sale, as: 'convertedSale', attributes: ['id', 'sale_number', 'total'] }
       ]
@@ -215,8 +215,8 @@ export const approve = async (req: Request, res: Response) => {
 
     await preOrder.update({
       status: 'approved',
-      approvedBy: (req as any).user.id,
-      approvedAt: new Date()
+      approved_by: (req as any).user.id,
+      approved_at: new Date()
     });
 
     res.json({ data: preOrder });
@@ -238,8 +238,8 @@ export const reject = async (req: Request, res: Response) => {
 
     await preOrder.update({
       status: 'rejected',
-      approvedBy: (req as any).user.id,
-      approvedAt: new Date()
+      approved_by: (req as any).user.id,
+      approved_at: new Date()
     });
 
     res.json({ data: preOrder });
@@ -272,13 +272,13 @@ export const convert = async (req: Request, res: Response) => {
     for (const detail of preOrder.details) {
       const inventory = await Inventory.findOne({
         where: {
-          product_id: detail.productId,
-          warehouse_id: preOrder.warehouseId
+          product_id: detail.product_id,
+          warehouse_id: preOrder.warehouse_id
         },
         transaction
       }) as any;
 
-      const unitsNeeded = detail.isUnit
+      const unitsNeeded = detail.is_unit
         ? parseFloat(detail.quantity)
         : parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1);
 
@@ -294,12 +294,12 @@ export const convert = async (req: Request, res: Response) => {
 
     // Build sale payload and use the createSale endpoint internally
     // We build the items array matching createSale's expected format
-    const saleItems = preOrder.details.map(d => ({
-      product_id: d.productId,
-      presentation_id: d.presentationId,
+    const saleItems = preOrder.details.map((d: any) => ({
+      product_id: d.product_id,
+      presentation_id: d.presentation_id,
       quantity: parseFloat(d.quantity),
-      unit_price: parseFloat(d.unitPrice),
-      is_unit: d.isUnit
+      unit_price: parseFloat(d.unit_price),
+      is_unit: d.is_unit
     }));
 
     // Get current exchange rate for the sale
@@ -312,8 +312,8 @@ export const convert = async (req: Request, res: Response) => {
     // Create a minimal sale request body
     // The sale will be created as cash type with no payment (to be completed at POS)
     const saleBody = {
-      customer_id: preOrder.customerId,
-      warehouse_id: preOrder.warehouseId,
+      customer_id: preOrder.customer_id,
+      warehouse_id: preOrder.warehouse_id,
       sale_type: req.body.sale_type || 'cash',
       currency_mode: preOrder.currency === 'USD' ? 'USD' : 'COP',
       items: saleItems,
@@ -323,10 +323,10 @@ export const convert = async (req: Request, res: Response) => {
     };
 
     // Calculate paid_amount from payment_lines
-    const cashLines = saleBody.payment_lines.filter(l => l.method !== 'credit');
+    const cashLines = saleBody.payment_lines.filter((l: any) => l.method !== 'credit');
     let paid_amount = 0;
     if (cashLines.length > 0) {
-      paid_amount = cashLines.reduce((sum, line) => {
+      paid_amount = cashLines.reduce((sum: any, line: any) => {
         const amount = parseFloat(line.amount) || 0;
         if (amount <= 0) return sum;
         const rate = parseFloat(line.exchange_rate) || 1;
@@ -362,7 +362,7 @@ export const convert = async (req: Request, res: Response) => {
     for (const item of saleItems) {
       const presentation = await ProductPresentation.findByPk(item.presentation_id, { transaction }) as any;
       const inventory = await Inventory.findOne({
-        where: { product_id: item.product_id, warehouse_id: preOrder.warehouseId },
+        where: { product_id: item.product_id, warehouse_id: preOrder.warehouse_id },
         lock: transaction.LOCK.UPDATE,
         transaction
       }) as any;
@@ -458,7 +458,7 @@ export const convert = async (req: Request, res: Response) => {
     // Update pre-order status
     await preOrder.update({
       status: 'converted',
-      convertedSaleId: sale.id
+      converted_sale_id: sale.id
     }, { transaction });
 
     await transaction.commit();

@@ -58,7 +58,7 @@ const SupplierContact = sequelize.define<Model<SupplierContactAttributes, Suppli
       type: DataTypes.STRING(100),
       allowNull: true,
       validate: {
-        isEmailOrEmpty(value) {
+        isEmailOrEmpty(value: any) {
           if (value && value.trim() !== '') {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(value)) {
@@ -124,7 +124,7 @@ const SupplierContact = sequelize.define<Model<SupplierContactAttributes, Suppli
 );
 
 // Asociaciones
-(SupplierContact as any).associate = (models) => {
+(SupplierContact as any).associate = (models: any) => {
   SupplierContact.belongsTo(models.Supplier, {
     foreignKey: 'supplier_id',
     as: 'supplier'

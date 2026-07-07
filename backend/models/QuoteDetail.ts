@@ -4,20 +4,20 @@ import { sequelize } from '../config/database';
 // 1. Interfaz con TODOS los campos del modelo (los de la BD + timestamps)
 interface QuoteDetailAttributes {
   id: number;
-  quoteId: number;
-  productId: number;
-  productPresentationId: number | null;
+  quote_id: number;
+  product_id: number;
+  product_presentation_id: number | null;
   description: string | null;
   quantity: number;
-  unitPrice: number;
-  discountPercentage: number;
-  discountAmount: number;
-  taxPercentage: number;
-  taxAmount: number;
+  unit_price: number;
+  discount_percentage: number;
+  discount_amount: number;
+  tax_percentage: number;
+  tax_amount: number;
   subtotal: number;
   total: number;
   notes: string | null;
-  lineOrder: number;
+  line_order: number;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date | null;
@@ -26,7 +26,7 @@ interface QuoteDetailAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface QuoteDetailCreationAttributes extends Optional<
   QuoteDetailAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'quantity' | 'discountPercentage' | 'discountAmount' | 'taxPercentage' | 'taxAmount' | 'subtotal' | 'total' | 'lineOrder'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'quantity' | 'discount_percentage' | 'discount_amount' | 'tax_percentage' | 'tax_amount' | 'subtotal' | 'total' | 'line_order'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -38,17 +38,17 @@ const QuoteDetail = sequelize.define<Model<QuoteDetailAttributes, QuoteDetailCre
       primaryKey: true,
       autoIncrement: true
     },
-    quoteId: {
+    quote_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID de la cotización'
     },
-    productId: {
+    product_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID del producto'
     },
-    productPresentationId: {
+    product_presentation_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'ID de la presentación del producto'
@@ -64,30 +64,30 @@ const QuoteDetail = sequelize.define<Model<QuoteDetailAttributes, QuoteDetailCre
       defaultValue: 1,
       comment: 'Cantidad cotizada'
     },
-    unitPrice: {
+    unit_price: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       comment: 'Precio unitario'
     },
-    discountPercentage: {
+    discount_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Porcentaje de descuento por línea'
     },
-    discountAmount: {
+    discount_amount: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
       comment: 'Monto del descuento por línea'
     },
-    taxPercentage: {
+    tax_percentage: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 18,
       comment: 'Porcentaje de impuesto'
     },
-    taxAmount: {
+    tax_amount: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0,
@@ -110,7 +110,7 @@ const QuoteDetail = sequelize.define<Model<QuoteDetailAttributes, QuoteDetailCre
       allowNull: true,
       comment: 'Notas adicionales para esta línea'
     },
-    lineOrder: {
+    line_order: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
@@ -126,19 +126,19 @@ const QuoteDetail = sequelize.define<Model<QuoteDetailAttributes, QuoteDetailCre
     hooks: {
       beforeSave: (detail: any) => {
         // Calcular subtotal
-        detail.subtotal = detail.quantity * detail.unitPrice;
+        detail.subtotal = detail.quantity * detail.unit_price;
 
         // Calcular descuento
-        if (detail.discountPercentage > 0) {
-          detail.discountAmount = (detail.subtotal * detail.discountPercentage) / 100;
+        if (detail.discount_percentage > 0) {
+          detail.discount_amount = (detail.subtotal * detail.discount_percentage) / 100;
         }
 
         // Calcular impuesto
-        const baseAmount = detail.subtotal - detail.discountAmount;
-        detail.taxAmount = (baseAmount * detail.taxPercentage) / 100;
+        const baseAmount = detail.subtotal - detail.discount_amount;
+        detail.tax_amount = (baseAmount * detail.tax_percentage) / 100;
 
         // Calcular total
-        detail.total = baseAmount + detail.taxAmount;
+        detail.total = baseAmount + detail.tax_amount;
       }
     }
   }
