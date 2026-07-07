@@ -298,7 +298,7 @@ async function buildCustomerStatement(customerId: any) {
  * @returns {{ blocked: boolean, reason: string|null }}
  */
 async function getCustomerCreditBlock(customerId: any) {
-  const customer = await Customer.findOne({ where: { id: customerId, isDeleted: false } });
+  const customer = await Customer.findOne({ where: { id: customerId } });
   if (!customer) return { blocked: false, reason: null };
 
   const creditDays = (customer as any).credit_days || 0;

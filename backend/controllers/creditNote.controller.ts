@@ -228,7 +228,7 @@ export const getCreditNoteById = async (req: Request, res: Response) => {
             {
               model: Batch,
               as: 'batch',
-              attributes: ['id', 'batch_number', 'expiry_date'],
+              attributes: ['id', 'batch_number', 'expiration_date'],
               required: false
             }
           ]

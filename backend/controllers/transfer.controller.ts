@@ -386,7 +386,7 @@ export const receiveTransfer = async (req: Request, res: Response, next: NextFun
     const inventoryImpact = [];
 
     for (const detail of transfer.details) {
-      const totalUnits = detail.quantity_requested;
+      const totalUnits = parseFloat(detail.quantity_requested);
 
       let inventory = await Inventory.findOne({
         where: {
@@ -511,7 +511,7 @@ export const cancelTransfer = async (req: Request, res: Response, next: NextFunc
     const inventoryImpact = [];
 
     for (const detail of transfer.details) {
-      const totalUnits = detail.quantity_requested;
+      const totalUnits = parseFloat(detail.quantity_requested);
 
       let inventory = await Inventory.findOne({
         where: {
