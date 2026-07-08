@@ -31,9 +31,15 @@ export const quoteService = {
     return response.data;
   },
 
+  // Update quote status only (approve, reject, sent)
+  updateStatus: async (id, status) => {
+    const response = await api.patch(`/quotes/${id}/status`, { status });
+    return response.data;
+  },
+
   // Convert quote to sale
-  convertToSale: async (id, data) => {
-    const response = await api.post(`/quotes/${id}/convert`, data);
+  convertToSale: async (id) => {
+    const response = await api.post(`/quotes/${id}/convert`);
     return response.data;
   },
 };

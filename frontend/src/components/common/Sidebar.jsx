@@ -152,6 +152,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'sales.view',
     },
     {
+      name: 'Cotizaciones',
+      icon: FileSpreadsheet,
+      path: '/cotizaciones',
+      permission: 'sales.quotes.view',
+    },
+    {
       name: 'Pre-Pedidos',
       icon: Bot,
       path: '/pre-pedidos',

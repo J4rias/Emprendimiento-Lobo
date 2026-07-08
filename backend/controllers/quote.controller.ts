@@ -12,6 +12,8 @@ import Product from '../models/Product';
 import ProductPresentation from '../models/ProductPresentation';
 import User from '../models/User';
 import PriceList from '../models/PriceList';
+import Warehouse from '../models/Warehouse';
+import * as saleService from '../services/sale.service';
 
 // Other requires that are not models/sequelize/express → leave as require()
 const { sequelize } = require('../config/database');
@@ -479,6 +481,146 @@ export const deleteQuote = async (req: Request, res: Response, next: NextFunctio
       message: 'Cotización eliminada exitosamente'
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Actualizar estado de una cotización (approve / reject / sent)
+ * PATCH /api/quotes/:id/status
+ */
+export const updateQuoteStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as { status: string };
+
+    const allowed = ['draft', 'sent', 'approved', 'rejected'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: `Estado inválido. Permitidos: ${allowed.join(', ')}` });
+    }
+
+    const quote = await Quote.findByPk(id) as any;
+    if (!quote) return res.status(404).json({ message: 'Cotización no encontrada' });
+    if (quote.status === 'converted') {
+      return res.status(400).json({ message: 'No se puede cambiar el estado de una cotización ya convertida' });
+    }
+
+    await quote.update({ status });
+    res.json({ message: 'Estado actualizado', data: quote });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Convertir cotización a venta a crédito
+ * POST /api/quotes/:id/convert
+ */
+export const convertQuote = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role?.name || '';
+
+    // 1. Load quote with details
+    const quote = await Quote.findOne({
+      where: { id },
+      include: [{
+        model: QuoteDetail,
+        as: 'details',
+        include: [
+          { model: Product, as: 'product', attributes: ['id', 'name'] },
+          { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package', 'cost', 'package_cost', 'purchase_currency'] }
+        ]
+      }]
+    }) as any;
+
+    if (!quote) return res.status(404).json({ message: 'Cotización no encontrada' });
+
+    // 2. Business rule validations
+    if (quote.status === 'converted') {
+      return res.status(400).json({ message: 'Esta cotización ya fue convertida a venta' });
+    }
+    if (!['approved', 'sent', 'draft'].includes(quote.status)) {
+      return res.status(400).json({ message: 'Solo se pueden convertir cotizaciones aprobadas, enviadas o en borrador' });
+    }
+    if (quote.isExpired()) {
+      return res.status(400).json({ message: 'La cotización está vencida y no puede ser convertida' });
+    }
+    if (!quote.details || quote.details.length === 0) {
+      return res.status(400).json({ message: 'La cotización no tiene productos' });
+    }
+
+    // 3. Validate all items have presentations
+    const missingPresentation = quote.details.find((d: any) => !d.product_presentation_id);
+    if (missingPresentation) {
+      return res.status(400).json({
+        message: `El producto "${missingPresentation.product?.name}" no tiene presentación asignada. Edite la cotización antes de convertir.`
+      });
+    }
+
+    // 4. Get warehouse (only one in this system)
+    const warehouse = await Warehouse.findOne({ where: { is_active: true } }) as any;
+    if (!warehouse) return res.status(500).json({ message: 'No se encontró depósito activo' });
+
+    // 5. Get current exchange rate
+    const rateRow = await sequelize.query(
+      `SELECT rate FROM exchange_rates WHERE from_currency = 'USD' AND to_currency = 'COP' ORDER BY created_at DESC LIMIT 1`,
+      { type: sequelize.QueryTypes.SELECT }
+    ) as any[];
+    const exchangeRate = rateRow.length > 0 ? parseFloat(rateRow[0].rate) : 1;
+
+    // 6. Map quote details to sale items
+    const items = (quote.details as any[]).map((d: any) => ({
+      product_id: d.product_id,
+      presentation_id: d.product_presentation_id,
+      quantity: parseFloat(d.quantity),
+      unit_price: parseFloat(d.unit_price),
+      is_unit: false,
+      discount_percent: parseFloat(d.discount_percentage || 0),
+      tax_percent: 0, // quote taxes not mapped to sale taxes (different systems)
+      notes: d.notes || null
+    }));
+
+    // 7. Determine currency_mode from quote currency
+    const currency_mode = quote.currency === 'USD' ? 'USD' : 'COP';
+
+    // 8. Create credit sale
+    const { sale } = await saleService.createSale(
+      {
+        customer_id: quote.customer_id,
+        warehouse_id: warehouse.id,
+        sale_type: 'credit',
+        currency_mode,
+        exchange_rate: exchangeRate,
+        payment_lines: [],
+        items,
+        notes: `Generada desde cotización ${quote.code}${quote.notes ? '\n' + quote.notes : ''}`,
+        authorized_by: userId
+      },
+      userId,
+      userRole
+    );
+
+    // 9. Mark quote as converted
+    await quote.update({
+      status: 'converted',
+      converted_to_sale_id: sale.id,
+      converted_at: new Date()
+    });
+
+    res.status(201).json({
+      message: `Cotización ${quote.code} convertida a venta ${sale.sale_number} exitosamente`,
+      data: {
+        sale_id: sale.id,
+        sale_number: sale.sale_number,
+        quote_code: quote.code
+      }
+    });
+  } catch (error: any) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message, ...(error.details || {}) });
+    }
     next(error);
   }
 };

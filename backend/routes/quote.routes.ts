@@ -67,6 +67,28 @@ router.put(
 );
 
 /**
+ * @route   PATCH /api/quotes/:id/status
+ * @desc    Cambiar estado de una cotización (approve, reject, sent)
+ * @access  Private (sales.quotes.update)
+ */
+router.patch(
+  '/:id/status',
+  authorize('sales.quotes.update'),
+  quoteController.updateQuoteStatus
+);
+
+/**
+ * @route   POST /api/quotes/:id/convert
+ * @desc    Convertir cotización aprobada a venta a crédito
+ * @access  Private (sales.quotes.update)
+ */
+router.post(
+  '/:id/convert',
+  authorize('sales.quotes.update'),
+  quoteController.convertQuote
+);
+
+/**
  * @route   DELETE /api/quotes/:id
  * @desc    Eliminar una cotización (soft delete)
  * @access  Private (sales.quotes.delete)
