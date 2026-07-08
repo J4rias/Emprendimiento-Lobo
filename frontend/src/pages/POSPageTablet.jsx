@@ -8,7 +8,7 @@ import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
-import Modal from '../components/common/Modal';
+import { Textarea } from '../components/ui';
 import {
   Search, X, AlertCircle, CheckCircle, User,
   Package, Lock, Banknote, CreditCard, Smartphone,
@@ -75,7 +75,7 @@ const POSPageTablet = () => {
           {/* Clock */}
           <div className="flex items-center gap-1 text-gray-400 text-sm min-w-[60px]">
             <Clock className="w-4 h-4" />
-            {pos.currentTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            {pos.currentTime.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </div>
@@ -277,7 +277,7 @@ const POSPageTablet = () => {
                         <span className="text-gray-500">{cur.code}</span>
                         <span className="font-medium text-gray-700">
                           {converted !== null
-                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.round(converted).toLocaleString('es-CO') : converted.toFixed(2)}`
+                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.ceil(converted).toLocaleString('es-VE') : converted.toFixed(2)}`
                             : 'Sin tasa'}
                         </span>
                       </div>
@@ -605,8 +605,8 @@ function TabletCheckoutModal({
 
   const isUSD = displayCurrency === 'USD';
   const sSym = isUSD ? '$' : 'COP$';
-  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.round(usdVal * copPerUSD).toLocaleString('es-CO');
-  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.round(copVal).toLocaleString('es-CO');
+  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.ceil(usdVal * copPerUSD).toLocaleString('es-VE');
+  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.ceil(copVal).toLocaleString('es-VE');
 
   const [newPayCurrency, setNewPayCurrency] = useState(isUSD ? 'USD' : 'COP');
   const [newPayMethod, setNewPayMethod] = useState('cash');
@@ -712,7 +712,7 @@ function TabletCheckoutModal({
 
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
-    if (currency === 'COP') return Math.round(n).toLocaleString('es-CO');
+    if (currency === 'COP') return Math.ceil(n).toLocaleString('es-VE');
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -781,9 +781,8 @@ function TabletCheckoutModal({
           {/* Notes */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-2">Notas (opcional)</label>
-            <textarea
+            <Textarea
               value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Observaciones..."
             />
           </div>
@@ -812,9 +811,9 @@ function TabletCheckoutModal({
                         {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                           <span className="text-xs text-gray-400">
                             @ {line.method === 'usdt'
-                              ? `${Math.round(line.cop_rate).toLocaleString('es-CO')} COP/USDT`
+                              ? `${Math.ceil(line.cop_rate).toLocaleString('es-VE')} COP/USDT`
                               : line.display_rate
-                              ? `${line.currency === 'COP' ? Math.round(line.display_rate).toLocaleString('es-CO') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                              ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString('es-VE') : line.display_rate.toFixed(2)} ${line.currency}/USD`
                               : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
                           </span>
                         )}
@@ -873,7 +872,7 @@ function TabletCheckoutModal({
                 }
                 formatted = effectiveCurrency === 'USD'
                   ? remainingInCurrency.toFixed(2)
-                  : Math.ceil(remainingInCurrency).toLocaleString('es-CO');
+                  : Math.ceil(remainingInCurrency).toLocaleString('es-VE');
                 return (
                   <p className="text-base font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
                 );
@@ -942,7 +941,7 @@ function TabletCheckoutModal({
                     </div>
                     <div className="flex justify-between text-base font-semibold text-green-700">
                       <span>Entregar:</span>
-                      <span>COP$ {vueltoCOP.toLocaleString('es-CO')}</span>
+                      <span>COP$ {vueltoCOP.toLocaleString('es-VE')}</span>
                     </div>
                   </div>
                 );

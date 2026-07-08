@@ -1,51 +1,55 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Download, BookOpen, Search, X, Shield, Eye, EyeOff, CheckCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Download, BookOpen, Eye, EyeOff, CheckCircle, ChevronUp, ChevronDown, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { arService } from '../services/api/arService';
-import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../context/AuthContext';
+import { Button, Modal, Pagination, SearchInput, useTableLimit } from '../components/ui';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const BUCKETS = [
-  { key: 'all',        label: 'Todos',       color: 'gray' },
-  { key: 'vigente',    label: 'Vigente',     color: 'green' },
-  { key: '0_30',       label: '0-30 días',   color: 'yellow' },
-  { key: '31_60',      label: '31-60 días',  color: 'orange' },
-  { key: '61_90',      label: '61-90 días',  color: 'red' },
-  { key: '+90',        label: '+90 días',    color: 'rose' },
-  { key: 'sin_termino',label: 'Sin término', color: 'slate' },
+  { key: 'all',         label: 'Todos',       color: 'gray' },
+  { key: 'vigente',     label: 'Vigente',     color: 'green' },
+  { key: '0_30',        label: '0-30 días',   color: 'yellow' },
+  { key: '31_60',       label: '31-60 días',  color: 'orange' },
+  { key: '61_90',       label: '61-90 días',  color: 'red' },
+  { key: '+90',         label: '+90 días',    color: 'rose' },
+  { key: 'sin_termino', label: 'Sin término', color: 'slate' },
 ];
 
 const BUCKET_COLORS = {
-  vigente:    { bg: 'bg-green-500',  text: 'text-green-700',  badge: 'bg-green-100 text-green-700' },
-  '0_30':     { bg: 'bg-yellow-400', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
-  '31_60':    { bg: 'bg-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
-  '61_90':    { bg: 'bg-red-500',    text: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
-  '+90':      { bg: 'bg-rose-700',   text: 'text-rose-800',   badge: 'bg-rose-100 text-rose-800' },
-  sin_termino:{ bg: 'bg-slate-400',  text: 'text-slate-600',  badge: 'bg-slate-100 text-slate-600' },
+  vigente:     { bg: 'bg-green-500',  text: 'text-green-700',  badge: 'bg-green-100 text-green-700' },
+  '0_30':      { bg: 'bg-yellow-400', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
+  '31_60':     { bg: 'bg-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+  '61_90':     { bg: 'bg-red-500',    text: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
+  '+90':       { bg: 'bg-rose-700',   text: 'text-rose-800',   badge: 'bg-rose-100 text-rose-800' },
+  sin_termino: { bg: 'bg-slate-400',  text: 'text-slate-600',  badge: 'bg-slate-100 text-slate-600' },
 };
 
 // ─── Formateo ─────────────────────────────────────────────────────────────────
 
-const fmt = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = (n) =>
+  new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 // ─── Barra de Aging ──────────────────────────────────────────────────────────
 
 function AgingBar({ distribution, total }) {
   if (!distribution?.length || !total) return null;
-  const buckets = distribution;
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-800">Distribución de Cartera</h3>
-        <span className="text-sm text-gray-500">Total pendiente: <strong className="text-gray-800">{fmt(total)}</strong></span>
+        <span className="text-sm text-gray-500">
+          Total pendiente: <strong className="text-gray-800">{fmt(total)}</strong>
+        </span>
       </div>
-      {/* Barra segmentada */}
       <div className="flex h-8 rounded-lg overflow-hidden mb-3">
-        {buckets.map(b => {
+        {distribution.map(b => {
           const colors = BUCKET_COLORS[b.bucket];
           if (!b.pct) return null;
           return (
@@ -58,9 +62,8 @@ function AgingBar({ distribution, total }) {
           );
         })}
       </div>
-      {/* Leyenda */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {buckets.map(b => {
+        {distribution.map(b => {
           const colors = BUCKET_COLORS[b.bucket];
           if (!b.count) return null;
           return (
@@ -79,7 +82,7 @@ function AgingBar({ distribution, total }) {
   );
 }
 
-// ─── Skeleton ────────────────────────────────────────────────────────────────
+// ─── Skeletons ────────────────────────────────────────────────────────────────
 
 function SkeletonRow() {
   return (
@@ -105,9 +108,31 @@ function SkeletonCard() {
   );
 }
 
+// ─── Bucket filter pills ──────────────────────────────────────────────────────
+
+function BucketFilter({ activeBucket, onSelect }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {BUCKETS.map(b => (
+        <button
+          key={b.key}
+          onClick={() => onSelect(b.key)}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+            activeBucket === b.key
+              ? 'bg-teal-700 text-white border-teal-700'
+              : 'bg-white text-gray-600 border-gray-300 hover:border-teal-400'
+          }`}
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Modal PIN de configuración ──────────────────────────────────────────────
 
-function PinSetupModal({ onClose }) {
+function PinSetupModal({ open, onClose }) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [show, setShow] = useState(false);
@@ -129,13 +154,16 @@ function PinSetupModal({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">Configurar PIN de Crédito</h3>
-        <p className="text-sm text-gray-500 mb-5">Este PIN se usará para autorizar reversiones de abonos.</p>
-        <div className="space-y-4">
+    <Modal open={open} onClose={onClose} title="Configurar PIN de Crédito" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Este PIN se usará para autorizar reversiones de abonos.
+        </p>
+        <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nuevo PIN (4-6 dígitos)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nuevo PIN (4-6 dígitos)
+            </label>
             <div className="relative">
               <input
                 type={show ? 'text' : 'password'}
@@ -143,10 +171,14 @@ function PinSetupModal({ onClose }) {
                 maxLength={6}
                 value={pin}
                 onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 tracking-widest text-lg"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 tracking-widest text-lg pr-10"
                 placeholder="••••"
               />
-              <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <button
+                type="button"
+                onClick={() => setShow(!show)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
                 {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -164,21 +196,33 @@ function PinSetupModal({ onClose }) {
             />
           </div>
         </div>
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} disabled={loading} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Cancelar</button>
-          <button onClick={handleSave} disabled={loading} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium flex items-center justify-center gap-2">
-            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-            Guardar
-          </button>
+        <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="success"
+            className="flex-1"
+            loading={loading}
+            onClick={handleSave}
+          >
+            <CheckCircle className="w-4 h-4" />
+            Guardar PIN
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
 // ─── Tab General ─────────────────────────────────────────────────────────────
 
-function TabGeneral({ data, loading, activeBucket, setActiveBucket, search, setSearch, onExport, currentPage, setCurrentPage, itemsPerPage }) {
+function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState('pending_cop');
   const [sortDir, setSortDir] = useState('desc');
@@ -187,90 +231,61 @@ function TabGeneral({ data, loading, activeBucket, setActiveBucket, search, setS
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDir('desc');
     }
   };
 
-  const sortedInvoices = [...invoices].sort((a, b) => {
-    const aVal = a[sortField];
-    const bVal = b[sortField];
-    const result = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-    return sortDir === 'asc' ? result : -result;
+  const sorted = [...invoices].sort((a, b) => {
+    const r = a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0;
+    return sortDir === 'asc' ? r : -r;
   });
 
-  const totalPages = sortedInvoices.length > 0 ? Math.ceil(sortedInvoices.length / itemsPerPage) : 1;
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedInvoices = sortedInvoices.slice(startIdx, startIdx + itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / limit));
+  const startIdx = (currentPage - 1) * limit;
+  const paginated = sorted.slice(startIdx, startIdx + limit);
 
   const SortIcon = ({ field }) => {
-    if (sortField !== field) return <div className="w-4 h-4" />;
+    if (sortField !== field) return <span className="w-4 h-4 inline-block" />;
     return sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
   };
 
+  const TH = ({ field, children }) => (
+    <th
+      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">{children} <SortIcon field={field} /></div>
+    </th>
+  );
+
   return (
     <div>
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-4 items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          {BUCKETS.map(b => (
-            <button
-              key={b.key}
-              onClick={() => setActiveBucket(b.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                activeBucket === b.key
-                  ? 'bg-teal-700 text-white border-teal-700'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-teal-400'
-              }`}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
-            placeholder="Buscar cliente o factura..."
-          />
-          {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>}
-        </div>
+        <BucketFilter activeBucket={activeBucket} onSelect={onBucketSelect} />
+        <SearchInput
+          value={search}
+          onChange={onSearch}
+          placeholder="Buscar cliente o factura..."
+          className="w-64"
+        />
       </div>
 
-      {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('sale_date')}>
-                  <div className="flex items-center gap-2">Fecha <SortIcon field="sale_date" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('sale_number')}>
-                  <div className="flex items-center gap-2">Factura <SortIcon field="sale_number" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('customer_name')}>
-                  <div className="flex items-center gap-2">Cliente <SortIcon field="customer_name" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('total_cop')}>
-                  <div className="flex items-center gap-2">Total COP <SortIcon field="total_cop" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('paid_cop')}>
-                  <div className="flex items-center gap-2">Pagado <SortIcon field="paid_cop" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('pending_cop')}>
-                  <div className="flex items-center gap-2">Pendiente <SortIcon field="pending_cop" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('due_date')}>
-                  <div className="flex items-center gap-2">Vencimiento <SortIcon field="due_date" /></div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('aging_bucket')}>
-                  <div className="flex items-center gap-2">Estado <SortIcon field="aging_bucket" /></div>
-                </th>
+                <TH field="sale_date">Fecha</TH>
+                <TH field="sale_number">Factura</TH>
+                <TH field="customer_name">Cliente</TH>
+                <TH field="total_cop">Total COP</TH>
+                <TH field="paid_cop">Pagado</TH>
+                <TH field="pending_cop">Pendiente</TH>
+                <TH field="due_date">Vencimiento</TH>
+                <TH field="aging_bucket">Estado</TH>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -278,7 +293,7 @@ function TabGeneral({ data, loading, activeBucket, setActiveBucket, search, setS
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               ) : invoices.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-6 py-16 text-center">
+                  <td colSpan="8" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <CheckCircle className="w-12 h-12 text-green-400" />
                       <p className="text-lg font-semibold text-green-700">¡Todo al día!</p>
@@ -287,7 +302,7 @@ function TabGeneral({ data, loading, activeBucket, setActiveBucket, search, setS
                   </td>
                 </tr>
               ) : (
-                paginatedInvoices.map(inv => {
+                paginated.map(inv => {
                   const colors = BUCKET_COLORS[inv.aging_bucket] || BUCKET_COLORS.sin_termino;
                   return (
                     <tr
@@ -315,54 +330,24 @@ function TabGeneral({ data, loading, activeBucket, setActiveBucket, search, setS
             </tbody>
           </table>
         </div>
+        {sorted.length > 0 && (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={sorted.length}
+            limit={limit}
+            onPageChange={onPageChange}
+            onLimitChange={onLimitChange}
+          />
+        )}
       </div>
-
-      {/* Paginación */}
-      {sortedInvoices.length > 0 && (
-        <div className="mt-6 flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Mostrando {startIdx + 1} a {Math.min(startIdx + itemsPerPage, sortedInvoices.length)} de {sortedInvoices.length} resultados
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Anterior
-            </button>
-            <div className="flex gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    currentPage === page
-                      ? 'bg-teal-600 text-white'
-                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ─── Tab Por Cliente ──────────────────────────────────────────────────────────
 
-function TabClientes({ data, loading, activeBucket, setActiveBucket, search, setSearch, onExport, currentPage, setCurrentPage, itemsPerPage }) {
+function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState('total_adeudado_cop');
   const [sortDir, setSortDir] = useState('desc');
@@ -371,56 +356,40 @@ function TabClientes({ data, loading, activeBucket, setActiveBucket, search, set
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDir('desc');
     }
   };
 
-  const sortedCustomers = [...customers].sort((a, b) => {
-    const aVal = a[sortField];
-    const bVal = b[sortField];
-    const result = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-    return sortDir === 'asc' ? result : -result;
+  const sorted = [...customers].sort((a, b) => {
+    const r = a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0;
+    return sortDir === 'asc' ? r : -r;
   });
 
-  const totalPages = sortedCustomers.length > 0 ? Math.ceil(sortedCustomers.length / itemsPerPage) : 1;
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedCustomers = sortedCustomers.slice(startIdx, startIdx + itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / limit));
+  const startIdx = (currentPage - 1) * limit;
+  const paginated = sorted.slice(startIdx, startIdx + limit);
+
+  const SORT_OPTS = [
+    { label: 'Total adeudado', field: 'total_adeudado_cop' },
+    { label: 'Vencido',        field: 'overdue_cop' },
+    { label: 'Nombre',         field: 'customer_name' },
+  ];
 
   return (
     <div>
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-4 items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          {BUCKETS.map(b => (
-            <button
-              key={b.key}
-              onClick={() => setActiveBucket(b.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                activeBucket === b.key
-                  ? 'bg-teal-700 text-white border-teal-700'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-teal-400'
-              }`}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
-            placeholder="Buscar cliente..."
-          />
-          {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>}
-        </div>
+        <BucketFilter activeBucket={activeBucket} onSelect={onBucketSelect} />
+        <SearchInput
+          value={search}
+          onChange={onSearch}
+          placeholder="Buscar cliente..."
+          className="w-64"
+        />
       </div>
 
-      {/* Grid de cards */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
@@ -434,123 +403,103 @@ function TabClientes({ data, loading, activeBucket, setActiveBucket, search, set
       ) : (
         <div>
           <div className="mb-4 flex gap-2 flex-wrap">
-            {['Total adeudado', 'Vencido', 'Nombre'].map(label => {
-              const field = label === 'Total adeudado' ? 'total_adeudado_cop' : label === 'Vencido' ? 'overdue_cop' : 'customer_name';
-              const isActive = sortField === field;
+            {SORT_OPTS.map(({ label, field }) => (
+              <button
+                key={field}
+                onClick={() => handleSort(field)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
+                  sortField === field
+                    ? 'bg-teal-100 text-teal-700 border border-teal-300'
+                    : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-150'
+                }`}
+              >
+                {label}
+                {sortField === field && (
+                  sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {paginated.map(c => {
+              const worstColors = BUCKET_COLORS[c.worst_bucket] || BUCKET_COLORS.sin_termino;
+              const agingTotal = Object.values(c.aging || {}).reduce((s, v) => s + v, 0);
               return (
-                <button
-                  key={field}
-                  onClick={() => handleSort(field)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                    isActive
-                      ? 'bg-teal-100 text-teal-700 border border-teal-300'
-                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-150'
-                  }`}
+                <div
+                  key={c.customer_id}
+                  onClick={() => navigate(`/cuentas-por-cobrar/cliente/${c.customer_id}`)}
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all"
                 >
-                  {label}
-                  {isActive && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                </button>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="font-bold text-gray-900">{c.customer_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {c.customer_code} · {c.pending_invoices} factura{c.pending_invoices !== 1 ? 's' : ''} pendiente{c.pending_invoices !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    {c.blocked ? (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">BLOQUEADO</span>
+                    ) : (
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${worstColors.badge}`}>
+                        {BUCKETS.find(b => b.key === c.worst_bucket)?.label || 'Vigente'}
+                      </span>
+                    )}
+                  </div>
+
+                  {agingTotal > 0 && (
+                    <div className="flex h-2 rounded-full overflow-hidden mb-3">
+                      {Object.entries(c.aging || {}).filter(([, v]) => v > 0).map(([bucket, amount]) => {
+                        const pct = Math.round((amount / agingTotal) * 100);
+                        return (
+                          <div
+                            key={bucket}
+                            className={BUCKET_COLORS[bucket]?.bg || 'bg-gray-300'}
+                            style={{ width: `${pct}%` }}
+                            title={`${bucket}: ${fmt(amount)}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div>
+                      <p className="text-xs text-gray-500">Total adeudado</p>
+                      <p className="text-sm font-bold text-orange-700">{fmt(c.total_adeudado_cop)}</p>
+                    </div>
+                    {c.overdue_cop > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-500">Vencido</p>
+                        <p className="text-sm font-bold text-red-700">{fmt(c.overdue_cop)}</p>
+                      </div>
+                    )}
+                    {c.last_payment_date && (
+                      <div>
+                        <p className="text-xs text-gray-500">Último pago</p>
+                        <p className="text-sm text-gray-700">{fmtDate(c.last_payment_date)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {c.blocked_reason && (
+                    <p className="mt-3 text-xs text-red-600 bg-red-50 rounded px-2 py-1">{c.blocked_reason}</p>
+                  )}
+                </div>
               );
             })}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedCustomers.map(c => {
-            const worstColors = BUCKET_COLORS[c.worst_bucket] || BUCKET_COLORS.sin_termino;
-            const agingTotal = Object.values(c.aging || {}).reduce((s, v) => s + v, 0);
-            return (
-              <div
-                key={c.customer_id}
-                onClick={() => navigate(`/cuentas-por-cobrar/cliente/${c.customer_id}`)}
-                className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all"
-              >
-                {/* Header de card */}
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-gray-900">{c.customer_name}</p>
-                    <p className="text-xs text-gray-500">{c.customer_code} · {c.pending_invoices} factura{c.pending_invoices !== 1 ? 's' : ''} pendiente{c.pending_invoices !== 1 ? 's' : ''}</p>
-                  </div>
-                  {c.blocked ? (
-                    <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">BLOQUEADO</span>
-                  ) : (
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${worstColors.badge}`}>{BUCKETS.find(b => b.key === c.worst_bucket)?.label || 'Vigente'}</span>
-                  )}
-                </div>
 
-                {/* Mini barra de aging */}
-                {agingTotal > 0 && (
-                  <div className="flex h-2 rounded-full overflow-hidden mb-3">
-                    {Object.entries(c.aging || {}).filter(([, v]) => v > 0).map(([bucket, amount]) => {
-                      const pct = Math.round((amount / agingTotal) * 100);
-                      return <div key={bucket} className={`${BUCKET_COLORS[bucket]?.bg || 'bg-gray-300'}`} style={{ width: `${pct}%` }} title={`${bucket}: ${fmt(amount)}`} />;
-                    })}
-                  </div>
-                )}
-
-                {/* Datos principales */}
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div>
-                    <p className="text-xs text-gray-500">Total adeudado</p>
-                    <p className="text-sm font-bold text-orange-700">{fmt(c.total_adeudado_cop)}</p>
-                  </div>
-                  {c.overdue_cop > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-500">Vencido</p>
-                      <p className="text-sm font-bold text-red-700">{fmt(c.overdue_cop)}</p>
-                    </div>
-                  )}
-                  {c.last_payment_date && (
-                    <div>
-                      <p className="text-xs text-gray-500">Último pago</p>
-                      <p className="text-sm text-gray-700">{fmtDate(c.last_payment_date)}</p>
-                    </div>
-                  )}
-                </div>
-
-                {c.blocked_reason && (
-                  <p className="mt-3 text-xs text-red-600 bg-red-50 rounded px-2 py-1">{c.blocked_reason}</p>
-                )}
-              </div>
-            );
-            })}
-          </div>
-
-          {/* Paginación */}
-          {sortedCustomers.length > itemsPerPage && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Mostrando {startIdx + 1} a {Math.min(startIdx + itemsPerPage, sortedCustomers.length)} de {sortedCustomers.length} resultados
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Anterior
-                </button>
-                <div className="flex gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        currentPage === page
-                          ? 'bg-teal-600 text-white'
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Siguiente
-                </button>
-              </div>
+          {sorted.length > limit && (
+            <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={sorted.length}
+                limit={limit}
+                onPageChange={onPageChange}
+                onLimitChange={onLimitChange}
+              />
             </div>
           )}
         </div>
@@ -558,6 +507,21 @@ function TabClientes({ data, loading, activeBucket, setActiveBucket, search, set
     </div>
   );
 }
+
+// ─── Tab button ───────────────────────────────────────────────────────────────
+
+const TabBtn = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+      active
+        ? 'border-teal-600 text-teal-700'
+        : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`}
+  >
+    {children}
+  </button>
+);
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 
@@ -569,117 +533,133 @@ export default function AccountsReceivablePage() {
   );
   const [activeBucket, setActiveBucket] = useState('all');
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [summaryData, setSummaryData] = useState(null);
-  const [customersData, setCustomersData] = useState(null);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
+  const [limit, setLimit] = useTableLimit();
 
-  const debouncedSearch = useDebounce(search, 350);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setCurrentPage(1);
-    try {
-      const params = {};
-      if (activeBucket !== 'all') params.bucket = activeBucket;
-      if (debouncedSearch) params.search = debouncedSearch;
-
-      if (activeTab === 'general') {
-        const res = await arService.getSummary(params);
-        setSummaryData(res.data);
-      } else {
-        const res = await arService.getCustomers(params);
-        setCustomersData(res.data);
-      }
-    } catch {
-      toast.error('Error al cargar datos de cartera');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, activeBucket, debouncedSearch]);
-
-  // Detectar cambios de ruta y actualizar tab
+  // Keep tab in sync if URL changes externally
   useEffect(() => {
     setActiveTab(location.pathname.endsWith('/clientes') ? 'clientes' : 'general');
   }, [location.pathname]);
 
-  // Fetch data cuando cambian los filtros
+  // Reset page when filters change
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    setCurrentPage(1);
+  }, [activeBucket, search, activeTab]);
 
-  // Reset filtros al cambiar tab
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setActiveBucket('all');
     setSearch('');
+    setCurrentPage(1);
   };
 
+  // ── Queries ──
+
+  const queryParams = {
+    ...(activeBucket !== 'all' && { bucket: activeBucket }),
+    ...(search && { search }),
+  };
+
+  const { data: summaryData, isLoading: loadingSummary } = useQuery({
+    queryKey: ['ar-summary', activeBucket, search],
+    queryFn: () => arService.getSummary(queryParams).then(r => r.data),
+    enabled: activeTab === 'general',
+    staleTime: 60_000,
+  });
+
+  const { data: customersData, isLoading: loadingCustomers } = useQuery({
+    queryKey: ['ar-customers', activeBucket, search],
+    queryFn: () => arService.getCustomers(queryParams).then(r => r.data),
+    enabled: activeTab === 'clientes',
+    staleTime: 60_000,
+  });
+
+  const loading = activeTab === 'general' ? loadingSummary : loadingCustomers;
   const distribution = summaryData?.aging_distribution || [];
   const totalPending = activeTab === 'general'
     ? (summaryData?.totals?.total_pending_cop || 0)
     : (customersData?.totals?.total_pending_cop || 0);
 
+  const handleExport = () => {
+    if (activeTab === 'general') {
+      arService.exportInvoicesCSV(queryParams);
+    } else {
+      arService.exportCustomersCSV({ search: search || undefined });
+    }
+  };
+
+  const sharedProps = {
+    activeBucket,
+    onBucketSelect: setActiveBucket,
+    search,
+    onSearch: setSearch,
+    limit,
+    onLimitChange: (n) => { setLimit(n); setCurrentPage(1); },
+    currentPage,
+    onPageChange: setCurrentPage,
+  };
+
   return (
     <div className="min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <BookOpen className="h-7 w-7 text-teal-700" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Cuentas por Cobrar</h1>
             <p className="text-sm text-gray-500">
-              {activeTab === 'general' ? 'Vista consolidada de todas las facturas pendientes' : 'Análisis detallado por cliente'}
+              {activeTab === 'general'
+                ? 'Vista consolidada de todas las facturas pendientes'
+                : 'Análisis detallado por cliente'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => activeTab === 'general' ? arService.exportInvoicesCSV({ bucket: activeBucket !== 'all' ? activeBucket : undefined, search: debouncedSearch || undefined }) : arService.exportCustomersCSV({ search: debouncedSearch || undefined })}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          {hasPermission('admin') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowPinSetup(true)}
+              title="Configurar PIN de reversión"
+            >
+              <Shield className="w-4 h-4" />
+              PIN
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4" />
             Exportar CSV
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Barra de aging (solo tab general) */}
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex -mb-px">
+          <TabBtn active={activeTab === 'general'} onClick={() => handleTabChange('general')}>
+            Facturas
+          </TabBtn>
+          <TabBtn active={activeTab === 'clientes'} onClick={() => handleTabChange('clientes')}>
+            Por Cliente
+          </TabBtn>
+        </nav>
+      </div>
+
+      {/* Aging bar (solo tab Facturas) */}
       {activeTab === 'general' && !loading && distribution.length > 0 && (
         <AgingBar distribution={distribution} total={totalPending} />
       )}
 
-      {/* Contenido */}
+      {/* Content */}
       {activeTab === 'general' ? (
-        <TabGeneral
-          data={summaryData}
-          loading={loading}
-          activeBucket={activeBucket}
-          setActiveBucket={b => { setActiveBucket(b); }}
-          search={search}
-          setSearch={setSearch}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          itemsPerPage={ITEMS_PER_PAGE}
-        />
+        <TabGeneral data={summaryData} loading={loadingSummary} {...sharedProps} />
       ) : (
-        <TabClientes
-          data={customersData}
-          loading={loading}
-          activeBucket={activeBucket}
-          setActiveBucket={b => { setActiveBucket(b); }}
-          search={search}
-          setSearch={setSearch}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          itemsPerPage={ITEMS_PER_PAGE}
-        />
+        <TabClientes data={customersData} loading={loadingCustomers} {...sharedProps} />
       )}
 
-      {/* Modal PIN */}
-      {showPinSetup && <PinSetupModal onClose={() => setShowPinSetup(false)} />}
+      {/* PIN Setup Modal */}
+      <PinSetupModal open={showPinSetup} onClose={() => setShowPinSetup(false)} />
     </div>
   );
 }

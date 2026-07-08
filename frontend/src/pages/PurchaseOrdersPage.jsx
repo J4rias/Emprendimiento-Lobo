@@ -1,407 +1,323 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatMoney } from '../utils/formatUtils';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { supplierService } from '../services/api/supplierService';
+import { formatMoney } from '../utils/formatUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { toast } from 'sonner';
 import {
-  Plus,
-  Search,
-  Eye,
-  Edit,
-  Check,
-  X,
-  Package,
-  FileText,
-  Calendar,
-  DollarSign,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  CreditCard
+  Plus, Eye, Edit, Check, X, Package, FileText,
+  DollarSign, TrendingUp, Clock, AlertCircle, XCircle, CreditCard,
 } from 'lucide-react';
-import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
+import {
+  Alert, Badge, Button, Card, ConfirmDialog, Modal,
+  Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
+} from '../components/ui';
+
+// ── Status / payment config ───────────────────────────────────────────────────
+const STATUS_VARIANT = {
+  draft: 'neutral', sent: 'info', confirmed: 'purple',
+  partially_received: 'warning', received: 'success', cancelled: 'error',
+};
+const STATUS_LABEL = {
+  draft: 'Borrador', sent: 'Enviada', confirmed: 'Confirmada',
+  partially_received: 'Parcialmente Recibida', received: 'Recibida', cancelled: 'Cancelada',
+};
+const PAYMENT_VARIANT = { paid: 'success', partial: 'info', pending: 'neutral' };
+const PAYMENT_LABEL  = { paid: 'Pagada',   partial: 'Abonada', pending: 'Pendiente Pago' };
+
+const PAYMENT_METHOD_LABEL = {
+  cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque',
+  card: 'Tarjeta', credit_balance: 'Saldo a Favor', usdt: 'USDT',
+};
+const PAYMENT_METHOD_COLOR = {
+  cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700',
+  check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700',
+  credit_balance: 'bg-indigo-100 text-indigo-700', usdt: 'bg-cyan-100 text-cyan-700',
+  other: 'bg-gray-100 text-gray-700',
+};
+
+const PERIOD_LABELS = {
+  this_week: 'Esta Semana', this_month: 'Este Mes', last_month: 'Mes Anterior',
+  last_30_days: 'Últimos 30 días', this_year: 'Este Año', all: 'Total Histórico',
+};
+
+// ── Date range helper ─────────────────────────────────────────────────────────
+const getDateRange = (period) => {
+  const today = new Date(); today.setHours(23, 59, 59, 999);
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  if (period === 'all') return {};
+  if (period === 'this_week') {
+    const d = start.getDay(); start.setDate(start.getDate() - (d === 0 ? 6 : d - 1));
+  } else if (period === 'this_month') {
+    start.setDate(1);
+  } else if (period === 'last_month') {
+    start.setMonth(start.getMonth() - 1); start.setDate(1);
+    today.setTime(new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999).getTime());
+  } else if (period === 'last_30_days') {
+    start.setDate(start.getDate() - 30);
+  } else if (period === 'this_year') {
+    start.setMonth(0, 1);
+  }
+  return { date_from: start.toISOString(), date_to: today.toISOString() };
+};
 
 const PurchaseOrdersPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState(null);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [limit, setLimit] = useTableLimit();
+
+  // ─── Filters ──────────────────────────────────────────────────────────────────
+  const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [supplierFilter, setSupplierFilter] = useState('');
+  const [currentPage, setCurrentPage]   = useState(1);
+  const [statsPeriod, setStatsPeriod]   = useState('this_week');
+
+  // ─── UI state ─────────────────────────────────────────────────────────────────
   const [showViewModal, setShowViewModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [viewingOrder, setViewingOrder]   = useState(null);
   const [approvingOrderId, setApprovingOrderId] = useState(null);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
-  const [viewingOrder, setViewingOrder] = useState(null);
-  const [statsPeriod, setStatsPeriod] = useState('this_week');
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const { data: ordersData, isLoading: loading, error: fetchError } = useQuery({
-    queryKey: ['purchase-orders', currentPage, debouncedSearch, statusFilter, supplierFilter],
+  // ─── Queries ──────────────────────────────────────────────────────────────────
+  const { data: ordersData, isLoading, isError: fetchError } = useQuery({
+    queryKey: ['purchase-orders', currentPage, search, statusFilter, supplierFilter, limit],
     queryFn: () => purchaseOrderService.getAll({
-      page: currentPage, limit: 20,
-      search: debouncedSearch,
+      page: currentPage, limit,
+      search: search || undefined,
       status: statusFilter || undefined,
       supplier_id: supplierFilter || undefined,
     }),
-    keepPreviousData: true,
     staleTime: 30_000,
   });
+  const orders     = ordersData?.data || [];
+  const totalPages = ordersData?.pagination?.totalPages || 1;
+  const total      = ordersData?.pagination?.total || 0;
 
   const { data: statsData } = useQuery({
     queryKey: ['purchase-orders-stats', statsPeriod],
-    queryFn: () => purchaseOrderService.getStats(getDateRangeForPeriod(statsPeriod)),
+    queryFn: () => purchaseOrderService.getStats(getDateRange(statsPeriod)),
     staleTime: 30_000,
   });
+  const stats = statsData?.data || null;
 
   const { data: suppliersData } = useQuery({
     queryKey: ['suppliers-active'],
     queryFn: () => supplierService.getActive(),
     staleTime: 5 * 60_000,
   });
+  const suppliers = suppliersData?.data || [];
 
   const { data: ratesData } = useQuery({
     queryKey: ['exchange-rates'],
     queryFn: () => exchangeRateService.getLatest(),
     staleTime: 5 * 60_000,
   });
-
-  const orders = ordersData?.data || [];
-  const totalPages = ordersData?.pagination?.totalPages || 1;
-  const stats = statsData?.data || null;
-  const suppliers = suppliersData?.data || [];
   const exchangeRates = ratesData?.data || [];
-  const error = fetchError?.message || mutationError;
 
+  // ─── Mutations ────────────────────────────────────────────────────────────────
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders-stats'] });
+  };
+
+  const approveMutation = useMutation({
+    mutationFn: (id) => purchaseOrderService.approve(id),
+    onSuccess: () => {
+      toast.success('Orden aprobada exitosamente');
+      setApprovingOrderId(null);
+      invalidate();
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Error al aprobar la orden'),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }) => purchaseOrderService.cancel(id, reason),
+    onSuccess: () => {
+      toast.success('Orden cancelada exitosamente');
+      setCancellingOrderId(null);
+      setCancelReason('');
+      invalidate();
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Error al cancelar la orden'),
+  });
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────────
   const copFormat = (amount, currency) => {
     const val = parseFloat(amount || 0);
-    if (currency === 'COP') return `COP ${val.toLocaleString('de-DE')}`;
+    if (currency === 'COP') return `COP ${Math.ceil(val).toLocaleString('es-VE')}`;
     const rate = calculateEffectiveRate(currency, 'COP', exchangeRates) || 1;
-    const cop = Math.round(val * rate);
-    return `COP ${cop.toLocaleString('de-DE')}`;
+    return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
   };
 
-  const calculateTotalValueInCOP = () => {
+  const totalValueInCOP = () => {
     if (!stats?.value_by_currency) return 0;
-    let total = 0;
-    stats.value_by_currency.forEach(item => {
-      if (item.currency === 'COP') {
-        total += parseFloat(item.total || 0);
-      } else {
-        const rate = calculateEffectiveRate(item.currency, 'COP', exchangeRates) || 1;
-        total += parseFloat(item.total || 0) * rate;
-      }
-    });
-    return total;
+    return stats.value_by_currency.reduce((sum, item) => {
+      if (item.currency === 'COP') return sum + parseFloat(item.total || 0);
+      const rate = calculateEffectiveRate(item.currency, 'COP', exchangeRates) || 1;
+      return sum + parseFloat(item.total || 0) * rate;
+    }, 0);
   };
-
-  const getDateRangeForPeriod = (period) => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-
-    let date_from, date_to;
-
-    switch (period) {
-      case 'this_week':
-        const currentDay = start.getDay();
-        const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
-        start.setDate(start.getDate() - distanceToMonday);
-        date_from = start.toISOString();
-        date_to = today.toISOString();
-        break;
-      case 'this_month':
-        start.setDate(1);
-        date_from = start.toISOString();
-        date_to = today.toISOString();
-        break;
-      case 'last_month':
-        start.setMonth(start.getMonth() - 1);
-        start.setDate(1);
-        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
-        date_from = start.toISOString();
-        date_to = endOfLastMonth.toISOString();
-        break;
-      case 'last_30_days':
-        start.setDate(start.getDate() - 30);
-        date_from = start.toISOString();
-        date_to = today.toISOString();
-        break;
-      case 'this_year':
-        start.setMonth(0, 1);
-        date_from = start.toISOString();
-        date_to = today.toISOString();
-        break;
-      case 'all':
-      default:
-        return {};
-    }
-    return { date_from, date_to };
-  };
-
 
   const handleView = async (order) => {
     try {
-      const response = await purchaseOrderService.getById(order.id);
-      setViewingOrder(response.data);
+      const res = await purchaseOrderService.getById(order.id);
+      setViewingOrder(res.data);
       setShowViewModal(true);
-    } catch (err) {
-      setMutationError('Error al cargar el detalle de la orden');
-      console.error('Error fetching order details:', err);
+    } catch {
+      toast.error('Error al cargar el detalle de la orden');
     }
   };
 
-  const handleEdit = (order) => {
-    navigate(`/purchase-orders/edit/${order.id}`);
-  };
+  const handleSearchChange   = (v) => { setSearch(v);                    setCurrentPage(1); };
+  const handleStatusChange   = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleSupplierChange = (e) => { setSupplierFilter(e.target.value); setCurrentPage(1); };
 
-  const handleApproveClick = (id) => {
-    setApprovingOrderId(id);
-    setShowApproveModal(true);
-  };
-
-  const handleApproveConfirm = async () => {
-    try {
-      await purchaseOrderService.approve(approvingOrderId);
-      setShowApproveModal(false);
-      setApprovingOrderId(null);
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders-stats'] });
-    } catch (err) {
-      setMutationError('Error al aprobar la orden');
-      console.error('Error approving order:', err);
-    }
-  };
-
-  const handleCancelClick = (id) => {
-    setCancellingOrderId(id);
-    setCancelReason('');
-    setShowCancelModal(true);
-  };
-
-  const handleCancelConfirm = async () => {
-    if (!cancelReason.trim()) {
-      alert('Por favor, ingrese un motivo para la cancelación.');
-      return;
-    }
-
-    try {
-      await purchaseOrderService.cancel(cancellingOrderId, cancelReason);
-      setShowCancelModal(false);
-      setCancelReason('');
-      setCancellingOrderId(null);
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders-stats'] });
-    } catch (err) {
-      setMutationError('Error al cancelar la orden');
-      console.error('Error canceling order:', err);
-    }
-  };
-
-  const handleReceive = (order) => {
-    navigate(`/purchase-orders/receive/${order.id}`);
-  };
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-700', icon: FileText },
-      sent: { label: 'Enviada', color: 'bg-blue-100 text-blue-700', icon: Clock },
-      confirmed: { label: 'Confirmada', color: 'bg-purple-100 text-purple-700', icon: CheckCircle },
-      partially_received: { label: 'Parcialmente Recibida', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
-      received: { label: 'Recibida', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-      cancelled: { label: 'Cancelada', color: 'bg-red-100 text-red-700', icon: XCircle }
-    };
-
-    const config = statusConfig[status] || statusConfig.draft;
-    const Icon = config.icon;
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="w-3 h-3" />
-        {config.label}
-      </span>
-    );
-  };
-
-  const getPaymentBadge = (paymentStatus) => {
-    const pStatusConfig = {
-      paid: { label: 'Pagada', color: 'bg-emerald-100 text-emerald-700', icon: DollarSign },
-      partial: { label: 'Abonada', color: 'bg-blue-100 text-blue-700', icon: DollarSign },
-      pending: { label: 'Pendiente Pago', color: 'bg-gray-100 text-gray-600', icon: Clock }
-    };
-
-    // Only show if we actually have a payment status definition
-    if (!paymentStatus || !pStatusConfig[paymentStatus]) return null;
-
-    const pConfig = pStatusConfig[paymentStatus];
-    const UserIcon = pConfig.icon;
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pConfig.color} mt-1`}>
-        <UserIcon className="w-3 h-3" />
-        {pConfig.label}
-      </span>
-    );
-  };
-
+  // ─── Table columns ────────────────────────────────────────────────────────────
   const columns = [
     {
+      key: 'order_number',
       header: 'Número',
-      accessor: (row) => (
-        <div className="font-medium text-gray-900">{row.order_number}</div>
-      )
+      render: (v) => <div className="font-medium text-gray-900">{v}</div>,
     },
     {
+      key: 'supplier',
       header: 'Proveedor',
-      accessor: (row) => (
+      render: (_, row) => (
         <div>
           <div className="font-medium text-gray-900">{row.supplier?.name}</div>
-          <div className="text-sm text-gray-500">{row.supplier?.code}</div>
+          <div className="text-xs text-gray-500">{row.supplier?.code}</div>
         </div>
-      )
+      ),
     },
     {
+      key: 'order_date',
       header: 'Fecha',
-      accessor: (row) => (
-        <div className="text-sm text-gray-600">
-          {new Date(row.order_date).toLocaleDateString('es-PE')}
-        </div>
-      )
+      render: (v) => (
+        <div className="text-sm text-gray-600">{new Date(v).toLocaleDateString('es-VE')}</div>
+      ),
     },
     {
+      key: 'warehouse',
       header: 'Almacén',
-      accessor: (row) => (
-        <div className="text-sm text-gray-600">{row.warehouse?.name}</div>
-      )
+      render: (_, row) => <div className="text-sm text-gray-600">{row.warehouse?.name}</div>,
     },
     {
+      key: 'total',
       header: 'Total',
-      accessor: (row) => (
+      render: (_, row) => (
         <div className="flex flex-col">
-          <span className="font-semibold text-gray-900">
-            {formatMoney(row.total, row.currency)}
-          </span>
+          <span className="font-semibold text-gray-900">{formatMoney(row.total, row.currency)}</span>
           {row.currency !== 'COP' && (
             <span className="text-xs text-emerald-600 font-medium mt-0.5">
               ≈ {copFormat(row.total, row.currency)}
             </span>
           )}
         </div>
-      )
+      ),
     },
     {
+      key: 'status',
       header: 'Estado',
-      accessor: (row) => (
+      render: (_, row) => (
         <div className="flex flex-col items-start gap-1">
-          {getStatusBadge(row.status)}
-          {['received', 'partially_received', 'confirmed'].includes(row.status) && getPaymentBadge(row.payment_status)}
+          <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
+            {STATUS_LABEL[row.status] || row.status}
+          </Badge>
+          {['received', 'partially_received', 'confirmed'].includes(row.status) && row.payment_status && PAYMENT_LABEL[row.payment_status] && (
+            <Badge variant={PAYMENT_VARIANT[row.payment_status] || 'neutral'}>
+              {PAYMENT_LABEL[row.payment_status]}
+            </Badge>
+          )}
         </div>
-      )
+      ),
     },
     {
+      key: 'actions',
       header: 'Acciones',
-      accessor: (row) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleView(row)}
-            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-            title="Ver detalles"
-          >
+      render: (_, row) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={() => handleView(row)} title="Ver detalles">
             <Eye className="h-4 w-4" />
-          </button>
-
+          </Button>
           {['partially_received', 'received'].includes(row.status) && hasPermission('supplier_payments.create') && (
-            <button
+            <Button
+              variant="ghost" size="sm"
               onClick={() => navigate('/supplier-payments', { state: { prefillOrder: row } })}
-              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
               title="Registrar Pago"
+              className="text-emerald-600 hover:bg-emerald-50"
             >
               <CreditCard className="h-4 w-4" />
-            </button>
+            </Button>
           )}
-
           {row.status === 'draft' && hasPermission('purchases.update') && (
-            <button
-              onClick={() => handleEdit(row)}
-              className="p-1 text-green-600 hover:bg-green-50 rounded"
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => navigate(`/purchase-orders/edit/${row.id}`)}
               title="Editar"
+              className="text-green-600 hover:bg-green-50"
             >
               <Edit className="h-4 w-4" />
-            </button>
+            </Button>
           )}
-
           {row.status === 'draft' && hasPermission('purchases.approve') && (
-            <button
-              onClick={() => handleApproveClick(row.id)}
-              className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => setApprovingOrderId(row.id)}
               title="Aprobar"
+              className="text-purple-600 hover:bg-purple-50"
             >
               <Check className="h-4 w-4" />
-            </button>
+            </Button>
           )}
-
           {['sent', 'confirmed', 'partially_received'].includes(row.status) && hasPermission('purchases.receive') && (
-            <button
-              onClick={() => handleReceive(row)}
-              className={`p-1 rounded ${row.status === 'partially_received'
-                ? 'text-amber-600 hover:bg-amber-100'
-                : 'text-indigo-600 hover:bg-indigo-50'
-                }`}
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => navigate(`/purchase-orders/receive/${row.id}`)}
               title={row.status === 'partially_received' ? 'Continuar recepción parcial' : 'Recibir mercancía'}
+              className={row.status === 'partially_received' ? 'text-amber-600 hover:bg-amber-100' : 'text-indigo-600 hover:bg-indigo-50'}
             >
-              {row.status === 'partially_received' ? (
-                <AlertCircle className="h-4 w-4" />
-              ) : (
-                <Package className="h-4 w-4" />
-              )}
-            </button>
+              {row.status === 'partially_received'
+                ? <AlertCircle className="h-4 w-4" />
+                : <Package className="h-4 w-4" />}
+            </Button>
           )}
-
           {!['received', 'cancelled'].includes(row.status) && hasPermission('purchases.delete') && (
-            <button
-              onClick={() => handleCancelClick(row.id)}
-              className="p-1 text-red-600 hover:bg-red-50 rounded"
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => { setCancellingOrderId(row.id); setCancelReason(''); }}
               title="Cancelar"
+              className="text-red-600 hover:bg-red-50"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
-      )
-    }
+      ),
+    },
   ];
 
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
+      {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Órdenes de Compra</h1>
-          <p className="text-gray-600">Gestiona las órdenes de compra a proveedores</p>
+          <h1 className="text-2xl font-bold text-gray-800 mb-1">Órdenes de Compra</h1>
+          <p className="text-gray-500">Gestiona las órdenes de compra a proveedores</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Mostrar estadísticas de:</label>
-          <select
+          <label className="text-sm font-medium text-gray-700">Estadísticas de:</label>
+          <Select
             value={statsPeriod}
             onChange={(e) => setStatsPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            className="w-48"
           >
             <option value="this_week">Esta Semana</option>
             <option value="this_month">Este Mes</option>
@@ -409,104 +325,71 @@ const PurchaseOrdersPage = () => {
             <option value="last_30_days">Últimos 30 días</option>
             <option value="this_year">Este Año</option>
             <option value="all">Histórico Completo</option>
-          </select>
+          </Select>
         </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Stats cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
+          <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Total Órdenes</span>
               <FileText className="w-5 h-5 text-blue-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats.total_orders || 0}</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
+          </Card>
+          <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Pendientes</span>
               <Clock className="w-5 h-5 text-yellow-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats.pending_orders || 0}</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
+          </Card>
+          <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Valor Total (COP)</span>
               <DollarSign className="w-5 h-5 text-green-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900 break-all">
-              {formatMoney(calculateTotalValueInCOP(), '$', 0)}
+              {formatMoney(totalValueInCOP(), '$', 0)}
             </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-4">
+          </Card>
+          <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">
-                {statsPeriod === 'this_week' ? 'Esta Semana' :
-                  statsPeriod === 'this_month' ? 'Este Mes' :
-                    statsPeriod === 'last_month' ? 'Mes Anterior' :
-                      statsPeriod === 'last_30_days' ? 'Últimos 30 días' :
-                        statsPeriod === 'this_year' ? 'Este Año' : 'Total Histórico'}
-              </span>
+              <span className="text-sm text-gray-600">{PERIOD_LABELS[statsPeriod]}</span>
               <TrendingUp className="w-5 h-5 text-purple-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {stats.total_orders || 0}
-            </p>
-          </div>
+            <p className="text-2xl font-bold text-gray-900">{stats.total_orders || 0}</p>
+          </Card>
         </div>
       )}
 
-      {/* Error Alert */}
-      {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-          <button onClick={() => setMutationError(null)} className="text-red-600 hover:text-red-800">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Fetch error */}
+      {fetchError && (
+        <Alert variant="error" className="mb-4" dismissible>
+          Error al cargar las órdenes de compra. Intenta de nuevo.
+        </Alert>
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Buscar por número, proveedor..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <select
-              value={supplierFilter}
-              onChange={(e) => {
-                setSupplierFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
+      <Card variant="flat" className="mb-6">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <SearchInput
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Buscar por número, proveedor..."
+            />
+          </div>
+          <div className="w-52">
+            <Select value={supplierFilter} onChange={handleSupplierChange}>
               <option value="">Todos los proveedores</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </div>
+          <div className="w-52">
+            <Select value={statusFilter} onChange={handleStatusChange}>
               <option value="">Todos los estados</option>
               <option value="draft">Borrador</option>
               <option value="sent">Enviada</option>
@@ -514,24 +397,22 @@ const PurchaseOrdersPage = () => {
               <option value="partially_received">Parcialmente Recibida</option>
               <option value="received">Recibida</option>
               <option value="cancelled">Cancelada</option>
-            </select>
-
-            {hasPermission('purchases.create') && (
-              <button
-                onClick={() => navigate('/purchase-orders/create')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Nueva Orden
-              </button>
-            )}
+            </Select>
           </div>
+          {hasPermission('purchases.create') && (
+            <Button onClick={() => navigate('/purchase-orders/create')}>
+              <Plus className="h-4 w-4" /> Nueva Orden
+            </Button>
+          )}
         </div>
+      </Card>
 
-        <DataTable
+      {/* Table */}
+      <Card variant="flat" className="overflow-hidden">
+        <Table
           columns={columns}
           data={orders}
-          loading={loading}
+          loading={isLoading}
           emptyMessage="No se encontraron órdenes de compra"
           rowClassName={(row) =>
             row.status === 'partially_received'
@@ -539,69 +420,62 @@ const PurchaseOrdersPage = () => {
               : ''
           }
         />
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setCurrentPage}
+          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+        />
+      </Card>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-gray-200 flex items-center justify-between">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Anterior
-            </button>
-            <span className="text-sm text-gray-600">
-              Página {currentPage} de {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Siguiente
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* View Modal */}
-      {showViewModal && viewingOrder && (
-        <Modal
-          isOpen={showViewModal}
-          onClose={() => setShowViewModal(false)}
-          title={`Orden de Compra: ${viewingOrder.order_number}`}
-          size="xl"
-        >
+      {/* ── View modal ────────────────────────────────────────────────────────── */}
+      <Modal
+        open={showViewModal}
+        onClose={() => { setShowViewModal(false); setViewingOrder(null); }}
+        title={viewingOrder ? `Orden de Compra: ${viewingOrder.order_number}` : ''}
+        size="xl"
+      >
+        {viewingOrder && (
           <div className="space-y-6">
-            {/* Header Info */}
+            {/* Header info */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Proveedor</label>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Proveedor</p>
                 <p className="text-gray-900">{viewingOrder.supplier?.name}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Almacén</label>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Almacén</p>
                 <p className="text-gray-900">{viewingOrder.warehouse?.name}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Fecha de Orden</label>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha de Orden</p>
                 <p className="text-gray-900">
-                  {new Date(viewingOrder.order_date).toLocaleDateString('es-PE')}
+                  {new Date(viewingOrder.order_date).toLocaleDateString('es-VE')}
                 </p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Estado</label>
-                <div className="mt-1 flex flex-col items-start">
-                  {getStatusBadge(viewingOrder.status)}
-                  {getPaymentBadge(viewingOrder.payment_status)}
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
+                <div className="mt-1 flex flex-col items-start gap-1">
+                  <Badge variant={STATUS_VARIANT[viewingOrder.status] || 'neutral'}>
+                    {STATUS_LABEL[viewingOrder.status] || viewingOrder.status}
+                  </Badge>
+                  {viewingOrder.payment_status && PAYMENT_LABEL[viewingOrder.payment_status] && (
+                    <Badge variant={PAYMENT_VARIANT[viewingOrder.payment_status] || 'neutral'}>
+                      {PAYMENT_LABEL[viewingOrder.payment_status]}
+                    </Badge>
+                  )}
                 </div>
               </div>
-              {viewingOrder.invoices && viewingOrder.invoices.length > 0 && (
+              {viewingOrder.invoices?.length > 0 && (
                 <div className="col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100 ring-1 ring-blue-500/20">
-                  <label className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 block">Documentos/Facturas del Proveedor</label>
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
+                    Documentos / Facturas del Proveedor
+                  </p>
                   <div className="flex flex-wrap gap-2">
-                    {viewingOrder.invoices.map((inv, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-white text-blue-700 font-bold rounded-full border border-blue-200 shadow-sm text-sm">
+                    {viewingOrder.invoices.map((inv, i) => (
+                      <span key={i} className="px-3 py-1 bg-white text-blue-700 font-bold rounded-full border border-blue-200 shadow-sm text-sm">
                         #{inv}
                       </span>
                     ))}
@@ -610,38 +484,27 @@ const PurchaseOrdersPage = () => {
               )}
             </div>
 
-            {/* Products Table */}
+            {/* Products table */}
             <div>
               <h3 className="font-medium text-gray-900 mb-3">Productos</h3>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Producto</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Presentación</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Ordenado</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Recibido</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Costo Unit.</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
+                      {['Producto', 'Presentación', 'Ordenado', 'Recibido', 'Costo Unit.', 'Total'].map(h => (
+                        <th key={h} className={`px-4 py-2 text-xs font-medium text-gray-500 ${['Ordenado','Recibido','Costo Unit.','Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {viewingOrder.details?.map((detail) => (
-                      <tr key={detail.id}>
-                        <td className="px-4 py-2 text-sm text-gray-900">{detail.product?.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{detail.presentation?.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {detail.package_quantity}p + {detail.loose_units}u
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-600 text-right">
-                          {detail.received_package_quantity}p + {detail.received_loose_units}u
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {formatMoney(detail.unit_cost, viewingOrder.currency)}
-                        </td>
-                        <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
-                          {formatMoney(detail.line_total, viewingOrder.currency)}
-                        </td>
+                    {viewingOrder.details?.map(d => (
+                      <tr key={d.id}>
+                        <td className="px-4 py-2 text-sm text-gray-900">{d.product?.name}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600">{d.presentation?.name}</td>
+                        <td className="px-4 py-2 text-sm text-right">{d.package_quantity}p + {d.loose_units}u</td>
+                        <td className="px-4 py-2 text-sm text-gray-600 text-right">{d.received_package_quantity}p + {d.received_loose_units}u</td>
+                        <td className="px-4 py-2 text-sm text-right">{formatMoney(d.unit_cost, viewingOrder.currency)}</td>
+                        <td className="px-4 py-2 text-sm font-medium text-right">{formatMoney(d.line_total, viewingOrder.currency)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -651,55 +514,89 @@ const PurchaseOrdersPage = () => {
 
             {/* Totals */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{formatMoney(viewingOrder.subtotal, viewingOrder.currency)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Descuento:</span>
-                <span className="font-medium text-red-600">-{formatMoney(viewingOrder.discount_amount, viewingOrder.currency)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Impuestos:</span>
-                <span className="font-medium">{formatMoney(viewingOrder.tax_amount, viewingOrder.currency)}</span>
-              </div>
+              {[
+                { label: 'Subtotal', value: formatMoney(viewingOrder.subtotal, viewingOrder.currency) },
+                { label: 'Descuento', value: `-${formatMoney(viewingOrder.discount_amount, viewingOrder.currency)}`, cls: 'text-red-600' },
+                { label: 'Impuestos', value: formatMoney(viewingOrder.tax_amount, viewingOrder.currency) },
+              ].map(({ label, value, cls }) => (
+                <div key={label} className="flex justify-between text-sm">
+                  <span className="text-gray-600">{label}:</span>
+                  <span className={`font-medium ${cls || ''}`}>{value}</span>
+                </div>
+              ))}
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
                 <span className="text-blue-600">{formatMoney(viewingOrder.total, viewingOrder.currency)}</span>
               </div>
             </div>
 
-            {/* Reception History */}
-            {viewingOrder.reception_history && viewingOrder.reception_history.length > 0 && (
-              <div className="mt-8 border-t border-gray-100 pt-6">
+            {/* Reception history */}
+            {viewingOrder.reception_history?.length > 0 && (
+              <div className="border-t border-gray-100 pt-6">
                 <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
+                  <div className="w-1.5 h-6 bg-green-500 rounded-full" />
                   Historial de Recepciones
                 </h3>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-[#f8fafc]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Documento</th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Cantidad (U)</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Recibido por</th>
+                        {['Fecha', 'Documento', 'Cantidad (U)', 'Recibido por'].map((h, i) => (
+                          <th key={h} className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase ${i === 2 ? 'text-center' : 'text-left'}`}>{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
-                      {viewingOrder.reception_history.map((rec) => (
+                      {viewingOrder.reception_history.map(rec => (
                         <tr key={rec.id} className="hover:bg-blue-50/30 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                            {new Date(rec.date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {new Date(rec.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className="font-bold text-blue-600">{rec.document_number || viewingOrder.order_number}</span>
+                          <td className="px-4 py-3 text-sm font-bold text-blue-600">
+                            {rec.document_number || viewingOrder.order_number}
                           </td>
                           <td className="px-4 py-3 text-sm text-center font-bold text-green-600">
-                            +{parseFloat(rec.quantity).toLocaleString('de-DE')}
+                            +{parseFloat(rec.quantity).toLocaleString('es-VE')}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 italic">
-                            {rec.user}
+                          <td className="px-4 py-3 text-sm text-gray-600 italic">{rec.user}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Payment history */}
+            {viewingOrder.payment_history?.length > 0 && (
+              <div className="border-t border-gray-100 pt-6">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
+                  Historial de Pagos
+                </h3>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-[#f8fafc]">
+                      <tr>
+                        {['Fecha', 'Referencia de Pago', 'Método', 'Monto Distribuido (OC)'].map((h, i) => (
+                          <th key={h} className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {viewingOrder.payment_history.map((pay, i) => (
+                        <tr key={pay.id || i} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
+                            {new Date(pay.payment_date).toLocaleDateString('es-VE')}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-bold text-blue-600">{pay.payment_number}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${PAYMENT_METHOD_COLOR[pay.payment_method] || PAYMENT_METHOD_COLOR.other}`}>
+                              {PAYMENT_METHOD_LABEL[pay.payment_method] || pay.payment_method}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-gray-900">
+                            {viewingOrder.currency} {parseFloat(pay.allocated_amount_po_currency).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
                       ))}
@@ -709,165 +606,63 @@ const PurchaseOrdersPage = () => {
               </div>
             )}
 
-            {/* Payment History */}
-            {viewingOrder.payment_history && viewingOrder.payment_history.length > 0 && (
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-                  Historial de Pagos
-                </h3>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-[#f8fafc]">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Referencia de Pago</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Método</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Monto Distribuido (OC)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {viewingOrder.payment_history.map((pay, idx) => {
-                        const methodLabels = { cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque', card: 'Tarjeta', credit_balance: 'Saldo a Favor', usdt: 'USDT' };
-                        const methodColors = { cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700', check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700', credit_balance: 'bg-indigo-100 text-indigo-700', other: 'bg-gray-100 text-gray-700', usdt: 'bg-cyan-100 text-cyan-700' };
-                        const badgeColor = methodColors[pay.payment_method] || methodColors.other;
-                        const label = methodLabels[pay.payment_method] || pay.payment_method;
-
-                        return (
-                          <tr key={pay.id || idx} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
-                              {new Date(pay.payment_date).toLocaleDateString('es-PE')}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className="font-bold text-blue-600">{pay.payment_number}</span>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColor}`}>
-                                {label}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right font-bold text-gray-900">
-                              {viewingOrder.currency} {parseFloat(pay.allocated_amount_po_currency).toLocaleString('de-DE', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* Notes */}
             {viewingOrder.notes && (
               <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
-                <label className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1 block">Notas de la Orden</label>
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Notas de la Orden</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingOrder.notes}</p>
               </div>
             )}
           </div>
-        </Modal>
-      )}
-      {/* Cancellation Modal */}
-      {showCancelModal && (
-        <Modal
-          isOpen={showCancelModal}
-          onClose={() => setShowCancelModal(false)}
-          title="Cancelar Orden de Compra"
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="h-5 w-5 text-red-400" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">
-                    ¿Estás seguro de que deseas cancelar esta orden de compra? Esta acción no se puede deshacer.
-                  </p>
-                </div>
-              </div>
-            </div>
+        )}
+      </Modal>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Motivo de la cancelación *
-              </label>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                rows="4"
-                placeholder="Indique brevemente por qué se cancela esta orden..."
-                autoFocus
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => setShowCancelModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={handleCancelConfirm}
-                disabled={!cancelReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <XCircle className="w-4 h-4" />
-                Confirmar Cancelación
-              </button>
-            </div>
+      {/* ── Cancel modal ──────────────────────────────────────────────────────── */}
+      <Modal
+        open={!!cancellingOrderId}
+        onClose={() => { setCancellingOrderId(null); setCancelReason(''); }}
+        title="Cancelar Orden de Compra"
+        size="md"
+      >
+        <div className="space-y-4">
+          <Alert variant="error">
+            ¿Estás seguro de que deseas cancelar esta orden? Esta acción no se puede deshacer.
+          </Alert>
+          <Textarea
+            label="Motivo de la cancelación *"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={4}
+            placeholder="Indique brevemente por qué se cancela esta orden..."
+            autoFocus
+          />
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="secondary" onClick={() => { setCancellingOrderId(null); setCancelReason(''); }}>
+              Cerrar
+            </Button>
+            <Button
+              variant="ghost"
+              className="text-red-600 hover:bg-red-50"
+              onClick={() => cancelMutation.mutate({ id: cancellingOrderId, reason: cancelReason })}
+              loading={cancelMutation.isPending}
+              disabled={!cancelReason.trim()}
+            >
+              <XCircle className="h-4 w-4" /> Confirmar Cancelación
+            </Button>
           </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
 
-      {/* Approval Modal */}
-      {showApproveModal && (
-        <Modal
-          isOpen={showApproveModal}
-          onClose={() => setShowApproveModal(false)}
-          title="Aprobar Orden de Compra"
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <CheckCircle className="h-5 w-5 text-blue-400" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-blue-700">
-                    ¿Estás seguro de que deseas aprobar esta orden de compra? Al hacerlo, la orden pasará a estado <strong>Enviada</strong> y podrá comenzar el proceso de recepción.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-gray-600 text-sm">
-              Esta acción notificará al proveedor (si está configurado) y formalizará la solicitud de mercancía para tu inventario.
-            </p>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => setShowApproveModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleApproveConfirm}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <Check className="w-4 h-4" />
-                Confirmar y Aprobar
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* ── Approve confirm dialog ────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!approvingOrderId}
+        onClose={() => setApprovingOrderId(null)}
+        onConfirm={() => approveMutation.mutate(approvingOrderId)}
+        loading={approveMutation.isPending}
+        title="Aprobar Orden de Compra"
+        description="La orden pasará a estado Enviada y podrá comenzar el proceso de recepción de mercancía."
+        confirmLabel="Confirmar y Aprobar"
+      />
     </div>
   );
 };

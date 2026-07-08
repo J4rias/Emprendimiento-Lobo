@@ -1,273 +1,255 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Eye, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import { quoteService } from '../services/api/quoteService';
+import {
+  Alert, Badge, Button, Card, ConfirmDialog, Modal, Pagination, SearchInput, Select, Table, useTableLimit,
+} from '../components/ui';
+
+// ── Status config ────────────────────────────────────────────────────────────
+const STATUS_VARIANT = {
+  draft: 'neutral', sent: 'info', approved: 'success',
+  rejected: 'error', converted: 'purple', expired: 'warning',
+};
+const STATUS_LABEL = {
+  draft: 'Borrador', sent: 'Enviada', approved: 'Aprobada',
+  rejected: 'Rechazada', converted: 'Convertida', expired: 'Vencida',
+};
+
+const customerName = (c) =>
+  c?.businessName || `${c?.firstName || ''} ${c?.lastName || ''}`.trim();
 
 const QuotesPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useTableLimit();
+
+  // ─── Filtros y paginación ────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ─── UI state ────────────────────────────────────────────────────────────────
   const [selectedQuote, setSelectedQuote] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const statusLabels = {
-    draft: { text: 'Borrador', class: 'bg-gray-100 text-gray-800' },
-    sent: { text: 'Enviada', class: 'bg-blue-100 text-blue-800' },
-    approved: { text: 'Aprobada', class: 'bg-green-100 text-green-800' },
-    rejected: { text: 'Rechazada', class: 'bg-red-100 text-red-800' },
-    converted: { text: 'Convertida', class: 'bg-purple-100 text-purple-800' },
-    expired: { text: 'Vencida', class: 'bg-orange-100 text-orange-800' },
-  };
-
-  const { data: quotesData, isLoading: loading } = useQuery({
-    queryKey: ['quotes', currentPage, search, statusFilter],
+  // ─── Query ───────────────────────────────────────────────────────────────────
+  const {
+    data: quotesData,
+    isLoading,
+    isError: fetchError,
+  } = useQuery({
+    queryKey: ['quotes', currentPage, search, statusFilter, limit],
     queryFn: () => quoteService.getAll({
       page: currentPage,
-      limit: 20,
-      ...(search && { search }),
+      limit,
+      ...(search       && { search }),
       ...(statusFilter && { status: statusFilter }),
     }),
-    keepPreviousData: true,
     staleTime: 30_000,
   });
 
-  const quotes = quotesData?.data?.quotes || [];
+  const quotes     = quotesData?.data?.quotes || [];
   const totalPages = quotesData?.data?.pagination?.pages || 1;
+  const total      = quotesData?.data?.pagination?.total || 0;
 
+  // ─── Mutations ───────────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (id) => quoteService.delete(id),
     onSuccess: () => {
       toast.success('Cotización eliminada');
+      setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Error al eliminar la cotización');
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Error al eliminar la cotización');
+      setDeleteTarget(null);
     },
   });
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Está seguro de eliminar esta cotización?')) return;
-    deleteMutation.mutate(id);
-  };
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+  const handleSearchChange  = (value) => { setSearch(value); setCurrentPage(1); };
+  const handleStatusFilter  = (e)     => { setStatusFilter(e.target.value); setCurrentPage(1); };
 
-  const handleView = (quote) => {
-    setSelectedQuote(quote);
-    setShowModal(true);
-  };
-
+  // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { header: 'Código', accessor: 'code' },
+    { key: 'code',   header: 'Código',  render: (v) => v },
     {
+      key: 'customer',
       header: 'Cliente',
-      accessor: (row) => row.customer?.businessName || `${row.customer?.firstName} ${row.customer?.lastName}`,
+      render: (_, row) => customerName(row.customer),
     },
     {
+      key: 'date',
       header: 'Fecha',
-      accessor: (row) => new Date(row.quoteDate || row.created_at).toLocaleDateString('es-PE'),
+      render: (_, row) =>
+        new Date(row.quoteDate || row.created_at).toLocaleDateString('es-VE'),
     },
     {
+      key: 'status',
       header: 'Estado',
-      accessor: (row) => {
-        const status = statusLabels[row.status] || statusLabels.draft;
-        return (
-          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${status.class}`}>
-            {status.text}
-          </span>
-        );
-      },
+      render: (_, row) => (
+        <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
+          {STATUS_LABEL[row.status] || row.status}
+        </Badge>
+      ),
     },
     {
+      key: 'total',
       header: 'Total',
-      accessor: (row) => `$ ${parseFloat(row.total || 0).toFixed(2)}`,
-      className: 'text-right font-semibold',
+      render: (_, row) => `$ ${parseFloat(row.total || 0).toFixed(2)}`,
+      cellClassName: 'text-right font-semibold',
     },
     {
+      key: 'actions',
       header: 'Acciones',
-      accessor: (row) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleView(row)}
-            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-            title="Ver detalles"
-          >
+      render: (_, row) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedQuote(row)} title="Ver detalles">
             <Eye className="h-4 w-4" />
-          </button>
+          </Button>
           {hasPermission('sales.quotes.update') && row.status === 'draft' && (
-            <button
-              onClick={() => {/* TODO: Navigate to edit */}}
-              className="p-1 text-green-600 hover:bg-green-50 rounded"
-              title="Editar"
-            >
+            <Button variant="ghost" size="sm" onClick={() => {}} title="Editar">
               <Edit className="h-4 w-4" />
-            </button>
+            </Button>
           )}
           {hasPermission('sales.quotes.delete') && row.status === 'draft' && (
-            <button
-              onClick={() => handleDelete(row.id)}
-              className="p-1 text-red-600 hover:bg-red-50 rounded"
-              title="Eliminar"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(row)} title="Eliminar">
               <Trash2 className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
       ),
     },
   ];
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="p-6">
+      {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cotizaciones</h1>
-          <p className="text-gray-600 mt-1">Gestiona las cotizaciones de venta</p>
+          <h1 className="text-2xl font-bold text-gray-800">Cotizaciones</h1>
+          <p className="text-gray-500 mt-1">Gestiona las cotizaciones de venta</p>
         </div>
         {hasPermission('sales.quotes.create') && (
-          <button
-            onClick={() => {/* TODO: Navigate to create */}}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-5 w-5" />
-            Nueva Cotización
-          </button>
+          <Button onClick={() => {}}>
+            <Plus className="h-4 w-4" /> Nueva Cotización
+          </Button>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Buscar por código, cliente..."
+      {/* ── Error de carga ────────────────────────────────────────────────────── */}
+      {fetchError && (
+        <Alert variant="error" className="mb-4" dismissible>
+          Error al cargar las cotizaciones. Intenta de nuevo.
+        </Alert>
+      )}
+
+      {/* ── Filtros ───────────────────────────────────────────────────────────── */}
+      <Card variant="flat" className="mb-6">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <SearchInput
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input pl-10"
+              onChange={handleSearchChange}
+              placeholder="Buscar por código, cliente..."
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="input"
-          >
-            <option value="">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="sent">Enviada</option>
-            <option value="approved">Aprobada</option>
-            <option value="rejected">Rechazada</option>
-            <option value="converted">Convertida</option>
-            <option value="expired">Vencida</option>
-          </select>
+          <div className="w-52">
+            <Select value={statusFilter} onChange={handleStatusFilter}>
+              <option value="">Todos los estados</option>
+              <option value="draft">Borrador</option>
+              <option value="sent">Enviada</option>
+              <option value="approved">Aprobada</option>
+              <option value="rejected">Rechazada</option>
+              <option value="converted">Convertida</option>
+              <option value="expired">Vencida</option>
+            </Select>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
+      {/* ── Tabla ─────────────────────────────────────────────────────────────── */}
+      <Card variant="flat" className="overflow-hidden">
+        <Table
           columns={columns}
           data={quotes}
-          loading={loading}
+          loading={isLoading}
           emptyMessage="No se encontraron cotizaciones"
         />
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setCurrentPage}
+          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+        />
+      </Card>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Anterior
-              </button>
-              <span className="text-sm text-gray-700">
-                Página {currentPage} de {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* View Modal */}
-      {showModal && selectedQuote && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            setSelectedQuote(null);
-          }}
-          title={`Cotización ${selectedQuote.code}`}
-          size="large"
-        >
+      {/* ── Modal ver cotización ──────────────────────────────────────────────── */}
+      <Modal
+        open={!!selectedQuote}
+        onClose={() => setSelectedQuote(null)}
+        title={selectedQuote ? `Cotización ${selectedQuote.code}` : ''}
+        size="lg"
+      >
+        {selectedQuote && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <label className="text-sm font-medium text-gray-700">Cliente</label>
-                <p className="mt-1 text-gray-900">
-                  {selectedQuote.customer?.businessName ||
-                   `${selectedQuote.customer?.firstName} ${selectedQuote.customer?.lastName}`}
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Cliente</p>
+                <p className="text-gray-900">{customerName(selectedQuote.customer)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha</p>
+                <p className="text-gray-900">
+                  {new Date(selectedQuote.quoteDate || selectedQuote.created_at).toLocaleDateString('es-VE')}
                 </p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Fecha</label>
-                <p className="mt-1 text-gray-900">
-                  {new Date(selectedQuote.quoteDate || selectedQuote.created_at).toLocaleDateString('es-PE')}
-                </p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
+                <Badge variant={STATUS_VARIANT[selectedQuote.status] || 'neutral'}>
+                  {STATUS_LABEL[selectedQuote.status] || selectedQuote.status}
+                </Badge>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Estado</label>
-                <p className="mt-1">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusLabels[selectedQuote.status].class}`}>
-                    {statusLabels[selectedQuote.status].text}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Vendedor</label>
-                <p className="mt-1 text-gray-900">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Vendedor</p>
+                <p className="text-gray-900">
                   {selectedQuote.user?.first_name} {selectedQuote.user?.last_name}
                 </p>
               </div>
             </div>
 
             {selectedQuote.notes && (
-              <div>
-                <label className="text-sm font-medium text-gray-700">Notas</label>
-                <p className="mt-1 text-gray-900 whitespace-pre-wrap">{selectedQuote.notes}</p>
+              <div className="text-sm">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Notas</p>
+                <p className="text-gray-900 whitespace-pre-wrap">{selectedQuote.notes}</p>
               </div>
             )}
 
-            <div className="border-t pt-4">
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span>$ {parseFloat(selectedQuote.total || 0).toFixed(2)}</span>
-              </div>
+            <div className="border-t border-gray-200 pt-4 flex justify-between text-lg font-semibold">
+              <span>Total</span>
+              <span>$ {parseFloat(selectedQuote.total || 0).toFixed(2)}</span>
             </div>
           </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
+
+      {/* ── Confirmar eliminación ─────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
+        loading={deleteMutation.isPending}
+        variant="danger"
+        title="¿Eliminar esta cotización?"
+        description={deleteTarget ? `La cotización ${deleteTarget.code} será eliminada permanentemente.` : ''}
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 };

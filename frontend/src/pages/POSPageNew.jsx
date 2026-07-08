@@ -6,7 +6,7 @@ import { bankService } from '../services/api/bankService';
 import POSTabs from '../components/pos/POSTabs';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
-import Modal from '../components/common/Modal';
+import { Modal, Button, Textarea } from '../components/ui';
 import {
   Plus, Search, X, AlertCircle, CheckCircle, User,
   Package, Lock, Banknote, CreditCard, Smartphone,
@@ -63,7 +63,7 @@ const POSPage = () => {
             {/* Clock */}
             <div className="flex items-center gap-1 text-gray-400 text-sm">
               <Clock className="w-4 h-4" />
-              {pos.currentTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+              {pos.currentTime.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
             </div>
 
             {/* Shortcuts hint */}
@@ -275,7 +275,7 @@ const POSPage = () => {
                         <span className="text-gray-500">{cur.name} ({cur.code})</span>
                         <span className="font-medium text-gray-700">
                           {converted !== null
-                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.round(converted).toLocaleString('es-CO') : converted.toFixed(2)}`
+                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.ceil(converted).toLocaleString('es-VE') : converted.toFixed(2)}`
                             : 'Sin tasa'}
                         </span>
                       </div>
@@ -591,8 +591,8 @@ function CheckoutModal({
 
   const isUSD = displayCurrency === 'USD';
   const sSym = isUSD ? '$' : 'COP$';
-  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.round(usdVal * copPerUSD).toLocaleString('es-CO');
-  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.round(copVal).toLocaleString('es-CO');
+  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.ceil(usdVal * copPerUSD).toLocaleString('es-VE');
+  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.ceil(copVal).toLocaleString('es-VE');
 
   const [newPayCurrency, setNewPayCurrency] = useState(isUSD ? 'USD' : 'COP');
   const [newPayMethod, setNewPayMethod] = useState('cash');
@@ -704,7 +704,7 @@ function CheckoutModal({
 
   const fmtLine = (amount, currency) => {
     const n = parseFloat(amount) || 0;
-    if (currency === 'COP') return Math.round(n).toLocaleString('es-CO');
+    if (currency === 'COP') return Math.ceil(n).toLocaleString('es-VE');
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -712,7 +712,7 @@ function CheckoutModal({
 
   return (
     <>
-    <Modal isOpen={show} onClose={onClose} title="Confirmar Venta">
+    <Modal open={show} onClose={onClose} title="Confirmar Venta">
       <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
 
         {/* Resumen */}
@@ -776,9 +776,9 @@ function CheckoutModal({
                       {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                         <span className="text-[10px] text-gray-400">
                           @ {line.method === 'usdt'
-                            ? `${Math.round(line.cop_rate).toLocaleString('es-CO')} COP/USDT`
+                            ? `${Math.ceil(line.cop_rate).toLocaleString('es-VE')} COP/USDT`
                             : line.display_rate
-                            ? `${line.currency === 'COP' ? Math.round(line.display_rate).toLocaleString('es-CO') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                            ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString('es-VE') : line.display_rate.toFixed(2)} ${line.currency}/USD`
                             : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
                         </span>
                       )}
@@ -847,7 +847,7 @@ function CheckoutModal({
               }
               formatted = effectiveCurrency === 'USD'
                 ? remainingInCurrency.toFixed(2)
-                : Math.ceil(remainingInCurrency).toLocaleString('es-CO');
+                : Math.ceil(remainingInCurrency).toLocaleString('es-VE');
               return (
                 <p className="text-sm font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
               );
@@ -915,7 +915,7 @@ function CheckoutModal({
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-green-700">
                     <span>Entregar:</span>
-                    <span>COP$ {vueltoCOP.toLocaleString('es-CO')}</span>
+                    <span>COP$ {vueltoCOP.toLocaleString('es-VE')}</span>
                   </div>
                 </div>
               );
@@ -929,25 +929,18 @@ function CheckoutModal({
         {/* Notes */}
         <div>
           <label className="block text-sm font-semibold text-gray-900 mb-1">Notas (opcional)</label>
-          <textarea
+          <Textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Observaciones de la venta..."
           />
         </div>
 
         {/* Buttons */}
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-semibold text-gray-900 hover:bg-gray-50">
-            Cancelar
-          </button>
-          <button
-            onClick={onComplete}
-            disabled={saving}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
-          >
-            {saving ? 'Guardando...' : 'Confirmar Venta'}
-          </button>
+          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Button>
+          <Button variant="success" className="flex-1" onClick={onComplete} loading={saving}>
+            Confirmar Venta
+          </Button>
         </div>
       </div>
     </Modal>
@@ -971,7 +964,7 @@ function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, o
   if (!show || !sale) return null;
 
   return (
-    <Modal isOpen={show} onClose={onClose} title="Venta Completada">
+    <Modal open={show} onClose={onClose} title="Venta Completada">
       <div className="space-y-4">
         <div className="flex items-center justify-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -995,16 +988,11 @@ function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, o
           )}
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={onPrint}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition"
-          >
+          <Button variant="secondary" className="flex-1" onClick={onPrint}>
             <Printer className="w-4 h-4" />
             Imprimir
-          </button>
-          <button onClick={onClose} className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-            Nueva Venta
-          </button>
+          </Button>
+          <Button className="flex-1" onClick={onClose}>Nueva Venta</Button>
         </div>
       </div>
     </Modal>

@@ -128,12 +128,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       permission: 'price_lists.view',
     },
     {
-      name: 'Cotizaciones',
-      icon: FileSpreadsheet,
-      path: '/cotizaciones',
-      permission: 'sales.quotes.view',
-    },
-    {
       name: 'Punto de Venta',
       icon: CreditCard,
       permission: 'sales.create',

@@ -1,32 +1,33 @@
 import { useState, useEffect } from 'react';
-import { X, Loader, AlertCircle, FileText, Banknote } from 'lucide-react';
+import { X, AlertCircle, FileText, Banknote } from 'lucide-react';
+import { Spinner } from '../ui';
 import { supplierService } from '../../services/api/supplierService';
 
 // --- Formatters ---
 const fmtUSD = (v) => {
   const val = parseFloat(v) || 0;
-  return `$ ${val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$ ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const fmtCOP = (v) => {
   const val = parseFloat(v) || 0;
-  return `$ ${Math.round(val).toLocaleString('es-ES')}`;
+  return `$ ${Math.ceil(val).toLocaleString('es-VE')}`;
 };
 
 const fmtVES = (v) => {
   const val = parseFloat(v) || 0;
   if (Math.abs(val) < 0.01) return '-';
-  return `Bs ${Math.round(val).toLocaleString('es-ES')}`;
+  return `Bs ${Math.ceil(val).toLocaleString('es-VE')}`;
 };
 
 const fmtRate = (v) => {
   const val = parseFloat(v) || 0;
-  return val.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  return val.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 };
 
 const fmtDate = (d) => {
   if (!d) return '-';
-  return new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 // Category display config
@@ -121,8 +122,8 @@ const SupplierLedgerModal = ({ supplier, onClose }) => {
           {/* Content */}
           <div className="flex-1 overflow-hidden flex flex-col">
             {loading ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-20">
-                <Loader className="h-8 w-8 text-blue-600 animate-spin mb-3" />
+              <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3">
+                <Spinner size="lg" />
                 <p className="text-gray-500 text-sm">Cargando estado de cuenta...</p>
               </div>
             ) : error ? (
