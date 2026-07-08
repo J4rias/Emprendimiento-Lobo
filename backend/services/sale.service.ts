@@ -517,8 +517,35 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
       updated_by: userId
     }, { transaction });
 
+    // Mark all non-reversed payments as reversed and collect refund info
+    const [paymentsToReverse] = await sequelize.query(
+      `SELECT id, amount, currency, payment_method FROM sale_payments
+       WHERE sale_id = ? AND reversed_at IS NULL`,
+      { replacements: [saleId], transaction }
+    ) as any[];
+
+    if ((paymentsToReverse as any[]).length > 0) {
+      await sequelize.query(
+        `UPDATE sale_payments SET reversed_at = NOW(), reversed_by = ?
+         WHERE sale_id = ? AND reversed_at IS NULL`,
+        { replacements: [userId, saleId], transaction }
+      );
+    }
+
+    // Build refund summary: only cash payments with positive amounts (what was physically received)
+    const refundLines: Array<{ amount: number; currency: string; payment_method: string }> = [];
+    for (const p of paymentsToReverse as any[]) {
+      if (parseFloat(p.amount) > 0) {
+        refundLines.push({
+          amount: parseFloat(p.amount),
+          currency: p.currency,
+          payment_method: p.payment_method
+        });
+      }
+    }
+
     await transaction.commit();
-    return sale;
+    return { sale, refund_lines: refundLines };
 
   } catch (error) {
     try { await transaction.rollback(); } catch (_) { /* already rolled back */ }

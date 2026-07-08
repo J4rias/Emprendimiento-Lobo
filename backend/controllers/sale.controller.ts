@@ -375,8 +375,8 @@ export const cancelSale = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const sale = await saleService.cancelSale(parseInt(id), reason, (req as any).user.id);
-    return res.json({ message: 'Venta cancelada exitosamente', data: sale });
+    const { sale, refund_lines } = await saleService.cancelSale(parseInt(id), reason, (req as any).user.id);
+    return res.json({ message: 'Venta cancelada exitosamente', data: sale, refund_lines });
   } catch (error: any) {
     if (error instanceof ServiceError) {
       return res.status(error.status).json({ message: error.message });
