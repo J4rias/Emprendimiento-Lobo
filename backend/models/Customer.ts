@@ -169,7 +169,7 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
     tableName: 'customers',
     timestamps: true,
     underscored: true,
-    paranoid: true,
+    paranoid: false,
     indexes: [
       {
         fields: ['code']

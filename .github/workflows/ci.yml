@@ -33,6 +33,9 @@ jobs:
       - name: TypeScript check
         run: pnpm tsc:check
 
+      - name: Paranoid model check
+        run: pnpm check:paranoid
+
       - name: Security audit
         run: pnpm audit:ci
         continue-on-error: true  # informativo hasta limpiar xlsx/nodemailer

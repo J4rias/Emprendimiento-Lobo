@@ -166,7 +166,7 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
     tableName: 'quotes',
     timestamps: true,
     underscored: true,
-    paranoid: true,
+    paranoid: false,
     indexes: [
       {
         fields: ['code']

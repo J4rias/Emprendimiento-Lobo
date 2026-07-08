@@ -77,14 +77,6 @@ const LoginPage = () => {
             Gestión de inventario, ventas, cuentas por cobrar y reportes multi-moneda en una sola plataforma.
           </p>
 
-          {/* Feature pills */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            {['POS Multi-moneda', 'Control de crédito', 'Inventario en tiempo real', 'Reportes'].map(f => (
-              <span key={f} className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-xs font-medium border border-white/10">
-                {f}
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* Footer branding */}

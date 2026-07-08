@@ -73,7 +73,7 @@ const Brand = sequelize.define<Model<BrandAttributes, BrandCreationAttributes>>(
 }, {
   tableName: 'brands',
   timestamps: true,
-  paranoid: true
+  paranoid: false
 });
 
 export = Brand;
