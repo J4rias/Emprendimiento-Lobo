@@ -12,11 +12,7 @@ import { downloadCSV } from '../utils/csvUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmtDate = (d) =>
-  new Date(d).toLocaleString('es-VE', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+const fmtDate = (d) => new Date(d).toLocaleDateString('es-VE');
 
 const getUserName = (user) => {
   if (!user) return 'Sistema';
@@ -63,21 +59,26 @@ const InventoryMovementsPage = () => {
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExport = () => {
-    const headers = ['Fecha', 'Producto', 'SKU', 'Tipo', 'Presentación', 'Bultos', 'Sueltas', 'Total', 'Almacén', 'Referencia', 'Motivo', 'Usuario'];
-    const rows = movements.map(m => [
-      fmtDate(m.createdAt || m.created_at),
-      m.product?.name || '',
-      m.product?.sku  || '',
-      m.movement_type || '',
-      m.presentation?.name || '',
-      m.package_quantity != null ? m.package_quantity : '',
-      m.loose_units > 0 ? m.loose_units : '',
-      parseFloat(m.quantity || 0).toFixed(2),
-      m.warehouse?.name || '',
-      m.document_number || '',
-      m.reason || '',
-      getUserName(m.user),
-    ]);
+    const headers = ['Fecha', 'Producto', 'SKU', 'Tipo', 'Presentación', 'Bultos', 'Sueltas', 'Total uds', 'Almacén', 'Referencia', 'Usuario'];
+    const rows = movements.map(m => {
+      const upu    = parseInt(m.presentation?.units_per_package, 10) || 0;
+      const qty    = Math.floor(parseFloat(m.quantity) || 0);
+      const bultos  = upu > 0 ? Math.floor(qty / upu) : 0;
+      const sueltas = upu > 0 ? qty % upu : qty;
+      return [
+        fmtDate(m.createdAt || m.created_at),
+        m.product?.name || '',
+        m.product?.sku  || '',
+        m.movement_type || '',
+        m.presentation?.name || '',
+        bultos  || '',
+        sueltas || '',
+        qty,
+        m.warehouse?.name || '',
+        m.document_number || '',
+        getUserName(m.user),
+      ];
+    });
     downloadCSV(`movimientos_inventario`, headers, rows);
   };
 
@@ -128,29 +129,26 @@ const InventoryMovementsPage = () => {
     {
       header: 'Bultos',
       className: 'text-right',
-      render: (m) => (
-        <span className="text-sm font-medium text-right block">
-          {m.package_quantity != null ? m.package_quantity : <span className="text-gray-300">—</span>}
-        </span>
-      ),
+      render: (m) => {
+        const upu = parseInt(m.presentation?.units_per_package, 10) || 0;
+        const qty = Math.floor(parseFloat(m.quantity) || 0);
+        const bultos = upu > 0 ? Math.floor(qty / upu) : 0;
+        return bultos > 0
+          ? <span className="text-sm font-medium text-right block">{bultos}</span>
+          : <span className="text-xs text-gray-300 text-right block">—</span>;
+      },
     },
     {
       header: 'Sueltas',
       className: 'text-right',
-      render: (m) => (
-        <span className="text-sm font-medium text-right block">
-          {m.loose_units > 0 ? m.loose_units : <span className="text-gray-300">—</span>}
-        </span>
-      ),
-    },
-    {
-      header: 'Total uds',
-      className: 'text-right',
-      render: (m) => (
-        <span className="text-sm font-semibold text-primary-700 text-right block">
-          {parseFloat(m.quantity || 0).toFixed(2)}
-        </span>
-      ),
+      render: (m) => {
+        const upu = parseInt(m.presentation?.units_per_package, 10) || 0;
+        const qty = Math.floor(parseFloat(m.quantity) || 0);
+        const sueltas = upu > 0 ? qty % upu : qty;
+        return sueltas > 0
+          ? <span className="text-sm font-medium text-right block">{sueltas}</span>
+          : <span className="text-xs text-gray-300 text-right block">—</span>;
+      },
     },
     {
       header: 'Almacén',
@@ -160,21 +158,40 @@ const InventoryMovementsPage = () => {
     },
     {
       header: 'Referencia',
-      render: (m) =>
-        m.document_number
-          ? <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">{m.document_number}</span>
-          : <span className="text-gray-300 text-xs">—</span>,
-    },
-    {
-      header: 'Motivo',
-      render: (m) => (
-        <span className="text-xs text-gray-600">
-          {m.reason
-            ? (m.reason.length > 45 ? m.reason.slice(0, 45) + '…' : m.reason)
-            : <span className="text-gray-300">—</span>
+      render: (m) => {
+        if (!m.document_number) return <span className="text-gray-300 text-xs">—</span>;
+        const isSale = ['egreso', 'egreso_venta', 'venta', 'devolucion_cliente'].includes(m.movement_type);
+        const dest = isSale
+          ? null  // manejado vía state con sale_id
+          : {
+              ingreso: '/purchase-orders', ingreso_compra: '/purchase-orders', compra: '/purchase-orders', devolucion_proveedor: '/purchase-orders',
+              transferencia: '/transferencias', transferencia_entrada: '/transferencias', transferencia_salida: '/transferencias',
+            }[m.movement_type] ?? null;
+
+        const handleClick = () => {
+          if (isSale && m.sale_id) {
+            navigate('/ventas', { state: { openSaleId: m.sale_id } });
+          } else if (dest) {
+            navigate(dest);
           }
-        </span>
-      ),
+        };
+
+        const isClickable = (isSale && !!m.sale_id) || !!dest;
+
+        return (
+          <button
+            onClick={isClickable ? handleClick : undefined}
+            disabled={!isClickable}
+            className={`text-xs font-mono text-left ${
+              isClickable
+                ? 'text-primary-600 hover:text-primary-800 hover:underline cursor-pointer'
+                : 'text-gray-600 cursor-default'
+            }`}
+          >
+            {m.document_number}
+          </button>
+        );
+      },
     },
     {
       header: 'Usuario',

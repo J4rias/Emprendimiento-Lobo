@@ -144,12 +144,14 @@ const ImageUpload = ({
       fullUrl = `${baseUrl}${url}`;
     }
 
+    const isFullWidth = previewSize.includes('w-full');
+
     return (
-      <div key={index || 'preview'} className="relative group">
+      <div key={index || 'preview'} className={`relative group${isFullWidth ? ' w-full' : ''}`}>
         <img
           src={fullUrl}
           alt="Preview"
-          className={`${previewSize} object-cover rounded-lg border-2 border-gray-200 max-w-full max-h-full`}
+          className={`${previewSize} object-contain object-center rounded-lg border-2 border-gray-200`}
         />
         {!disabled && (
           <button
@@ -179,7 +181,7 @@ const ImageUpload = ({
 
       {/* Vista previa */}
       {showPreview && value && (
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2${previewSize.includes('w-full') ? ' w-full' : ' justify-center'}`}>
           {Array.isArray(value) ? (
             value.map((url, index) => renderPreview(url, index))
           ) : (

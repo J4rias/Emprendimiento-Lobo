@@ -495,6 +495,19 @@ class InventoryController {
 
       const { count, rows: movements } = await InventoryMovement.findAndCountAll({
         where,
+        attributes: {
+          include: [
+            // sale_id derivado del document_number para linkear al detalle de venta
+            [
+              sequelize.literal(`(
+                SELECT id FROM sales
+                WHERE sale_number = \`InventoryMovement\`.\`document_number\`
+                LIMIT 1
+              )`),
+              'sale_id',
+            ],
+          ],
+        },
         include: [
           {
             model: Product,

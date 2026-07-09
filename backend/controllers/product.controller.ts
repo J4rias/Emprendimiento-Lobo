@@ -15,6 +15,9 @@ import Brand from '../models/Brand';
 import PackagingType from '../models/PackagingType';
 import PresentationType from '../models/PresentationType';
 import PriceListDetail from '../models/PriceListDetail';
+import SaleDetail from '../models/SaleDetail';
+import InventoryMovement from '../models/InventoryMovement';
+import PurchaseOrderDetail from '../models/PurchaseOrderDetail';
 
 // Other requires that are not models/sequelize/express → leave as require()
 const skuConfig = require('../config/sku');
@@ -669,7 +672,7 @@ async update(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-  // Delete product (soft delete)
+  // Delete product
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -682,7 +685,7 @@ async update(req: Request, res: Response, next: NextFunction) {
         });
       }
 
-      // Check if product has inventory
+      // Check if product has inventory with stock
       const inventory = await Inventory.findOne({
         where: { product_id: id, quantity: { [Op.gt]: 0 } }
       }) as any;
@@ -693,8 +696,34 @@ async update(req: Request, res: Response, next: NextFunction) {
         });
       }
 
-      // Soft delete via paranoid
-      await product.destroy();
+      // Check for transactional history — if any exists, only deactivation is allowed
+      const [saleCount, movementCount, poCount] = await Promise.all([
+        SaleDetail.count({ where: { product_id: id } }),
+        InventoryMovement.count({ where: { product_id: id } }),
+        PurchaseOrderDetail.count({ where: { product_id: id } }),
+      ]);
+
+      if (saleCount > 0 || movementCount > 0 || poCount > 0) {
+        return res.status(409).json({
+          message:
+            'Este producto tiene historial de transacciones y no puede eliminarse. ' +
+            'Puedes desactivarlo para ocultarlo del inventario.',
+        });
+      }
+
+      // No transactional history — cascade-delete metadata then destroy
+      const transaction = await sequelize.transaction();
+      try {
+        await PriceListDetail.destroy({ where: { product_id: id }, transaction });
+        await Barcode.destroy({ where: { product_id: id }, transaction });
+        await Inventory.destroy({ where: { product_id: id }, transaction });
+        await ProductPresentation.destroy({ where: { product_id: id }, transaction });
+        await product.destroy({ transaction });
+        await transaction.commit();
+      } catch (err) {
+        await transaction.rollback();
+        throw err;
+      }
 
       res.json({
         message: 'Producto eliminado exitosamente'

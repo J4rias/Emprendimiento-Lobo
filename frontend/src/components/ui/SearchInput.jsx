@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MagnifyingGlass, X } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
-import { Button } from './Button'
 
 /**
  * Input de búsqueda con icono, debounce interno y botón de limpiar.
@@ -97,16 +96,13 @@ export function SearchInput({
         )}
       />
       {localValue && (
-        // size="icon" → h-9 w-9 (36px): mismo alto que el input, mayor área táctil
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
           onClick={handleClear}
-          className="absolute right-0 top-0 h-full rounded-l-none text-gray-400 hover:text-gray-600 active:bg-gray-100"
+          className="absolute right-0 top-0 h-full w-9 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X size={15} />
-        </Button>
+        </button>
       )}
     </div>
   )

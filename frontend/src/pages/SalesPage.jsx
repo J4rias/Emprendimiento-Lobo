@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
@@ -58,6 +59,7 @@ const PAYMENT_METHOD_LABEL = {
 const SalesPage = () => {
   const { companySettings } = useCompany();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [limit, setLimit] = useTableLimit();
 
   // ─── Filters ──────────────────────────────────────────────────────────────────
@@ -216,6 +218,15 @@ const SalesPage = () => {
       toast.error('Error al cargar el detalle de la venta');
     }
   };
+
+  // Abre el detalle directamente si se navegó desde otra página con un sale_id en state
+  useEffect(() => {
+    if (location.state?.openSaleId) {
+      handleViewDetail(location.state.openSaleId);
+      // Limpiar el state para que no se reabra al refrescar
+      window.history.replaceState({}, '');
+    }
+  }, []);
 
   const handleCancelSale = (saleId) => {
     setCancelSaleId(saleId);

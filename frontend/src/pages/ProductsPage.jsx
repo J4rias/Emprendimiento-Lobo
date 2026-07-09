@@ -3,8 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, MagnifyingGlass, Funnel, X, FileCsv } from '@phosphor-icons/react';
-import { Button, Alert, Modal, ConfirmDialog, useTableLimit } from '../components/ui';
+import { Plus, X } from '@phosphor-icons/react';
+import {
+  Button, Alert, Card, Modal, ConfirmDialog, ExportCsvAction,
+  SearchInput, Select, useTableLimit,
+} from '../components/ui';
 import { presentationService } from '../services/api/presentationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import ProductTable from '../components/products/ProductTable';
@@ -484,9 +487,7 @@ const ProductsPage = () => {
           <p className="text-gray-600">Gestión de productos del inventario</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="icon" onClick={handleDownloadCSV} title="Exportar CSV">
-            <FileCsv className="w-4 h-4 text-emerald-600" />
-          </Button>
+          <ExportCsvAction onClick={handleDownloadCSV} title="Exportar CSV" />
           {hasPermission('products.create') && (
             <Button onClick={() => setShowModal(true)}>
               <Plus className="h-4 w-4" />
@@ -504,54 +505,29 @@ const ProductsPage = () => {
       )}
 
       {/* Filters */}
-      <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
+      <Card variant="flat">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <SearchInput
               placeholder="Nombre, SKU o código de barras..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input pl-10"
+              onChange={(v) => { setSearch(v); setCurrentPage(1); }}
             />
           </div>
-
-          <div className="relative">
-            <Funnel className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-            <select
+          <div className="w-52">
+            <Select
               value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input pl-10"
+              onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
             >
               <option value="">Todas las categorías</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => {
-                setSearch('');
-                setCategoryFilter('');
-                setCurrentPage(1);
-              }}
-            >
-              Limpiar Filtros
-            </Button>
-          </div>
+          <Button variant="secondary" onClick={() => { setSearch(''); setCategoryFilter(''); setCurrentPage(1); }}>
+            Limpiar
+          </Button>
         </div>
 
         {/* Active filter chip */}
@@ -563,14 +539,14 @@ const ProductsPage = () => {
               <button
                 type="button"
                 onClick={() => { setCategoryFilter(''); setCurrentPage(1); }}
-                className="hover:text-primary-900 ml-0.5"
+                className="rounded-full hover:bg-primary-200 hover:text-primary-900 ml-0.5 leading-none"
               >
                 <X className="h-3 w-3" />
               </button>
             </span>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Products Table */}
       <ProductTable

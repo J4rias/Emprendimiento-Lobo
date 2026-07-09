@@ -6,7 +6,7 @@ import { warehouseService } from '../services/api/warehouseService';
 import { categoryService } from '../services/api/categoryService';
 import {
   Package, Warning, Calendar, CurrencyDollar, Funnel,
-  FileCsv, ArrowClockwise, Plus, Info, X, Warehouse,
+  ArrowClockwise, Plus, Info, X, Warehouse,
   CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
@@ -14,47 +14,50 @@ import { formatMoney } from '../utils/formatUtils';
 import { downloadCSV } from '../utils/csvUtils';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
-import { Alert, Badge, Button, Card, Input, Modal, SearchInput, Select, ViewAction, AdjustAction } from '../components/ui';
+import {
+  Alert, Badge, Button, Card, EmptyState, ExportCsvAction, Input,
+  Modal, SearchInput, Select, Spinner, Table, ViewAction, AdjustAction,
+} from '../components/ui';
 
 const InventoryPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Funnel state
+  // ── Filters ────────────────────────────────────────────────────────────────
   const [selectedWarehouse, setSelectedWarehouse] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedCategory, setSelectedCategory]   = useState('');
+  const [searchTerm, setSearchTerm]               = useState('');
+  const [showFilters, setShowFilters]             = useState(false);
   const [filters, setFilters] = useState({ lowStock: false, expiring: false, outOfStock: false });
-  const [showHelp, setShowHelp] = useState(false);
+  const [showHelp, setShowHelp]                   = useState(false);
   const [showCurrencyBreakdown, setShowCurrencyBreakdown] = useState(false);
 
-  // Quick count mode
+  // ── Quick Count ────────────────────────────────────────────────────────────
   const [quickCountMode, setQuickCountMode] = useState(false);
-  const [countEdits, setCountEdits] = useState({});
-  const [saveStatus, setSaveStatus] = useState({});
+  const [countEdits, setCountEdits]         = useState({});
+  const [saveStatus, setSaveStatus]         = useState({});
   const countEditsRef = useRef({});
-  const timersRef = useRef({});
-  const inputRefs = useRef({});
+  const timersRef     = useRef({});
+  const inputRefs     = useRef({});
 
-  // Individual adjust modal
-  const [adjustItem, setAdjustItem] = useState(null);
-  const [adjustForm, setAdjustForm] = useState({ type: 'add', bultos: '', unidades: '', reason: '' });
+  // ── Individual Adjust ──────────────────────────────────────────────────────
+  const [adjustItem, setAdjustItem]   = useState(null);
+  const [adjustForm, setAdjustForm]   = useState({ type: 'add', bultos: '', unidades: '', reason: '' });
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
-    { code: 'COP', name: 'Peso Colombiano', symbol: '$' },
-    { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' },
+    { code: 'COP', name: 'Peso Colombiano',      symbol: '$' },
+    { code: 'VES', name: 'Bolívar Venezolano',   symbol: 'Bs' },
   ];
 
-  // --- Queries ---
+  // ── Queries ────────────────────────────────────────────────────────────────
   const { data: inventoryData, isLoading } = useQuery({
     queryKey: ['inventory', selectedWarehouse, searchTerm, selectedCategory, filters],
     queryFn: () => inventoryService.getByWarehouse(selectedWarehouse, {
       search: searchTerm,
       category_id: selectedCategory || undefined,
-      low_stock: filters.lowStock,
-      expiring: filters.expiring,
+      low_stock:   filters.lowStock,
+      expiring:    filters.expiring,
       out_of_stock: filters.outOfStock,
       limit: 500,
     }),
@@ -112,7 +115,7 @@ const InventoryPage = () => {
     refetchInterval: 60000,
   });
 
-  // --- Mutations ---
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const adjustMutation = useMutation({
     mutationFn: (data) => inventoryService.adjustInventory(data),
     onSuccess: () => {
@@ -124,7 +127,7 @@ const InventoryPage = () => {
     onError: (err) => toast.error(err.response?.data?.message || 'Error al ajustar inventario'),
   });
 
-  // --- Helpers ---
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const formatCOP = (val) =>
     new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.ceil(val));
 
@@ -147,7 +150,7 @@ const InventoryPage = () => {
     return { text: 'Normal', variant: 'success' };
   };
 
-  const hasActiveFilters = filters.lowStock || filters.expiring || filters.outOfStock;
+  const hasActiveFilters   = filters.lowStock || filters.expiring || filters.outOfStock;
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
   const handleClearFilters = () => {
@@ -157,12 +160,12 @@ const InventoryPage = () => {
     setFilters({ lowStock: false, expiring: false, outOfStock: false });
   };
 
-  // ── Quick Count ──
+  // ── Quick Count handlers ────────────────────────────────────────────────────
   const handleCountChange = (item, field, value) => {
     const id = item.id;
     if (!countEditsRef.current[id]) countEditsRef.current[id] = {};
     countEditsRef.current[id][field] = value;
-    countEditsRef.current[id].dirty = true;
+    countEditsRef.current[id].dirty  = true;
     setCountEdits(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field]: value, dirty: true } }));
     setSaveStatus(prev => ({ ...prev, [id]: 'idle' }));
     if (timersRef.current[id]) clearTimeout(timersRef.current[id]);
@@ -172,12 +175,12 @@ const InventoryPage = () => {
   };
 
   const saveCountEdit = async (item, edits) => {
-    const pres = getDefaultPresentation(item);
+    const pres       = getDefaultPresentation(item);
     const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-    const bultos = parseFloat(edits.bultos) || 0;
-    const unidades = parseFloat(edits.unidades) || 0;
-    const newTotal = (bultos * unitsPerPkg) + unidades;
-    const diff = newTotal - parseFloat(item.quantity);
+    const bultos     = parseFloat(edits.bultos)   || 0;
+    const unidades   = parseFloat(edits.unidades) || 0;
+    const newTotal   = (bultos * unitsPerPkg) + unidades;
+    const diff       = newTotal - parseFloat(item.quantity);
     if (diff === 0) {
       setSaveStatus(prev => ({ ...prev, [item.id]: 'saved' }));
       setTimeout(() => setSaveStatus(prev => ({ ...prev, [item.id]: 'idle' })), 2000);
@@ -186,11 +189,11 @@ const InventoryPage = () => {
     setSaveStatus(prev => ({ ...prev, [item.id]: 'saving' }));
     try {
       await inventoryService.adjustInventory({
-        product_id: item.product_id,
+        product_id:   item.product_id,
         warehouse_id: item.warehouse_id,
-        type: diff > 0 ? 'add' : 'remove',
-        loose_units: Math.abs(diff),
-        reason: 'Conteo Rápido',
+        type:         diff > 0 ? 'add' : 'remove',
+        loose_units:  Math.abs(diff),
+        reason:       'Conteo Rápido',
       });
       setSaveStatus(prev => ({ ...prev, [item.id]: 'saved' }));
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -205,40 +208,40 @@ const InventoryPage = () => {
 
   const handleExitQuickCount = () => {
     Object.values(timersRef.current).forEach(t => clearTimeout(t));
-    timersRef.current = {};
+    timersRef.current   = {};
     countEditsRef.current = {};
     setCountEdits({});
     setSaveStatus({});
     setQuickCountMode(false);
   };
 
-  // ── Individual Adjust ──
+  // ── Individual Adjust ──────────────────────────────────────────────────────
   const openAdjust = (item) => {
     setAdjustItem(item);
     setAdjustForm({ type: 'add', bultos: '', unidades: '', reason: '' });
   };
 
   const handleSubmitAdjust = () => {
-    const pres = getDefaultPresentation(adjustItem);
+    const pres       = getDefaultPresentation(adjustItem);
     const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-    const bultos = parseFloat(adjustForm.bultos) || 0;
-    const unidades = parseFloat(adjustForm.unidades) || 0;
+    const bultos     = parseFloat(adjustForm.bultos)   || 0;
+    const unidades   = parseFloat(adjustForm.unidades) || 0;
     if ((bultos * unitsPerPkg) + unidades <= 0) {
       toast.error('Ingresa al menos una cantidad');
       return;
     }
     adjustMutation.mutate({
-      product_id: adjustItem.product_id,
-      warehouse_id: adjustItem.warehouse_id,
-      type: adjustForm.type,
-      presentation_id: pres.id || undefined,
-      package_quantity: bultos || undefined,
-      loose_units: unidades || undefined,
-      reason: adjustForm.reason || undefined,
+      product_id:       adjustItem.product_id,
+      warehouse_id:     adjustItem.warehouse_id,
+      type:             adjustForm.type,
+      presentation_id:  pres.id || undefined,
+      package_quantity: bultos   || undefined,
+      loose_units:      unidades || undefined,
+      reason:           adjustForm.reason || undefined,
     });
   };
 
-  // ── CSV Export ──
+  // ── CSV Export ─────────────────────────────────────────────────────────────
   const handleDownloadReport = () => {
     if (!inventoryData?.data?.length) {
       toast.error('No hay datos para exportar');
@@ -266,9 +269,100 @@ const InventoryPage = () => {
     );
   };
 
+  // ── Columnas tabla normal ──────────────────────────────────────────────────
+  const inventoryColumns = [
+    {
+      header: 'Producto',
+      accessor: 'product',
+      render: (_, item) => (
+        <div>
+          <div className="font-medium text-gray-900">{item.product.name}</div>
+          {selectedWarehouse === 'all' && (
+            <div className="text-xs text-gray-400">{item.warehouse?.name}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'Categoría',
+      accessor: 'category',
+      render: (_, item) => item.product.category ? (
+        <span
+          className="px-2 py-1 text-xs rounded-full text-white font-medium"
+          style={{ backgroundColor: item.product.category.color || '#6B7280' }}
+        >
+          {item.product.category.name}
+        </span>
+      ) : (
+        <Badge variant="neutral">N/A</Badge>
+      ),
+    },
+    {
+      header: 'Bultos',
+      accessor: 'bultos',
+      cellClassName: 'text-center',
+      render: (_, item) => {
+        const pres = getDefaultPresentation(item);
+        const qty  = parseFloat(item.quantity);
+        return <span className="font-semibold text-gray-900">{Math.floor(qty / (parseFloat(pres.units_per_package) || 1))}</span>;
+      },
+    },
+    {
+      header: 'Unidades',
+      accessor: 'unidades',
+      cellClassName: 'text-center',
+      render: (_, item) => {
+        const pres = getDefaultPresentation(item);
+        const qty  = parseFloat(item.quantity);
+        return <span className="text-gray-600">{Math.round(qty % (parseFloat(pres.units_per_package) || 1))}</span>;
+      },
+    },
+    {
+      header: 'Último Ajuste',
+      accessor: 'updated_at',
+      render: (_, item) => (
+        <span className="text-sm text-gray-500">
+          {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-VE') : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Valor Inventario',
+      accessor: 'value',
+      cellClassName: 'text-right',
+      render: (_, item) => {
+        const pres       = getDefaultPresentation(item);
+        const qty        = parseFloat(item.quantity);
+        const pkgCost    = parseFloat(pres.package_cost || 0);
+        const upu        = parseFloat(pres.units_per_package) || 1;
+        const valueCOP   = toCOP(qty * (pkgCost / upu), pres.purchase_currency || 'USD');
+        return <span className="font-medium text-gray-700">{valueCOP > 0 ? formatCOP(valueCOP) : '—'}</span>;
+      },
+    },
+    {
+      header: 'Estado',
+      accessor: 'status',
+      render: (_, item) => {
+        const s = getStockStatus(parseFloat(item.quantity), item.product.reorder_point);
+        return <Badge variant={s.variant}>{s.text}</Badge>;
+      },
+    },
+    {
+      header: 'Acciones',
+      accessor: 'id',
+      render: (_, item) => (
+        <div className="flex items-center gap-1">
+          <ViewAction onClick={() => navigate(`/inventario/${item.id}`)} />
+          <AdjustAction onClick={() => openAdjust(item)} />
+        </div>
+      ),
+    },
+  ];
+
+  // ─── Layout ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
@@ -305,7 +399,7 @@ const InventoryPage = () => {
         </div>
       </div>
 
-      {/* Quick Count Banner */}
+      {/* Banner Conteo Rápido */}
       {quickCountMode && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-3 flex items-center gap-3">
           <ClipboardText className="w-5 h-5 text-amber-600 shrink-0" />
@@ -316,7 +410,7 @@ const InventoryPage = () => {
         </div>
       )}
 
-      {/* Help Panel */}
+      {/* Panel de ayuda */}
       {showHelp && (
         <Card className="bg-blue-50 border-blue-200">
           <div className="flex items-start gap-3">
@@ -324,11 +418,11 @@ const InventoryPage = () => {
             <div className="flex-1">
               <h3 className="font-semibold text-blue-900 mb-2">¿Cómo funciona el inventario?</h3>
               <div className="text-sm text-blue-800 space-y-1.5">
-                <p><strong>📦 Bultos / Unidades:</strong> El stock se muestra como paquetes completos + unidades sueltas según la presentación por defecto del producto.</p>
-                <p><strong>📋 Conteo Rápido:</strong> Ajusta el stock de múltiples productos a la vez sin salir de la página. Los cambios se guardan automáticamente.</p>
-                <p><strong>✏️ Ajuste individual:</strong> El botón de lápiz en cada fila abre un formulario para ajustar un producto específico.</p>
-                <p><strong>⚠️ Stock Bajo:</strong> Productos en o por debajo del punto de reorden configurado.</p>
-                <p><strong>💰 Valor Inventario:</strong> Costo estimado basado en el costo de compra de la presentación por defecto (en USD).</p>
+                <p><strong>Bultos / Unidades:</strong> El stock se muestra como paquetes completos + unidades sueltas según la presentación por defecto del producto.</p>
+                <p><strong>Conteo Rápido:</strong> Ajusta el stock de múltiples productos a la vez sin salir de la página. Los cambios se guardan automáticamente.</p>
+                <p><strong>Ajuste individual:</strong> El botón de lápiz en cada fila abre un formulario para ajustar un producto específico.</p>
+                <p><strong>Stock Bajo:</strong> Productos en o por debajo del punto de reorden configurado.</p>
+                <p><strong>Valor Inventario:</strong> Costo estimado basado en el costo de compra de la presentación por defecto (en USD).</p>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
@@ -417,7 +511,7 @@ const InventoryPage = () => {
         </Card>
       </div>
 
-      {/* Filters Bar */}
+      {/* Filtros */}
       <Card variant="flat">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1">
@@ -469,245 +563,155 @@ const InventoryPage = () => {
               )}
             </Button>
 
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={handleClearFilters}
-              title="Limpiar filtros"
-            >
+            <Button variant="secondary" size="icon" onClick={handleClearFilters} title="Limpiar filtros">
               <ArrowClockwise className="w-4 h-4" />
             </Button>
 
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={handleDownloadReport}
-              title="Exportar CSV"
-            >
-              <FileCsv className="w-4 h-4 text-emerald-600" />
-            </Button>
+            <ExportCsvAction onClick={handleDownloadReport} title="Exportar CSV" />
           </div>
         </div>
 
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.lowStock}
-                onChange={(e) => setFilters(f => ({ ...f, lowStock: e.target.checked }))}
-                className="rounded text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Stock Bajo</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.expiring}
-                onChange={(e) => setFilters(f => ({ ...f, expiring: e.target.checked }))}
-                className="rounded text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Próximos a vencer</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.outOfStock}
-                onChange={(e) => setFilters(f => ({ ...f, outOfStock: e.target.checked }))}
-                className="rounded text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Agotados</span>
-            </label>
+            {[
+              { key: 'lowStock',   label: 'Stock Bajo' },
+              { key: 'expiring',   label: 'Próximos a vencer' },
+              { key: 'outOfStock', label: 'Agotados' },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters[key]}
+                  onChange={(e) => setFilters(f => ({ ...f, [key]: e.target.checked }))}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{label}</span>
+              </label>
+            ))}
           </div>
         )}
       </Card>
 
-      {/* Inventory Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-            <p className="ml-3 text-gray-600">Cargando inventario...</p>
+      {/* Tabla */}
+      {isLoading ? (
+        <Card variant="flat" className="flex justify-center py-16">
+          <Spinner size="lg" />
+        </Card>
+      ) : !inventoryData?.data?.length ? (
+        <Card variant="flat">
+          <EmptyState
+            icon={Package}
+            title="No hay productos en el inventario"
+            description="Comienza agregando productos para gestionar tu inventario"
+            action={
+              <Button onClick={() => navigate('/productos?action=new')}>
+                <Plus className="w-4 h-4" />
+                Crear Primer Producto
+              </Button>
+            }
+          />
+        </Card>
+      ) : quickCountMode ? (
+        /* ── Modo Conteo Rápido ─────────────────────────────────────────────── */
+        <Card variant="flat" className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Stock Actual (ref.)</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Bultos Nuevos</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Uds. Nuevas</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {inventoryData.data.map((item, index) => {
+                  const pres       = getDefaultPresentation(item);
+                  const upu        = parseFloat(pres.units_per_package) || 1;
+                  const qty        = parseFloat(item.quantity);
+                  const bultos     = Math.floor(qty / upu);
+                  const unidades   = Math.round(qty % upu);
+                  const edit       = countEdits[item.id] || {};
+                  const statusSave = saveStatus[item.id] || 'idle';
+                  const nextItem   = inventoryData.data[index + 1];
+
+                  return (
+                    <tr key={item.id} className={edit.dirty ? 'bg-blue-50/40' : 'hover:bg-gray-50'}>
+                      <td className="px-6 py-3">
+                        <div className="font-medium text-gray-900">{item.product.name}</div>
+                        {selectedWarehouse === 'all' && (
+                          <div className="text-xs text-gray-400">{item.warehouse?.name}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-center text-sm text-gray-400">
+                        {bultos} bultos + {unidades} sueltas
+                      </td>
+                      <td className="px-6 py-3 text-center bg-blue-50/20">
+                        <input
+                          type="number" min="0" step="1"
+                          value={edit.bultos !== undefined ? edit.bultos : ''}
+                          placeholder={String(bultos)}
+                          onChange={(e) => handleCountChange(item, 'bultos', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') inputRefs.current[`${item.id}-unidades`]?.focus();
+                          }}
+                          ref={(el) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
+                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+                        />
+                      </td>
+                      <td className="px-6 py-3 text-center bg-blue-50/20">
+                        <input
+                          type="number" min="0" step="1"
+                          value={edit.unidades !== undefined ? edit.unidades : ''}
+                          placeholder={String(unidades)}
+                          onChange={(e) => handleCountChange(item, 'unidades', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && nextItem) inputRefs.current[`${nextItem.id}-bultos`]?.focus();
+                          }}
+                          ref={(el) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
+                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+                        />
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        {statusSave === 'saving' && (
+                          <span className="text-amber-600 text-xs flex items-center justify-center gap-1">
+                            <CircleNotch className="w-3 h-3 animate-spin" /> guardando...
+                          </span>
+                        )}
+                        {statusSave === 'saved' && (
+                          <span className="text-green-600 text-xs flex items-center justify-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> guardado
+                          </span>
+                        )}
+                        {statusSave === 'error' && (
+                          <button
+                            onClick={() => retrySave(item)}
+                            className="text-red-600 text-xs flex items-center justify-center gap-1 hover:underline"
+                          >
+                            <WarningCircle className="w-3 h-3" /> Error — Reintentar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  {quickCountMode ? (
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Stock Actual (ref.)</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Bultos Nuevos</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Uds. Nuevas</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Bultos</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Unidades</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Ajuste</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Inventario</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  )}
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {inventoryData?.data?.map((item, index) => {
-                    const pres = getDefaultPresentation(item);
-                    const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-                    const qty = parseFloat(item.quantity);
-                    const bultos = Math.floor(qty / unitsPerPkg);
-                    const unidades = Math.round(qty % unitsPerPkg);
-                    const status = getStockStatus(qty, item.product.reorder_point);
-                    const pkgCost = parseFloat(pres.package_cost || 0);
-                    const unitCost = pkgCost / unitsPerPkg;
-                    const valueCOP = toCOP(qty * unitCost, pres.purchase_currency || 'USD');
-                    const edit = countEdits[item.id] || {};
-                    const statusSave = saveStatus[item.id] || 'idle';
-                    const nextItem = inventoryData.data[index + 1];
+        </Card>
+      ) : (
+        /* ── Modo normal ─────────────────────────────────────────────────────── */
+        <Card variant="flat" className="overflow-hidden">
+          <Table
+            columns={inventoryColumns}
+            data={inventoryData.data}
+            emptyMessage="No hay productos en el inventario"
+          />
+        </Card>
+      )}
 
-                    if (quickCountMode) {
-                      return (
-                        <tr key={item.id} className={edit.dirty ? 'bg-blue-50/40' : 'hover:bg-gray-50'}>
-                          <td className="px-6 py-3">
-                            <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
-                            {selectedWarehouse === 'all' && (
-                              <div className="text-xs text-gray-400">{item.warehouse?.name}</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-3 text-center">
-                            <span className="text-sm text-gray-400">{bultos} bultos + {unidades} sueltas</span>
-                          </td>
-                          <td className="px-6 py-3 text-center bg-blue-50/20">
-                            <input
-                              type="number" min="0" step="1"
-                              value={edit.bultos !== undefined ? edit.bultos : ''}
-                              placeholder={String(bultos)}
-                              onChange={(e) => handleCountChange(item, 'bultos', e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const next = inputRefs.current[`${item.id}-unidades`];
-                                  if (next) next.focus();
-                                }
-                              }}
-                              ref={(el) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
-                              className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-center bg-blue-50/20">
-                            <input
-                              type="number" min="0" step="1"
-                              value={edit.unidades !== undefined ? edit.unidades : ''}
-                              placeholder={String(unidades)}
-                              onChange={(e) => handleCountChange(item, 'unidades', e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && nextItem) {
-                                  const next = inputRefs.current[`${nextItem.id}-bultos`];
-                                  if (next) next.focus();
-                                }
-                              }}
-                              ref={(el) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
-                              className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-center">
-                            {statusSave === 'saving' && (
-                              <span className="text-amber-600 text-xs flex items-center justify-center gap-1">
-                                <CircleNotch className="w-3 h-3 animate-spin" /> guardando...
-                              </span>
-                            )}
-                            {statusSave === 'saved' && (
-                              <span className="text-green-600 text-xs flex items-center justify-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> guardado
-                              </span>
-                            )}
-                            {statusSave === 'error' && (
-                              <button
-                                onClick={() => retrySave(item)}
-                                className="text-red-600 text-xs flex items-center justify-center gap-1 hover:underline"
-                              >
-                                <WarningCircle className="w-3 h-3" /> Error — Reintentar
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
-                          {selectedWarehouse === 'all' && (
-                            <div className="text-xs text-gray-400">{item.warehouse?.name}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {item.product.category ? (
-                            <span
-                              className="px-2 py-1 text-xs rounded-full text-white font-medium inline-flex items-center gap-1.5"
-                              style={{ backgroundColor: item.product.category.color || '#6B7280' }}
-                            >
-                              {item.product.category.name}
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">N/A</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-sm font-semibold text-gray-900">{bultos}</span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-sm text-gray-600">{unidades}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-gray-500">
-                            {item.updated_at
-                              ? new Date(item.updated_at).toLocaleDateString('es-VE')
-                              : '-'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-sm font-medium text-gray-700">
-                            {valueCOP > 0 ? formatCOP(valueCOP) : '-'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={status.variant}>{status.text}</Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1">
-                            <ViewAction onClick={() => navigate(`/inventario/${item.id}`)} />
-                            <AdjustAction onClick={() => openAdjust(item)} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {!inventoryData?.data?.length && (
-              <div className="text-center py-12">
-                <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos en el inventario</h3>
-                <p className="text-gray-500">Comienza agregando productos para gestionar tu inventario</p>
-                <Button className="mt-6" onClick={() => navigate('/productos?action=new')}>
-                  <Plus className="w-4 h-4" />
-                  Crear Primer Producto
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Individual Adjust Modal */}
+      {/* Modal: Ajuste individual */}
       <Modal
         open={!!adjustItem}
         onClose={() => setAdjustItem(null)}
@@ -758,8 +762,7 @@ const InventoryPage = () => {
             </div>
             <div className="flex gap-3 pt-2">
               <Button
-                variant="secondary"
-                className="flex-1"
+                variant="secondary" className="flex-1"
                 onClick={() => setAdjustItem(null)}
                 disabled={adjustMutation.isPending}
               >
@@ -777,7 +780,7 @@ const InventoryPage = () => {
         )}
       </Modal>
 
-      {/* Currency Breakdown Modal */}
+      {/* Modal: Desglose de moneda */}
       <Modal
         open={showCurrencyBreakdown}
         onClose={() => setShowCurrencyBreakdown(false)}
@@ -800,7 +803,7 @@ const InventoryPage = () => {
                   .filter(([, value]) => value > 0)
                   .map(([currency, value]) => {
                     const currencyInfo = currencies.find(c => c.code === currency);
-                    const conversion = valuationData.data.conversions?.find(c => c.currency === currency);
+                    const conversion   = valuationData.data.conversions?.find(c => c.currency === currency);
                     return (
                       <Card key={currency} variant="flat">
                         <div className="flex items-center justify-between mb-1">

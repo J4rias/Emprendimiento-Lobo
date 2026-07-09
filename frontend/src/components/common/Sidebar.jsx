@@ -42,7 +42,7 @@ const MENU = [
   {
     section: 'Inventario',
     items: [
-      { name: 'Inventario',       icon: Package,               path: '/inventario',            permission: 'inventory.view'     },
+      { name: 'Inventario',       icon: Package,               path: '/inventario',            permission: 'inventory.view',     end: true },
       { name: 'Movimientos',      icon: ClockCounterClockwise, path: '/inventario/movimientos', permission: 'inventory.view'     },
       { name: 'Reponer Stock',    icon: Scan,                  path: '/reponer-stock',          permission: 'inventory.adjust'   },
       { name: 'Transferencias',   icon: ArrowsLeftRight,       path: '/transferencias',         permission: 'inventory.transfer' },
@@ -233,6 +233,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onCollapse }) => {
       <NavLink
         key={item.path}
         to={item.path}
+        end={item.end}
         onClick={onClose}
         onMouseEnter={collapsed ? (e) => showTip(e, item.name) : undefined}
         onMouseLeave={collapsed ? hideTip : undefined}
