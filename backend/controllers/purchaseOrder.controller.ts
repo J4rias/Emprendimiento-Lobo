@@ -803,9 +803,8 @@ class PurchaseOrderController {
 
           // CRITICAL: Update product presentation costs
           // This updates the base purchase price in the system
-          const presentation = await ProductPresentation.findByPk(detail.presentation_id, {
-            transaction
-          }) as any;
+          // Use already eager-loaded instance to avoid N+1 per item
+          const presentation = detail.presentation as any;
 
           if (presentation) {
             // Check if we need to convert currencies

@@ -223,10 +223,32 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
   return availableCredit >= amount;
 };
 
-// Personalizar JSON para excluir campos sensibles
+// Serialización — incluye aliases camelCase para compatibilidad con frontend
 (Customer as any).prototype.toJSON = function () {
-  const values = { ...this.get() };
-  return values;
+  const v = { ...this.get() };
+  return {
+    ...v,
+    // fullName / name — computed from type + name fields
+    fullName: this.type === 'juridical'
+      ? (v.business_name || v.trade_name || '')
+      : `${v.first_name || ''} ${v.last_name || ''}`.trim(),
+    name: this.type === 'juridical'
+      ? (v.business_name || v.trade_name || '')
+      : `${v.first_name || ''} ${v.last_name || ''}`.trim(),
+    // camelCase aliases (frontend usa estos)
+    firstName:          v.first_name,
+    lastName:           v.last_name,
+    businessName:       v.business_name,
+    tradeName:          v.trade_name,
+    documentType:       v.document_type,
+    documentNumber:     v.document_number,
+    creditLimit:        v.credit_limit,
+    creditUsed:         v.credit_used,
+    creditDays:         v.credit_days,
+    priceListId:        v.price_list_id,
+    discountPercentage: v.discount_percentage,
+    postalCode:         v.postal_code,
+  };
 };
 
 // 5. export = en lugar de module.exports = (CJS compat con TypeScript)

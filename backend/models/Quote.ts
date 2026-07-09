@@ -240,10 +240,23 @@ const Quote = sequelize.define<Model<QuoteAttributes, QuoteCreationAttributes>>(
   return this.status === 'approved' && !this.isExpired();
 };
 
-// Personalizar JSON
+// Serialización — aliases camelCase para compatibilidad con frontend
 (Quote as any).prototype.toJSON = function() {
-  const values = { ...this.get() };
-  return values;
+  const v = { ...this.get() };
+  return {
+    ...v,
+    quoteDate:          v.quote_date,
+    validUntil:         v.valid_until,
+    discountPercentage: v.discount_percentage,
+    discountAmount:     v.discount_amount,
+    taxPercentage:      v.tax_percentage,
+    taxAmount:          v.tax_amount,
+    paymentTerms:       v.payment_terms,
+    deliveryTerms:      v.delivery_terms,
+    internalNotes:      v.internal_notes,
+    convertedToSaleId:  v.converted_to_sale_id,
+    convertedAt:        v.converted_at,
+  };
 };
 
 export = Quote;

@@ -27,21 +27,26 @@ export async function getCustomerStats(customerId: string | number) {
 
   const recentSales = await Sale.findAll({
     where: { customer_id: customerId },
-    attributes: ['id', 'sale_number', 'sale_date', 'total', 'payment_status'],
+    attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount'],
     order: [['sale_date', 'DESC']],
     limit: 5
   }) as any[];
 
-  const paymentSummary = await Sale.findAll({
-    where: { customer_id: customerId },
-    attributes: [
-      'payment_status',
-      [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      [sequelize.fn('SUM', sequelize.col('total')), 'amount']
-    ],
-    group: ['payment_status'],
-    raw: true
-  }) as any[];
+  // payment_status is not a real DB column — compute via CASE expression
+  const paymentSummaryRaw = await sequelize.query(`
+    SELECT
+      CASE
+        WHEN paid_amount <= 0 THEN 'pending'
+        WHEN paid_amount >= total THEN 'paid'
+        ELSE 'partial'
+      END AS payment_status,
+      COUNT(*) AS count,
+      SUM(total) AS amount
+    FROM sales
+    WHERE customer_id = :customerId
+      AND deleted_at IS NULL
+    GROUP BY 1
+  `, { replacements: { customerId }, type: sequelize.QueryTypes.SELECT }) as any[];
 
   const stats = salesStats[0];
   return {
@@ -51,12 +56,21 @@ export async function getCustomerStats(customerId: string | number) {
       totalAmount: parseFloat(stats.totalAmount) || 0,
       averageAmount: parseFloat(stats.averageAmount) || 0
     },
-    paymentSummary: paymentSummary.map((p: any) => ({
+    paymentSummary: paymentSummaryRaw.map((p: any) => ({
       status: p.payment_status,
       count: parseInt(p.count),
       amount: parseFloat(p.amount)
     })),
-    recentSales: recentSales.map((s: any) => ({ ...s.toJSON(), total: parseFloat(s.total) }))
+    recentSales: recentSales.map((s: any) => {
+      const json = s.toJSON ? s.toJSON() : s;
+      const paid = parseFloat(json.paid_amount || 0);
+      const total = parseFloat(json.total || 0);
+      return {
+        ...json,
+        total,
+        payment_status: paid <= 0 ? 'pending' : paid >= total ? 'paid' : 'partial'
+      };
+    })
   };
 }
 
@@ -68,9 +82,9 @@ export async function getOverdueCustomers() {
   const overdueSales = await Sale.findAll({
     where: {
       sale_type: 'credit',
-      payment_status: { [Op.in]: ['pending', 'partial'] }
+      status: { [Op.notIn]: ['cancelled', 'returned'] }
     } as any,
-    attributes: ['id', 'sale_number', 'sale_date', 'total', 'customer_id', 'payment_status'],
+    attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'customer_id'],
     include: [
       {
         model: Customer,

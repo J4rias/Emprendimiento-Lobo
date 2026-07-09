@@ -165,10 +165,18 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
   return this.status === 'active';
 };
 
-// Personalizar JSON
+// Serialización — aliases camelCase para compatibilidad con frontend
 (PriceList as any).prototype.toJSON = function () {
-  const values = { ...this.get() };
-  return values;
+  const v = { ...this.get() };
+  return {
+    ...v,
+    isDefault:        v.is_default,
+    basePercentage:   v.base_percentage,
+    validityDays:     v.validity_days,
+    validFrom:        v.valid_from,
+    validUntil:       v.valid_until,
+    updatedBy:        v.updated_by,
+  };
 };
 
 export = PriceList;

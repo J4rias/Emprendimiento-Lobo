@@ -9,7 +9,7 @@ const { getSupplierStatement, getSupplierLedger, getSupplierResumen } = require(
 
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { pageStr = '1', limitStr = '20', search = '', sort_by = 'name', sort_dir = 'ASC', is_active } = req.query as Record<string, string>;
+    const { page: pageStr = '1', limit: limitStr = '20', search = '', sort_by = 'name', sort_dir = 'ASC', is_active } = req.query as Record<string, string>;
 
     if (is_active === 'true') {
       return getActive(req, res, next);

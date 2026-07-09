@@ -25,7 +25,7 @@ class CustomerController {
   async getAllCustomers(req: Request, res: Response, next: NextFunction) {
     try {
       const {
-        pageStr = '1', limitStr = '50', search, status, type, is_active,
+        page: pageStr = '1', limit: limitStr = '50', search, status, type, is_active,
         sort_by = 'created_at', sort_dir = 'DESC'
       } = req.query as Record<string, string>;
 
@@ -242,30 +242,35 @@ class CustomerController {
       const availableCredit = Math.max(0, creditLimit - creditUsed);
       const creditUsagePercent = creditLimit > 0 ? (creditUsed / creditLimit) * 100 : 0;
 
-      const pendingSales = await Sale.findAll({
+      // Fetch all non-cancelled credit sales; compute payment_status from paid_amount vs total
+      const allCreditSales = await Sale.findAll({
         where: {
           customer_id: id,
           sale_type: 'credit',
-          payment_status: { [Op.in]: ['pending', 'partial'] }
+          status: { [Op.notIn]: ['cancelled', 'returned'] }
         } as any,
-        attributes: ['id', 'sale_number', 'sale_date', 'total', 'payment_status'],
+        attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount'],
         include: [{ model: SalePayment, as: 'payments', attributes: ['amount', 'payment_date'] }],
         order: [['sale_date', 'DESC']],
-        limit: 10
+        limit: 50
       }) as any[];
+
+      const pendingSales = allCreditSales
+        .map((s: any) => {
+          const paid = (s.payments || []).reduce((sum: any, p: any) => sum + parseFloat(p.amount), 0);
+          const total = parseFloat(s.total);
+          const balance = total - paid;
+          const payment_status = paid <= 0 ? 'pending' : paid >= total ? 'paid' : 'partial';
+          return { id: s.id, sale_number: s.sale_number, sale_date: s.sale_date, total, paid, balance, payment_status };
+        })
+        .filter((s: any) => s.balance > 0)
+        .slice(0, 10);
 
       res.json({
         data: {
           customer: { id: customer.id, code: customer.code, name: customer.getFullName(), creditLimit, creditDays: customer.credit_days },
           credit: { limit: creditLimit, used: creditUsed, available: availableCredit, usagePercent: parseFloat(creditUsagePercent.toFixed(2)) },
-          pendingSales: pendingSales.map((s: any) => {
-            const paid = (s.payments || []).reduce((sum: any, p: any) => sum + parseFloat(p.amount), 0);
-            return {
-              id: s.id, sale_number: s.sale_number, sale_date: s.sale_date,
-              total: parseFloat(s.total), paid, balance: parseFloat(s.total) - paid,
-              payment_status: s.payment_status
-            };
-          })
+          pendingSales
         }
       });
     } catch (error) {
