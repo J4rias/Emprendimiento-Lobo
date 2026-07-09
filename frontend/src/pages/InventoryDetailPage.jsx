@@ -5,31 +5,16 @@ import { inventoryService } from '../services/api/inventoryService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import {
   ArrowLeft, Package, Calendar, CurrencyDollar, Warning,
-  Warehouse, PencilSimple, ArrowsLeftRight, TrendUp, TrendDown, Minus
+  Warehouse, PencilSimple, ArrowsLeftRight,
 } from '@phosphor-icons/react';
-import { Alert, Badge, Button, Card, Spinner } from '../components/ui';
+import {
+  Alert, Badge, Button, Card, DateRangeFilter, ExportCsvAction, getDefaultDateRange,
+  Pagination, Select, Spinner, useTableLimit,
+} from '../components/ui';
+import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
+import { downloadCSV } from '../utils/csvUtils';
 
-// ─── Movement type helpers ────────────────────────────────────────────────────
-
-const isPositiveMovement = (type) =>
-  type?.includes('positivo') || type?.includes('ingreso') || type?.includes('entrada') ||
-  ['compra', 'devolucion_cliente'].includes(type);
-
-const MOVEMENT_LABELS = {
-  compra: 'Compra',
-  venta: 'Venta',
-  ajuste_positivo: 'Ajuste +',
-  ajuste_negativo: 'Ajuste −',
-  devolucion_cliente: 'Dev. Cliente',
-  devolucion_proveedor: 'Dev. Proveedor',
-  transferencia_salida: 'Transfer. Salida',
-  transferencia_entrada: 'Transfer. Entrada',
-  egreso_venta: 'Egreso Venta',
-  ingreso_compra: 'Ingreso Compra',
-};
-
-const getMovementLabel = (type) =>
-  MOVEMENT_LABELS[type] || type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$' },
@@ -37,24 +22,23 @@ const CURRENCIES = [
   { code: 'VES', symbol: 'Bs' },
 ];
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── Página ───────────────────────────────────────────────────────────────────
 
 const InventoryDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [selectedCurrency, setSelectedCurrency] = useState(null); // null = use product's currency
+  const [selectedCurrency, setSelectedCurrency] = useState(null);
 
-  // --- Kardex filters & pagination ---
-  const today         = new Date();
-  const firstOfMonth  = new Date(today.getFullYear(), today.getMonth(), 1);
-  const toISO         = (d) => d.toISOString().slice(0, 10);
+  // ── Filtros del kardex ─────────────────────────────────────────────────────
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
+  const [movType, setMovType]     = useState('');
+  const [movPage, setMovPage]     = useState(1);
+  const [movLimit, setMovLimit]   = useTableLimit();
 
-  const [movDateFrom, setMovDateFrom]   = useState(toISO(firstOfMonth));
-  const [movDateTo,   setMovDateTo]     = useState(toISO(today));
-  const [movPage,     setMovPage]       = useState(1);
-  const [movLimit,    setMovLimit]      = useState(10);
+  const handleDateChange = (range) => { setDateRange(range); setMovPage(1); };
+  const handleTypeChange = (val)   => { setMovType(val);     setMovPage(1); };
 
-  // --- Inventory detail ---
+  // ── Detalle de inventario ──────────────────────────────────────────────────
   const {
     data: inventory,
     isLoading,
@@ -73,9 +57,10 @@ const InventoryDetailPage = () => {
     },
   });
 
-  // --- Movement history (Kardex) ---
-  // Fetch all movements (no limit) so the running balance is always accurate
-  const { data: movementsRaw = [] } = useQuery({
+  // ── Historial de movimientos (Kardex) ─────────────────────────────────────
+  // Se cargan todos para que el balance corriente sea siempre exacto,
+  // sin importar el filtro de fechas o tipo activo.
+  const { data: movementsRaw = [], isLoading: loadingMovements } = useQuery({
     queryKey: ['inventory-movements', inventory?.product_id],
     queryFn: () =>
       inventoryService.getMovements({ product_id: inventory.product_id, limit: 9999 })
@@ -84,47 +69,55 @@ const InventoryDetailPage = () => {
     staleTime: 60_000,
   });
 
-  // Build Kardex: compute running balance on ALL movements (oldest→newest),
-  // then filter by date range, then paginate — balance numbers stay correct
-  // regardless of what the user filters or which page they're on.
+  // ── Balance corriente ──────────────────────────────────────────────────────
+  // 1. Ordenar de más antiguo a más nuevo
+  // 2. Calcular saldo acumulado
+  // 3. Invertir (más nuevo primero)
+  // 4. Filtrar por fecha y tipo
+  // 5. Paginar
   const { allKardex, filteredKardex, pagedKardex, totalMovPages } = (() => {
-    if (!movementsRaw.length) return { allKardex: [], filteredKardex: [], pagedKardex: [], totalMovPages: 1 };
+    if (!movementsRaw.length) {
+      return { allKardex: [], filteredKardex: [], pagedKardex: [], totalMovPages: 1 };
+    }
 
     const sorted = [...movementsRaw].sort(
       (a, b) => new Date(a.created_at) - new Date(b.created_at)
     );
+
     let balance = 0;
     const withBalance = sorted.map(m => {
-      const qty = parseFloat(m.quantity) || 0;
+      const qty      = parseFloat(m.quantity) || 0;
       const positive = isPositiveMovement(m.movement_type);
-      balance = positive ? balance + qty : balance - qty;
+      balance        = positive ? balance + qty : balance - qty;
       return { ...m, qty, positive, balance };
     });
-    const all = withBalance.reverse(); // newest first
 
-    // Date filtering (client-side, after balance computation)
-    const dateFrom = movDateFrom ? new Date(movDateFrom + 'T00:00:00') : null;
-    const dateTo   = movDateTo   ? new Date(movDateTo   + 'T23:59:59') : null;
+    const all = withBalance.reverse();
+
+    const dateFrom = dateRange.start_date ? new Date(`${dateRange.start_date}T00:00:00`) : null;
+    const dateTo   = dateRange.end_date   ? new Date(`${dateRange.end_date}T23:59:59`)   : null;
+
     const filtered = all.filter(m => {
       const d = new Date(m.created_at);
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
+      if (movType  && m.movement_type !== movType) return false;
       return true;
     });
 
-    const pages  = Math.max(1, Math.ceil(filtered.length / movLimit));
+    const pages    = Math.max(1, Math.ceil(filtered.length / movLimit));
     const safePage = Math.min(movPage, pages);
-    const paged  = filtered.slice((safePage - 1) * movLimit, safePage * movLimit);
+    const paged    = filtered.slice((safePage - 1) * movLimit, safePage * movLimit);
 
     return { allKardex: all, filteredKardex: filtered, pagedKardex: paged, totalMovPages: pages };
   })();
 
-  // --- Currency conversion ---
+  // ── Conversión de moneda ───────────────────────────────────────────────────
   const defaultPresentation = inventory?.product?.presentations?.find(p => p.is_default)
     || inventory?.product?.presentations?.[0];
-  const originalCurrency = defaultPresentation?.purchase_currency || 'USD';
+  const originalCurrency  = defaultPresentation?.purchase_currency || 'USD';
   const effectiveCurrency = selectedCurrency || originalCurrency;
-  const needsConversion = effectiveCurrency !== originalCurrency;
+  const needsConversion   = effectiveCurrency !== originalCurrency;
 
   const { data: conversionData } = useQuery({
     queryKey: ['currency-convert', defaultPresentation?.cost, originalCurrency, effectiveCurrency],
@@ -138,7 +131,26 @@ const InventoryDetailPage = () => {
     staleTime: 5 * 60_000,
   });
 
-  // ─── Render states ────────────────────────────────────────────────────────
+  // ── Export CSV ────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const headers = ['Fecha', 'Tipo', 'Referencia', 'Entrada', 'Salida', 'Existencia', 'Motivo', 'Usuario'];
+    const rows = filteredKardex.map(m => [
+      new Date(m.created_at).toLocaleString('es-VE'),
+      m.movement_type,
+      m.document_number || '',
+      m.positive ? m.qty : '',
+      !m.positive ? m.qty : '',
+      Math.max(0, Math.round(m.balance)),
+      m.reason || '',
+      m.user
+        ? `${m.user.first_name || ''} ${m.user.last_name || ''}`.trim() || m.user.username
+        : 'Sistema',
+    ]);
+    const productName = inventory?.product?.name?.replace(/\s+/g, '_') || 'kardex';
+    downloadCSV(`kardex_${productName}`, headers, rows);
+  };
+
+  // ─── Estados de carga/error ────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -159,11 +171,12 @@ const InventoryDetailPage = () => {
     );
   }
 
-  // ─── Stock helpers ────────────────────────────────────────────────────────
-  const totalUnits = Math.floor(inventory.quantity);
-  const unitsPerPkg = defaultPresentation?.units_per_package || 1;
+  // ─── Helpers de stock ─────────────────────────────────────────────────────
+
+  const totalUnits   = Math.floor(inventory.quantity);
+  const unitsPerPkg  = defaultPresentation?.units_per_package || 1;
   const totalPackages = Math.floor(totalUnits / unitsPerPkg);
-  const looseUnits = totalUnits % unitsPerPkg;
+  const looseUnits   = totalUnits % unitsPerPkg;
   const reorderPoint = Math.floor(inventory.product.reorder_point || 0);
 
   const stockStatus = totalUnits === 0
@@ -172,7 +185,8 @@ const InventoryDetailPage = () => {
     ? { label: 'Stock Bajo', variant: 'warning' }
     : { label: 'Normal', variant: 'success' };
 
-  // ─── Cost display ─────────────────────────────────────────────────────────
+  // ─── Costo ────────────────────────────────────────────────────────────────
+
   const costValue = (() => {
     const sym = CURRENCIES.find(c => c.code === effectiveCurrency)?.symbol || '$';
     if (!needsConversion || !conversionData) {
@@ -183,9 +197,83 @@ const InventoryDetailPage = () => {
     return `${sym} ${parseFloat(conversionData.converted_amount || 0).toFixed(2)} ${effectiveCurrency}`;
   })();
 
+  // ─── Columnas del kardex ──────────────────────────────────────────────────
+
+  const kardexColumns = [
+    {
+      header: 'Fecha',
+      accessor: 'created_at',
+      render: (_, m) => (
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          {new Date(m.created_at).toLocaleString('es-VE', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          })}
+        </span>
+      ),
+    },
+    {
+      header: 'Tipo',
+      accessor: 'movement_type',
+      render: (_, m) => <MovementTypeBadge type={m.movement_type} />,
+    },
+    {
+      header: 'Referencia',
+      accessor: 'document_number',
+      render: (_, m) =>
+        m.document_number
+          ? <span className="text-xs font-mono text-gray-600">{m.document_number}</span>
+          : <span className="text-xs text-gray-400">—</span>,
+    },
+    {
+      header: 'Entrada',
+      accessor: 'qty_in',
+      cellClassName: 'text-right',
+      render: (_, m) =>
+        m.positive
+          ? <span className="text-sm font-semibold text-green-600">+{m.qty}</span>
+          : <span className="text-xs text-gray-300">—</span>,
+    },
+    {
+      header: 'Salida',
+      accessor: 'qty_out',
+      cellClassName: 'text-right',
+      render: (_, m) =>
+        !m.positive
+          ? <span className="text-sm font-semibold text-red-600">−{m.qty}</span>
+          : <span className="text-xs text-gray-300">—</span>,
+    },
+    {
+      header: 'Existencia',
+      accessor: 'balance',
+      cellClassName: 'text-right',
+      render: (_, m) => (
+        <span className="text-sm font-medium text-gray-900">
+          {Math.max(0, Math.round(m.balance))}
+        </span>
+      ),
+    },
+    {
+      header: 'Motivo / Usuario',
+      accessor: 'reason',
+      render: (_, m) => (
+        <div className="text-xs">
+          {m.reason && <div className="text-gray-600">{m.reason}</div>}
+          <div className="text-gray-400 mt-0.5">
+            {m.user
+              ? `${m.user.first_name || ''} ${m.user.last_name || ''}`.trim() || m.user.username
+              : 'Sistema'}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  // ─── Layout ───────────────────────────────────────────────────────────────
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Cabecera */}
       <div>
         <Button
           variant="ghost"
@@ -208,7 +296,7 @@ const InventoryDetailPage = () => {
         </div>
       </div>
 
-      {/* Stock summary cards */}
+      {/* Cards de resumen */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card variant="compact" className="text-center">
           <Package className="w-8 h-8 text-blue-500 mx-auto mb-2" />
@@ -247,7 +335,7 @@ const InventoryDetailPage = () => {
         </Card>
       </div>
 
-      {/* Product info */}
+      {/* Información del producto */}
       <Card>
         <h2 className="text-base font-semibold text-gray-900 mb-4">Información del Producto</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -284,7 +372,7 @@ const InventoryDetailPage = () => {
         </div>
       </Card>
 
-      {/* Presentations */}
+      {/* Presentaciones */}
       {inventory.product.presentations?.length > 0 && (
         <Card>
           <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -327,68 +415,54 @@ const InventoryDetailPage = () => {
       )}
 
       {/* Kardex de movimientos */}
-      <Card>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+      <Card variant="flat" className="overflow-hidden">
+        {/* Header del kardex */}
+        <div className="px-4 pt-4 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
             <ArrowsLeftRight className="w-4 h-4 text-gray-500" />
-            Kardex de Movimientos
-          </h2>
-          <span className="text-xs text-gray-400">
-            {filteredKardex.length} movimientos
-          </span>
-        </div>
-
-        {/* Filters row */}
-        <div className="flex flex-wrap items-end gap-3 mb-4 pb-4 border-b border-gray-100">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Desde</label>
-            <input
-              type="date"
-              value={movDateFrom}
-              onChange={e => { setMovDateFrom(e.target.value); setMovPage(1); }}
-              className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
+            <h2 className="text-base font-semibold text-gray-900">Kardex de Movimientos</h2>
+            {filteredKardex.length > 0 && (
+              <span className="text-xs text-gray-400">
+                ({filteredKardex.length} movimientos)
+              </span>
+            )}
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Hasta</label>
-            <input
-              type="date"
-              value={movDateTo}
-              onChange={e => { setMovDateTo(e.target.value); setMovPage(1); }}
-              className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Por página</label>
-            <select
-              value={movLimit}
-              onChange={e => { setMovLimit(Number(e.target.value)); setMovPage(1); }}
-              className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-          {(movDateFrom || movDateTo) && (
-            <button
-              onClick={() => { setMovDateFrom(''); setMovDateTo(''); setMovPage(1); }}
-              className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Limpiar fechas
-            </button>
+          {filteredKardex.length > 0 && (
+            <ExportCsvAction onClick={handleExportCSV} title="Exportar kardex" />
           )}
         </div>
 
-        {allKardex.length === 0 ? (
-          <p className="text-center text-gray-400 py-8 text-sm">
+        {/* Filtros */}
+        <div className="px-4 pb-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-end gap-3">
+            <DateRangeFilter
+              startDate={dateRange.start_date}
+              endDate={dateRange.end_date}
+              onChange={handleDateChange}
+              showPresets
+            />
+            <div className="w-44">
+              <Select
+                value={movType}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                options={MOVEMENT_TYPE_OPTIONS}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla */}
+        {loadingMovements ? (
+          <div className="flex items-center justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : allKardex.length === 0 ? (
+          <p className="text-center text-gray-400 py-10 text-sm">
             No hay movimientos registrados para este producto
           </p>
         ) : filteredKardex.length === 0 ? (
-          <p className="text-center text-gray-400 py-8 text-sm">
-            No hay movimientos en el rango de fechas seleccionado
+          <p className="text-center text-gray-400 py-10 text-sm">
+            No hay movimientos con los filtros activos
           </p>
         ) : (
           <>
@@ -396,123 +470,43 @@ const InventoryDetailPage = () => {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Fecha</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Cantidad</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Existencia</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Motivo</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Usuario</th>
+                    {kardexColumns.map(col => (
+                      <th
+                        key={col.accessor}
+                        className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                          col.cellClassName?.includes('text-right') ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {col.header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pagedKardex.map((m) => (
                     <tr key={m.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(m.created_at).toLocaleString('es-VE', {
-                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          {m.positive
-                            ? <TrendUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            : <TrendDown className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                          }
-                          <span className="text-xs font-medium text-gray-700">
-                            {getMovementLabel(m.movement_type)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className={`text-sm font-semibold ${m.positive ? 'text-green-600' : 'text-red-600'}`}>
-                          {m.positive ? '+' : '−'}{m.qty}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className="text-sm font-medium text-gray-900">
-                          {Math.max(0, Math.round(m.balance))}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-gray-600">
-                        {m.reason || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500">
-                        {m.user
-                          ? `${m.user.first_name || ''} ${m.user.last_name || ''}`.trim() || m.user.username
-                          : 'Sistema'}
-                      </td>
+                      {kardexColumns.map(col => (
+                        <td
+                          key={col.accessor}
+                          className={`px-4 py-3 ${col.cellClassName || ''}`}
+                        >
+                          {col.render(null, m)}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalMovPages > 1 && (
-              <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500">
-                  Mostrando {((movPage - 1) * movLimit) + 1}–{Math.min(movPage * movLimit, filteredKardex.length)} de {filteredKardex.length}
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMovPage(1)}
-                    disabled={movPage === 1}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    «
-                  </button>
-                  <button
-                    onClick={() => setMovPage(p => Math.max(1, p - 1))}
-                    disabled={movPage === 1}
-                    className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    ‹
-                  </button>
-
-                  {/* Page numbers — show up to 5 around current page */}
-                  {Array.from({ length: totalMovPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalMovPages || Math.abs(p - movPage) <= 2)
-                    .reduce((acc, p, i, arr) => {
-                      if (i > 0 && p - arr[i - 1] > 1) acc.push('…');
-                      acc.push(p);
-                      return acc;
-                    }, [])
-                    .map((p, i) =>
-                      p === '…' ? (
-                        <span key={`ellipsis-${i}`} className="px-1.5 py-1 text-xs text-gray-400">…</span>
-                      ) : (
-                        <button
-                          key={p}
-                          onClick={() => setMovPage(p)}
-                          className={`px-2.5 py-1 text-xs border rounded ${
-                            p === movPage
-                              ? 'bg-primary-600 text-white border-primary-600'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      )
-                    )
-                  }
-
-                  <button
-                    onClick={() => setMovPage(p => Math.min(totalMovPages, p + 1))}
-                    disabled={movPage === totalMovPages}
-                    className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setMovPage(totalMovPages)}
-                    disabled={movPage === totalMovPages}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
-                  >
-                    »
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              page={Math.min(movPage, totalMovPages)}
+              totalPages={totalMovPages}
+              total={filteredKardex.length}
+              limit={movLimit}
+              onPageChange={setMovPage}
+              onLimitChange={(l) => { setMovLimit(l); setMovPage(1); }}
+            />
           </>
         )}
       </Card>

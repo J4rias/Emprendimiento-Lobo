@@ -25,6 +25,7 @@ import {
   CaretRight,
   ArrowLineLeft,
   ArrowLineRight,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
@@ -41,9 +42,10 @@ const MENU = [
   {
     section: 'Inventario',
     items: [
-      { name: 'Inventario',       icon: Package,         path: '/inventario',     permission: 'inventory.view'     },
-      { name: 'Reponer Stock',    icon: Scan,            path: '/reponer-stock',  permission: 'inventory.adjust'   },
-      { name: 'Transferencias',   icon: ArrowsLeftRight, path: '/transferencias', permission: 'inventory.transfer' },
+      { name: 'Inventario',       icon: Package,               path: '/inventario',            permission: 'inventory.view'     },
+      { name: 'Movimientos',      icon: ClockCounterClockwise, path: '/inventario/movimientos', permission: 'inventory.view'     },
+      { name: 'Reponer Stock',    icon: Scan,                  path: '/reponer-stock',          permission: 'inventory.adjust'   },
+      { name: 'Transferencias',   icon: ArrowsLeftRight,       path: '/transferencias',         permission: 'inventory.transfer' },
       {
         name: 'Productos', icon: Warehouse, permission: 'products.view', isAccordion: true,
         items: [

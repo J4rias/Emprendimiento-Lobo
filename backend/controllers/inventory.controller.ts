@@ -460,35 +460,64 @@ class InventoryController {
         movement_type,
         date_from,
         date_to,
+        search,
+        sort_by = 'created_at',
+        sort_dir = 'DESC',
         page = '1',
         limit = '50'
       } = req.query as Record<string, string>;
 
+      const ALLOWED_SORT = ['created_at', 'quantity', 'movement_type'];
+      const safeSortBy  = ALLOWED_SORT.includes(sort_by) ? sort_by : 'created_at';
+      const safeSortDir = sort_dir.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
       const where: any = {};
 
-      if (product_id) where.product_id = product_id;
-      if (warehouse_id) where.warehouse_id = warehouse_id;
-      if (movement_type) where.movement_type = movement_type;
+      if (product_id)     where.product_id     = product_id;
+      if (warehouse_id)   where.warehouse_id   = warehouse_id;
+      if (movement_type)  where.movement_type  = movement_type;
 
       if (date_from || date_to) {
         where.created_at = {};
-        if (date_from) where.created_at[Op.gte] = date_from;
-        if (date_to) where.created_at[Op.lte] = date_to;
+        if (date_from) where.created_at[Op.gte] = `${date_from}T00:00:00`;
+        if (date_to)   where.created_at[Op.lte] = `${date_to}T23:59:59`;
       }
 
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
+      // Búsqueda por nombre o SKU de producto (sólo para la vista global)
+      const productWhere: any = search
+        ? { [Op.or]: [
+            { name: { [Op.like]: `%${search}%` } },
+            { sku:  { [Op.like]: `%${search}%` } },
+          ]}
+        : {};
+
       const { count, rows: movements } = await InventoryMovement.findAndCountAll({
         where,
         include: [
-          { model: Product, as: 'product', attributes: ['id', 'name', 'sku'] },
+          {
+            model: Product,
+            as: 'product',
+            attributes: ['id', 'name', 'sku'],
+            where: Object.keys(productWhere).length ? productWhere : undefined,
+            required: !!search,
+            // Incluir el id de inventario para poder linkear al kardex por producto
+            include: [{
+              model: Inventory,
+              as: 'inventories',
+              attributes: ['id'],
+              required: false,
+            }],
+          },
           { model: Warehouse, as: 'warehouse', attributes: ['id', 'name'] },
           { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name', 'units_per_package'] },
           { model: User, as: 'user', attributes: ['id', 'username', 'first_name', 'last_name'] }
         ],
-        order: [['created_at', 'DESC']],
+        order: [[safeSortBy, safeSortDir], ['id', 'DESC']],
         limit: parseInt(limit),
-        offset
+        offset,
+        subQuery: false,
       }) as any;
 
       res.json({
