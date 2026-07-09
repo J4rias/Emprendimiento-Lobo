@@ -19,7 +19,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const ExchangeRatesPage = () => {
   const { token, hasPermission } = useAuth();
-  const [rates, setRates] = useState([]);
+  const [ratesRaw, setRatesRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,6 +28,8 @@ const ExchangeRatesPage = () => {
   const [editingRate, setEditingRate] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rateSortBy, setRateSortBy] = useState('effective_date');
+  const [rateSortDir, setRateSortDir] = useState('desc');
   const [formData, setFormData] = useState({
     from_currency: 'USD',
     to_currency: 'VES',
@@ -45,7 +47,7 @@ const ExchangeRatesPage = () => {
 
   useEffect(() => {
     fetchRates();
-  }, [currentPage, selectedDate]);
+  }, [currentPage, selectedDate, rateSortBy, rateSortDir]);
 
   const fetchRates = async () => {
     setLoading(true);
@@ -56,7 +58,9 @@ const ExchangeRatesPage = () => {
         page: currentPage,
         limit: 20,
         date_from: selectedDate,
-        date_to: selectedDate
+        date_to: selectedDate,
+        sort_by: rateSortBy,
+        sort_dir: rateSortDir,
       });
 
       const response = await fetch(`${API_URL}/exchange-rates?${params}`, {
@@ -66,7 +70,7 @@ const ExchangeRatesPage = () => {
       if (!response.ok) throw new Error('Error al cargar tasas de cambio');
 
       const data = await response.json();
-      setRates(data.data || []);
+      setRatesRaw(data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
     } catch (err) {
       setError(err.message);
@@ -169,9 +173,14 @@ const ExchangeRatesPage = () => {
     return currencies.find(c => c.code === code)?.name || code;
   };
 
+  const rates = ratesRaw;
+  const rateOnSort = (f, d) => { setRateSortBy(f); setRateSortDir(d); setCurrentPage(1); };
+
   const columns = [
     {
       header: 'Desde',
+      sortable: true,
+      sortKey: 'from_currency',
       render: (_, rate) => (
         <div>
           <div className="font-medium">{rate.from_currency}</div>
@@ -181,6 +190,8 @@ const ExchangeRatesPage = () => {
     },
     {
       header: 'Hacia',
+      sortable: true,
+      sortKey: 'to_currency',
       render: (_, rate) => (
         <div>
           <div className="font-medium">{rate.to_currency}</div>
@@ -190,6 +201,8 @@ const ExchangeRatesPage = () => {
     },
     {
       header: 'Tasa',
+      sortable: true,
+      sortKey: 'rate',
       render: (_, rate) => (
         <div>
           <div className="flex items-center gap-2">
@@ -204,6 +217,8 @@ const ExchangeRatesPage = () => {
     },
     {
       header: 'Fecha Efectiva',
+      sortable: true,
+      sortKey: 'effective_date',
       render: (_, rate) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-400" />
@@ -294,6 +309,9 @@ const ExchangeRatesPage = () => {
               Nueva Tasa
             </Button>
           ) : undefined}
+          sortBy={rateSortBy}
+          sortDir={rateSortDir}
+          onSort={rateOnSort}
         />
       </Card>
 

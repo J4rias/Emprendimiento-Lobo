@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Shield, CheckSquare, Square, Buildings, Printer, Users } from '@phosphor-icons/react';
+import { useTableSort } from '../hooks/useTableSort';
+import { Plus, Shield, CheckSquare, Square, Buildings, Printer, Users, Lock } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { toast } from 'sonner';
@@ -102,7 +103,7 @@ const SettingsPage = () => {
     queryKey: ['roles'],
     queryFn: () => api.get('/roles').then(r => r.data),
   });
-  const roles = rolesData?.data?.roles || [];
+  const rolesRaw = rolesData?.data?.roles || [];
 
   const { data: permsData } = useQuery({
     queryKey: ['permissions'],
@@ -117,7 +118,10 @@ const SettingsPage = () => {
       ...(userRoleFilter && { roleId: userRoleFilter }),
     }),
   });
-  const users = usersData?.data || [];
+  const usersRaw = usersData?.data || [];
+
+  const { sortBy: roleSortBy, sortDir: roleSortDir, onSort: roleOnSort, sortedData: roles } = useTableSort(rolesRaw);
+  const { sortBy: settingsUserSortBy, sortDir: settingsUserSortDir, onSort: settingsUserOnSort, sortedData: users } = useTableSort(usersRaw);
 
   // ── Mutations ──────────────────────────────────────────────────────────────────
   const roleSaveMutation = useMutation({
@@ -255,7 +259,7 @@ const SettingsPage = () => {
 
   // ── Table columns ──────────────────────────────────────────────────────────────
   const roleColumns = [
-    { key: 'name',        header: 'Nombre',      render: (v) => v },
+    { key: 'name', header: 'Nombre', sortable: true, sortKey: 'name', render: (v) => v },
     { key: 'description', header: 'Descripción', render: (v) => v },
     { key: 'permissions', header: 'Permisos',    render: (_, row) => row.permissions?.length || 0 },
     {
@@ -281,10 +285,10 @@ const SettingsPage = () => {
   ];
 
   const userColumns = [
-    { key: 'username',   header: 'Usuario', render: (v) => v },
-    { key: 'first_name', header: 'Nombre',  render: (_, row) => `${row.first_name} ${row.last_name}` },
+    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v) => v },
+    { key: 'first_name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_, row) => `${row.first_name} ${row.last_name}` },
     { key: 'email',      header: 'Email',   render: (v) => v },
-    { key: 'role',       header: 'Rol',     render: (_, row) => row.role?.name || '-' },
+    { key: 'role',       header: 'Rol',     sortable: true, sortKey: 'role.name', render: (_, row) => row.role?.name || '-' },
     {
       key: 'is_active',
       header: 'Estado',
@@ -365,6 +369,9 @@ const SettingsPage = () => {
               data={roles}
               loading={rolesLoading}
               emptyMessage="No se encontraron roles"
+              sortBy={roleSortBy}
+              sortDir={roleSortDir}
+              onSort={roleOnSort}
             />
           </Card>
         </div>
@@ -399,6 +406,9 @@ const SettingsPage = () => {
               data={users}
               loading={usersLoading}
               emptyMessage="No se encontraron usuarios"
+              sortBy={settingsUserSortBy}
+              sortDir={settingsUserSortDir}
+              onSort={settingsUserOnSort}
             />
           </Card>
         </div>

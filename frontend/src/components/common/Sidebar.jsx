@@ -1,17 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import {
   SquaresFour,
   Package,
   Scan,
   Warehouse,
   ShoppingCart,
-  TrendUp,
-  Users,
-  Gear,
-  CaretDown,
-  CaretRight,
-  Shield,
-  UserGear,
   UserCheck,
   ReadCvLogo,
   ShoppingBag,
@@ -26,288 +20,205 @@ import {
   BookOpen,
   ClipboardText,
   Robot,
+  Shield,
+  CaretDown,
+  CaretRight,
+  ArrowLineLeft,
+  ArrowLineRight,
 } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
 
-const Sidebar = ({ isOpen, onClose }) => {
+// ─── Menu definition ──────────────────────────────────────────────────────────
+
+const MENU = [
+  {
+    section: null,
+    items: [
+      { name: 'Dashboard', icon: SquaresFour, path: '/dashboard' },
+    ],
+  },
+  {
+    section: 'Inventario',
+    items: [
+      { name: 'Inventario',       icon: Package,         path: '/inventario',     permission: 'inventory.view'     },
+      { name: 'Reponer Stock',    icon: Scan,            path: '/reponer-stock',  permission: 'inventory.adjust'   },
+      { name: 'Transferencias',   icon: ArrowsLeftRight, path: '/transferencias', permission: 'inventory.transfer' },
+      {
+        name: 'Productos', icon: Warehouse, permission: 'products.view', isAccordion: true,
+        items: [
+          { name: 'Lista de Productos', path: '/productos',  permission: 'products.view'  },
+          { name: 'Categorías',         path: '/categorias', permission: 'products.view'  },
+          { name: 'Proveedores',        path: '/proveedores',permission: 'suppliers.view' },
+          { name: 'Marcas',             path: '/marcas',     permission: 'products.view'  },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'Ventas',
+    items: [
+      { name: 'Clientes',        icon: UserCheck,   path: '/clientes',       permission: 'customers.view'    },
+      { name: 'Listas de Precios', icon: Receipt,   path: '/listas-precios', permission: 'price_lists.view'  },
+      {
+        name: 'Punto de Venta', icon: CreditCard, permission: 'sales.create', isAccordion: true,
+        items: [
+          { name: 'POS Desktop', path: '/pos/new',    permission: 'sales.create' },
+          { name: 'POS Tablet',  path: '/pos/tablet', permission: 'sales.create' },
+        ],
+      },
+      { name: 'Ventas',       icon: ShoppingCart, path: '/ventas',       permission: 'sales.view'        },
+      { name: 'Cotizaciones', icon: ReadCvLogo,   path: '/cotizaciones', permission: 'sales.quotes.view' },
+      { name: 'Pre-Pedidos',  icon: Robot,        path: '/pre-pedidos',  permission: 'pre_orders.view'   },
+    ],
+  },
+  {
+    section: 'Compras',
+    items: [
+      { name: 'Órdenes de Compra',     icon: ShoppingBag,   path: '/purchase-orders',  permission: 'purchases.view'         },
+      { name: 'Entregas',              icon: Truck,         path: '/deliveries',       permission: 'deliveries.view'        },
+      { name: 'Notas de Crédito',      icon: FileX,         path: '/credit-notes',     permission: 'credit_notes.view'      },
+      { name: 'Pagos a Proveedores',   icon: Receipt,       path: '/supplier-payments',permission: 'supplier_payments.view' },
+      { name: 'Cuentas por Pagar',     icon: ClipboardText, path: '/cuentas-por-pagar',permission: 'suppliers.view'         },
+    ],
+  },
+  {
+    section: 'Finanzas',
+    items: [
+      {
+        name: 'Cuentas por Cobrar', icon: BookOpen, permission: 'ar.view', isAccordion: true,
+        items: [
+          { name: 'General',     path: '/cuentas-por-cobrar',         permission: 'ar.view' },
+          { name: 'Por Cliente', path: '/cuentas-por-cobrar/clientes',permission: 'ar.view' },
+        ],
+      },
+      { name: 'Reportes',      icon: ChartBar,   path: '/reportes',    permission: 'reports.view' },
+      { name: 'Cierre de Caja', icon: Calculator, path: '/cierre-caja', permission: 'sales.view'  },
+    ],
+  },
+  {
+    section: 'Sistema',
+    items: [
+      {
+        name: 'Configuración', icon: Shield, permission: 'settings.manage', isAccordion: true,
+        items: [
+          { name: 'Configuración General', path: '/configuracion', permission: 'settings.manage' },
+          { name: 'Tasas de Cambio',       path: '/tasas-cambio',  permission: 'settings.manage' },
+        ],
+      },
+    ],
+  },
+];
+
+// ─── Sidebar component ────────────────────────────────────────────────────────
+
+const Sidebar = ({ isOpen, onClose, collapsed, onCollapse }) => {
   const { hasPermission } = useAuth();
   const location = useLocation();
-  const [productsOpen, setProductsOpen] = useState(false);
-  const [posOpen, setPosOpen] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [arOpen, setArOpen] = useState(false);
 
-  // Rutas de los subitems de cada acordeón
-  const productsRoutes = ['/productos', '/categorias', '/proveedores', '/marcas'];
-  const posRoutes = ['/pos/new', '/pos/tablet'];
-  const configRoutes = ['/usuarios', '/roles', '/configuracion', '/tasas-cambio'];
-  const arRoutes = ['/cuentas-por-cobrar', '/cuentas-por-cobrar/clientes'];
+  // Set of accordion names that are currently open
+  const [openAccordions, setOpenAccordions] = useState(new Set());
 
-  // Efecto para controlar el estado de los acordeones basado en la ruta actual
+  // Portal tooltip state — shows to the right of any item when collapsed
+  const [tip, setTip] = useState(null); // { x, y, label, subs? }
+  const showTip = (e, label, subs) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ x: r.right + 8, y: r.top + r.height / 2, label, subs });
+  };
+  const hideTip = () => setTip(null);
+
+  const toggleAccordion = (name) => {
+    setOpenAccordions(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
+  // Auto-open the accordion that contains the current route
   useEffect(() => {
-    const currentPath = location.pathname;
-
-    // Verificar si la ruta actual pertenece a algún acordeón
-    const isInProducts = productsRoutes.some(route => currentPath === route);
-    const isInPOS = posRoutes.some(route => currentPath === route);
-    const isInConfig = configRoutes.some(route => currentPath === route);
-    const isInAR = arRoutes.some(route => currentPath.startsWith(route));
-
-    // Actualizar estados
-    setProductsOpen(isInProducts);
-    setPosOpen(isInPOS);
-    setConfigOpen(isInConfig);
-    setArOpen(isInAR);
+    const path = location.pathname;
+    const toOpen = new Set();
+    MENU.forEach(({ items }) =>
+      items.forEach(item => {
+        if (item.isAccordion) {
+          const active = item.items.some(sub => path === sub.path || path.startsWith(sub.path + '/'));
+          if (active) toOpen.add(item.name);
+        }
+      })
+    );
+    setOpenAccordions(toOpen);
   }, [location.pathname]);
 
-  const menuItems = [
-    {
-      name: 'Dashboard',
-      icon: SquaresFour,
-      path: '/dashboard',
-      permission: null,
-    },
-    {
-      name: 'Inventario',
-      icon: Package,
-      path: '/inventario',
-      permission: 'inventory.view',
-    },
-    {
-      name: 'Reponer Stock',
-      icon: Scan,
-      path: '/reponer-stock',
-      permission: 'inventory.adjust',
-    },
-    {
-      name: 'Transferencias',
-      icon: ArrowsLeftRight,
-      path: '/transferencias',
-      permission: 'inventory.transfer',
+  // When collapsing, close all accordions (they'd be invisible anyway)
+  // When expanding (e.g. from accordion click), clear any frozen tooltip
+  useEffect(() => {
+    if (collapsed) setOpenAccordions(new Set());
+    setTip(null);
+  }, [collapsed]);
 
-    },
-    {
-      name: 'Productos',
-      icon: Warehouse,
-      permission: 'products.view',
-      isAccordion: true,
-      items: [
-        {
-          name: 'Lista de Productos',
-          path: '/productos',
-          permission: 'products.view',
-        },
-        {
-          name: 'Categorías',
-          path: '/categorias',
-          permission: 'products.view',
-        },
-        {
-          name: 'Proveedores',
-          path: '/proveedores',
-          permission: 'suppliers.view',
-        },
-        {
-          name: 'Marcas',
-          path: '/marcas',
-          permission: 'products.view',
-        },
-      ],
-    },
-    {
-      name: 'Clientes',
-      icon: UserCheck,
-      path: '/clientes',
-      permission: 'customers.view',
-    },
-    {
-      name: 'Listas de Precios',
-      icon: Receipt,
-      path: '/listas-precios',
-      permission: 'price_lists.view',
-    },
-    {
-      name: 'Punto de Venta',
-      icon: CreditCard,
-      permission: 'sales.create',
-      isAccordion: true,
-      items: [
-        {
-          name: 'POS Desktop',
-          path: '/pos/new',
-          permission: 'sales.create',
-        },
-        {
-          name: 'POS Tablet',
-          path: '/pos/tablet',
-          permission: 'sales.create',
-        },
-      ],
-    },
-    {
-      name: 'Ventas',
-      icon: ShoppingCart,
-      path: '/ventas',
-      permission: 'sales.view',
-    },
-    {
-      name: 'Cotizaciones',
-      icon: ReadCvLogo,
-      path: '/cotizaciones',
-      permission: 'sales.quotes.view',
-    },
-    {
-      name: 'Pre-Pedidos',
-      icon: Robot,
-      path: '/pre-pedidos',
-      permission: 'pre_orders.view',
-    },
-    {
-      name: 'Compras',
-      icon: ShoppingBag,
-      path: '/purchase-orders',
-      permission: 'purchases.view',
-    },
-    {
-      name: 'Entregas',
-      icon: Truck,
-      path: '/deliveries',
-      permission: 'deliveries.view',
-    },
-    {
-      name: 'Notas de Crédito',
-      icon: FileX,
-      path: '/credit-notes',
-      permission: 'credit_notes.view',
-    },
-    {
-      name: 'Pagos a Proveedores',
-      icon: Receipt,
-      path: '/supplier-payments',
-      permission: 'supplier_payments.view',
-    },
-    {
-      name: 'Cuentas por Pagar',
-      icon: ClipboardText,
-      path: '/cuentas-por-pagar',
-      permission: 'suppliers.view',
-    },
-    {
-      name: 'Cuentas por Cobrar',
-      icon: BookOpen,
-      permission: 'ar.view',
-      isAccordion: true,
-      items: [
-        {
-          name: 'General',
-          path: '/cuentas-por-cobrar',
-          permission: 'ar.view',
-        },
-        {
-          name: 'Por Cliente',
-          path: '/cuentas-por-cobrar/clientes',
-          permission: 'ar.view',
-        },
-      ],
-    },
-    {
-      name: 'Reportes',
-      icon: ChartBar,
-      path: '/reportes',
-      permission: 'reports.view',
-    },
-    {
-      name: 'Cierre de Caja',
-      icon: Calculator,
-      path: '/cierre-caja',
-      permission: 'sales.view', // Can be refined later
-    },
-    {
-      name: 'Configuración',
-      icon: Shield,
-      permission: 'settings.manage',
-      isAccordion: true,
-      items: [
-        {
-          name: 'Configuración General',
-          path: '/configuracion',
-          permission: 'settings.manage',
-        },
-        {
-          name: 'Tasas de Cambio',
-          path: '/tasas-cambio',
-          permission: 'settings.manage',
-        },
-      ],
-    },
-  ];
+  const can = (permission) => !permission || hasPermission(permission);
 
-  const visibleItems = menuItems.filter(
-    (item) => !item.permission || hasPermission(item.permission)
-  );
+  // ── Render a single nav item ────────────────────────────────────────────────
+  const renderItem = (item) => {
+    if (!can(item.permission)) return null;
 
-  const renderMenuItem = (item) => {
     if (item.isAccordion) {
-      const visibleSubItems = item.items.filter(
-        (subItem) => !subItem.permission || hasPermission(subItem.permission)
+      const visibleSubs = item.items.filter(s => can(s.permission));
+      if (visibleSubs.length === 0) return null;
+
+      const isOpen = openAccordions.has(item.name);
+      const isSubActive = visibleSubs.some(
+        s => location.pathname === s.path || location.pathname.startsWith(s.path + '/')
       );
 
-      // Si ningún subitem es visible, no mostrar el acordeón
-      if (visibleSubItems.length === 0) return null;
-
-      // Determinar qué acordeón es y su estado
-      const isProductsAccordion = item.name === 'Productos';
-      const isPOSAccordion = item.name === 'Punto de Venta';
-      const isARAccordion = item.name === 'Cuentas por Cobrar';
-      const isOpen = isProductsAccordion ? productsOpen
-        : isPOSAccordion ? posOpen
-        : isARAccordion ? arOpen
-        : configOpen;
-      const toggleOpen = isProductsAccordion
-        ? () => setProductsOpen(!productsOpen)
-        : isPOSAccordion
-          ? () => setPosOpen(!posOpen)
-          : isARAccordion
-            ? () => setArOpen(!arOpen)
-            : () => setConfigOpen(!configOpen);
-
       return (
-        <div key={`${item.name.toLowerCase()}-accordion`} className="space-y-1">
+        <div key={item.name}>
           <button
-            onClick={toggleOpen}
-            className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isOpen
-              ? 'bg-primary-50 text-primary-700'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+            onClick={() => {
+              if (collapsed) onCollapse();
+              else toggleAccordion(item.name);
+            }}
+            onMouseEnter={collapsed ? (e) => showTip(e, item.name, visibleSubs.map(s => s.name)) : undefined}
+            onMouseLeave={collapsed ? hideTip : undefined}
+            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium
+                       rounded-lg transition-colors ${
+                         isOpen || isSubActive
+                           ? 'bg-primary-50 text-primary-700'
+                           : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                       }`}
           >
-            <div className="flex items-center">
-              <item.icon className="mr-3 h-5 w-5" />
-              {item.name}
+            <div className="flex items-center min-w-0">
+              <item.icon size={20} className="shrink-0" />
+              {!collapsed && (
+                <span className="ml-3 truncate">{item.name}</span>
+              )}
             </div>
-            {isOpen ? (
-              <CaretDown className="h-4 w-4" />
-            ) : (
-              <CaretRight className="h-4 w-4" />
+            {!collapsed && (
+              isOpen
+                ? <CaretDown size={14} className="shrink-0 ml-1" />
+                : <CaretRight size={14} className="shrink-0 ml-1" />
             )}
           </button>
 
-          {isOpen && (
-            <div className="ml-8 space-y-1">
-              {visibleSubItems.map((subItem) => (
+          {/* Sub-items */}
+          {!collapsed && isOpen && (
+            <div className="mt-1 ml-7 pl-3 border-l border-gray-100 space-y-0.5">
+              {visibleSubs.map(sub => (
                 <NavLink
-                  key={subItem.path}
-                  to={subItem.path}
-                  end={true}
-                  onClick={() => onClose()}
+                  key={sub.path}
+                  to={sub.path}
+                  end
+                  onClick={onClose}
                   className={({ isActive }) =>
-                    `flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    `block px-3 py-2 text-sm rounded-lg transition-colors ${
+                      isActive
+                        ? 'text-primary-700 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                 >
-                  {subItem.name}
+                  {sub.name}
                 </NavLink>
               ))}
             </div>
@@ -320,52 +231,114 @@ const Sidebar = ({ isOpen, onClose }) => {
       <NavLink
         key={item.path}
         to={item.path}
-        onClick={() => onClose()}
+        onClick={onClose}
+        onMouseEnter={collapsed ? (e) => showTip(e, item.name) : undefined}
+        onMouseLeave={collapsed ? hideTip : undefined}
         className={({ isActive }) =>
-          `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive
-            ? 'bg-primary-50 text-primary-700'
-            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+          `flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+            isActive
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
           }`
         }
       >
-        <item.icon className="mr-3 h-5 w-5" />
-        {item.name}
+        <item.icon size={20} className="shrink-0" />
+        {!collapsed && <span className="ml-3 truncate">{item.name}</span>}
       </NavLink>
     );
   };
 
+  // ── Render a section ────────────────────────────────────────────────────────
+  const renderSection = ({ section, items }, idx) => {
+    const visibleItems = items.map(renderItem).filter(Boolean);
+    if (visibleItems.length === 0) return null;
+
+    return (
+      <div key={section ?? '__top'}>
+        {/* Section divider */}
+        {idx > 0 && (
+          <div className={`mt-3 mb-2 ${collapsed ? 'mx-3 border-t border-gray-100' : 'mx-1'}`}>
+            {!collapsed && section && (
+              <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                {section}
+              </span>
+            )}
+            {collapsed && <div className="border-t border-gray-100" />}
+          </div>
+        )}
+        <div className="space-y-0.5">{visibleItems}</div>
+      </div>
+    );
+  };
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
   return (
     <>
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-20 lg:hidden"
+          className="fixed inset-0 bg-gray-600/50 z-20 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar panel */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+        className={`fixed inset-y-0 left-0 z-30 bg-white border-r border-gray-200 shadow-sm
+                    flex flex-col overflow-hidden transition-all duration-300 ease-in-out
+                    ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+                    lg:translate-x-0 lg:static lg:inset-0
+                    w-64 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
       >
-        <div className="h-full flex flex-col">
-          {/* Close button (mobile only) */}
-          <div className="lg:hidden flex justify-end p-4">
-            <button
-              onClick={onClose}
-              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 pt-4 pb-4 space-y-1 overflow-y-auto">
-            {visibleItems.map((item) => renderMenuItem(item))}
-          </nav>
+        {/* Header */}
+        <div className={`flex items-center h-16 border-b border-gray-100 shrink-0 ${
+          collapsed ? 'justify-center px-2' : 'px-4 justify-between'
+        }`}>
+          {!collapsed && (
+            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Navegación</span>
+          )}
+          {/* Collapse toggle — desktop only */}
+          <button
+            onClick={onCollapse}
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg
+                       text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+            title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            {collapsed ? <ArrowLineRight size={16} /> : <ArrowLineLeft size={16} />}
+          </button>
+          {/* Close button — mobile only */}
+          <button
+            onClick={onClose}
+            className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg
+                       text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <X size={18} />
+          </button>
         </div>
+
+        {/* Navigation */}
+        <nav className={`flex-1 overflow-y-auto py-3 space-y-0 ${collapsed ? 'px-2' : 'px-3'}`}>
+          {MENU.map((section, idx) => renderSection(section, idx))}
+        </nav>
       </div>
+
+      {/* Portal tooltip — renders in document.body, escapes all overflow constraints */}
+      {collapsed && tip && createPortal(
+        <div
+          style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 9999 }}
+          className="pointer-events-none bg-gray-900 text-white text-xs rounded-md px-2.5 py-1.5 shadow-lg"
+        >
+          <div className="font-medium whitespace-nowrap">{tip.label}</div>
+          {tip.subs?.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {tip.subs.map(s => (
+                <div key={s} className="text-gray-400 whitespace-nowrap">{s}</div>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </>
   );
 };

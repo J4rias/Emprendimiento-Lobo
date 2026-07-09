@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
 import {
   Calendar, CurrencyDollar, TrendUp, ShoppingBag,
@@ -77,14 +78,20 @@ const SalesPage = () => {
   const [cancelReason, setCancelReason]   = useState('');
   const [refundLines, setRefundLines]     = useState(null); // set after cancel if refund needed
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: salesSortBy, sortDir: salesSortDir, onSort: _salesOnSort } = useTableSort([], { serverSide: true, defaultField: 'sale_date', defaultDir: 'desc' });
+  const salesOnSort = (f, d) => { _salesOnSort(f, d); setCurrentPage(1); };
+
   // ─── Queries ──────────────────────────────────────────────────────────────────
   const { data: salesData, isLoading } = useQuery({
-    queryKey: ['sales', currentPage, limit, search, statusFilter, saleTypeFilter],
+    queryKey: ['sales', currentPage, limit, search, statusFilter, saleTypeFilter, salesSortBy, salesSortDir],
     queryFn: () => saleService.getSales({
       page: currentPage, limit,
       search,
       status: statusFilter || undefined,
       sale_type: saleTypeFilter || undefined,
+      sort_by: salesSortBy,
+      sort_dir: salesSortDir,
     }),
     staleTime: 30_000,
   });
@@ -291,11 +298,15 @@ const SalesPage = () => {
     {
       key: 'sale_number',
       header: 'Número',
+      sortable: true,
+      sortKey: 'sale_number',
       render: (v) => <span className="text-sm font-medium text-gray-900">{v}</span>,
     },
     {
       key: 'sale_date',
       header: 'Fecha',
+      sortable: true,
+      sortKey: 'sale_date',
       render: (v) => (
         <span className="text-sm text-gray-600">
           {new Date(v).toLocaleDateString('es-VE', {
@@ -322,11 +333,15 @@ const SalesPage = () => {
     {
       key: 'total',
       header: 'Total / Pendiente',
+      sortable: true,
+      sortKey: 'total',
       render: (_, row) => renderTotal(row),
     },
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'status',
       render: (_, row) => (
         <StatusBadge
           status={row.status}
@@ -461,6 +476,9 @@ const SalesPage = () => {
           data={sales}
           loading={isLoading}
           emptyMessage="No se encontraron ventas"
+          sortBy={salesSortBy}
+          sortDir={salesSortDir}
+          onSort={salesOnSort}
         />
         <Pagination
           page={currentPage}

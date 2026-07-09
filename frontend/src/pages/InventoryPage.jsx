@@ -6,11 +6,12 @@ import { warehouseService } from '../services/api/warehouseService';
 import { categoryService } from '../services/api/categoryService';
 import {
   Package, Warning, Calendar, CurrencyDollar, Funnel,
-  DownloadSimple, ArrowClockwise, Plus, Info, X, Warehouse,
+  FileCsv, ArrowClockwise, Plus, Info, X, Warehouse,
   CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../utils/formatUtils';
+import { downloadCSV } from '../utils/csvUtils';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { Alert, Badge, Button, Card, Input, Modal, SearchInput, Select, ViewAction, AdjustAction } from '../components/ui';
@@ -243,39 +244,26 @@ const InventoryPage = () => {
       toast.error('No hay datos para exportar');
       return;
     }
-    const headers = ['Producto', 'Categoría', 'Bultos', 'Unidades', 'Depósito', 'Estado'];
-    const rows = inventoryData.data.map(item => {
-      const pres = getDefaultPresentation(item);
-      const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-      const qty = parseFloat(item.quantity);
-      const status = getStockStatus(qty, item.product.reorder_point);
-      return [
-        item.product.name,
-        item.product.category?.name || 'N/A',
-        Math.floor(qty / unitsPerPkg),
-        qty % unitsPerPkg,
-        item.warehouse?.name || 'N/A',
-        status.text,
-      ];
-    });
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => {
-        const s = String(cell);
-        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(',')),
-    ].join('\n');
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    const timestamp = new Date().toISOString().split('T')[0];
+    const timestamp     = new Date().toISOString().split('T')[0];
     const warehouseName = selectedWarehouse === 'all' ? 'todos' : `deposito-${selectedWarehouse}`;
-    link.setAttribute('href', url);
-    link.setAttribute('download', `inventario-${warehouseName}-${timestamp}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(
+      `inventario-${warehouseName}-${timestamp}`,
+      ['Producto', 'Categoría', 'Bultos', 'Unidades', 'Depósito', 'Estado'],
+      inventoryData.data.map(item => {
+        const pres        = getDefaultPresentation(item);
+        const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
+        const qty         = parseFloat(item.quantity);
+        const status      = getStockStatus(qty, item.product.reorder_point);
+        return [
+          item.product.name,
+          item.product.category?.name || 'N/A',
+          Math.floor(qty / unitsPerPkg),
+          qty % unitsPerPkg,
+          item.warehouse?.name || 'N/A',
+          status.text,
+        ];
+      })
+    );
   };
 
   return (
@@ -491,12 +479,12 @@ const InventoryPage = () => {
             </Button>
 
             <Button
-              variant="success"
+              variant="secondary"
               size="icon"
               onClick={handleDownloadReport}
-              title="Descargar reporte CSV"
+              title="Exportar CSV"
             >
-              <DownloadSimple className="w-4 h-4" />
+              <FileCsv className="w-4 h-4 text-emerald-600" />
             </Button>
           </div>
         </div>

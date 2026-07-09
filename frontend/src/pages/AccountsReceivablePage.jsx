@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { DownloadSimple, BookOpen, Eye, EyeSlash, CheckCircle, CaretUp, CaretDown, Shield } from '@phosphor-icons/react';
+import { FileCsv, BookOpen, Eye, EyeSlash, CheckCircle, CaretUp, CaretDown, Shield } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { arService } from '../services/api/arService';
 import { useAuth } from '../context/AuthContext';
@@ -627,9 +627,8 @@ export default function AccountsReceivablePage() {
               PIN
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={handleExport}>
-            <DownloadSimple className="w-4 h-4" />
-            Exportar CSV
+          <Button variant="secondary" size="icon" onClick={handleExport} title="Exportar CSV">
+            <FileCsv className="w-4 h-4 text-emerald-600" />
           </Button>
         </div>
       </div>

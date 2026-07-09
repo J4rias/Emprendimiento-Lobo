@@ -25,11 +25,13 @@ const METHOD_VARIANT = {
 const fmtAmt = (v, currency) =>
   `${currency || ''} ${(parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`.trim();
 
-export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasPermission }) {
+export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasPermission, sortBy, sortDir, onSort }) {
   const columns = [
     {
       header: 'Número',
       accessor: 'payment_number',
+      sortable: true,
+      sortKey: 'payment_number',
       render: (_, p) => (
         <div>
           <div className="font-medium text-gray-900">{p.payment_number || 'N/A'}</div>
@@ -75,6 +77,8 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Estado',
       accessor: 'status',
+      sortable: true,
+      sortKey: 'status',
       render: (_, p) => (
         <Badge variant={STATUS_VARIANT[p.status] ?? 'neutral'}>
           {STATUS_LABEL[p.status] ?? p.status}
@@ -93,6 +97,8 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Monto',
       accessor: 'amount',
+      sortable: true,
+      sortKey: 'amount',
       cellClassName: 'text-right',
       render: (_, p) => (
         <div className="text-right">
@@ -132,10 +138,13 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
   return (
     <Table
       columns={columns}
-      data={payments}
+      data={payments ?? []}
       loading={loading}
       emptyMessage="No se encontraron pagos"
       rowClassName={(p) => (p.status === 'cancelled' ? 'opacity-60' : '')}
+      sortBy={sortBy}
+      sortDir={sortDir}
+      onSort={onSort}
     />
   );
 }

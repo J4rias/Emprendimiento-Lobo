@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, MagnifyingGlass, Funnel, X, FileText } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, Funnel, X, FileCsv } from '@phosphor-icons/react';
 import { Button, Alert, Modal, ConfirmDialog, useTableLimit } from '../components/ui';
 import { presentationService } from '../services/api/presentationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
@@ -484,9 +484,8 @@ const ProductsPage = () => {
           <p className="text-gray-600">Gestión de productos del inventario</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={handleDownloadCSV} title="Exportar a CSV">
-            <FileText className="h-4 w-4 text-red-600" />
-            CSV
+          <Button variant="secondary" size="icon" onClick={handleDownloadCSV} title="Exportar CSV">
+            <FileCsv className="w-4 h-4 text-emerald-600" />
           </Button>
           {hasPermission('products.create') && (
             <Button onClick={() => setShowModal(true)}>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -44,18 +45,24 @@ const QuotesPage = () => {
   const [convertTarget, setConvertTarget]   = useState(null); // quote to convert (confirm)
   const [lastConversion, setLastConversion] = useState(null); // { sale_number, quote_code }
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: quoteSortBy, sortDir: quoteSortDir, onSort: _quoteOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
+  const quoteOnSort = (f, d) => { _quoteOnSort(f, d); setCurrentPage(1); };
+
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
     data: quotesData,
     isLoading,
     isError: fetchError,
   } = useQuery({
-    queryKey: ['quotes', currentPage, search, statusFilter, limit],
+    queryKey: ['quotes', currentPage, search, statusFilter, limit, quoteSortBy, quoteSortDir],
     queryFn: () => quoteService.getAll({
       page: currentPage,
       limit,
       ...(search       && { search }),
       ...(statusFilter && { status: statusFilter }),
+      sort_by: quoteSortBy,
+      sort_dir: quoteSortDir,
     }),
     staleTime: 30_000,
   });
@@ -111,7 +118,7 @@ const QuotesPage = () => {
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'code', header: 'Código', render: (v) => <span className="font-mono text-sm">{v}</span> },
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v) => <span className="font-mono text-sm">{v}</span> },
     {
       key: 'customer',
       header: 'Cliente',
@@ -120,6 +127,8 @@ const QuotesPage = () => {
     {
       key: 'date',
       header: 'Fecha',
+      sortable: true,
+      sortKey: 'quote_date',
       render: (_, row) => fmtDate(row.quote_date || row.quoteDate || row.created_at),
     },
     {
@@ -134,6 +143,8 @@ const QuotesPage = () => {
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'status',
       render: (_, row) => (
         <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
           {STATUS_LABEL[row.status] || row.status}
@@ -143,6 +154,8 @@ const QuotesPage = () => {
     {
       key: 'total',
       header: 'Total',
+      sortable: true,
+      sortKey: 'total',
       render: (_, row) => fmtUSD(row.total),
       cellClassName: 'text-right font-semibold',
     },
@@ -225,6 +238,9 @@ const QuotesPage = () => {
           data={quotes}
           loading={isLoading}
           emptyMessage="No se encontraron cotizaciones"
+          sortBy={quoteSortBy}
+          sortDir={quoteSortDir}
+          onSort={quoteOnSort}
         />
         <Pagination
           page={currentPage}

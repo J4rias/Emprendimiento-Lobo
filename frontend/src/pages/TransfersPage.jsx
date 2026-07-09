@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Package, ArrowRight } from '@phosphor-icons/react';
+import { Plus, Package, ArrowRight, Prohibit } from '@phosphor-icons/react';
 import { transferService } from '../services/api/transferService';
 import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
@@ -265,7 +265,7 @@ const TransfersPage = () => {
               loading={cancelMutation.isPending}
               onClick={() => cancelMutation.mutate({ id: cancelTarget.id, reason: cancelReason })}
             >
-              <Ban className="w-4 h-4" />
+              <Prohibit className="w-4 h-4" />
               Confirmar Cancelación
             </Button>
           </div>

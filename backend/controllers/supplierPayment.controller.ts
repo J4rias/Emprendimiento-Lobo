@@ -37,7 +37,9 @@ export const getAllPayments = async (req: Request, res: Response) => {
       payment_method,
       currency,
       date_from,
-      date_to
+      date_to,
+      sort_by = 'payment_date',
+      sort_dir = 'DESC',
     } = req.query as Record<string, string>;
 
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
@@ -83,7 +85,7 @@ export const getAllPayments = async (req: Request, res: Response) => {
     const count = await SupplierPayment.count({ where });
     const baseRows = await SupplierPayment.findAll({
       where,
-      order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
+      order: [[sort_by, sort_dir.toUpperCase()]],
       limit: parseInt(limit, 10),
       offset
     }) as any[];

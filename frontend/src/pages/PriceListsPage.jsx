@@ -6,11 +6,12 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    MagnifyingGlass, DownloadSimple,
+    MagnifyingGlass, FileCsv,
     CheckCircle, WarningCircle, X,
     Package, Printer, Lock, LockOpen
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { Button } from '../components/ui';
 
 const PriceListsPage = () => {
     useAuth();
@@ -460,9 +461,9 @@ const PriceListsPage = () => {
                                 <button onClick={handlePrint} className="btn-secondary flex items-center gap-2" title="Imprimir">
                                     <Printer className="w-4 h-4" /> Imprimir
                                 </button>
-                                <button onClick={() => handleExportCSV(editingList.id)} className="btn-secondary flex items-center gap-2" title="Exportar CSV">
-                                    <DownloadSimple className="w-4 h-4" /> CSV
-                                </button>
+                                <Button variant="secondary" size="icon" onClick={() => handleExportCSV(editingList.id)} title="Exportar CSV">
+                                    <FileCsv className="w-4 h-4 text-emerald-600" />
+                                </Button>
                             </>
                         )}
                     </div>

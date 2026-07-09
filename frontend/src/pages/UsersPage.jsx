@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -54,8 +55,10 @@ const UsersPage = () => {
     staleTime: Infinity,
   });
 
-  const users = usersData?.data || [];
-  const roles = rolesData?.data?.roles || [];
+  const usersRaw = usersData?.data || [];
+  const roles    = rolesData?.data?.roles || [];
+
+  const { sortBy: userSortBy, sortDir: userSortDir, onSort: userOnSort, sortedData: users } = useTableSort(usersRaw);
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
   const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -120,8 +123,8 @@ const UsersPage = () => {
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'username',  header: 'Usuario',  render: (v) => v },
-    { key: 'name',      header: 'Nombre',   render: (_, r) => `${r.first_name} ${r.last_name}` },
+    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v) => v },
+    { key: 'name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_, r) => `${r.first_name} ${r.last_name}` },
     { key: 'email',     header: 'Email',    render: (v) => v },
     { key: 'phone',     header: 'Teléfono', render: (_, r) => r.phone || '—' },
     { key: 'role',      header: 'Rol',      render: (_, r) => r.role?.name || '—' },
@@ -137,6 +140,8 @@ const UsersPage = () => {
     {
       key: 'last_login',
       header: 'Último acceso',
+      sortable: true,
+      sortKey: 'last_login',
       render: (_, r) =>
         r.last_login
           ? new Date(r.last_login).toLocaleDateString('es-VE')
@@ -210,6 +215,9 @@ const UsersPage = () => {
           data={users}
           loading={isLoading}
           emptyMessage="No se encontraron usuarios"
+          sortBy={userSortBy}
+          sortDir={userSortDir}
+          onSort={userOnSort}
         />
       </Card>
 

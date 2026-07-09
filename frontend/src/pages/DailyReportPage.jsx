@@ -4,7 +4,7 @@ import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, DownloadSimple, Printer, CurrencyDollar, Wallet, Users, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
+import { Calendar, Printer, CurrencyDollar, Wallet, Users, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 const DailyReportPage = () => {

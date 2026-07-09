@@ -6,10 +6,11 @@ import { inventoryService } from '../services/api/inventoryService';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { toast } from 'sonner';
 import {
-  FileText, DownloadSimple, Funnel, TrendUp, Package,
+  FileText, FileCsv, Funnel, TrendUp, Package,
   ShoppingCart, CurrencyDollar, ChartBar
 } from '@phosphor-icons/react';
 import { Button, Card, DateRangeFilter, Select, Spinner } from '../components/ui';
+import { downloadCSV } from '../utils/csvUtils';
 
 const SALES_PAGE_SIZE = 50;
 const INVENTORY_PAGE_SIZE = 50;
@@ -334,72 +335,6 @@ const ReportsPage = () => {
     return allItems;
   };
 
-  const buildSalesCSV = (sales) => {
-    let csv = 'Número,Fecha,Cliente,Tipo,Estado,Total COP\n';
-    sales.forEach(sale => {
-      const rate     = parseFloat(sale.exchange_rate) || 1;
-      const totalCOP = Math.ceil((parseFloat(sale.total) || 0) * rate);
-      csv += `"${sale.sale_number}","${fmtDate(sale.sale_date)}","${getCustomerName(sale.customer)}","${getSaleTypeLabel(sale.sale_type)}","${sale.status}",${totalCOP}\n`;
-    });
-    return csv;
-  };
-
-  const buildInventoryCSV = (items) => {
-    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Costo Unitario,Valor Total\n';
-    items.forEach(item => {
-      const presentations      = item.product?.presentations || [];
-      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
-      const unitsPerPackage    = defaultPresentation?.units_per_package || 1;
-      const totalUnits         = item.quantity || 0;
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${Math.floor(totalUnits / unitsPerPackage)},${totalUnits % unitsPerPackage},${unitsPerPackage},${item.product?.cost || 0},${item.value || 0}\n`;
-    });
-    return csv;
-  };
-
-  const buildPurchasesCSV = () => {
-    let csv = 'Número,Fecha,Proveedor,Estado,Moneda,Total\n';
-    reportData.forEach(po => {
-      csv += `"${po.order_number}","${fmtDate(po.order_date)}","${po.supplier?.name || ''}","${po.status}","${po.currency}",${po.total}\n`;
-    });
-    return csv;
-  };
-
-  const buildTopProductsCSV = () => {
-    let csv = 'SKU,Producto,Cantidad Vendida,Monto Total\n';
-    reportData.forEach(item => {
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.total_amount}\n`;
-    });
-    return csv;
-  };
-
-  const buildProductSalesCSV = () => {
-    let csv = 'SKU,Producto,Cant. Vendida,# Ventas,Total USD,Total COP\n';
-    reportData.forEach(item => {
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}",${item.total_quantity},${item.num_sales},${parseFloat(item.total_usd || 0).toFixed(2)},${Math.ceil(item.total_cop || 0)}\n`;
-    });
-    return csv;
-  };
-
-  const buildLowStockCSV = () => {
-    let csv = 'SKU,Producto,Almacén,Cant. Total,Existencia (Paquetes),Existencia (Unidades),Uds/Paquete,Stock Mínimo,Estado\n';
-    reportData.forEach(item => {
-      const presentations      = item.product?.presentations || [];
-      const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
-      const unitsPerPackage    = defaultPresentation?.units_per_package || 1;
-      const totalUnits         = item.quantity || 0;
-      csv += `"${item.product?.sku || ''}","${item.product?.name || ''}","${item.warehouse?.name || ''}",${totalUnits},${Math.floor(totalUnits / unitsPerPackage)},${totalUnits % unitsPerPackage},${unitsPerPackage},${item.product?.minimum_stock || 0},"Crítico"\n`;
-    });
-    return csv;
-  };
-
-  const downloadCSV = (content, filename) => {
-    const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-  };
-
   const exportToCSV = async () => {
     if (!reportData || reportData.length === 0) {
       toast.error('No hay datos para exportar');
@@ -410,7 +345,15 @@ const ReportsPage = () => {
         setExportingCSV(true);
         try {
           const allSales = await fetchAllSalesForExport();
-          downloadCSV(buildSalesCSV(allSales), `reporte_ventas_${dateRange.start_date}_${dateRange.end_date}.csv`);
+          downloadCSV(
+            `reporte_ventas_${dateRange.start_date}_${dateRange.end_date}`,
+            ['Número', 'Fecha', 'Cliente', 'Tipo', 'Estado', 'Total COP'],
+            allSales.map(sale => {
+              const rate     = parseFloat(sale.exchange_rate) || 1;
+              const totalCOP = Math.ceil((parseFloat(sale.total) || 0) * rate);
+              return [sale.sale_number, fmtDate(sale.sale_date), getCustomerName(sale.customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
+            })
+          );
           toast.success(`${allSales.length} ventas exportadas`);
         } catch (e) {
           console.error('Error exporting sales CSV:', e);
@@ -424,7 +367,17 @@ const ReportsPage = () => {
         setExportingCSV(true);
         try {
           const allItems = await fetchAllInventoryForExport();
-          downloadCSV(buildInventoryCSV(allItems), `inventario_valorizado_${today}.csv`);
+          downloadCSV(
+            `inventario_valorizado_${today}`,
+            ['SKU', 'Producto', 'Almacén', 'Cant. Total', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', 'Costo Unitario', 'Valor Total'],
+            allItems.map(item => {
+              const presentations       = item.product?.presentations || [];
+              const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
+              const unitsPerPackage     = defaultPresentation?.units_per_package || 1;
+              const totalUnits          = item.quantity || 0;
+              return [item.product?.sku || '', item.product?.name || '', item.warehouse?.name || '', totalUnits, Math.floor(totalUnits / unitsPerPackage), totalUnits % unitsPerPackage, unitsPerPackage, item.product?.cost || 0, item.value || 0];
+            })
+          );
           toast.success(`${allItems.length} items exportados`);
         } catch (e) {
           console.error('Error exporting inventory CSV:', e);
@@ -435,16 +388,38 @@ const ReportsPage = () => {
         break;
       }
       case 'purchases':
-        downloadCSV(buildPurchasesCSV(), `reporte_compras_${dateRange.start_date}_${dateRange.end_date}.csv`);
+        downloadCSV(
+          `reporte_compras_${dateRange.start_date}_${dateRange.end_date}`,
+          ['Número', 'Fecha', 'Proveedor', 'Estado', 'Moneda', 'Total'],
+          reportData.map(po => [po.order_number, fmtDate(po.order_date), po.supplier?.name || '', po.status, po.currency, po.total])
+        );
         break;
       case 'top_products':
-        downloadCSV(buildTopProductsCSV(), `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}.csv`);
+        downloadCSV(
+          `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}`,
+          ['SKU', 'Producto', 'Cantidad Vendida', 'Monto Total'],
+          reportData.map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.total_amount])
+        );
         break;
       case 'product_sales':
-        downloadCSV(buildProductSalesCSV(), `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}.csv`);
+        downloadCSV(
+          `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}`,
+          ['SKU', 'Producto', 'Cant. Vendida', '# Ventas', 'Total USD', 'Total COP'],
+          reportData.map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.num_sales, parseFloat(item.total_usd || 0).toFixed(2), Math.ceil(item.total_cop || 0)])
+        );
         break;
       case 'low_stock':
-        downloadCSV(buildLowStockCSV(), `productos_bajo_stock_${today}.csv`);
+        downloadCSV(
+          `productos_bajo_stock_${today}`,
+          ['SKU', 'Producto', 'Almacén', 'Cant. Total', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', 'Stock Mínimo', 'Estado'],
+          reportData.map(item => {
+            const presentations       = item.product?.presentations || [];
+            const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
+            const unitsPerPackage     = defaultPresentation?.units_per_package || 1;
+            const totalUnits          = item.quantity || 0;
+            return [item.product?.sku || '', item.product?.name || '', item.warehouse?.name || '', totalUnits, Math.floor(totalUnits / unitsPerPackage), totalUnits % unitsPerPackage, unitsPerPackage, item.product?.minimum_stock || 0, 'Crítico'];
+          })
+        );
         break;
       default:
         break;
@@ -746,9 +721,8 @@ const ReportsPage = () => {
             {loading ? 'Generando...' : 'Generar Reporte'}
           </Button>
           {reportData && reportData.length > 0 && (
-            <Button variant="secondary" loading={exportingCSV} onClick={exportToCSV} disabled={exportingCSV}>
-              <DownloadSimple className="w-4 h-4" />
-              {exportingCSV ? 'Exportando...' : 'Exportar CSV'}
+            <Button variant="secondary" size="icon" loading={exportingCSV} onClick={exportToCSV} disabled={exportingCSV} title="Exportar CSV">
+              <FileCsv className="w-4 h-4 text-emerald-600" />
             </Button>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
@@ -9,7 +10,7 @@ import { formatMoney } from '../utils/formatUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { toast } from 'sonner';
 import {
-  Plus, XCircle,
+  Plus, XCircle, FileText,
   CurrencyDollar, TrendUp, Clock,
 } from '@phosphor-icons/react';
 import {
@@ -88,14 +89,20 @@ const PurchaseOrdersPage = () => {
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: ordersSortBy, sortDir: ordersSortDir, onSort: _ordersOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
+  const ordersOnSort = (f, d) => { _ordersOnSort(f, d); setCurrentPage(1); };
+
   // ─── Queries ──────────────────────────────────────────────────────────────────
   const { data: ordersData, isLoading, isError: fetchError } = useQuery({
-    queryKey: ['purchase-orders', currentPage, search, statusFilter, supplierFilter, limit],
+    queryKey: ['purchase-orders', currentPage, search, statusFilter, supplierFilter, limit, ordersSortBy, ordersSortDir],
     queryFn: () => purchaseOrderService.getAll({
       page: currentPage, limit,
       search: search || undefined,
       status: statusFilter || undefined,
       supplier_id: supplierFilter || undefined,
+      sort_by: ordersSortBy,
+      sort_dir: ordersSortDir,
     }),
     staleTime: 30_000,
   });
@@ -187,6 +194,8 @@ const PurchaseOrdersPage = () => {
     {
       key: 'order_number',
       header: 'Número',
+      sortable: true,
+      sortKey: 'order_number',
       render: (v) => <div className="font-medium text-gray-900">{v}</div>,
     },
     {
@@ -202,6 +211,8 @@ const PurchaseOrdersPage = () => {
     {
       key: 'order_date',
       header: 'Fecha',
+      sortable: true,
+      sortKey: 'order_date',
       render: (v) => (
         <div className="text-sm text-gray-600">{new Date(v).toLocaleDateString('es-VE')}</div>
       ),
@@ -214,6 +225,8 @@ const PurchaseOrdersPage = () => {
     {
       key: 'total',
       header: 'Total',
+      sortable: true,
+      sortKey: 'total',
       render: (_, row) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-900">{formatMoney(row.total, row.currency)}</span>
@@ -228,6 +241,8 @@ const PurchaseOrdersPage = () => {
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'status',
       render: (_, row) => (
         <div className="flex flex-col items-start gap-1">
           <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
@@ -384,6 +399,9 @@ const PurchaseOrdersPage = () => {
           data={orders}
           loading={isLoading}
           emptyMessage="No se encontraron órdenes de compra"
+          sortBy={ordersSortBy}
+          sortDir={ordersSortDir}
+          onSort={ordersOnSort}
           rowClassName={(row) =>
             row.status === 'partially_received'
               ? 'bg-amber-50/50 hover:bg-amber-100/50 transition-colors'

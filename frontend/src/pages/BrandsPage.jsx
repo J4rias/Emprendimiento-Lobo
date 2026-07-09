@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import api from '../services/api/axios';
 import { Plus, Buildings, Globe } from '@phosphor-icons/react';
 import ImageUpload from '../components/common/ImageUpload';
@@ -40,18 +41,22 @@ const BrandsPage = () => {
     is_active: true
   });
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: brandSortBy, sortDir: brandSortDir, onSort: _brandOnSort } = useTableSort([], { serverSide: true, defaultField: 'name', defaultDir: 'asc' });
+  const brandOnSort = (f, d) => { _brandOnSort(f, d); setCurrentPage(1); };
+
   const { data: brandsData, isLoading, error: fetchError } = useQuery({
-    queryKey: ['brands', currentPage, searchTerm, limit],
-    queryFn: () => api.get('/brands', { params: { page: currentPage, limit, search: searchTerm } }).then(r => r.data),
+    queryKey: ['brands', currentPage, searchTerm, limit, brandSortBy, brandSortDir],
+    queryFn: () => api.get('/brands', { params: { page: currentPage, limit, search: searchTerm, sort_by: brandSortBy, sort_dir: brandSortDir } }).then(r => r.data),
     keepPreviousData: true,
     staleTime: 30_000,
   });
 
-  const brands = brandsData?.data || [];
+  const brands     = brandsData?.data || [];
   const totalPages = brandsData?.pagination?.totalPages || 1;
-  const total = brandsData?.pagination?.total || 0;
-  const loading = isLoading;
-  const error = fetchError?.message;
+  const total      = brandsData?.pagination?.total || 0;
+  const loading    = isLoading;
+  const error      = fetchError?.message;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -129,6 +134,8 @@ const BrandsPage = () => {
   const columns = [
     {
       header: 'Marca',
+      sortable: true,
+      sortKey: 'name',
       render: (_, brand) => (
         <div className="flex items-center">
           {brand.logo_url ? (
@@ -165,6 +172,8 @@ const BrandsPage = () => {
     },
     {
       header: 'Estado',
+      sortable: true,
+      sortKey: 'is_active',
       render: (_, brand) => (
         <Badge variant={brand.is_active ? 'success' : 'error'}>
           {brand.is_active ? 'Activa' : 'Inactiva'}
@@ -231,6 +240,9 @@ const BrandsPage = () => {
               Nueva Marca
             </Button>
           ) : undefined}
+          sortBy={brandSortBy}
+          sortDir={brandSortDir}
+          onSort={brandOnSort}
         />
         <Pagination
           page={currentPage}

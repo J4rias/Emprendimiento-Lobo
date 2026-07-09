@@ -4,7 +4,6 @@ import {
   Plus,
   MagnifyingGlass,
   Funnel,
-  DownloadSimple,
   WarningCircle,
   CheckCircle,
   XCircle,

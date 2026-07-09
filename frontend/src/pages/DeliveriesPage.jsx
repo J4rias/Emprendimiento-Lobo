@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { useAuth } from '../context/AuthContext';
 import { deliveryService } from '../services/api/deliveryService';
 import { saleService } from '../services/api/saleService';
@@ -70,19 +71,25 @@ const DeliveriesPage = () => {
   const [cancelTarget, setCancelTarget]   = useState(null); // delivery object
   const [cancelReason, setCancelReason]   = useState('');
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: delSortBy, sortDir: delSortDir, onSort: _delOnSort } = useTableSort([], { serverSide: true, defaultField: 'scheduled_date', defaultDir: 'desc' });
+  const delOnSort = (f, d) => { _delOnSort(f, d); setCurrentPage(1); };
+
   // ─── Queries ─────────────────────────────────────────────────────────────────
   const { data: deliveriesData, isLoading, isError: fetchError } = useQuery({
-    queryKey: ['deliveries', currentPage, search, statusFilter, limit],
+    queryKey: ['deliveries', currentPage, search, statusFilter, limit, delSortBy, delSortDir],
     queryFn: () => deliveryService.getAll({
       page: currentPage, limit,
       search: search || undefined,
       status: statusFilter || undefined,
+      sort_by: delSortBy,
+      sort_dir: delSortDir,
     }),
     staleTime: 30_000,
   });
-  const deliveries  = deliveriesData?.data || [];
-  const totalPages  = deliveriesData?.pagination?.totalPages || 1;
-  const total       = deliveriesData?.pagination?.total || 0;
+  const deliveries = deliveriesData?.data || [];
+  const totalPages = deliveriesData?.pagination?.totalPages || 1;
+  const total      = deliveriesData?.pagination?.total || 0;
 
   const { data: statsData } = useQuery({
     queryKey: ['deliveries-stats'],
@@ -179,6 +186,8 @@ const DeliveriesPage = () => {
     {
       key: 'delivery_number',
       header: 'Número',
+      sortable: true,
+      sortKey: 'delivery_number',
       render: (_, row) => (
         <div>
           <div className="font-medium text-gray-900">{row.delivery_number}</div>
@@ -232,6 +241,8 @@ const DeliveriesPage = () => {
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'status',
       render: (v) => <StatusBadge status={v} />,
     },
     {
@@ -352,6 +363,9 @@ const DeliveriesPage = () => {
           data={deliveries}
           loading={isLoading}
           emptyMessage="No se encontraron entregas"
+          sortBy={delSortBy}
+          sortDir={delSortDir}
+          onSort={delOnSort}
         />
         <Pagination
           page={currentPage}

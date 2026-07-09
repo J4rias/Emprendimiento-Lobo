@@ -48,6 +48,9 @@ const SupplierPaymentsPage = () => {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('payment_date');
+  const [sortDir, setSortDir] = useState('desc');
+  const onSort = (f, d) => { setSortBy(f); setSortDir(d); setCurrentPage(1); };
 
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -64,7 +67,7 @@ const SupplierPaymentsPage = () => {
     isLoading: loadingPayments,
     isError: paymentsError,
   } = useQuery({
-    queryKey: ['supplier-payments', currentPage, search, supplierFilter, paymentMethodFilter, limit],
+    queryKey: ['supplier-payments', currentPage, search, supplierFilter, paymentMethodFilter, limit, sortBy, sortDir],
     queryFn: async () => {
       const res = await supplierPaymentService.getAll({
         page: currentPage,
@@ -72,6 +75,8 @@ const SupplierPaymentsPage = () => {
         supplier_id: supplierFilter || undefined,
         payment_method: paymentMethodFilter || undefined,
         limit,
+        sort_by: sortBy,
+        sort_dir: sortDir,
       });
       return {
         payments: res.data || [],
@@ -295,6 +300,9 @@ const SupplierPaymentsPage = () => {
           payments={payments}
           loading={loadingPayments}
           hasPermission={hasPermission}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={onSort}
           onView={(p) => { setViewingPayment(p); setShowViewModal(true); }}
           onEdit={(p) => { setEditingPayment(p); setShowEditModal(true); }}
           onCancel={(p) => setCancelTarget(p)}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
 import {
   Plus, Building, User, Envelope, Phone,
@@ -45,14 +46,18 @@ const SuppliersPage = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: supSortBy, sortDir: supSortDir, onSort: _supOnSort } = useTableSort([], { serverSide: true, defaultField: 'name', defaultDir: 'asc' });
+  const supOnSort = (f, d) => { _supOnSort(f, d); setCurrentPage(1); };
+
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
     data: suppliersData = {},
     isLoading,
     isError: fetchError,
   } = useQuery({
-    queryKey: ['suppliers', currentPage, search, limit],
-    queryFn: () => supplierService.getAll({ page: currentPage, limit, search: search || undefined }),
+    queryKey: ['suppliers', currentPage, search, limit, supSortBy, supSortDir],
+    queryFn: () => supplierService.getAll({ page: currentPage, limit, search: search || undefined, sort_by: supSortBy, sort_dir: supSortDir }),
     staleTime: 30_000,
   });
 
@@ -118,6 +123,8 @@ const SuppliersPage = () => {
     {
       key: 'supplier',
       header: 'Proveedor',
+      sortable: true,
+      sortKey: 'name',
       render: (_, row) => (
         <div className="flex items-center gap-3">
           <Building className="h-5 w-5 text-gray-400 shrink-0" />
@@ -161,6 +168,8 @@ const SuppliersPage = () => {
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'is_active',
       render: (_, row) => (
         <Badge variant={row.is_active ? 'success' : 'error'}>
           {row.is_active ? 'Activo' : 'Inactivo'}
@@ -225,6 +234,9 @@ const SuppliersPage = () => {
           data={suppliers}
           loading={isLoading}
           emptyMessage="No se encontraron proveedores"
+          sortBy={supSortBy}
+          sortDir={supSortDir}
+          onSort={supOnSort}
         />
         <Pagination
           page={currentPage}

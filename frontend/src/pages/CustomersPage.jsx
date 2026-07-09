@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
 import { Plus, User, Phone, MapPin, CurrencyCircleDollar } from '@phosphor-icons/react';
 import CustomerStatementModal from '../components/customers/CustomerStatementModal';
 import CustomerViewSheet from '../components/customers/CustomerViewSheet';
@@ -70,19 +71,25 @@ const CustomersPage = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
 
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: custSortBy, sortDir: custSortDir, onSort: _custOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
+  const custOnSort = (f, d) => { _custOnSort(f, d); setCurrentPage(1); };
+
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
     data: customersData = {},
     isLoading,
     isError: fetchError,
   } = useQuery({
-    queryKey: ['customers', currentPage, search, typeFilter, statusFilter, limit],
+    queryKey: ['customers', currentPage, search, typeFilter, statusFilter, limit, custSortBy, custSortDir],
     queryFn: () => customerService.getAll({
       page: currentPage,
       limit,
       search: search || undefined,
       type: typeFilter || undefined,
       status: statusFilter || undefined,
+      sort_by: custSortBy,
+      sort_dir: custSortDir,
     }),
     staleTime: 30_000,
   });
@@ -207,10 +214,12 @@ const CustomersPage = () => {
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'code',     header: 'Código',    render: (v) => v },
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v) => v },
     {
       key: 'name',
       header: 'Nombre / Razón Social',
+      sortable: true,
+      sortKey: 'firstName',
       render: (_, row) =>
         row.type === 'juridical'
           ? row.businessName || row.tradeName
@@ -234,6 +243,8 @@ const CustomersPage = () => {
     {
       key: 'status',
       header: 'Estado',
+      sortable: true,
+      sortKey: 'status',
       render: (_, row) => (
         <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
           {STATUS_LABEL[row.status] || row.status}
@@ -317,6 +328,9 @@ const CustomersPage = () => {
           data={customers}
           loading={isLoading}
           emptyMessage="No se encontraron clientes. Crea el primero con 'Nuevo Cliente'."
+          sortBy={custSortBy}
+          sortDir={custSortDir}
+          onSort={custOnSort}
         />
         <Pagination
           page={currentPage}

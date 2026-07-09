@@ -2,7 +2,7 @@ import {
   Eye, PencilSimple, Trash, XCircle, Receipt, CreditCard,
   ArrowCounterClockwise, SealCheck, TrayArrowDown, HourglassMedium,
   ArrowCircleRight, Truck, CheckCircle, Package,
-  Lock, LockOpen, SlidersHorizontal,
+  Lock, LockOpen, SlidersHorizontal, FileCsv,
 } from '@phosphor-icons/react';
 import { Button } from './Button';
 
@@ -139,6 +139,12 @@ export const ToggleLockAction = ({ active, onClick, disabled }) => (
 export const AdjustAction = ({ onClick, disabled, title = 'Ajustar stock' }) => (
   <ActionButton variant="adjust" title={title} onClick={onClick} disabled={disabled}>
     <SlidersHorizontal size={16} />
+  </ActionButton>
+);
+
+export const ExportCsvAction = ({ onClick, disabled, title = 'Exportar CSV' }) => (
+  <ActionButton variant="view" title={title} onClick={onClick} disabled={disabled}>
+    <FileCsv size={16} />
   </ActionButton>
 );
 
