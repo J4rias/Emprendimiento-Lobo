@@ -297,7 +297,7 @@ const InventoryDetailPage = () => {
       </div>
 
       {/* Cards de resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Card variant="compact" className="text-center">
           <Package className="w-8 h-8 text-blue-500 mx-auto mb-2" />
           <p className="text-xs text-gray-500 mb-1">Stock Actual</p>
@@ -318,7 +318,7 @@ const InventoryDetailPage = () => {
             <select
               value={effectiveCurrency}
               onChange={(e) => setSelectedCurrency(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 bg-white"
+              className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-primary-200 bg-white"
             >
               {CURRENCIES.map(c => (
                 <option key={c.code} value={c.code}>{c.code}</option>

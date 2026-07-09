@@ -98,7 +98,7 @@ const POSPageTablet = () => {
                 placeholder="Buscar producto, SKU o código de barras..."
                 value={pos.searchTerm}
                 onChange={(e) => pos.setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-10 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200"
               />
               {pos.searchTerm && (
                 <button
@@ -1095,7 +1095,7 @@ function TabletCreditPinModal({ onClose, onValidated }) {
             onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 6) setPin(v); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
             maxLength={6}
-            className="w-full border border-gray-300 rounded-xl px-4 py-4 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full border border-gray-300 rounded-xl px-4 py-4 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-transparent"
             placeholder="••••"
             disabled={loading}
             autoFocus

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CurrencyDollar,
@@ -8,10 +9,9 @@ import {
   ArrowClockwise,
 } from '@phosphor-icons/react';
 import { supplierService } from '../services/api/supplierService';
-import SupplierLedgerModal from '../components/suppliers/SupplierLedgerModal';
-import { Alert, Button, SearchInput, Spinner, ViewAction } from '../components/ui';
+import { Alert, Button, Card, SearchInput, Spinner, ViewAction } from '../components/ui';
 
-// --- Formatters ---
+// ── Formatters ────────────────────────────────────────────────────────────────
 const fmtUSD = (v) => {
   const val = parseFloat(v) || 0;
   if (Math.abs(val) < 0.01) return '-';
@@ -30,13 +30,13 @@ const fmtVES = (v) => {
   return `Bs ${Math.ceil(val).toLocaleString('es-VE')}`;
 };
 
-// --- Row component ---
+// ── Row ───────────────────────────────────────────────────────────────────────
 const SupplierRow = ({ supplier, bcvRate, onView }) => {
   const { balances } = supplier;
   const vesEquiv = bcvRate ? (balances.USD || 0) * parseFloat(bcvRate) : 0;
 
   return (
-    <tr className="hover:bg-blue-50/40 transition-colors">
+    <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-6 py-3 text-sm font-medium text-gray-900">{supplier.name}</td>
       <td className="px-6 py-3 text-right text-sm font-medium text-blue-700">
         {fmtUSD(balances.USD)}
@@ -53,16 +53,16 @@ const SupplierRow = ({ supplier, bcvRate, onView }) => {
         </td>
       )}
       <td className="px-6 py-3 text-center">
-        <ViewAction onClick={onView} title="Ver detalle" />
+        <ViewAction onClick={onView} title="Ver estado de cuenta" />
       </td>
     </tr>
   );
 };
 
-// --- Main page ---
+// ── Page ──────────────────────────────────────────────────────────────────────
 const SupplierResumenPage = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['supplier-resumen'],
@@ -84,7 +84,7 @@ const SupplierResumenPage = () => {
 
   if (isError) {
     return (
-      <div className="p-6">
+      <div className="space-y-6">
         <Alert variant="error">
           <p className="font-medium mb-2">Error al cargar resumen</p>
           <p className="text-sm mb-3">{error?.message}</p>
@@ -103,28 +103,30 @@ const SupplierResumenPage = () => {
     ? suppliers.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
     : suppliers;
 
-  const usdSuppliers = filtered.filter((s) => Math.abs(s.balances.USD) > 0.01);
+  const usdSuppliers     = filtered.filter((s) => Math.abs(s.balances.USD)     > 0.01);
   const divisasSuppliers = filtered.filter((s) => Math.abs(s.balances.DIVISAS) > 0.01);
-  const copSuppliers = filtered.filter((s) => Math.abs(s.balances.COP) > 0.01);
+  const copSuppliers     = filtered.filter((s) => Math.abs(s.balances.COP)     > 0.01);
+
+  // Totales calculados sobre los proveedores visibles (respetan el filtro de búsqueda)
+  const visibleTotals = {
+    USD:     filtered.reduce((s, p) => s + (p.balances.USD     || 0), 0),
+    DIVISAS: filtered.reduce((s, p) => s + (p.balances.DIVISAS || 0), 0),
+    COP:     filtered.reduce((s, p) => s + (p.balances.COP     || 0), 0),
+  };
+  const visibleVesNeeded = bcv_rate ? visibleTotals.USD * parseFloat(bcv_rate) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Resumen de Proveedores</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Saldos pendientes por categoría de pago · {suppliers.length} proveedores con deuda
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => refetch()}>
-          <ArrowClockwise className="h-4 w-4" />
-          Actualizar
-        </Button>
+      {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Resumen de Proveedores</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Saldos por categoría de pago · {suppliers.length} proveedores con saldo
+        </p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* ── Tarjetas resumen ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Total USD</span>
@@ -136,7 +138,7 @@ const SupplierResumenPage = () => {
 
         <div className="bg-white rounded-xl border border-emerald-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Total Divisas</span>
+            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Total USD Digital</span>
             <Money className="h-5 w-5 text-emerald-500" />
           </div>
           <p className="text-xl font-bold text-emerald-900">{fmtUSD(totals?.DIVISAS)}</p>
@@ -175,7 +177,7 @@ const SupplierResumenPage = () => {
         </div>
       </div>
 
-      {/* Search */}
+      {/* ── Búsqueda ──────────────────────────────────────────────────────────── */}
       <SearchInput
         value={search}
         onChange={setSearch}
@@ -183,8 +185,8 @@ const SupplierResumenPage = () => {
         className="max-w-sm"
       />
 
-      {/* Main Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* ── Tabla ─────────────────────────────────────────────────────────────── */}
+      <Card variant="flat" className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead>
@@ -196,7 +198,7 @@ const SupplierResumenPage = () => {
                   USD
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wider">
-                  Divisas
+                  USD Digital
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-amber-600 uppercase tracking-wider">
                   COP
@@ -206,7 +208,7 @@ const SupplierResumenPage = () => {
                     Equiv. Bs
                   </th>
                 )}
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-16" />
+                <th className="px-6 py-3 w-16" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -221,19 +223,34 @@ const SupplierResumenPage = () => {
                   {copSuppliers
                     .sort((a, b) => b.balances.COP - a.balances.COP)
                     .map((s) => (
-                      <SupplierRow key={`cop-${s.id}`} supplier={s} bcvRate={bcv_rate} onView={() => setSelectedSupplier(s)} />
+                      <SupplierRow
+                        key={`cop-${s.id}`}
+                        supplier={s}
+                        bcvRate={bcv_rate}
+                        onView={() => navigate(`/proveedores/${s.id}/estado-cuenta`)}
+                      />
                     ))}
                   {usdSuppliers
                     .filter((s) => !copSuppliers.some((c) => c.id === s.id))
                     .sort((a, b) => b.balances.USD - a.balances.USD)
                     .map((s) => (
-                      <SupplierRow key={`usd-${s.id}`} supplier={s} bcvRate={bcv_rate} onView={() => setSelectedSupplier(s)} />
+                      <SupplierRow
+                        key={`usd-${s.id}`}
+                        supplier={s}
+                        bcvRate={bcv_rate}
+                        onView={() => navigate(`/proveedores/${s.id}/estado-cuenta`)}
+                      />
                     ))}
                   {divisasSuppliers
                     .filter((s) => !copSuppliers.some((c) => c.id === s.id) && !usdSuppliers.some((u) => u.id === s.id))
                     .sort((a, b) => b.balances.DIVISAS - a.balances.DIVISAS)
                     .map((s) => (
-                      <SupplierRow key={`div-${s.id}`} supplier={s} bcvRate={bcv_rate} onView={() => setSelectedSupplier(s)} />
+                      <SupplierRow
+                        key={`div-${s.id}`}
+                        supplier={s}
+                        bcvRate={bcv_rate}
+                        onView={() => navigate(`/proveedores/${s.id}/estado-cuenta`)}
+                      />
                     ))}
                 </>
               )}
@@ -242,11 +259,11 @@ const SupplierResumenPage = () => {
               <tfoot>
                 <tr className="bg-gray-800 text-white">
                   <td className="px-6 py-3 text-sm font-bold uppercase">Totales</td>
-                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtUSD(totals?.USD)}</td>
-                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtUSD(totals?.DIVISAS)}</td>
-                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtCOP(totals?.COP)}</td>
+                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtUSD(visibleTotals.USD)}</td>
+                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtUSD(visibleTotals.DIVISAS)}</td>
+                  <td className="px-6 py-3 text-right text-sm font-bold">{fmtCOP(visibleTotals.COP)}</td>
                   {bcv_rate && (
-                    <td className="px-6 py-3 text-right text-sm font-bold">{fmtVES(ves_needed)}</td>
+                    <td className="px-6 py-3 text-right text-sm font-bold">{fmtVES(visibleVesNeeded)}</td>
                   )}
                   <td className="px-6 py-3" />
                 </tr>
@@ -254,18 +271,11 @@ const SupplierResumenPage = () => {
             )}
           </table>
         </div>
-      </div>
+      </Card>
 
       <p className="text-xs text-gray-400 text-center">
-        USD = facturas en dólares pagadas en bolívares (BCV) · Divisas = pagos directos en USD (Zelle) · COP = pesos colombianos
+        USD = facturas en dólares pagadas en bolívares (BCV) · USD Digital = pagos en USD (Zelle, USDT, transferencia) · COP = pesos colombianos
       </p>
-
-      {selectedSupplier && (
-        <SupplierLedgerModal
-          supplier={selectedSupplier}
-          onClose={() => setSelectedSupplier(null)}
-        />
-      )}
     </div>
   );
 };

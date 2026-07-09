@@ -110,7 +110,7 @@ const InventoryAdjustPage = () => {
 
   if (error && !inventory) {
     return (
-      <div className="p-6">
+      <div className="space-y-6">
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
           <p className="font-medium">Error</p>
           <p className="text-sm">{error}</p>
@@ -120,9 +120,9 @@ const InventoryAdjustPage = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4">
         <button
           onClick={() => navigate(`/inventario/${id}`)}
           className="p-2 hover:bg-gray-100 rounded-lg"
@@ -136,9 +136,9 @@ const InventoryAdjustPage = () => {
       </div>
 
       {/* Product Info */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Producto</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Nombre</p>
             <p className="font-medium">{inventory.product.name}</p>
@@ -234,7 +234,7 @@ const InventoryAdjustPage = () => {
               Presentación del Producto *
             </label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
               value={selectedPresentation || ''}
               onChange={(e) => setSelectedPresentation(e.target.value ? parseInt(e.target.value) : null)}
               required
@@ -300,7 +300,7 @@ const InventoryAdjustPage = () => {
                 </button>
                 <input
                   type="number"
-                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-primary-200"
                   value={packageQuantity}
                   onChange={(e) => setPackageQuantity(Math.max(0, parseInt(e.target.value) || 0))}
                   min="0"
@@ -327,7 +327,7 @@ const InventoryAdjustPage = () => {
             </label>
             <input
               type="number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
               value={looseUnits}
               onChange={(e) => setLooseUnits(Math.max(0, parseFloat(e.target.value) || 0))}
               min="0"

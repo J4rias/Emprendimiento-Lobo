@@ -186,7 +186,7 @@ const DailyReportPage = () => {
                         <select
                             value={filters.user_id}
                             onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-48"
+                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-48"
                         >
                             <option value="">Todos los cajeros</option>
                             {users.map(u => (
@@ -199,7 +199,7 @@ const DailyReportPage = () => {
                         type="date"
                         value={filters.date}
                         onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
-                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
+                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-auto"
                     />
 
                     <button

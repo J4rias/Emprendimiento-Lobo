@@ -249,7 +249,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                       <select
                         value={presentation.packaging_type_id || ''}
                         onChange={(e) => updatePresentation(index, 'packaging_type_id', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         <option value="">Sin empaque</option>
                         {packagingTypes.map((type) => (
@@ -268,7 +268,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                       <select
                         value={presentation.presentation_type_id || ''}
                         onChange={(e) => updatePresentation(index, 'presentation_type_id', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         <option value="">Sin tipo</option>
                         {presentationTypes.map((type) => (
@@ -290,7 +290,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         step="1"
                         value={presentation.units_per_package}
                         onChange={(e) => updatePresentation(index, 'units_per_package', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                         required
                       />
                     )}
@@ -310,7 +310,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         min="0"
                         value={presentation.package_price || ''}
                         onChange={(e) => updatePresentation(index, 'package_price', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       />
                     )}
                   </div>
@@ -329,7 +329,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         min="0"
                         value={presentation.package_cost || ''}
                         onChange={(e) => updatePresentation(index, 'package_cost', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       />
                     )}
                     {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
@@ -348,7 +348,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                       <select
                         value={presentation.purchase_currency}
                         onChange={(e) => updatePresentation(index, 'purchase_currency', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         {currencies.map((curr) => (
                           <option key={curr.code} value={curr.code}>
@@ -367,7 +367,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                           type="checkbox"
                           checked={presentation.is_active}
                           onChange={(e) => updatePresentation(index, 'is_active', e.target.checked)}
-                          className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-primary-200"
                         />
                         <span className="text-sm text-gray-700">Activa</span>
                       </label>

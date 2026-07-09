@@ -482,7 +482,7 @@ const PriceListsPage = () => {
                                     type="text"
                                     value={detailSearch}
                                     onChange={e => setDetailSearch(e.target.value)}
-                                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent text-sm"
                                     placeholder="Buscar producto..."
                                 />
                                 {detailSearch && (
@@ -567,7 +567,7 @@ const PriceListsPage = () => {
                                                                                 : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
                                                                             }
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                     <div className="text-gray-500 font-medium text-[11px]">
@@ -596,7 +596,7 @@ const PriceListsPage = () => {
                                                                             min="0"
                                                                             value={d.package_price || ''}
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                 </>
@@ -610,7 +610,7 @@ const PriceListsPage = () => {
                                                             min="0"
                                                             value={d.package_price_usd || ''}
                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
-                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">

@@ -42,6 +42,7 @@ const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivab
 const ARCustomerDetailPage         = lazy(() => import('./pages/ARCustomerDetailPage'));
 const CatalogPage                  = lazy(() => import('./pages/CatalogPage'));
 const PreOrdersPage                = lazy(() => import('./pages/PreOrdersPage'));
+const SupplierStatementPage        = lazy(() => import('./pages/SupplierStatementPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-[400px] flex items-center justify-center">
@@ -246,6 +247,16 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <SuppliersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/proveedores/:id/estado-cuenta"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SupplierStatementPage />
             </AppLayout>
           </PrivateRoute>
         }

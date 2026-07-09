@@ -131,7 +131,7 @@ const LoginPage = () => {
                 placeholder="Ingresa tu usuario"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400
                            text-sm outline-none transition
-                           focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                           focus:border-primary-500 focus:ring-2 focus:ring-primary-200
                            hover:border-gray-300"
               />
             </div>
@@ -153,7 +153,7 @@ const LoginPage = () => {
                   placeholder="Ingresa tu contraseña"
                   className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400
                              text-sm outline-none transition
-                             focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                             focus:border-primary-500 focus:ring-2 focus:ring-primary-200
                              hover:border-gray-300"
                 />
                 <button
@@ -175,7 +175,7 @@ const LoginPage = () => {
                          bg-blue-600 hover:bg-blue-700 active:bg-blue-800
                          text-white text-sm font-semibold
                          transition-all duration-150
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                         focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-2
                          disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600
                          shadow-sm hover:shadow-md"
             >

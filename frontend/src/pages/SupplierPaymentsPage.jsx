@@ -18,7 +18,7 @@ import {
 import { PaymentTable } from '../components/supplierPayments/PaymentTable';
 import { PaymentFormModal } from '../components/supplierPayments/PaymentFormModal';
 import { PaymentEditModal } from '../components/supplierPayments/PaymentEditModal';
-import { PaymentViewModal } from '../components/supplierPayments/PaymentViewModal';
+import { PaymentViewSheet } from '../components/supplierPayments/PaymentViewSheet';
 import { SupplierBalanceSummary } from '../components/supplierPayments/SupplierBalanceSummary';
 
 // ── Opciones de filtro de método de pago ─────────────────────────────────────
@@ -54,9 +54,8 @@ const SupplierPaymentsPage = () => {
 
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [viewingPayment, setViewingPayment] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
 
@@ -127,6 +126,7 @@ const SupplierPaymentsPage = () => {
     queryClient.invalidateQueries({ queryKey: ['supplier-payments'] });
     queryClient.invalidateQueries({ queryKey: ['supplier-payment-stats'] });
     queryClient.invalidateQueries({ queryKey: ['supplier-payable-balance'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier-resumen'] });
   };
 
   const createMutation = useMutation({
@@ -187,9 +187,9 @@ const SupplierPaymentsPage = () => {
   );
 
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
-      <div className="mb-6">
+      <div>
         <h1 className="text-2xl font-bold text-gray-800">Pagos a Proveedores</h1>
         <p className="text-gray-500 mt-1">Gestión de pagos realizados a proveedores</p>
       </div>
@@ -203,7 +203,7 @@ const SupplierPaymentsPage = () => {
 
       {/* ── Stats (solo con proveedor seleccionado) ───────────────────────────── */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Card variant="compact" className="bg-blue-50 border-blue-100">
             <div className="flex items-center justify-between">
               <div>
@@ -253,7 +253,7 @@ const SupplierPaymentsPage = () => {
       )}
 
       {/* ── Filtros ───────────────────────────────────────────────────────────── */}
-      <Card variant="flat" className="mb-6">
+      <Card variant="flat">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <SearchInput
@@ -303,7 +303,7 @@ const SupplierPaymentsPage = () => {
           sortBy={sortBy}
           sortDir={sortDir}
           onSort={onSort}
-          onView={(p) => { setViewingPayment(p); setShowViewModal(true); }}
+          onView={(p) => setViewingPayment(p)}
           onEdit={(p) => { setEditingPayment(p); setShowEditModal(true); }}
           onCancel={(p) => setCancelTarget(p)}
         />
@@ -335,10 +335,10 @@ const SupplierPaymentsPage = () => {
         isPending={updateMutation.isPending}
       />
 
-      <PaymentViewModal
+      <PaymentViewSheet
         payment={viewingPayment}
-        open={showViewModal}
-        onClose={() => { setShowViewModal(false); setViewingPayment(null); }}
+        open={!!viewingPayment}
+        onClose={() => setViewingPayment(null)}
       />
 
       <ConfirmDialog

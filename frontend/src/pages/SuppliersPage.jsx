@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
 import {
@@ -9,7 +10,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supplierService } from '../services/api/supplierService';
 import SupplierContactManager from '../components/suppliers/SupplierContactManager';
-import SupplierStatementModal from '../components/suppliers/SupplierStatementModal';
 import SupplierViewSheet from '../components/suppliers/SupplierViewSheet';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal,
@@ -31,6 +31,7 @@ const emptyForm = () => ({
 
 const SuppliersPage = () => {
   const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [limit, setLimit] = useTableLimit();
 
@@ -42,7 +43,6 @@ const SuppliersPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [viewingSupplier, setViewingSupplier] = useState(null);
-  const [statementSupplier, setStatementSupplier] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
 
@@ -183,7 +183,7 @@ const SuppliersPage = () => {
       render: (_, row) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => setViewingSupplier(row)} />
-          <StatementAction onClick={() => setStatementSupplier(row)} />
+          <StatementAction onClick={() => navigate(`/proveedores/${row.id}/estado-cuenta`)} />
           {hasPermission('suppliers.update') && row.is_active && (
             <EditAction onClick={() => handleEdit(row)} />
           )}
@@ -291,14 +291,6 @@ const SuppliersPage = () => {
         onEdit={() => { handleEdit(viewingSupplier); setViewingSupplier(null); }}
         hasPermission={hasPermission}
       />
-
-      {/* ── Estado de cuenta ──────────────────────────────────────────────────── */}
-      {statementSupplier && (
-        <SupplierStatementModal
-          supplier={statementSupplier}
-          onClose={() => setStatementSupplier(null)}
-        />
-      )}
 
       {/* ── Confirmar eliminación ─────────────────────────────────────────────── */}
       <ConfirmDialog

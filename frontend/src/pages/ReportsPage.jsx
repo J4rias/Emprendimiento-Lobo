@@ -433,7 +433,7 @@ const ReportsPage = () => {
     switch (reportType) {
       case 'sales':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Ventas" value={stats.total_sales} />
             <StatCard label="Monto Total" value={`COP ${fmtCOP(stats.total_amount_cop)}`} />
             <StatCard label="Ticket Promedio" value={`COP ${fmtCOP(stats.average_ticket_cop)}`} />
@@ -441,13 +441,13 @@ const ReportsPage = () => {
         );
       case 'inventory':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Items" value={stats.total_items} />
           </div>
         );
       case 'purchases':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Órdenes" value={stats.total_orders} />
             <StatCard label="Monto Total" value={`$ ${parseFloat(stats.total_amount || 0).toFixed(2)}`} />
             <StatCard label="Promedio por Orden" value={`$ ${parseFloat(stats.average_order || 0).toFixed(2)}`} />
@@ -455,7 +455,7 @@ const ReportsPage = () => {
         );
       case 'top_products':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Productos" value={stats.total_products} />
             <StatCard label="Unidades Vendidas" value={stats.total_units_sold} />
             <StatCard label="Ingresos Totales" value={`$ ${parseFloat(stats.total_revenue || 0).toFixed(2)}`} />
@@ -463,7 +463,7 @@ const ReportsPage = () => {
         );
       case 'product_sales':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Productos" value={stats.total_products} />
             <StatCard label="Total Unidades" value={stats.total_units} />
             <StatCard label="Total USD" value={`$ ${parseFloat(stats.total_usd || 0).toFixed(2)}`} />
@@ -472,7 +472,7 @@ const ReportsPage = () => {
         );
       case 'low_stock':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <Card variant="compact">
               <p className="text-sm text-gray-600 mb-1">Items Críticos</p>
               <p className="text-2xl font-bold text-red-600">{stats.critical_items}</p>
@@ -681,7 +681,7 @@ const ReportsPage = () => {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
         <p className="text-gray-600 mt-1">Genera y exporta reportes del sistema</p>

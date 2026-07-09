@@ -107,7 +107,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                   placeholder="Buscar por nombre, documento o teléfono..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
                 />
               </div>
 

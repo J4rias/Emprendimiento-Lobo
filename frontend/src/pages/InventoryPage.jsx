@@ -436,7 +436,7 @@ const InventoryPage = () => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card
           variant="compact"
           className="cursor-pointer hover:shadow-md transition-shadow"
@@ -583,7 +583,7 @@ const InventoryPage = () => {
                   type="checkbox"
                   checked={filters[key]}
                   onChange={(e) => setFilters(f => ({ ...f, [key]: e.target.checked }))}
-                  className="rounded text-blue-600 focus:ring-blue-500"
+                  className="rounded text-blue-600 focus:ring-primary-200"
                 />
                 <span className="text-sm text-gray-700">{label}</span>
               </label>
@@ -657,7 +657,7 @@ const InventoryPage = () => {
                             if (e.key === 'Enter') inputRefs.current[`${item.id}-unidades`]?.focus();
                           }}
                           ref={(el) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
-                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
                       <td className="px-6 py-3 text-center bg-blue-50/20">
@@ -670,7 +670,7 @@ const InventoryPage = () => {
                             if (e.key === 'Enter' && nextItem) inputRefs.current[`${nextItem.id}-bultos`]?.focus();
                           }}
                           ref={(el) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
-                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
                       <td className="px-6 py-3 text-center">

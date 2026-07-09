@@ -92,7 +92,7 @@ const POSPage = () => {
                 placeholder="Busca por nombre, SKU o código de barras... (F2)"
                 value={pos.searchTerm}
                 onChange={(e) => pos.setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
               />
               {pos.searchTerm && (
                 <button
@@ -566,7 +566,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
               max="100"
               value={item.discount_percent || 0}
               onChange={(e) => onDiscountChange(item.product_id, item.presentation_id, item.sellByUnit || false, parseFloat(e.target.value) || 0)}
-              className="w-12 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-blue-500"
+              className="w-12 text-right bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-primary-200"
             />
             <span className="text-gray-400">%</span>
           </div>
@@ -1061,7 +1061,7 @@ function CreditPinModal({ onClose, onValidated }) {
             onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 6) setPin(v); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
             maxLength={6}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-transparent"
             placeholder="••••"
             disabled={loading}
             autoFocus

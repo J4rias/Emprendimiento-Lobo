@@ -290,9 +290,9 @@ const PurchaseOrdersPage = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 mb-1">Órdenes de Compra</h1>
           <p className="text-gray-500">Gestiona las órdenes de compra a proveedores</p>
@@ -316,7 +316,7 @@ const PurchaseOrdersPage = () => {
 
       {/* Stats cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Total Órdenes</span>
@@ -358,7 +358,7 @@ const PurchaseOrdersPage = () => {
       )}
 
       {/* Filters */}
-      <Card variant="flat" className="mb-6">
+      <Card variant="flat" >
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <SearchInput

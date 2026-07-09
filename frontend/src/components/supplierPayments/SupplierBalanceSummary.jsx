@@ -8,12 +8,12 @@ export function SupplierBalanceSummary({ summary }) {
   if (!summary || Object.keys(summary).length === 0) return null;
 
   return (
-    <Card variant="flat" className="mb-6 border-l-4 border-primary-500">
+    <Card variant="flat" className="border-l-4 border-primary-500">
       <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
         <FileText className="w-5 h-5 text-primary-500" />
         Estado de Cuenta del Proveedor
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(summary).map(([currency, data]) => (
           <div key={currency} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
             <div className="text-sm font-bold text-gray-700 mb-2 border-b pb-1">{currency}</div>

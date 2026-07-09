@@ -17,7 +17,7 @@ import { useCompany } from '../context/CompanyContext';
 import SaleReturnModal from '../components/sales/SaleReturnModal';
 import SaleViewSheet from '../components/sales/SaleViewSheet';
 import {
-  Alert, Badge, Button, Card, Modal,
+  Alert, Badge, Button, Card, Input, Modal,
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
   ViewAction, PaymentAction, ReturnAction, CancelAction,
 } from '../components/ui';
@@ -385,16 +385,16 @@ const SalesPage = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-1">Gestión de Ventas</h1>
-        <p className="text-gray-500">Administra y consulta todas las ventas realizadas</p>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">Gestión de Ventas</h1>
+        <p className="text-gray-500 mt-1">Administra y consulta todas las ventas realizadas</p>
       </div>
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card variant="compact">
             <div className="flex items-center justify-between">
               <div>
@@ -451,7 +451,7 @@ const SalesPage = () => {
       )}
 
       {/* Filters */}
-      <Card variant="flat" className="mb-6">
+      <Card variant="flat">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <SearchInput
@@ -562,7 +562,7 @@ const SalesPage = () => {
                   step="1"
                   value={paymentData.amount_cop}
                   onChange={(e) => setPaymentData(p => ({ ...p, amount_cop: e.target.value }))}
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-lg"
+                  className="w-full pl-8 pr-4 h-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 font-medium text-lg"
                   placeholder="0"
                 />
               </div>
@@ -579,16 +579,13 @@ const SalesPage = () => {
                 <option value="card">Tarjeta / Punto</option>
                 <option value="transfer">Transferencia</option>
               </Select>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Referencia</label>
-                <input
-                  type="text"
-                  value={paymentData.reference}
-                  onChange={(e) => setPaymentData(p => ({ ...p, reference: e.target.value }))}
-                  className="w-full h-9 px-3 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="Ej. #12345"
-                />
-              </div>
+              <Input
+                label="Referencia"
+                type="text"
+                value={paymentData.reference}
+                onChange={(e) => setPaymentData(p => ({ ...p, reference: e.target.value }))}
+                placeholder="Ej. #12345"
+              />
             </div>
 
             <Textarea
@@ -603,7 +600,7 @@ const SalesPage = () => {
               <Button type="button" variant="secondary" onClick={() => setPaymentSale(null)} disabled={paymentMutation.isPending}>
                 Cancelar
               </Button>
-              <Button type="submit" loading={paymentMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button type="submit" variant="success" loading={paymentMutation.isPending}>
                 <CreditCard className="w-4 h-4" /> Registrar Abono
               </Button>
             </div>
@@ -635,8 +632,7 @@ const SalesPage = () => {
               Cerrar
             </Button>
             <Button
-              variant="ghost"
-              className="text-red-600 hover:bg-red-50"
+              variant="danger-outline"
               onClick={() => cancelMutation.mutate({ id: cancelSaleId, reason: cancelReason.trim() })}
               loading={cancelMutation.isPending}
               disabled={!cancelReason.trim()}

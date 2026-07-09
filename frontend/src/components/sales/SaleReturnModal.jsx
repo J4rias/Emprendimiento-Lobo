@@ -239,7 +239,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                                     value={item.returnQuantity === 0 ? '' : item.returnQuantity}
                                                     onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                                                     placeholder="0"
-                                                    className="w-20 px-2 py-1 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    className="w-20 px-2 py-1 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
                                                 />
                                                 <button
                                                     type="button"
@@ -305,7 +305,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                 required
                                 value={refundMethod}
                                 onChange={(e) => setRefundMethod(e.target.value)}
-                                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-medium text-blue-900 bg-blue-50"
+                                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-primary-200 focus:border-primary-500 font-medium text-blue-900 bg-blue-50"
                             >
                                 <option value="credit_balance" disabled={!sale?.customer_id}>💰 Monedero (Saldo a Favor del Cliente){!sale?.customer_id ? ' — N/A Consumidor Final' : ''}</option>
                                 <option value="cash">💵 Entregar Efectivo Físico</option>

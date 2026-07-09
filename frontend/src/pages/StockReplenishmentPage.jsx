@@ -202,7 +202,7 @@ const StockReplenishmentPage = () => {
           <select
             value={warehouseId}
             onChange={(e) => setWarehouseId(Number(e.target.value))}
-            className="w-full px-4 py-3 bg-white text-gray-900 rounded-lg text-lg font-medium focus:ring-2 focus:ring-blue-300"
+            className="w-full px-4 py-3 bg-white text-gray-900 rounded-lg text-lg font-medium focus:ring-2 focus:ring-primary-200"
             disabled={!scanMode}
           >
             {warehouses.map(warehouse => (
@@ -313,7 +313,7 @@ const StockReplenishmentPage = () => {
                   onChange={(e) => setBarcode(e.target.value)}
                   onKeyPress={handleBarcodeInput}
                   placeholder="Código de barras..."
-                  className="w-full px-4 py-4 text-xl text-center border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-4 text-xl text-center border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent"
                   autoFocus
                 />
 
@@ -354,7 +354,7 @@ const StockReplenishmentPage = () => {
                     Presentación del Producto *
                   </label>
                   <select
-                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-200 focus:border-transparent"
                     value={selectedPresentation || ''}
                     onChange={(e) => setSelectedPresentation(e.target.value ? parseInt(e.target.value) : null)}
                     required
@@ -396,7 +396,7 @@ const StockReplenishmentPage = () => {
                     </button>
                     <input
                       type="number"
-                      className="flex-1 text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500"
+                      className="flex-1 text-center text-3xl font-bold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-200"
                       value={packageQuantity}
                       onChange={(e) => setPackageQuantity(Math.max(0, parseInt(e.target.value) || 0))}
                       min="0"
@@ -432,7 +432,7 @@ const StockReplenishmentPage = () => {
                   </button>
                   <input
                     type="number"
-                    className="flex-1 text-center text-2xl font-semibold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500"
+                    className="flex-1 text-center text-2xl font-semibold py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-200"
                     value={looseUnits}
                     onChange={(e) => setLooseUnits(Math.max(0, parseFloat(e.target.value) || 0))}
                     min="0"

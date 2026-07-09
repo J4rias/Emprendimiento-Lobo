@@ -268,9 +268,9 @@ const DeliveriesPage = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Entregas</h1>
           <p className="text-gray-500 mt-1">Gestión de entregas a clientes</p>
@@ -286,7 +286,7 @@ const DeliveriesPage = () => {
 
       {/* Stats cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
             <div className="flex items-center justify-between">
               <div>
@@ -329,7 +329,7 @@ const DeliveriesPage = () => {
       )}
 
       {/* Filters */}
-      <Card variant="flat" className="mb-6">
+      <Card variant="flat" >
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <SearchInput

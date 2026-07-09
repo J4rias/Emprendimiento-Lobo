@@ -193,9 +193,9 @@ const CreditNoteCreatePage = () => {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
-      <div className="mb-6">
+      <div>
         <Button variant="ghost" onClick={() => navigate('/credit-notes')} className="mb-4 -ml-2">
           <ArrowLeft className="w-4 h-4" /> Volver a Notas de Crédito
         </Button>
@@ -211,7 +211,7 @@ const CreditNoteCreatePage = () => {
       )}
 
       {/* ── Buscar venta ──────────────────────────────────────────────────────── */}
-      <Card className="mb-6">
+      <Card>
         <h2 className="text-base font-semibold text-gray-900 mb-4">Buscar Venta</h2>
         <div className="flex gap-3">
           <div className="flex-1">
@@ -257,7 +257,7 @@ const CreditNoteCreatePage = () => {
 
           <form onSubmit={handleSubmit}>
             {/* ── Información de la devolución ── */}
-            <Card className="mb-6">
+            <Card>
               <h2 className="text-base font-semibold text-gray-900 mb-4">Información de la Devolución</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select label="Motivo *" value={formData.reason} onChange={set('reason')} required>
@@ -348,7 +348,7 @@ const CreditNoteCreatePage = () => {
                               type="checkbox"
                               checked={item.selected}
                               onChange={() => toggleItemSelection(index)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-primary-200"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -390,7 +390,7 @@ const CreditNoteCreatePage = () => {
                               checked={item.return_to_stock}
                               onChange={(e) => updateReturnItem(index, 'return_to_stock', e.target.checked)}
                               disabled={!item.selected}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-primary-200 disabled:opacity-50"
                             />
                           </td>
                         </tr>

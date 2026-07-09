@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatMoney } from '../utils/formatUtils';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
@@ -20,6 +20,7 @@ const ORDER_STATUS_LABEL = {
 const PurchaseOrderReceivePage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const queryClient = useQueryClient();
 
   const [validationError, setValidationError] = useState(null);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -70,6 +71,7 @@ const PurchaseOrderReceivePage = () => {
     mutationFn: (data) => purchaseOrderService.receive(id, data),
     onSuccess: () => {
       toast.success('Mercancía recibida correctamente');
+      queryClient.invalidateQueries({ queryKey: ['supplier-resumen'] });
       navigate('/purchase-orders');
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Error al recibir la mercancía'),
@@ -150,7 +152,7 @@ const PurchaseOrderReceivePage = () => {
   if (isError || !order) return null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <Button
@@ -185,7 +187,7 @@ const PurchaseOrderReceivePage = () => {
 
       {/* Order Info */}
       <Card className="bg-blue-50 border-blue-200">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <p className="text-sm text-blue-700">Fecha de Orden</p>
             <p className="font-medium text-blue-900">
@@ -295,7 +297,7 @@ const PurchaseOrderReceivePage = () => {
                           type="number" min="0" max={item.pending_packages}
                           value={item.receiving_packages}
                           onChange={(e) => updateReceivingItem(index, 'receiving_packages', e.target.value)}
-                          className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"
+                          className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100"
                           disabled={item.pending_packages === 0}
                         />
                         <span className="text-sm font-medium text-gray-600">pqte</span>
@@ -306,7 +308,7 @@ const PurchaseOrderReceivePage = () => {
                           type="number" min="0" max={item.pending_units}
                           value={item.receiving_units}
                           onChange={(e) => updateReceivingItem(index, 'receiving_units', e.target.value)}
-                          className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"
+                          className="w-20 px-3 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100"
                           disabled={item.pending_units === 0}
                         />
                         <span className="text-sm font-medium text-gray-600">unids</span>

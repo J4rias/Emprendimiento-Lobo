@@ -166,9 +166,9 @@ const UsersPage = () => {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Usuarios</h1>
           <p className="text-gray-500 mt-1">Gestiona los usuarios del sistema</p>
@@ -188,7 +188,7 @@ const UsersPage = () => {
       )}
 
       {/* ── Filtros ───────────────────────────────────────────────────────────── */}
-      <Card variant="flat" className="mb-6">
+      <Card variant="flat" >
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <SearchInput
