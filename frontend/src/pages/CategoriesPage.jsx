@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Edit, Trash2, Tag, Package } from 'lucide-react';
+import { Plus, Tag, Package } from '@phosphor-icons/react';
 import { categoryService } from '../services/api/categoryService';
 import {
   Button,
   Alert,
   Card,
+  EditAction,
+  DeleteAction,
   EmptyState,
   Skeleton,
   ConfirmDialog,
@@ -189,23 +191,8 @@ const CategoriesPage = () => {
                 </div>
                 {hasPermission('products.create') && (
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleOpenModal(category)}
-                      title="Editar"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleDelete(category)}
-                      title="Eliminar"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <EditAction onClick={() => handleOpenModal(category)} />
+                    <DeleteAction onClick={() => handleDelete(category)} />
                   </div>
                 )}
               </div>
@@ -231,7 +218,7 @@ const CategoriesPage = () => {
         onLimitChange={(newLimit) => { setLimit(newLimit); setCurrentPage(1); }}
       />
 
-      {/* Create/Edit Modal */}
+      {/* Create/PencilSimple Modal */}
       <Modal
         open={showModal}
         onClose={handleCloseModal}

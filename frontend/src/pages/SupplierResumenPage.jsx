@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  DollarSign,
-  Banknote,
-  Landmark,
-  TrendingDown,
-  Eye,
-  RefreshCw,
-} from 'lucide-react';
+  CurrencyDollar,
+  Money,
+  Bank,
+  TrendDown,
+  ArrowClockwise,
+} from '@phosphor-icons/react';
 import { supplierService } from '../services/api/supplierService';
 import SupplierLedgerModal from '../components/suppliers/SupplierLedgerModal';
-import { Alert, Button, SearchInput, Spinner } from '../components/ui';
+import { Alert, Button, SearchInput, Spinner, ViewAction } from '../components/ui';
 
 // --- Formatters ---
 const fmtUSD = (v) => {
@@ -54,14 +53,7 @@ const SupplierRow = ({ supplier, bcvRate, onView }) => {
         </td>
       )}
       <td className="px-6 py-3 text-center">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onView}
-          title="Ver detalle"
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
+        <ViewAction onClick={onView} title="Ver detalle" />
       </td>
     </tr>
   );
@@ -97,7 +89,7 @@ const SupplierResumenPage = () => {
           <p className="font-medium mb-2">Error al cargar resumen</p>
           <p className="text-sm mb-3">{error?.message}</p>
           <Button size="sm" variant="secondary" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
+            <ArrowClockwise className="h-4 w-4" />
             Reintentar
           </Button>
         </Alert>
@@ -126,7 +118,7 @@ const SupplierResumenPage = () => {
           </p>
         </div>
         <Button variant="secondary" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
+          <ArrowClockwise className="h-4 w-4" />
           Actualizar
         </Button>
       </div>
@@ -136,7 +128,7 @@ const SupplierResumenPage = () => {
         <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Total USD</span>
-            <DollarSign className="h-5 w-5 text-blue-500" />
+            <CurrencyDollar className="h-5 w-5 text-blue-500" />
           </div>
           <p className="text-xl font-bold text-blue-900">{fmtUSD(totals?.USD)}</p>
           <p className="text-xs text-blue-500 mt-1">{usdSuppliers.length} proveedor{usdSuppliers.length !== 1 ? 'es' : ''}</p>
@@ -145,7 +137,7 @@ const SupplierResumenPage = () => {
         <div className="bg-white rounded-xl border border-emerald-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Total Divisas</span>
-            <Banknote className="h-5 w-5 text-emerald-500" />
+            <Money className="h-5 w-5 text-emerald-500" />
           </div>
           <p className="text-xl font-bold text-emerald-900">{fmtUSD(totals?.DIVISAS)}</p>
           <p className="text-xs text-emerald-500 mt-1">{divisasSuppliers.length} proveedor{divisasSuppliers.length !== 1 ? 'es' : ''}</p>
@@ -154,7 +146,7 @@ const SupplierResumenPage = () => {
         <div className="bg-white rounded-xl border border-amber-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Total COP</span>
-            <Landmark className="h-5 w-5 text-amber-500" />
+            <Bank className="h-5 w-5 text-amber-500" />
           </div>
           <p className="text-xl font-bold text-amber-900">{fmtCOP(totals?.COP)}</p>
           <p className="text-xs text-amber-500 mt-1">{copSuppliers.length} proveedor{copSuppliers.length !== 1 ? 'es' : ''}</p>
@@ -163,7 +155,7 @@ const SupplierResumenPage = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tasa BCV</span>
-            <TrendingDown className="h-5 w-5 text-gray-500" />
+            <TrendDown className="h-5 w-5 text-gray-500" />
           </div>
           <p className="text-xl font-bold text-gray-900">
             {bcv_rate
@@ -176,7 +168,7 @@ const SupplierResumenPage = () => {
         <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">Bs Necesarios</span>
-            <Banknote className="h-5 w-5 text-red-500" />
+            <Money className="h-5 w-5 text-red-500" />
           </div>
           <p className="text-lg font-bold text-red-900">{fmtVES(ves_needed)}</p>
           <p className="text-xs text-red-500 mt-1">Para cubrir deuda USD</p>

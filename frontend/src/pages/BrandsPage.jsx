@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api/axios';
-import { Plus, Edit2, Trash2, Building2, Globe, Eye } from 'lucide-react';
+import { Plus, Buildings, Globe } from '@phosphor-icons/react';
 import ImageUpload from '../components/common/ImageUpload';
 import {
   Button,
@@ -16,7 +16,9 @@ import {
   SearchInput,
   Table,
   useTableLimit,
+  ViewAction, EditAction, DeleteAction,
 } from '../components/ui';
+import BrandViewSheet from '../components/brands/BrandViewSheet';
 
 const BrandsPage = () => {
   const queryClient = useQueryClient();
@@ -132,7 +134,7 @@ const BrandsPage = () => {
           {brand.logo_url ? (
             <img src={brand.logo_url} alt={brand.name} className="max-h-10 w-10 mr-3 object-cover" />
           ) : (
-            <Building2 className="h-10 w-10 text-gray-400 mr-3" />
+            <Buildings className="h-10 w-10 text-gray-400 mr-3" />
           )}
           <div className="text-sm font-medium text-gray-900">{brand.name}</div>
         </div>
@@ -174,22 +176,10 @@ const BrandsPage = () => {
       className: 'text-right',
       render: (_, brand) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => handleView(brand)} title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(brand)} title="Editar">
-            <Edit2 className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => handleView(brand)} />
+          <EditAction onClick={() => handleEdit(brand)} />
           {brand.is_active && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => handleDelete(brand.id)}
-              title="Eliminar"
-              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <DeleteAction onClick={() => handleDelete(brand.id)} />
           )}
         </div>
       ),
@@ -232,7 +222,7 @@ const BrandsPage = () => {
           columns={columns}
           data={brands}
           loading={loading}
-          emptyIcon={Building2}
+          emptyIcon={Buildings}
           emptyMessage="No se encontraron marcas"
           emptyDescription={searchTerm ? 'Intenta con otra búsqueda' : 'Crea tu primera marca'}
           emptyAction={!searchTerm ? (
@@ -321,72 +311,13 @@ const BrandsPage = () => {
         </form>
       </Modal>
 
-      {/* View Modal */}
-      <Modal
+      {/* View Sheet */}
+      <BrandViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingBrand(null); }}
-        title="Detalles de la Marca"
-        size="md"
-        footer={
-          <Button variant="secondary" onClick={() => { setShowViewModal(false); setViewingBrand(null); }}>
-            Cerrar
-          </Button>
-        }
-      >
-        {viewingBrand && (
-          <div className="space-y-4">
-            {viewingBrand.logo_url && (
-              <div className="flex justify-center">
-                <img src={viewingBrand.logo_url} alt={viewingBrand.name} className="h-32 w-32 object-contain" />
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Nombre</label>
-              <p className="text-sm text-gray-900">{viewingBrand.name || '-'}</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Descripción</label>
-              <p className="text-sm text-gray-900">{viewingBrand.description || '-'}</p>
-            </div>
-            {viewingBrand.website && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Sitio Web</label>
-                <a
-                  href={viewingBrand.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary-600 hover:text-primary-900 flex items-center gap-1"
-                >
-                  <Globe className="h-4 w-4" />
-                  {viewingBrand.website}
-                </a>
-              </div>
-            )}
-            {viewingBrand.notes && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Notas</label>
-                <p className="text-sm text-gray-900">{viewingBrand.notes}</p>
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Estado</label>
-              <Badge variant={viewingBrand.is_active ? 'success' : 'error'}>
-                {viewingBrand.is_active ? 'Activa' : 'Inactiva'}
-              </Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Creado</label>
-                <p className="text-sm text-gray-900">{formatDate(viewingBrand.createdAt || viewingBrand.created_at)}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Actualizado</label>
-                <p className="text-sm text-gray-900">{formatDate(viewingBrand.updatedAt || viewingBrand.updated_at)}</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        brand={viewingBrand}
+        onEdit={() => { setShowViewModal(false); handleEdit(viewingBrand); }}
+      />
 
       {/* Delete Confirm Dialog */}
       <ConfirmDialog

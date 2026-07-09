@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 import { Button } from '../ui';
 
 /** Formatea número con separadores de Venezuela (18.949.998,00) */

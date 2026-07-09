@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, RefreshCcw, FileX } from 'lucide-react';
+import { ShoppingBag, ArrowCounterClockwise, FileX } from '@phosphor-icons/react';
 import { creditNoteService } from '../../services/api/creditNoteService';
 import Modal from '../common/Modal';
 import { toast } from 'sonner';
@@ -172,7 +172,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
             onClose={() => !submitting && onClose()}
             title={
                 <div className="flex items-center gap-2 text-rose-600">
-                    <RefreshCcw className="w-5 h-5" />
+                    <ArrowCounterClockwise className="w-5 h-5" />
                     <span>Generar Devolución - Venta {sale.sale_number}</span>
                 </div>
             }

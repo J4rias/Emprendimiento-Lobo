@@ -10,13 +10,13 @@ import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
 import { Textarea } from '../components/ui';
 import {
-  Search, X, AlertCircle, CheckCircle, User,
-  Package, Lock, Banknote, CreditCard, Smartphone,
-  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
-} from 'lucide-react';
+  MagnifyingGlass, X, WarningCircle, CheckCircle, User,
+  Package, Lock, Money, CreditCard, DeviceMobile,
+  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch
+} from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
-const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone, usdt: Hash };
+const PAYMENT_ICONS = { cash: Money, card: CreditCard, transfer: DeviceMobile, usdt: Hash };
 
 // ============= TABLET POS =============
 const POSPageTablet = () => {
@@ -37,7 +37,7 @@ const POSPageTablet = () => {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
-          <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-4" />
+          <WarningCircle className="w-14 h-14 text-red-500 mx-auto mb-4" />
           <p className="text-xl font-semibold text-gray-900">Sin permiso</p>
           <p className="text-base text-gray-600">No tienes permisos para acceder al POS</p>
         </div>
@@ -88,10 +88,10 @@ const POSPageTablet = () => {
 
         {/* === Products panel === */}
         <div className="flex-1 flex flex-col bg-white rounded-xl shadow overflow-hidden">
-          {/* Search */}
+          {/* MagnifyingGlass */}
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 ref={pos.searchInputRef}
                 type="text"
@@ -263,7 +263,7 @@ const POSPageTablet = () => {
                 >
                   <Repeat className="w-3.5 h-3.5" />
                   {pos.showCurrencyTotals ? 'Ocultar divisas' : 'Ver en divisas'}
-                  {pos.showCurrencyTotals ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  {pos.showCurrencyTotals ? <CaretUp className="w-3.5 h-3.5" /> : <CaretDown className="w-3.5 h-3.5" />}
                 </button>
               )}
 
@@ -797,7 +797,7 @@ function TabletCheckoutModal({
               <div className="space-y-2">
                 {paymentLines.map((line, i) => {
                   const isCreditLine = line.method === 'credit';
-                  const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Banknote);
+                  const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Money);
                   return (
                     <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-3 text-base ${isCreditLine ? 'bg-amber-50' : 'bg-green-50'}`}>
                       <div className="flex items-center gap-2">
@@ -1102,14 +1102,14 @@ function TabletCreditPinModal({ onClose, onValidated }) {
           />
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-xl">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+              <CircleNotch className="w-5 h-5 animate-spin text-blue-600" />
             </div>
           )}
         </div>
 
         {error && (
           <div className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <WarningCircle className="w-3.5 h-3.5 flex-shrink-0" />
             {error}
           </div>
         )}
@@ -1127,7 +1127,7 @@ function TabletCreditPinModal({ onClose, onValidated }) {
             disabled={pin.length < 4 || loading}
             className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl active:bg-blue-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Autorizar'}
+            {loading ? <CircleNotch className="w-5 h-5 animate-spin mx-auto" /> : 'Autorizar'}
           </button>
         </div>
       </div>

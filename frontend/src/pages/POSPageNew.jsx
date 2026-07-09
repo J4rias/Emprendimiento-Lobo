@@ -8,14 +8,14 @@ import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
 import { Modal, Button, Textarea } from '../components/ui';
 import {
-  Plus, Search, X, AlertCircle, CheckCircle, User,
-  Package, Lock, Banknote, CreditCard, Smartphone,
-  Hash, Printer, Clock, Repeat, ChevronDown, ChevronUp, UserPlus, Loader2
-} from 'lucide-react';
+  Plus, MagnifyingGlass, X, WarningCircle, CheckCircle, User,
+  Package, Lock, Money, CreditCard, DeviceMobile,
+  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch
+} from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 // Icon map for payment methods
-const PAYMENT_ICONS = { cash: Banknote, card: CreditCard, transfer: Smartphone, usdt: Hash };
+const PAYMENT_ICONS = { cash: Money, card: CreditCard, transfer: DeviceMobile, usdt: Hash };
 
 // ============= MAIN COMPONENT =============
 const POSPage = () => {
@@ -25,7 +25,7 @@ const POSPage = () => {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <WarningCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-lg font-semibold text-gray-900">Sin permiso</p>
           <p className="text-gray-600">No tienes permisos para acceder al POS</p>
         </div>
@@ -85,7 +85,7 @@ const POSPage = () => {
         <div className="flex-1 flex flex-col bg-white rounded-lg shadow overflow-hidden">
           <div className="p-4 border-b border-gray-200">
             <div className="relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <MagnifyingGlass className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <input
                 ref={pos.searchInputRef}
                 type="text"
@@ -261,7 +261,7 @@ const POSPage = () => {
                 >
                   <Repeat className="w-3 h-3" />
                   {pos.showCurrencyTotals ? 'Ocultar divisas' : 'Ver en divisas'}
-                  {pos.showCurrencyTotals ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {pos.showCurrencyTotals ? <CaretUp className="w-3 h-3" /> : <CaretDown className="w-3 h-3" />}
                 </button>
               )}
 
@@ -762,7 +762,7 @@ function CheckoutModal({
             <div className="space-y-1">
               {paymentLines.map((line, i) => {
                 const isCreditLine = line.method === 'credit';
-                const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Banknote);
+                const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Money);
                 return (
                   <div key={i} className={`flex items-center justify-between rounded px-3 py-2 text-sm ${isCreditLine ? 'bg-amber-50' : 'bg-green-50'}`}>
                     <div className="flex items-center gap-2">
@@ -1068,14 +1068,14 @@ function CreditPinModal({ onClose, onValidated }) {
           />
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+              <CircleNotch className="w-5 h-5 animate-spin text-blue-600" />
             </div>
           )}
         </div>
 
         {error && (
           <div className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <WarningCircle className="w-3.5 h-3.5 flex-shrink-0" />
             {error}
           </div>
         )}
@@ -1093,7 +1093,7 @@ function CreditPinModal({ onClose, onValidated }) {
             disabled={pin.length < 4 || loading}
             className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Autorizar'}
+            {loading ? <CircleNotch className="w-4 h-4 animate-spin mx-auto" /> : 'Autorizar'}
           </button>
         </div>
       </div>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Edit, Trash2, DollarSign, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
+import { Plus, CurrencyDollar, Calendar, TrendUp, ArrowClockwise } from '@phosphor-icons/react';
 import {
   Button,
   Badge,
   Alert,
   Card,
+  EditAction,
+  DeleteAction,
   Input,
   ConfirmDialog,
   Modal,
@@ -191,7 +193,7 @@ const ExchangeRatesPage = () => {
       render: (_, rate) => (
         <div>
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-green-600" />
+            <TrendUp className="h-4 w-4 text-green-600" />
             <span className="font-mono text-lg font-semibold">{parseFloat(rate.rate).toFixed(6)}</span>
           </div>
           <div className="text-xs text-gray-500 mt-1">
@@ -227,18 +229,8 @@ const ExchangeRatesPage = () => {
       className: 'text-right',
       render: (_, rate) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(rate)} title="Editar">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => handleDelete(rate.id)}
-            title="Eliminar"
-            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <EditAction onClick={() => handleEdit(rate)} />
+          <DeleteAction onClick={() => handleDelete(rate.id)} />
         </div>
       ),
     }] : []),
@@ -281,7 +273,7 @@ const ExchangeRatesPage = () => {
             />
           </div>
           <Button variant="secondary" onClick={fetchRates}>
-            <RefreshCw className="h-4 w-4" />
+            <ArrowClockwise className="h-4 w-4" />
             Actualizar
           </Button>
         </div>
@@ -293,7 +285,7 @@ const ExchangeRatesPage = () => {
           columns={columns}
           data={rates}
           loading={loading}
-          emptyIcon={DollarSign}
+          emptyIcon={CurrencyDollar}
           emptyMessage="No hay tasas para esta fecha"
           emptyDescription="Agrega una tasa de cambio para comenzar"
           emptyAction={hasPermission('settings.manage') ? (
@@ -308,7 +300,7 @@ const ExchangeRatesPage = () => {
       {/* Quick Reference Card */}
       <Card className="bg-blue-50 border-blue-200">
         <div className="flex items-start gap-3">
-          <DollarSign className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+          <CurrencyDollar className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Sobre las Tasas de Cambio</h3>
             <ul className="text-sm text-gray-700 space-y-1">
@@ -321,7 +313,7 @@ const ExchangeRatesPage = () => {
         </div>
       </Card>
 
-      {/* Create/Edit Modal */}
+      {/* Create/PencilSimple Modal */}
       <Modal
         open={showModal}
         onClose={handleCloseModal}

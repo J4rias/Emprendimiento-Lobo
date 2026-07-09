@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { CaretUp, CaretDown, CaretUpDown } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import { SkeletonTable } from './Skeleton'
 import { EmptyState } from './EmptyState'
@@ -7,9 +7,9 @@ import { EmptyState } from './EmptyState'
 function SortIcon({ col, sortBy, sortDir }) {
   const field = col.sortKey ?? (typeof col.accessor === 'string' ? col.accessor : null)
   if (!col.sortable || !field) return null
-  if (sortBy !== field) return <ChevronsUpDown size={14} className="shrink-0 text-gray-400" />
-  if (sortDir === 'asc')  return <ChevronUp    size={14} className="shrink-0 text-primary-600" />
-  return                         <ChevronDown  size={14} className="shrink-0 text-primary-600" />
+  if (sortBy !== field) return <CaretUpDown size={14} className="shrink-0 text-gray-400" />
+  if (sortDir === 'asc')  return <CaretUp    size={14} className="shrink-0 text-primary-600" />
+  return                         <CaretDown  size={14} className="shrink-0 text-primary-600" />
 }
 
 /**
@@ -168,6 +168,8 @@ export function Table({
                           ? col.accessor(row)
                           : col.accessor
                           ? row[col.accessor]
+                          : typeof col.key === 'string'
+                          ? row[col.key]
                           : undefined
 
                       return (

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Filter, X, FileText } from 'lucide-react';
+import { Plus, MagnifyingGlass, Funnel, X, FileText } from '@phosphor-icons/react';
 import { Button, Alert, Modal, ConfirmDialog, useTableLimit } from '../components/ui';
 import { presentationService } from '../services/api/presentationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
@@ -99,7 +99,7 @@ const ProductsPage = () => {
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/brands/active`, {
+      const res = await fetch(`${API_URL}/brands?is_active=true`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Error al cargar marcas');
@@ -218,7 +218,7 @@ const ProductsPage = () => {
   const handleBarcodeDetected = async (barcode) => {
     if (!barcode) return;
     try {
-      const res = await fetch(`${API_URL}/products/barcode/${encodeURIComponent(barcode)}`, {
+      const res = await fetch(`${API_URL}/products?barcode=${encodeURIComponent(barcode)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -300,7 +300,7 @@ const ProductsPage = () => {
       // Validate barcode uniqueness
       if (formData.barcode) {
         const checkRes = await fetch(
-          `${API_URL}/products/barcode/${encodeURIComponent(formData.barcode)}`,
+          `${API_URL}/products?barcode=${encodeURIComponent(formData.barcode)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (checkRes.ok) {
@@ -450,7 +450,7 @@ const ProductsPage = () => {
 
   const handleDownloadCSV = async () => {
     try {
-      const res = await fetch(`${API_URL}/products/export-csv`, {
+      const res = await fetch(`${API_URL}/products?format=csv`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Error al exportar productos');
@@ -508,7 +508,7 @@ const ProductsPage = () => {
       <div className="card">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Nombre, SKU o código de barras..."
@@ -522,7 +522,7 @@ const ProductsPage = () => {
           </div>
 
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+            <Funnel className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
             <select
               value={categoryFilter}
               onChange={(e) => {

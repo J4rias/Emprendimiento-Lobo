@@ -17,7 +17,7 @@ export const saleService = {
   },
 
   getBySaleNumber: async (saleNumber: string) => {
-    const response = await api.get(`/sales/by-number/${saleNumber}`);
+    const response = await api.get('/sales', { params: { sale_number: saleNumber } });
     return response.data;
   },
 

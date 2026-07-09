@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, FileText, Banknote } from 'lucide-react';
+import { X, WarningCircle, FileText, Money } from '@phosphor-icons/react';
 import { Spinner } from '../ui';
 import { supplierService } from '../../services/api/supplierService';
 
@@ -129,7 +129,7 @@ const SupplierLedgerModal = ({ supplier, onClose }) => {
             ) : error ? (
               <div className="flex-1 flex items-center justify-center py-20">
                 <div className="bg-red-50 text-red-700 p-4 rounded-lg flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5" />
+                  <WarningCircle className="h-5 w-5" />
                   <p>{error}</p>
                 </div>
               </div>
@@ -292,7 +292,7 @@ const PaymentsTable = ({ payments, category, config, total }) => {
       <div className="bg-green-50 px-4 py-2.5 border-b border-green-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-green-800 text-sm flex items-center gap-2">
-            <Banknote className="h-4 w-4" /> Pagos
+            <Money className="h-4 w-4" /> Pagos
           </h4>
           <span className="text-xs text-green-600">{payments.length} registros</span>
         </div>

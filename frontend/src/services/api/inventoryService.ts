@@ -23,6 +23,8 @@ interface InventoryListParams {
   search?: string;
   date_from?: string;
   date_to?: string;
+  warehouse_id?: number;
+  product_id?: number;
 }
 
 interface InventoryListResponse {
@@ -40,14 +42,12 @@ interface AdjustData {
 
 export const inventoryService = {
   getByWarehouse: async (warehouseId: number, params?: InventoryListParams): Promise<InventoryListResponse> => {
-    const response = await api.get(`/inventory/warehouse/${warehouseId}`, { params });
+    const response = await api.get('/inventory', { params: { ...params, warehouse_id: warehouseId } });
     return response.data;
   },
 
   getAll: async (params?: InventoryListParams): Promise<InventoryListResponse> => {
-    // Default to warehouse 1 if not specified
-    const warehouseId = params?.warehouse_id || 1;
-    const response = await api.get(`/inventory/warehouse/${warehouseId}`, { params });
+    const response = await api.get('/inventory', { params });
     return response.data;
   },
 
@@ -57,7 +57,7 @@ export const inventoryService = {
   },
 
   getByProduct: async (productId: number): Promise<InventoryListResponse> => {
-    const response = await api.get(`/inventory/product/${productId}`);
+    const response = await api.get('/inventory', { params: { product_id: productId } });
     return response.data;
   },
 

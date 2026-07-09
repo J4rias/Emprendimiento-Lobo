@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Plus, Edit, Trash2, Eye, Building, User, Mail, Phone,
-  FileText, Calendar, Clock, Tag, Contact, BookText,
-} from 'lucide-react';
+  Plus, Building, User, Envelope, Phone,
+  Calendar, Clock, Tag, AddressBook, NotePencil,
+} from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { supplierService } from '../services/api/supplierService';
 import SupplierContactManager from '../components/suppliers/SupplierContactManager';
 import SupplierStatementModal from '../components/suppliers/SupplierStatementModal';
+import SupplierViewSheet from '../components/suppliers/SupplierViewSheet';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal,
   Pagination, SearchInput, Table, Textarea, useTableLimit,
+  ViewAction, StatementAction, EditAction, DeleteAction,
 } from '../components/ui';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -144,7 +146,7 @@ const SuppliersPage = () => {
             </div>
             {primary.email && (
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <Mail className="h-3 w-3" /> {primary.email}
+                <Envelope className="h-3 w-3" /> {primary.email}
               </div>
             )}
             {primary.phone && (
@@ -168,23 +170,16 @@ const SuppliersPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setViewingSupplier(row)} title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setStatementSupplier(row)} title="Estado de Cuenta">
-            <FileText className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => setViewingSupplier(row)} />
+          <StatementAction onClick={() => setStatementSupplier(row)} />
           {hasPermission('suppliers.update') && row.is_active && (
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Editar">
-              <Edit className="h-4 w-4" />
-            </Button>
+            <EditAction onClick={() => handleEdit(row)} />
           )}
           {hasPermission('suppliers.delete') && row.is_active && (
-            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(row)} title="Eliminar">
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <DeleteAction onClick={() => setDeleteTarget(row)} />
           )}
         </div>
       ),
@@ -276,111 +271,14 @@ const SuppliersPage = () => {
         </form>
       </Modal>
 
-      {/* ── Modal ver detalle ─────────────────────────────────────────────────── */}
-      <Modal
+      {/* ── Sheet ver detalle ─────────────────────────────────────────────────── */}
+      <SupplierViewSheet
         open={!!viewingSupplier}
         onClose={() => setViewingSupplier(null)}
-        title={viewingSupplier?.name || 'Proveedor'}
-        size="full"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setViewingSupplier(null)}>Cerrar</Button>
-            {hasPermission('suppliers.update') && viewingSupplier?.is_active && (
-              <Button onClick={() => handleEdit(viewingSupplier)}>
-                <Edit className="h-4 w-4" /> Editar
-              </Button>
-            )}
-          </>
-        }
-      >
-        {viewingSupplier && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
-            {/* Columna izquierda */}
-            <div className="space-y-4">
-              <Card variant="compact">
-                <p className="text-xs font-medium text-gray-500 mb-2">Estado</p>
-                <Badge variant={viewingSupplier.is_active ? 'success' : 'error'}>
-                  {viewingSupplier.is_active ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </Card>
-              <Card variant="compact" className="space-y-3">
-                <div>
-                  <p className="flex items-center gap-1 text-xs font-medium text-gray-500 mb-0.5">
-                    <Calendar className="h-3 w-3" /> Creado
-                  </p>
-                  <p className="text-gray-900">{fmtDate(viewingSupplier.createdAt || viewingSupplier.created_at)}</p>
-                </div>
-                <div>
-                  <p className="flex items-center gap-1 text-xs font-medium text-gray-500 mb-0.5">
-                    <Clock className="h-3 w-3" /> Actualizado
-                  </p>
-                  <p className="text-gray-900">{fmtDate(viewingSupplier.updatedAt || viewingSupplier.updated_at)}</p>
-                </div>
-              </Card>
-            </div>
-
-            {/* Columna derecha */}
-            <div className="lg:col-span-2 space-y-4">
-              <Card variant="compact">
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                  <Tag className="h-4 w-4" /> Información Básica
-                </h4>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-gray-500">Nombre</p>
-                    <p className="text-gray-900">{viewingSupplier.name}</p>
-                  </div>
-                  {viewingSupplier.tax_id && (
-                    <div>
-                      <p className="text-xs text-gray-500">RIF / Tax ID</p>
-                      <p className="text-gray-900">{viewingSupplier.tax_id}</p>
-                    </div>
-                  )}
-                  {viewingSupplier.payment_terms && (
-                    <div>
-                      <p className="text-xs text-gray-500">Condiciones de Pago</p>
-                      <p className="text-gray-900">{viewingSupplier.payment_terms}</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <Card variant="compact">
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                  <Contact className="h-4 w-4" /> Contactos
-                </h4>
-                {viewingSupplier.contacts?.length ? (
-                  <div className="space-y-3">
-                    {viewingSupplier.contacts.map((c) => (
-                      <div key={c.id} className="border border-gray-200 rounded-lg p-3 space-y-1">
-                        {c.is_primary && <Badge variant="info" className="mb-1">Contacto Principal</Badge>}
-                        <div className="flex items-center gap-2 font-medium text-gray-900">
-                          <User className="h-4 w-4 text-gray-400" /> {c.name}
-                          {c.position && <span className="font-normal text-gray-500">— {c.position}</span>}
-                        </div>
-                        {c.email  && <div className="flex items-center gap-2 text-gray-600"><Mail  className="h-3 w-3" /> {c.email}</div>}
-                        {c.phone  && <div className="flex items-center gap-2 text-gray-600"><Phone className="h-3 w-3" /> {c.phone}</div>}
-                        {c.mobile && <div className="flex items-center gap-2 text-gray-600"><Phone className="h-3 w-3" /> Móvil: {c.mobile}</div>}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-400">Sin contactos registrados</p>
-                )}
-              </Card>
-
-              {viewingSupplier.notes && (
-                <Card variant="compact">
-                  <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                    <BookText className="h-4 w-4" /> Notas
-                  </h4>
-                  <p className="text-gray-900 whitespace-pre-wrap">{viewingSupplier.notes}</p>
-                </Card>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
+        supplier={viewingSupplier}
+        onEdit={() => { handleEdit(viewingSupplier); setViewingSupplier(null); }}
+        hasPermission={hasPermission}
+      />
 
       {/* ── Estado de cuenta ──────────────────────────────────────────────────── */}
       {statementSupplier && (

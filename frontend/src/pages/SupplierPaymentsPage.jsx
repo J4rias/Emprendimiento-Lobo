@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { supplierPaymentService } from '../services/api/supplierPaymentService';
 import { supplierService } from '../services/api/supplierService';
-import { DollarSign, TrendingUp, CreditCard, Plus } from 'lucide-react';
+import { CurrencyDollar, TrendUp, CreditCard, Plus } from '@phosphor-icons/react';
 import {
   Alert,
   Button,
@@ -75,8 +75,8 @@ const SupplierPaymentsPage = () => {
       });
       return {
         payments: res.data || [],
-        totalPages: res.pagination?.totalPages || 1,
-        total: res.pagination?.total || 0,
+        totalPages: res.totalPages || 1,
+        total: res.total || 0,
       };
     },
   });
@@ -205,7 +205,7 @@ const SupplierPaymentsPage = () => {
                 <p className="text-sm text-blue-700">Total Pagos</p>
                 <p className="text-2xl font-bold text-blue-900">{stats.total_payments}</p>
               </div>
-              <DollarSign className="w-10 h-10 text-blue-600 opacity-40" />
+              <CurrencyDollar className="w-10 h-10 text-blue-600 opacity-40" />
             </div>
           </Card>
 
@@ -221,7 +221,7 @@ const SupplierPaymentsPage = () => {
                   ).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <TrendingUp className="w-10 h-10 text-green-600 opacity-40" />
+              <TrendUp className="w-10 h-10 text-green-600 opacity-40" />
             </div>
           </Card>
 

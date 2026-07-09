@@ -5,12 +5,14 @@ import { deliveryService } from '../services/api/deliveryService';
 import { saleService } from '../services/api/saleService';
 import { toast } from 'sonner';
 import {
-  Plus, Eye, Truck, CheckCircle, X, Package, Clock, XCircle,
-} from 'lucide-react';
+  Plus, Package, Clock, Truck, CheckCircle,
+} from '@phosphor-icons/react';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal,
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
+  ViewAction, TransitAction, DeliverAction, CancelAction,
 } from '../components/ui';
+import DeliveryViewSheet from '../components/deliveries/DeliveryViewSheet';
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -235,25 +237,18 @@ const DeliveriesPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => handleViewDelivery(row)} title="Ver detalle">
-            <Eye className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => handleViewDelivery(row)} />
           {row.status === 'pending' && hasPermission('deliveries.update') && (
-            <Button variant="ghost" size="sm" onClick={() => setTransitTarget(row.id)} title="Marcar en tránsito">
-              <Truck className="h-4 w-4 text-blue-600" />
-            </Button>
+            <TransitAction onClick={() => setTransitTarget(row.id)} />
           )}
           {['pending', 'in_transit'].includes(row.status) && hasPermission('deliveries.update') && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirmTarget(row.id)} title="Confirmar entrega">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </Button>
+            <DeliverAction onClick={() => setConfirmTarget(row.id)} />
           )}
           {['pending', 'in_transit'].includes(row.status) && hasPermission('deliveries.delete') && (
-            <Button variant="ghost" size="sm" onClick={() => setCancelTarget(row)} title="Cancelar">
-              <X className="h-4 w-4 text-red-600" />
-            </Button>
+            <CancelAction onClick={() => setCancelTarget(row)} />
           )}
         </div>
       ),
@@ -434,141 +429,12 @@ const DeliveriesPage = () => {
         </form>
       </Modal>
 
-      {/* ── View modal ───────────────────────────────────────────────────────── */}
-      <Modal
+      {/* ── View sheet ───────────────────────────────────────────────────────── */}
+      <DeliveryViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingDelivery(null); }}
-        title="Detalle de Entrega"
-        size="lg"
-      >
-        {viewingDelivery && (
-          <div className="space-y-6">
-            {/* Header info */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Número</p>
-                <p className="font-medium">{viewingDelivery.delivery_number}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
-                <StatusBadge status={viewingDelivery.status} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha Programada</p>
-                <p className="font-medium">
-                  {new Date(viewingDelivery.scheduled_date).toLocaleDateString('es-VE')}
-                </p>
-              </div>
-              {viewingDelivery.delivery_date && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha de Entrega</p>
-                  <p className="font-medium">
-                    {new Date(viewingDelivery.delivery_date).toLocaleDateString('es-VE')}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Sale info */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Información de Venta</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Número de Venta</p>
-                  <p className="font-medium text-blue-600">{viewingDelivery.sale?.sale_number}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha de Venta</p>
-                  <p className="font-medium">
-                    {new Date(viewingDelivery.sale?.sale_date).toLocaleDateString('es-VE')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Delivery info */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Información de Entrega</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Cliente</p>
-                  <p className="font-medium">{viewingDelivery.customer?.name}</p>
-                  <p className="text-xs text-gray-500">{viewingDelivery.customer?.phone}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Método</p>
-                  <p className="font-medium">{DELIVERY_METHODS[viewingDelivery.delivery_method] || viewingDelivery.delivery_method}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Dirección</p>
-                  <p className="font-medium">{viewingDelivery.delivery_address}</p>
-                  {(viewingDelivery.delivery_city || viewingDelivery.delivery_state) && (
-                    <p className="text-sm text-gray-500">
-                      {[viewingDelivery.delivery_city, viewingDelivery.delivery_state].filter(Boolean).join(', ')}
-                    </p>
-                  )}
-                </div>
-                {viewingDelivery.contact_name && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Contacto</p>
-                    <p className="font-medium">{viewingDelivery.contact_name}</p>
-                    {viewingDelivery.contact_phone && (
-                      <p className="text-xs text-gray-500">{viewingDelivery.contact_phone}</p>
-                    )}
-                  </div>
-                )}
-                {viewingDelivery.carrier && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Transportadora</p>
-                    <p className="font-medium">{viewingDelivery.carrier}</p>
-                  </div>
-                )}
-                {viewingDelivery.tracking_number && (
-                  <div className="col-span-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Tracking</p>
-                    <p className="font-medium text-blue-600">{viewingDelivery.tracking_number}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Products */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Productos Entregados</h3>
-              <div className="overflow-x-auto rounded-md border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {viewingDelivery.details?.map((detail, i) => (
-                      <tr key={i}>
-                        <td className="px-4 py-2">
-                          <div className="text-sm font-medium text-gray-900">{detail.product?.name}</div>
-                          <div className="text-xs text-gray-500">{detail.presentation?.name}</div>
-                        </td>
-                        <td className="px-4 py-2 text-center text-sm">
-                          {detail.package_quantity_delivered}p + {detail.loose_units_delivered}u
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {viewingDelivery.notes && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Notas</p>
-                <p className="text-sm text-gray-600">{viewingDelivery.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        delivery={viewingDelivery}
+      />
 
       {/* ── Cancel reason modal ───────────────────────────────────────────────── */}
       <Modal

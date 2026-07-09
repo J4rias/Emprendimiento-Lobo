@@ -17,7 +17,7 @@ export const saleService = {
   },
 
   getBySaleNumber: async (saleNumber) => {
-    const response = await api.get(`/sales/by-number/${saleNumber}`);
+    const response = await api.get('/sales', { params: { sale_number: saleNumber } });
     return response.data;
   },
 
@@ -48,7 +48,7 @@ export const saleService = {
 
   getDailyClosure: async (params = {}) => {
     const response = await api.get('/sales/daily-closure', { params });
-    return response.data;
+    return response.data.data ?? response.data;
   },
 
   validateCreditPin: async (pin) => {

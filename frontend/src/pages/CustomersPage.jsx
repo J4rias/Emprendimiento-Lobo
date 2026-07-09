@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Eye, User, Phone, MapPin, BadgeDollarSign, Receipt } from 'lucide-react';
+import { Plus, User, Phone, MapPin, CurrencyCircleDollar } from '@phosphor-icons/react';
 import CustomerStatementModal from '../components/customers/CustomerStatementModal';
+import CustomerViewSheet from '../components/customers/CustomerViewSheet';
 import { useAuth } from '../context/AuthContext';
 import { customerService } from '../services/api/customerService';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, Pagination,
   SearchInput, Select, Table, Textarea, useTableLimit,
+  ViewAction, StatementAction, EditAction, DeleteAction,
 } from '../components/ui';
 
 // ── Venezuelan document types ────────────────────────────────────────────────
@@ -241,23 +243,16 @@ const CustomersPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row)} title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleShowStatement(row)} title="Estado de cuenta">
-            <Receipt className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => handleView(row)} />
+          <StatementAction onClick={() => handleShowStatement(row)} />
           {hasPermission('customers.update') && (
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Editar">
-              <Edit className="h-4 w-4" />
-            </Button>
+            <EditAction onClick={() => handleEdit(row)} />
           )}
           {hasPermission('customers.delete') && (
-            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(row)} title="Eliminar">
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <DeleteAction onClick={() => setDeleteTarget(row)} />
           )}
         </div>
       ),
@@ -427,7 +422,7 @@ const CustomersPage = () => {
           {/* ── Crédito ── */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <BadgeDollarSign className="h-4 w-4 text-gray-400" />
+              <CurrencyCircleDollar className="h-4 w-4 text-gray-400" />
               <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Información de Crédito</h3>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -450,82 +445,14 @@ const CustomersPage = () => {
         </form>
       </Modal>
 
-      {/* ── Modal ver detalle ─────────────────────────────────────────────────── */}
-      <Modal
+      {/* ── Sheet ver detalle ─────────────────────────────────────────────────── */}
+      <CustomerViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingCustomer(null); }}
-        title={viewingCustomer ? `Cliente ${viewingCustomer.code}` : 'Cliente'}
-        size="lg"
-      >
-        {viewingCustomer && (
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Tipo</p>
-              <p className="text-gray-900">{viewingCustomer.type === 'natural' ? 'Persona Natural' : 'Persona Jurídica'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
-              <Badge variant={STATUS_VARIANT[viewingCustomer.status] || 'neutral'}>
-                {STATUS_LABEL[viewingCustomer.status] || viewingCustomer.status}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Documento</p>
-              <p className="text-gray-900">{viewingCustomer.documentType}-{viewingCustomer.documentNumber}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Nombre / Razón Social</p>
-              <p className="text-gray-900">
-                {viewingCustomer.type === 'natural'
-                  ? `${viewingCustomer.firstName} ${viewingCustomer.lastName}`
-                  : viewingCustomer.businessName}
-              </p>
-            </div>
-            {viewingCustomer.email && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Email</p>
-                <p className="text-gray-900">{viewingCustomer.email}</p>
-              </div>
-            )}
-            {(viewingCustomer.phone || viewingCustomer.mobile) && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Teléfono</p>
-                <p className="text-gray-900">{viewingCustomer.phone || viewingCustomer.mobile}</p>
-              </div>
-            )}
-            {viewingCustomer.address && (
-              <div className="col-span-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Dirección</p>
-                <p className="text-gray-900">
-                  {viewingCustomer.address}
-                  {viewingCustomer.city ? `, ${viewingCustomer.city}` : ''}
-                  {viewingCustomer.state ? `, ${viewingCustomer.state}` : ''}
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Límite de Crédito</p>
-              <p className="text-gray-900">
-                COP {Math.ceil(parseFloat(viewingCustomer.creditLimit || 0)).toLocaleString('es-VE')}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Días de Crédito</p>
-              <p className="text-gray-900">{viewingCustomer.creditDays || 0} días</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Descuento</p>
-              <p className="text-gray-900">{parseFloat(viewingCustomer.discountPercentage || 0).toFixed(2)}%</p>
-            </div>
-            {viewingCustomer.notes && (
-              <div className="col-span-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Notas</p>
-                <p className="text-gray-900 whitespace-pre-wrap">{viewingCustomer.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        customer={viewingCustomer}
+        onEdit={() => { setShowViewModal(false); handleEdit(viewingCustomer); }}
+        hasPermission={hasPermission}
+      />
 
       {/* ── Estado de cuenta ──────────────────────────────────────────────────── */}
       {statementCustomer && (

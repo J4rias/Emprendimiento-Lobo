@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import { usePOSStore } from '../../stores/posStore';
-import { Plus, X } from 'lucide-react';
+import { Plus, X } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 /**

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Package, Star, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Package, Star, Trash, CurrencyDollar } from '@phosphor-icons/react';
 import { formatMoney } from '../../utils/formatUtils';
 
 const PresentationManager = ({ presentations = [], onChange, readonly = false, packagingTypes = [], presentationTypes = [], productUnitSize = '', productUnitMeasure = 'UND' }) => {
@@ -163,7 +163,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
             <div className="text-sm text-gray-600">
               {getDefaultPresentation().package_price > 0 && (
                 <div className="flex items-center">
-                  <DollarSign className="h-3 w-3 mr-1" />
+                  <CurrencyDollar className="h-3 w-3 mr-1" />
                   Precio: {formatMoney(getDefaultPresentation().package_price, currencies.find(c => c.code === getDefaultPresentation().purchase_currency)?.symbol)}
                 </div>
               )}
@@ -233,7 +233,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         className="p-1 text-gray-400 hover:text-red-600"
                         title="Eliminar presentación"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash className="h-4 w-4" />
                       </button>
                     </div>
                   )}

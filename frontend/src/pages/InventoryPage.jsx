@@ -5,21 +5,21 @@ import { inventoryService } from '../services/api/inventoryService';
 import { warehouseService } from '../services/api/warehouseService';
 import { categoryService } from '../services/api/categoryService';
 import {
-  Package, AlertTriangle, Calendar, DollarSign, Filter,
-  Download, RefreshCw, Eye, Edit2, Plus, Info, X, Warehouse,
-  CheckCircle, Loader2, AlertCircle, ClipboardList, ArrowRightLeft
-} from 'lucide-react';
+  Package, Warning, Calendar, CurrencyDollar, Funnel,
+  DownloadSimple, ArrowClockwise, Plus, Info, X, Warehouse,
+  CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight
+} from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../utils/formatUtils';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
-import { Alert, Badge, Button, Card, Input, Modal, SearchInput, Select } from '../components/ui';
+import { Alert, Badge, Button, Card, Input, Modal, SearchInput, Select, ViewAction, AdjustAction } from '../components/ui';
 
 const InventoryPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Filter state
+  // Funnel state
   const [selectedWarehouse, setSelectedWarehouse] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -301,7 +301,7 @@ const InventoryPage = () => {
               className="bg-amber-500 hover:bg-amber-600 active:bg-amber-700 focus-visible:ring-amber-400"
               onClick={() => setQuickCountMode(true)}
             >
-              <ClipboardList className="w-4 h-4" />
+              <ClipboardText className="w-4 h-4" />
               Conteo Rápido
             </Button>
           ) : (
@@ -320,7 +320,7 @@ const InventoryPage = () => {
       {/* Quick Count Banner */}
       {quickCountMode && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-3 flex items-center gap-3">
-          <ClipboardList className="w-5 h-5 text-amber-600 shrink-0" />
+          <ClipboardText className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-sm text-amber-800">
             <span className="font-semibold">Modo Conteo Rápido activo.</span>
             {' '}Ingresa los nuevos valores de bultos y unidades por producto. Los cambios se guardan automáticamente 800ms después de escribir.
@@ -368,7 +368,7 @@ const InventoryPage = () => {
               <p className="text-xs text-gray-500 mt-1">Click para filtrar</p>
             </div>
             <div className="bg-red-100 p-3 rounded-lg shrink-0">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+              <Warning className="w-6 h-6 text-red-600" />
             </div>
           </div>
         </Card>
@@ -423,7 +423,7 @@ const InventoryPage = () => {
               )}
             </div>
             <div className="bg-green-100 p-3 rounded-lg shrink-0">
-              <DollarSign className="w-6 h-6 text-green-600" />
+              <CurrencyDollar className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </Card>
@@ -473,7 +473,7 @@ const InventoryPage = () => {
               title="Filtros rápidos"
               className="relative"
             >
-              <Filter className="w-4 h-4" />
+              <Funnel className="w-4 h-4" />
               {hasActiveFilters && (
                 <span className="absolute -top-1.5 -right-1.5 bg-white text-blue-600 text-xs w-4 h-4 rounded-full font-bold border border-blue-600 flex items-center justify-center leading-none">
                   {activeFiltersCount}
@@ -487,7 +487,7 @@ const InventoryPage = () => {
               onClick={handleClearFilters}
               title="Limpiar filtros"
             >
-              <RefreshCw className="w-4 h-4" />
+              <ArrowClockwise className="w-4 h-4" />
             </Button>
 
             <Button
@@ -496,7 +496,7 @@ const InventoryPage = () => {
               onClick={handleDownloadReport}
               title="Descargar reporte CSV"
             >
-              <Download className="w-4 h-4" />
+              <DownloadSimple className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -629,7 +629,7 @@ const InventoryPage = () => {
                           <td className="px-6 py-3 text-center">
                             {statusSave === 'saving' && (
                               <span className="text-amber-600 text-xs flex items-center justify-center gap-1">
-                                <Loader2 className="w-3 h-3 animate-spin" /> guardando...
+                                <CircleNotch className="w-3 h-3 animate-spin" /> guardando...
                               </span>
                             )}
                             {statusSave === 'saved' && (
@@ -642,7 +642,7 @@ const InventoryPage = () => {
                                 onClick={() => retrySave(item)}
                                 className="text-red-600 text-xs flex items-center justify-center gap-1 hover:underline"
                               >
-                                <AlertCircle className="w-3 h-3" /> Error — Reintentar
+                                <WarningCircle className="w-3 h-3" /> Error — Reintentar
                               </button>
                             )}
                           </td>
@@ -692,21 +692,9 @@ const InventoryPage = () => {
                           <Badge variant={status.variant}>{status.text}</Badge>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => navigate(`/inventario/${item.id}`)}
-                              className="p-1 text-blue-600 hover:text-blue-800"
-                              title="Ver detalles"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openAdjust(item)}
-                              className="p-1 text-green-600 hover:text-green-800"
-                              title="Ajustar stock"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
+                          <div className="flex items-center gap-1">
+                            <ViewAction onClick={() => navigate(`/inventario/${item.id}`)} />
+                            <AdjustAction onClick={() => openAdjust(item)} />
                           </div>
                         </td>
                       </tr>
@@ -837,7 +825,7 @@ const InventoryPage = () => {
                         {conversion && (
                           <div className="mt-2 pt-2 border-t border-gray-200">
                             <div className="flex items-center gap-2 text-xs text-gray-600">
-                              <ArrowRightLeft className="w-3 h-3" />
+                              <ArrowsLeftRight className="w-3 h-3" />
                               <span>Tasa: 1 {currency} = ${conversion.rate.toFixed(6)} USD</span>
                             </div>
                             <p className="text-sm text-green-600 font-medium mt-1">

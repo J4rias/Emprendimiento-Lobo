@@ -7,9 +7,8 @@ import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import {
   ArrowLeft,
   CheckCircle,
-  ClipboardList,
-  PackageCheck,
-} from 'lucide-react';
+  ClipboardText,
+} from '@phosphor-icons/react';
 import { Alert, Button, Card, Input, Modal, Spinner, Textarea } from '../components/ui';
 
 const ORDER_STATUS_LABEL = {
@@ -245,7 +244,7 @@ const PurchaseOrderReceivePage = () => {
             onClick={handleReceiveAll}
             title="Llenar todos los campos con las cantidades pendientes"
           >
-            <PackageCheck className="w-4 h-4" />
+            <CheckCircle className="w-4 h-4" />
             Recibir Todo
           </Button>
         </div>
@@ -375,7 +374,7 @@ const PurchaseOrderReceivePage = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <ClipboardList className="w-4 h-4" />
+                  <ClipboardText className="w-4 h-4" />
                   Razón de la recepción incompleta <span className="text-red-500">*</span>
                 </div>
                 <span className="text-xs text-gray-500 font-normal">

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Eye, ArrowRightCircle, CheckCircle, XCircle, SendHorizonal } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { quoteService } from '../services/api/quoteService';
 import {
-  Alert, Badge, Button, Card, ConfirmDialog, Modal, Pagination, SearchInput, Select, Table, useTableLimit,
+  Alert, Badge, Button, Card, ConfirmDialog, Pagination, SearchInput, Select, Table, useTableLimit,
+  ViewAction, ConvertAction, DeleteAction,
 } from '../components/ui';
+import QuoteViewSheet from '../components/quotes/QuoteViewSheet';
 
 // ── Status config ────────────────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -58,7 +60,7 @@ const QuotesPage = () => {
     staleTime: 30_000,
   });
 
-  const quotes     = quotesData?.data || quotesData?.quotes || [];
+  const quotes     = quotesData?.data || [];
   const pagination = quotesData?.pagination || {};
   const totalPages = pagination.totalPages || pagination.pages || 1;
   const total      = pagination.total || 0;
@@ -147,25 +149,15 @@ const QuotesPage = () => {
     {
       key: 'actions',
       header: '',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1 justify-end">
-          <Button variant="ghost" size="icon-sm" onClick={() => setSelectedQuote(row)} title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => setSelectedQuote(row)} />
           {hasPermission('sales.quotes.update') && row.status === 'approved' && (
-            <Button
-              variant="ghost" size="icon-sm"
-              className="text-teal-600 hover:bg-teal-50"
-              onClick={() => setConvertTarget(row)}
-              title="Convertir a venta"
-            >
-              <ArrowRightCircle className="h-4 w-4" />
-            </Button>
+            <ConvertAction onClick={() => setConvertTarget(row)} />
           )}
           {hasPermission('sales.quotes.delete') && row.status === 'draft' && (
-            <Button variant="ghost" size="icon-sm" onClick={() => setDeleteTarget(row)} title="Eliminar">
-              <Trash2 className="h-4 w-4 text-red-500" />
-            </Button>
+            <DeleteAction onClick={() => setDeleteTarget(row)} />
           )}
         </div>
       ),
@@ -244,160 +236,16 @@ const QuotesPage = () => {
         />
       </Card>
 
-      {/* ── Modal ver cotización ──────────────────────────────────────────────── */}
-      <Modal
+      {/* ── Sheet ver cotización ─────────────────────────────────────────────── */}
+      <QuoteViewSheet
         open={!!selectedQuote}
         onClose={() => setSelectedQuote(null)}
-        title={selectedQuote ? `Cotización ${selectedQuote.code}` : ''}
-        size="lg"
-      >
-        {selectedQuote && (
-          <div className="space-y-5">
-            {/* Header info */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Cliente</p>
-                <p className="text-gray-900 font-medium">{customerName(selectedQuote.customer)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
-                <Badge variant={STATUS_VARIANT[selectedQuote.status] || 'neutral'}>
-                  {STATUS_LABEL[selectedQuote.status] || selectedQuote.status}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha</p>
-                <p className="text-gray-900">{fmtDate(selectedQuote.quote_date || selectedQuote.quoteDate || selectedQuote.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Vence</p>
-                <p className="text-gray-900">{fmtDate(selectedQuote.valid_until || selectedQuote.validUntil)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Vendedor</p>
-                <p className="text-gray-900">{selectedQuote.user?.first_name} {selectedQuote.user?.last_name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Moneda</p>
-                <p className="text-gray-900">{selectedQuote.currency || 'USD'}</p>
-              </div>
-              {selectedQuote.converted_to_sale_id && (
-                <div className="col-span-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Venta generada</p>
-                  <p className="text-teal-700 font-medium">ID #{selectedQuote.converted_to_sale_id}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Product lines */}
-            {selectedQuote.details && selectedQuote.details.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Productos</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                      <tr>
-                        <th className="text-left px-3 py-2">Producto</th>
-                        <th className="text-right px-3 py-2">Cant.</th>
-                        <th className="text-right px-3 py-2">P.Unit</th>
-                        <th className="text-right px-3 py-2">Desc.</th>
-                        <th className="text-right px-3 py-2">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {selectedQuote.details.map((d, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-3 py-2">
-                            <p className="font-medium text-gray-800">{d.product?.name || d.description}</p>
-                            {d.presentation && (
-                              <p className="text-xs text-gray-400">{d.presentation.name}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-600">{parseFloat(d.quantity)}</td>
-                          <td className="px-3 py-2 text-right text-gray-600">{fmtUSD(d.unit_price)}</td>
-                          <td className="px-3 py-2 text-right text-gray-500">
-                            {parseFloat(d.discount_percentage || 0) > 0 ? `${parseFloat(d.discount_percentage)}%` : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-800">{fmtUSD(d.total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {selectedQuote.notes && (
-              <div className="text-sm">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Notas</p>
-                <p className="text-gray-700 whitespace-pre-wrap">{selectedQuote.notes}</p>
-              </div>
-            )}
-
-            {/* Totals */}
-            <div className="border-t border-gray-200 pt-3 space-y-1 text-sm">
-              {parseFloat(selectedQuote.discount_amount || 0) > 0 && (
-                <div className="flex justify-between text-gray-500">
-                  <span>Descuento</span>
-                  <span>- {fmtUSD(selectedQuote.discount_amount)}</span>
-                </div>
-              )}
-              {parseFloat(selectedQuote.tax_amount || 0) > 0 && (
-                <div className="flex justify-between text-gray-500">
-                  <span>IVA ({parseFloat(selectedQuote.tax_percentage || 0)}%)</span>
-                  <span>{fmtUSD(selectedQuote.tax_amount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-bold text-gray-900 pt-1 border-t border-gray-100">
-                <span>Total</span>
-                <span>{fmtUSD(selectedQuote.total)}</span>
-              </div>
-            </div>
-
-            {/* Action buttons — status workflow */}
-            {hasPermission('sales.quotes.update') && selectedQuote.status !== 'converted' && (
-              <div className="border-t border-gray-200 pt-4 flex flex-wrap gap-2 justify-end">
-                {['draft', 'sent'].includes(selectedQuote.status) && (
-                  <>
-                    <Button
-                      variant="secondary" size="sm"
-                      loading={statusMutation.isPending}
-                      onClick={() => handleStatusChange(selectedQuote, 'sent')}
-                      disabled={selectedQuote.status === 'sent'}
-                    >
-                      <SendHorizonal className="h-4 w-4" /> Marcar enviada
-                    </Button>
-                    <Button
-                      variant="ghost" size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      loading={statusMutation.isPending}
-                      onClick={() => handleStatusChange(selectedQuote, 'rejected')}
-                    >
-                      <XCircle className="h-4 w-4" /> Rechazar
-                    </Button>
-                    <Button
-                      size="sm"
-                      loading={statusMutation.isPending}
-                      onClick={() => handleStatusChange(selectedQuote, 'approved')}
-                    >
-                      <CheckCircle className="h-4 w-4" /> Aprobar
-                    </Button>
-                  </>
-                )}
-                {selectedQuote.status === 'approved' && (
-                  <Button
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white"
-                    onClick={() => { setConvertTarget(selectedQuote); setSelectedQuote(null); }}
-                  >
-                    <ArrowRightCircle className="h-4 w-4" /> Convertir a Venta
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        quote={selectedQuote}
+        hasPermission={hasPermission}
+        onStatusChange={handleStatusChange}
+        onConvert={(q) => { setConvertTarget(q); setSelectedQuote(null); }}
+        statusMutation={statusMutation}
+      />
 
       {/* ── Confirmar conversión ──────────────────────────────────────────────── */}
       <ConfirmDialog

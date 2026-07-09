@@ -2,10 +2,10 @@ import { Fragment, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, AlertTriangle, TrendingUp, TrendingDown,
-  AlertCircle, Wallet, RotateCcw, ChevronDown, ChevronRight,
-  ArrowDownRight, ArrowUpRight, Receipt, ShieldAlert, Lock, ChevronUp
-} from 'lucide-react';
+  ArrowLeft, Warning, TrendUp, TrendDown,
+  WarningCircle, Wallet, ArrowCounterClockwise, CaretDown, CaretRight,
+  ArrowDownRight, ArrowUpRight, Receipt, ShieldWarning, Lock, CaretUp
+} from '@phosphor-icons/react';
 import { arService } from '../services/api/arService';
 import { saleService } from '../services/api/saleService';
 import { useAuth } from '../context/AuthContext';
@@ -256,7 +256,7 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
       <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-gradient-to-r from-red-600 to-red-800 px-6 py-4 flex items-center gap-3">
-          <RotateCcw className="h-5 w-5 text-white" />
+          <ArrowCounterClockwise className="h-5 w-5 text-white" />
           <h2 className="text-white font-semibold text-lg">
             {step === 1 ? 'Revertir Abono' : 'Ingresa tu PIN'}
           </h2>
@@ -291,7 +291,7 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
               </div>
 
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-5 text-sm text-amber-800">
-                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <Warning className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>Esta acción <strong>no se puede deshacer</strong>. El saldo de la venta se recalculará automáticamente.</span>
               </div>
 
@@ -343,7 +343,7 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
 
               {pinError && (
                 <div className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <WarningCircle className="w-3.5 h-3.5 flex-shrink-0" />
                   {pinError}
                 </div>
               )}
@@ -462,7 +462,7 @@ const ARCustomerDetailPage = () => {
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <span className="w-4 h-4 inline-block" />;
-    return sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+    return sortDir === 'asc' ? <CaretUp className="w-4 h-4" /> : <CaretDown className="w-4 h-4" />;
   };
 
   // ─── Fila del ledger ──────────────────────────────────────────────────────
@@ -502,8 +502,8 @@ const ARCustomerDetailPage = () => {
         >
           <td className="px-3 py-3 w-8">
             {isExpanded
-              ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-              : <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+              ? <CaretDown className="h-3.5 w-3.5 text-gray-400" />
+              : <CaretRight className="h-3.5 w-3.5 text-gray-300" />
             }
           </td>
           <td className="px-2 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(entry.date)}</td>
@@ -551,7 +551,7 @@ const ARCustomerDetailPage = () => {
                 className="text-[10px] px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1 ml-auto"
                 title="Revertir abono"
               >
-                <RotateCcw className="h-3 w-3" />
+                <ArrowCounterClockwise className="h-3 w-3" />
                 Revertir
               </button>
             )}
@@ -630,7 +630,7 @@ const ARCustomerDetailPage = () => {
       {/* ── Aviso bloqueo ──────────────────────────────────────────────────── */}
       {block.blocked && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <ShieldAlert className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <ShieldWarning className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-red-800">Cliente con crédito bloqueado</p>
             <p className="text-xs text-red-600 mt-0.5">{block.reason}. No se puede otorgar crédito adicional hasta regularizar el saldo.</p>
@@ -649,13 +649,13 @@ const ARCustomerDetailPage = () => {
         <SummaryCard
           title="Total Pagado"
           value={summaryCOP.total_paid || 0}
-          icon={TrendingDown}
+          icon={TrendDown}
           colorClass="bg-green-50 border-green-200 text-green-800"
         />
         <SummaryCard
           title="Saldo Pendiente"
           value={summaryCOP.balance || 0}
-          icon={TrendingUp}
+          icon={TrendUp}
           colorClass={summaryCOP.balance > 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-gray-50 border-gray-200 text-gray-700'}
         />
         <SummaryCard

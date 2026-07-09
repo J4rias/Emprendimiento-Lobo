@@ -54,8 +54,8 @@ export const customerService = {
   },
 
   // Get active customers (for dropdowns)
-  getActive: async (): Promise<Customer[]> => {
-    const response = await api.get('/customers/active');
+  getActive: async (): Promise<{ data: Customer[]; pagination: { total: number; page: number; limit: number; totalPages: number } }> => {
+    const response = await api.get('/customers', { params: { is_active: true, limit: 1000 } });
     return response.data;
   },
 

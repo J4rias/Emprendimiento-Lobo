@@ -7,7 +7,7 @@ import { supplierService } from '../services/api/supplierService';
 import { productService } from '../services/api/productService';
 import { formatMoney } from '../utils/formatUtils';
 import api from '../services/api/axios';
-import { ArrowLeft, Plus, Trash2, Save, Send, Search, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash, FloppyDisk, PaperPlaneTilt, MagnifyingGlass, X } from '@phosphor-icons/react';
 import {
   Alert,
   Button,
@@ -436,7 +436,7 @@ const PurchaseOrderCreatePage = () => {
                             onClick={() => removeItem(index)}
                             className="p-1 text-red-500 hover:text-red-700"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -493,7 +493,7 @@ const PurchaseOrderCreatePage = () => {
             disabled={isSaving}
             loading={saveMutation.isPending}
           >
-            <Save className="w-4 h-4" />
+            <FloppyDisk className="w-4 h-4" />
             {saveMutation.isPending ? 'Guardando...' : 'Guardar Borrador'}
           </Button>
           {!isEditing && (
@@ -502,14 +502,14 @@ const PurchaseOrderCreatePage = () => {
               disabled={isSaving}
               loading={saveAndApproveMutation.isPending}
             >
-              <Send className="w-4 h-4" />
+              <PaperPlaneTilt className="w-4 h-4" />
               {saveAndApproveMutation.isPending ? 'Guardando...' : 'Guardar y Aprobar'}
             </Button>
           )}
         </CardFooter>
       </Card>
 
-      {/* Product Search Modal */}
+      {/* Product MagnifyingGlass Modal */}
       <Modal
         open={showProductSearch}
         onClose={closeProductSearch}
@@ -517,7 +517,7 @@ const PurchaseOrderCreatePage = () => {
         size="lg"
       >
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
           <input
             type="text"
             placeholder="Nombre, SKU o código de barras..."

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Package, ShoppingCart, AlertTriangle, DollarSign, Users, FileText, TrendingUp, Calendar, Tag } from 'lucide-react';
+import { Package, ShoppingCart, Warning, CurrencyDollar, Users, FileText, TrendUp, Calendar, Tag } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { inventoryService } from '../services/api/inventoryService';
 import { saleService } from '../services/api/saleService';
@@ -99,7 +99,7 @@ const Dashboard = () => {
     {
       name: 'Productos Stock Bajo',
       value: stats.lowStock,
-      icon: AlertTriangle,
+      icon: Warning,
       color: 'bg-yellow-500',
       link: '/inventario'
     },
@@ -107,7 +107,7 @@ const Dashboard = () => {
       name: 'Valor Inventario',
       value: `COP ${Math.round(stats.inventoryValueCOP).toLocaleString('de-DE')}`,
       subtitle: `USD ${formatMoney(stats.inventoryByCurrency.USD || 0)} · COP ${Math.round(stats.inventoryByCurrency.COP || 0).toLocaleString('de-DE')}`,
-      icon: DollarSign,
+      icon: CurrencyDollar,
       color: 'bg-purple-500',
       link: '/inventario'
     },
@@ -121,7 +121,7 @@ const Dashboard = () => {
     {
       name: 'Ingresos del Mes',
       value: `COP ${Math.round(stats.monthRevenueCOP).toLocaleString('de-DE')}`,
-      icon: TrendingUp,
+      icon: TrendUp,
       color: 'bg-indigo-500',
       link: `/reportes?type=sales&start=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end=${new Date().toISOString().split('T')[0]}`
     },
@@ -292,7 +292,7 @@ const Dashboard = () => {
       {stats.lowStock > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            <Warning className="w-5 h-5 text-yellow-600" />
             <div className="flex-1">
               <p className="font-medium text-yellow-900">
                 Tienes {stats.lowStock} producto{stats.lowStock !== 1 ? 's' : ''} con stock bajo

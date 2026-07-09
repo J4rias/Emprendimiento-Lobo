@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Download, BookOpen, Eye, EyeOff, CheckCircle, ChevronUp, ChevronDown, Shield } from 'lucide-react';
+import { DownloadSimple, BookOpen, Eye, EyeSlash, CheckCircle, CaretUp, CaretDown, Shield } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { arService } from '../services/api/arService';
 import { useAuth } from '../context/AuthContext';
@@ -179,7 +179,7 @@ function PinSetupModal({ open, onClose }) {
                 onClick={() => setShow(!show)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {show ? <EyeSlash className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -249,7 +249,7 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <span className="w-4 h-4 inline-block" />;
-    return sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+    return sortDir === 'asc' ? <CaretUp className="w-4 h-4" /> : <CaretDown className="w-4 h-4" />;
   };
 
   const TH = ({ field, children }) => (
@@ -415,7 +415,7 @@ function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSe
               >
                 {label}
                 {sortField === field && (
-                  sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  sortDir === 'asc' ? <CaretUp className="w-3 h-3" /> : <CaretDown className="w-3 h-3" />
                 )}
               </button>
             ))}
@@ -628,7 +628,7 @@ export default function AccountsReceivablePage() {
             </Button>
           )}
           <Button variant="secondary" size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4" />
+            <DownloadSimple className="w-4 h-4" />
             Exportar CSV
           </Button>
         </div>

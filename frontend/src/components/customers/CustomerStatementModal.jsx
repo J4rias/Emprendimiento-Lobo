@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Receipt, ArrowDownRight, ArrowUpRight, Loader, Info, Repeat, ChevronDown, ChevronRight, CreditCard } from 'lucide-react';
+import { X, Receipt, ArrowDownRight, ArrowUpRight, CircleNotch, Info, Repeat, CaretDown, CaretRight, CreditCard } from '@phosphor-icons/react';
 import { customerService } from '../../services/api/customerService';
 import { saleService } from '../../services/api/saleService';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
 
     if (loading) return (
         <div className="flex items-center gap-2 py-3 text-gray-500 text-sm">
-            <Loader className="w-4 h-4 animate-spin" /> Cargando detalle...
+            <CircleNotch className="w-4 h-4 animate-spin" /> Cargando detalle...
         </div>
     );
 
@@ -440,7 +440,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                     <div className="bg-gray-50 flex flex-col min-h-[500px] max-h-[80vh]">
                         {loading ? (
                             <div className="flex-1 flex flex-col items-center justify-center">
-                                <Loader className="h-10 w-10 text-teal-600 animate-spin mb-4" />
+                                <CircleNotch className="h-10 w-10 text-teal-600 animate-spin mb-4" />
                                 <p className="text-gray-500 font-medium">Generando balance financiero del cliente...</p>
                             </div>
                         ) : error ? (
@@ -575,8 +575,8 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                                     title="Ver detalle"
                                                                                 >
                                                                                     {isExpanded
-                                                                                        ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
-                                                                                        : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                        ? <CaretDown className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                                        : <CaretRight className="w-3.5 h-3.5 flex-shrink-0" />
                                                                                     }
                                                                                     {t.reference || '-'}
                                                                                 </button>

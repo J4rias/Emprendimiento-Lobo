@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import { WarningCircle } from '@phosphor-icons/react';
 
 /**
  * Stock Conflict Alert Component
@@ -20,7 +20,7 @@ export function StockConflictAlert({
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <AlertCircle className="w-6 h-6 text-red-500" />
+          <WarningCircle className="w-6 h-6 text-red-500" />
           <h2 className="text-lg font-bold text-gray-900">Stock Insuficiente</h2>
         </div>
 

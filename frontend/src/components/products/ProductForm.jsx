@@ -1,4 +1,4 @@
-import { Camera, X, AlertCircle } from 'lucide-react';
+import { Camera, X, WarningCircle } from '@phosphor-icons/react';
 import { Alert } from '../ui';
 import ImageUpload from '../common/ImageUpload';
 import PresentationManager from './PresentationManager';
@@ -83,7 +83,7 @@ const ProductForm = ({
                 {scannerError ? (
                   <div className="flex items-center justify-center h-full p-6 text-center">
                     <div>
-                      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                      <WarningCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                       <p className="text-white mb-2">Error al acceder a la cámara</p>
                       <p className="text-gray-400 text-sm mb-4">{scannerError}</p>
                       <button

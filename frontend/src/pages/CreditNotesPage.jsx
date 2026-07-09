@@ -2,19 +2,19 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Plus,
-  Search,
-  Filter,
-  Eye,
-  Download,
-  AlertCircle,
+  MagnifyingGlass,
+  Funnel,
+  DownloadSimple,
+  WarningCircle,
   CheckCircle,
   XCircle,
   Clock,
-  RefreshCw,
-  MoreVertical,
-  ChevronDown
-} from 'lucide-react';
+  ArrowClockwise,
+  DotsThreeVertical,
+  CaretDown
+} from '@phosphor-icons/react';
 import { creditNoteService } from '../services/api/creditNoteService';
+import { ViewAction } from '../components/ui';
 
 const CreditNotesPage = () => {
   const [filters, setFilters] = useState({
@@ -111,7 +111,7 @@ const CreditNotesPage = () => {
           <div className="flex flex-col md:flex-row gap-4 justify-between">
             <div className="flex-1 flex gap-4">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Buscar documento, cliente..."
@@ -122,7 +122,7 @@ const CreditNotesPage = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-400" />
+                <Funnel className="w-5 h-5 text-gray-400" />
                 <select
                   className="border border-gray-300 rounded-md py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={filters.status}
@@ -142,7 +142,7 @@ const CreditNotesPage = () => {
               className="p-2 border border-gray-300 rounded-md hover:bg-gray-50"
               title="Actualizar"
             >
-              <RefreshCw className="w-5 h-5 text-gray-600" />
+              <ArrowClockwise className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
@@ -166,7 +166,7 @@ const CreditNotesPage = () => {
               {loading ? (
                 <tr>
                   <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
-                    <RefreshCw className="w-8 h-8 mx-auto animate-spin mb-4" />
+                    <ArrowClockwise className="w-8 h-8 mx-auto animate-spin mb-4" />
                     <p>Cargando notas de crédito...</p>
                   </td>
                 </tr>
@@ -208,9 +208,7 @@ const CreditNotesPage = () => {
                       {getStatusBadge(note.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-gray-400 hover:text-blue-500" title="Ver Detalles">
-                        <Eye className="w-5 h-5" />
-                      </button>
+                      <ViewAction title="Ver Detalles" />
                     </td>
                   </tr>
                 ))

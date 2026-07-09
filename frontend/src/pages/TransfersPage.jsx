@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { ArrowRightLeft, Plus, Package, Check, Ban, Eye, ArrowRight } from 'lucide-react';
+import { Plus, Package, ArrowRight } from '@phosphor-icons/react';
 import { transferService } from '../services/api/transferService';
 import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { Modal, Button, Badge, Textarea, Spinner, Alert, ConfirmDialog, Card } from '../components/ui';
+import { Modal, Button, Badge, Textarea, Spinner, Alert, ConfirmDialog, Card, ViewAction, ReceiveTransferAction, CancelAction } from '../components/ui';
 import TransferFormModal from '../components/transfers/TransferFormModal';
+import TransferViewSheet from '../components/transfers/TransferViewSheet';
 
 const STATUS_CONFIG = {
   pending:   { label: 'Pendiente',   variant: 'warning' },
@@ -50,7 +51,7 @@ const TransfersPage = () => {
     },
     staleTime: 30_000,
   });
-  const transfers = transfersData?.data?.transfers || [];
+  const transfers = transfersData?.data || [];
 
   // --- Mutations ---
   const receiveMutation = useMutation({
@@ -181,35 +182,13 @@ const TransfersPage = () => {
                           <Badge variant={cfg.variant}>{cfg.label}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewDetails(transfer)}
-                              title="Ver detalle"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Ver
-                            </Button>
+                          <div className="flex gap-1">
+                            <ViewAction onClick={() => handleViewDetails(transfer)} />
                             {transfer.status === 'pending' && hasPermission('inventory.receive') && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => setConfirmReceive(transfer)}
-                              >
-                                <Check className="w-4 h-4" />
-                                Recibir
-                              </Button>
+                              <ReceiveTransferAction onClick={() => setConfirmReceive(transfer)} />
                             )}
                             {transfer.status === 'pending' && hasPermission('inventory.transfer') && (
-                              <Button
-                                variant="danger-outline"
-                                size="sm"
-                                onClick={() => openCancel(transfer)}
-                              >
-                                <Ban className="w-4 h-4" />
-                                Cancelar
-                              </Button>
+                              <CancelAction onClick={() => openCancel(transfer)} />
                             )}
                           </div>
                         </td>
@@ -223,118 +202,15 @@ const TransfersPage = () => {
         </div>
       </div>
 
-      {/* ── Detail Modal ── */}
-      <Modal
+      {/* ── Detail Sheet ── */}
+      <TransferViewSheet
         open={!!viewTransfer}
         onClose={() => setViewTransfer(null)}
-        title={`Transferencia ${viewTransfer?.transfer_number || ''}`}
-        size="lg"
-      >
-        {viewTransfer && (
-          <div className="space-y-4">
-            {/* Info grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Ruta</p>
-                <div className="flex items-center gap-1.5 font-medium text-gray-900">
-                  <span>{viewTransfer.originWarehouse?.name}</span>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                  <span>{viewTransfer.destinationWarehouse?.name}</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Fecha</p>
-                <p className="font-medium text-gray-900">
-                  {new Date(viewTransfer.transfer_date).toLocaleString('es-VE')}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Estado</p>
-                <Badge variant={STATUS_CONFIG[viewTransfer.status]?.variant}>
-                  {STATUS_CONFIG[viewTransfer.status]?.label || viewTransfer.status}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Solicitado por</p>
-                <p className="font-medium text-gray-900">
-                  {[viewTransfer.requester?.first_name, viewTransfer.requester?.last_name].filter(Boolean).join(' ') || '—'}
-                </p>
-              </div>
-              {viewTransfer.receiver && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Recibido por</p>
-                  <p className="font-medium text-gray-900">
-                    {[viewTransfer.receiver?.first_name, viewTransfer.receiver?.last_name].filter(Boolean).join(' ')}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {viewTransfer.notes && (
-              <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700">
-                <span className="font-medium text-gray-500">Notas: </span>{viewTransfer.notes}
-              </div>
-            )}
-
-            {/* Products */}
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">
-                Productos ({viewTransfer.details?.length || 0})
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {viewTransfer.details?.map((detail, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg px-4 py-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{detail.product?.name}</p>
-                        <p className="text-xs text-gray-500">SKU: {detail.product?.sku}</p>
-                        {detail.presentation && (
-                          <p className="text-xs text-gray-500">
-                            {detail.presentation.name} · {detail.package_quantity || 0} pqt + {detail.loose_units || 0} uds sueltas
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-sm font-semibold text-blue-600">
-                        {detail.quantity_requested} uds
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Actions if pending */}
-            {viewTransfer.status === 'pending' && (
-              <div className="flex gap-3 pt-2 border-t border-gray-100">
-                {hasPermission('inventory.receive') && (
-                  <Button
-                    variant="success"
-                    onClick={() => {
-                      setViewTransfer(null);
-                      setConfirmReceive(viewTransfer);
-                    }}
-                  >
-                    <Check className="w-4 h-4" />
-                    Recibir Transferencia
-                  </Button>
-                )}
-                {hasPermission('inventory.transfer') && (
-                  <Button
-                    variant="danger-outline"
-                    onClick={() => {
-                      setViewTransfer(null);
-                      openCancel(viewTransfer);
-                    }}
-                  >
-                    <Ban className="w-4 h-4" />
-                    Cancelar
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        transfer={viewTransfer}
+        hasPermission={hasPermission}
+        onReceive={(t) => setConfirmReceive(t)}
+        onCancel={(t) => openCancel(t)}
+      />
 
       {/* ── Receive ConfirmDialog ── */}
       <ConfirmDialog

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scan, Package, Plus, Minus, Check, X, ArrowLeft, Warehouse, AlertCircle, Camera, Keyboard } from 'lucide-react';
+import { Barcode, Package, Plus, Minus, Check, X, ArrowLeft, Warehouse, WarningCircle, Camera, Keyboard } from '@phosphor-icons/react';
 import { productService } from '../services/api/productService';
 import { inventoryService } from '../services/api/inventoryService';
 import { useAuth } from '../context/AuthContext';
@@ -264,7 +264,7 @@ const StockReplenishmentPage = () => {
                   {cameraError ? (
                     <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
                       <div>
-                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                        <WarningCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                         <p className="text-white mb-2">Error al acceder a la cámara</p>
                         <p className="text-gray-400 text-sm mb-4">{cameraError}</p>
                         <button
@@ -296,7 +296,7 @@ const StockReplenishmentPage = () => {
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <div className="text-center mb-6">
                   <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
-                    <Scan className="w-10 h-10 text-blue-600" />
+                    <Barcode className="w-10 h-10 text-blue-600" />
                   </div>
                   <h2 className="text-xl font-bold text-gray-900 mb-2">
                     Ingresa el Código de Barras
@@ -530,7 +530,7 @@ const StockReplenishmentPage = () => {
               {/* Validation warnings */}
               {!selectedPresentation && presentations.length > 0 && (
                 <div className="text-sm text-amber-700 bg-amber-50 border-2 border-amber-300 rounded-xl p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <WarningCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
                   <p className="font-medium">Debes seleccionar una presentación para continuar</p>
                 </div>
               )}
@@ -541,7 +541,7 @@ const StockReplenishmentPage = () => {
         {/* Alerts */}
         {error && (
           <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <WarningCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-red-800 font-medium">{error}</p>
             </div>

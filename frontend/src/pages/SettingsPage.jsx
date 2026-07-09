@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Shield, CheckSquare, Square, Building2, Printer, Users, Lock, Unlock } from 'lucide-react';
+import { Plus, Shield, CheckSquare, Square, Buildings, Printer, Users } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { userService } from '../services/api/userService';
 import { arService } from '../services/api/arService';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, SearchInput, Select, Table, Textarea,
+  EditAction, DeleteAction, ToggleLockAction,
 } from '../components/ui';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ const SettingsPage = () => {
 
   const { data: permsData } = useQuery({
     queryKey: ['permissions'],
-    queryFn: () => api.get('/permissions').then(r => r.data),
+    queryFn: () => api.get('/roles/permissions').then(r => r.data),
   });
   const permissions = permsData?.data?.permissions || [];
 
@@ -116,7 +117,7 @@ const SettingsPage = () => {
       ...(userRoleFilter && { roleId: userRoleFilter }),
     }),
   });
-  const users = usersData?.data?.users || usersData?.data || [];
+  const users = usersData?.data || [];
 
   // ── Mutations ──────────────────────────────────────────────────────────────────
   const roleSaveMutation = useMutation({
@@ -265,22 +266,13 @@ const SettingsPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
           {hasPermission('roles.manage') && (
             <>
-              <Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Editar">
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteRoleTarget(row.id)}
-                title="Eliminar"
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <EditAction onClick={() => handleEdit(row)} />
+              <DeleteAction onClick={() => setDeleteRoleTarget(row.id)} />
             </>
           )}
         </div>
@@ -301,22 +293,13 @@ const SettingsPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
-              <Button variant="ghost" size="sm" onClick={() => handleUserEdit(row)} title="Editar">
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setToggleUserTarget(row)}
-                title={row.is_active ? 'Desactivar' : 'Activar'}
-                className={row.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
-              >
-                {row.is_active ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-              </Button>
+              <EditAction onClick={() => handleUserEdit(row)} />
+              <ToggleLockAction active={row.is_active} onClick={() => setToggleUserTarget(row)} />
             </>
           )}
         </div>
@@ -343,7 +326,7 @@ const SettingsPage = () => {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           {hasPermission('settings.manage') && (
-            <TabBtn active={activeTab === 'empresa'} onClick={() => setActiveTab('empresa')} icon={Building2}>
+            <TabBtn active={activeTab === 'empresa'} onClick={() => setActiveTab('empresa')} icon={Buildings}>
               Empresa
             </TabBtn>
           )}

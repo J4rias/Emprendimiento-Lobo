@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Edit, Lock, Unlock } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api/userService';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, SearchInput, Select, Table,
+  EditAction, ToggleLockAction,
 } from '../components/ui';
 
 const emptyForm = () => ({
@@ -53,7 +54,7 @@ const UsersPage = () => {
     staleTime: Infinity,
   });
 
-  const users = usersData?.data?.users || [];
+  const users = usersData?.data || [];
   const roles = rolesData?.data?.roles || [];
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
@@ -144,22 +145,13 @@ const UsersPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, r) => (
         <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
-              <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(r)} title="Editar">
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setToggleTarget(r)}
-                title={r.is_active ? 'Desactivar' : 'Activar'}
-                className={r.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
-              >
-                {r.is_active ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-              </Button>
+              <EditAction onClick={() => handleEdit(r)} />
+              <ToggleLockAction active={r.is_active} onClick={() => setToggleTarget(r)} />
             </>
           )}
         </div>

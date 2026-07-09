@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Camera, AlertCircle } from 'lucide-react';
+import { UploadSimple, X, Camera, WarningCircle } from '@phosphor-icons/react';
 import api from '../../services/api/axios';
 
 const ImageUpload = ({
@@ -216,7 +216,7 @@ const ImageUpload = ({
             </div>
           ) : (
             <div className="space-y-2">
-              <Upload className="h-12 w-12 text-gray-400 mx-auto" />
+              <UploadSimple className="h-12 w-12 text-gray-400 mx-auto" />
               <p className="text-sm text-gray-600">{placeholder}</p>
               <p className="text-xs text-gray-500">
                 {multiple ? `Arrastra o click para subir hasta ${maxFiles} imágenes` : 'Arrastra o click para subir una imagen'}
@@ -229,7 +229,7 @@ const ImageUpload = ({
       {/* Error */}
       {error && (
         <div className="flex items-center gap-2 text-red-600 text-sm">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircle className="h-4 w-4" />
           <span>{error}</span>
         </div>
       )}

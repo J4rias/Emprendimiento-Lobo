@@ -4,7 +4,7 @@ import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart, RefreshCcw } from 'lucide-react';
+import { Calendar, DownloadSimple, Printer, CurrencyDollar, Wallet, Users, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 const DailyReportPage = () => {
@@ -243,7 +243,7 @@ const DailyReportPage = () => {
                                 {currencyTotals.map(([currency, total]) => (
                                     <div key={currency} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                                         <div className={`p-4 rounded-lg ${iconStyles[currency] || 'bg-gray-100 text-gray-600'}`}>
-                                            <DollarSign className="w-8 h-8" />
+                                            <CurrencyDollar className="w-8 h-8" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Recibido {currency}</p>
@@ -312,7 +312,7 @@ const DailyReportPage = () => {
                             {hasCreditCollections && (
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                                     <div className="p-4 bg-teal-100 rounded-lg text-teal-600">
-                                        <DollarSign className="w-8 h-8" />
+                                        <CurrencyDollar className="w-8 h-8" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Cobros de Credito</p>
@@ -331,7 +331,7 @@ const DailyReportPage = () => {
                             {hasRefunds && (
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-rose-200 flex items-center gap-4">
                                     <div className="p-4 bg-rose-100 rounded-lg text-rose-600">
-                                        <RefreshCcw className="w-8 h-8" />
+                                        <ArrowCounterClockwise className="w-8 h-8" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Devoluciones</p>
@@ -358,7 +358,7 @@ const DailyReportPage = () => {
                         <div className="p-6">
                             {Object.keys(report.paymentsBreakdown || {}).length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
-                                    <AlertCircle className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                                    <WarningCircle className="w-8 h-8 mx-auto text-gray-300 mb-2" />
                                     No se registraron pagos finalizados para esta fecha.
                                 </div>
                             ) : (

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Eye, Calendar, DollarSign, TrendingUp, ShoppingBag,
-  XCircle, Printer, Smartphone, CreditCard, RefreshCcw,
-} from 'lucide-react';
+  Calendar, CurrencyDollar, TrendUp, ShoppingBag,
+  XCircle, Printer, DeviceMobile, CreditCard,
+} from '@phosphor-icons/react';
 import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
@@ -13,9 +13,11 @@ import { formatDate } from '../utils/formatUtils';
 import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
 import SaleReturnModal from '../components/sales/SaleReturnModal';
+import SaleViewSheet from '../components/sales/SaleViewSheet';
 import {
   Alert, Badge, Button, Card, Modal,
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
+  ViewAction, PaymentAction, ReturnAction, CancelAction,
 } from '../components/ui';
 
 // ── Status / type config ──────────────────────────────────────────────────────
@@ -86,7 +88,7 @@ const SalesPage = () => {
     }),
     staleTime: 30_000,
   });
-  const sales      = salesData?.sales || [];
+  const sales      = salesData?.data || [];
   const totalPages = salesData?.pagination?.totalPages || 1;
   const total      = salesData?.pagination?.total || 0;
 
@@ -201,7 +203,7 @@ const SalesPage = () => {
   const handleViewDetail = async (saleId) => {
     try {
       const data = await saleService.getSaleById(saleId);
-      setSelectedSale(data.sale);
+      setSelectedSale(data.data);
       setShowDetailModal(true);
     } catch {
       toast.error('Error al cargar el detalle de la venta');
@@ -234,7 +236,7 @@ const SalesPage = () => {
   const handleOpenReturnModal = async (saleId) => {
     try {
       const data = await saleService.getSaleById(saleId);
-      setReturnSale(data.sale);
+      setReturnSale(data.data);
       setShowReturnModal(true);
     } catch {
       toast.error('Error al cargar el detalle de la venta para devolución');
@@ -337,25 +339,18 @@ const SalesPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => handleViewDetail(row.id)} title="Ver detalle">
-            <Eye className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => handleViewDetail(row.id)} />
           {(row.sale_type === 'credit' || row.sale_type === 'mixed') && row.status === 'pending' && (
-            <Button variant="ghost" size="sm" onClick={() => handleOpenPaymentModal(row)} title="Abonar Pago" className="text-emerald-600 hover:bg-emerald-50">
-              <CreditCard className="h-4 w-4" />
-            </Button>
+            <PaymentAction onClick={() => handleOpenPaymentModal(row)} title="Abonar Pago" />
           )}
           {row.status === 'completed' && (
-            <Button variant="ghost" size="sm" onClick={() => handleOpenReturnModal(row.id)} title="Generar Devolución" className="text-rose-600 hover:bg-rose-50">
-              <RefreshCcw className="h-4 w-4" />
-            </Button>
+            <ReturnAction onClick={() => handleOpenReturnModal(row.id)} />
           )}
           {row.status !== 'cancelled' && row.status !== 'returned' && (
-            <Button variant="ghost" size="sm" onClick={() => handleCancelSale(row.id)} title="Cancelar venta" className="text-red-600 hover:bg-red-50">
-              <XCircle className="h-4 w-4" />
-            </Button>
+            <CancelAction onClick={() => handleCancelSale(row.id)} title="Cancelar venta" />
           )}
         </div>
       ),
@@ -396,7 +391,7 @@ const SalesPage = () => {
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-green-600" />
+                <CurrencyDollar className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </Card>
@@ -409,7 +404,7 @@ const SalesPage = () => {
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
+                <TrendUp className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </Card>
@@ -477,131 +472,16 @@ const SalesPage = () => {
         />
       </Card>
 
-      {/* ── Detail modal ──────────────────────────────────────────────────────── */}
-      <Modal
+      {/* ── Detail sheet ──────────────────────────────────────────────────────── */}
+      <SaleViewSheet
         open={showDetailModal}
         onClose={() => setShowDetailModal(false)}
-        title={`Detalle de Venta — ${selectedSale?.sale_number || ''}`}
-        size="lg"
-      >
-        {selectedSale && (
-          <div className="space-y-6">
-            {/* Print actions */}
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={handlePrintTicket} className="text-blue-600 hover:bg-blue-50 border border-blue-100 text-xs font-bold">
-                <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handlePrintTicketPortable} className="text-amber-600 hover:bg-amber-50 border border-amber-100 text-xs font-bold">
-                <Smartphone className="w-3.5 h-3.5 mr-1" /> Portátil
-              </Button>
-            </div>
-
-            {/* Sale metadata */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg">
-              {[
-                { label: 'Fecha',    value: formatDate(selectedSale.sale_date) },
-                { label: 'Cliente',  value: getCustomerName(selectedSale.customer) },
-                { label: 'Vendedor', value: selectedSale.seller?.first_name || selectedSale.seller?.username || 'N/A' },
-                { label: 'Almacén',  value: selectedSale.warehouse?.name },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{label}</p>
-                  <p className="text-sm font-medium text-gray-800">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Items */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 mb-2 px-1">Resumen de Productos</h3>
-              <div className="border border-gray-100 rounded-lg overflow-hidden shadow-sm">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left   text-xs font-semibold text-gray-600 uppercase">Descripción</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-600 uppercase">Cant.</th>
-                      <th className="px-4 py-2.5 text-right  text-xs font-semibold text-gray-600 uppercase">P. Unit</th>
-                      <th className="px-4 py-2.5 text-right  text-xs font-semibold text-gray-600 uppercase">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {selectedSale.details?.map(detail => (
-                      <tr key={detail.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800">{detail.product?.name}</div>
-                          <div className="text-[11px] text-gray-500">{detail.presentation?.name}</div>
-                        </td>
-                        <td className="px-4 py-3 text-center text-gray-600 font-medium">{parseFloat(detail.quantity)}</td>
-                        <td className="px-4 py-3 text-right text-gray-600 font-medium">{copFormat(detail.unit_price, selectedSale.exchange_rate)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-gray-900">{copFormat(detail.total, selectedSale.exchange_rate)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Totals & payments */}
-            <div className="flex flex-col md:flex-row gap-6 border-t border-gray-100 pt-6">
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-gray-800 mb-2">Historial de Pagos</h3>
-                {selectedSale.payments?.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedSale.payments.map((p, i) => {
-                      let amountCOP = parseFloat(p.amount || 0);
-                      if (p.currency !== 'COP') {
-                        const amountUSD = amountCOP / parseFloat(p.exchange_rate || 1);
-                        amountCOP = amountUSD * parseFloat(selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
-                      }
-                      const showRate = p.currency && p.currency !== 'USD';
-                      const equivUSD = showRate ? parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1) : null;
-                      return (
-                        <div key={i} className="bg-slate-50 p-2 rounded space-y-0.5">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-500">{formatDate(p.payment_date)}</span>
-                            <span className="font-semibold text-slate-700 capitalize">
-                              {PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}
-                            </span>
-                            <span className="font-bold text-emerald-600">
-                              COP {Math.ceil(amountCOP).toLocaleString('es-VE')}
-                            </span>
-                          </div>
-                          {showRate && (
-                            <div className="text-[10px] text-gray-400 pl-1">
-                              {p.currency} {parseFloat(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} @ {parseFloat(p.exchange_rate).toFixed(2)} | Equiv: $ {equivUSD.toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400 italic">No hay pagos registrados</p>
-                )}
-              </div>
-              <div className="w-full md:w-64 space-y-2">
-                <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2 mt-2">
-                  <span className="text-gray-900">Total</span>
-                  <span className="text-blue-600">
-                    {copFormat(parseFloat(selectedSale.subtotal) - parseFloat(selectedSale.discount_amount), selectedSale.exchange_rate)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs pt-1">
-                  <span className="text-gray-500 italic">Monto Pagado</span>
-                  <span className="font-semibold text-emerald-600">{copFormat(selectedSale.paid_amount || 0, selectedSale.exchange_rate)}</span>
-                </div>
-              </div>
-            </div>
-
-            {selectedSale.notes && (
-              <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
-                <p className="text-[11px] font-bold text-amber-800 uppercase mb-1">Notas / Observaciones</p>
-                <p className="text-xs text-amber-900 whitespace-pre-wrap">{selectedSale.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        sale={selectedSale}
+        onPrint={handlePrintTicket}
+        onPrintPortable={handlePrintTicketPortable}
+        exchangeRates={exchangeRates}
+        calculateEffectiveRate={calculateEffectiveRate}
+      />
 
       {/* ── Payment modal ─────────────────────────────────────────────────────── */}
       <Modal

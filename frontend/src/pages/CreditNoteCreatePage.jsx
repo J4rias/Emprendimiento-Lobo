@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle } from '@phosphor-icons/react';
 import { creditNoteService } from '../services/api/creditNoteService';
 import { saleService } from '../services/api/saleService';
 import { Alert, Button, Card, Input, Select, Textarea } from '../components/ui';

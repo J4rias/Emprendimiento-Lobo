@@ -6,9 +6,9 @@ import { inventoryService } from '../services/api/inventoryService';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { toast } from 'sonner';
 import {
-  FileText, Download, Filter, TrendingUp, Package,
-  ShoppingCart, DollarSign, BarChart3
-} from 'lucide-react';
+  FileText, DownloadSimple, Funnel, TrendUp, Package,
+  ShoppingCart, CurrencyDollar, ChartBar
+} from '@phosphor-icons/react';
 import { Button, Card, DateRangeFilter, Select, Spinner } from '../components/ui';
 
 const SALES_PAGE_SIZE = 50;
@@ -712,13 +712,13 @@ const ReportsPage = () => {
         <p className="text-gray-600 mt-1">Genera y exporta reportes del sistema</p>
       </div>
 
-      {/* Filter area */}
+      {/* Funnel area */}
       <Card>
         <div className="flex flex-wrap items-end gap-4">
           {/* Report type */}
           <div className="min-w-[200px]">
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              <Filter className="w-3.5 h-3.5 inline mr-1" />
+              <Funnel className="w-3.5 h-3.5 inline mr-1" />
               Tipo de Reporte
             </label>
             <Select
@@ -747,7 +747,7 @@ const ReportsPage = () => {
           </Button>
           {reportData && reportData.length > 0 && (
             <Button variant="secondary" loading={exportingCSV} onClick={exportToCSV} disabled={exportingCSV}>
-              <Download className="w-4 h-4" />
+              <DownloadSimple className="w-4 h-4" />
               {exportingCSV ? 'Exportando...' : 'Exportar CSV'}
             </Button>
           )}

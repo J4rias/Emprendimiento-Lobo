@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Receipt, ArrowDownRight, ArrowUpRight, Loader, Info, Repeat } from 'lucide-react';
+import { X, Receipt, ArrowDownRight, ArrowUpRight, CircleNotch, Info, Repeat } from '@phosphor-icons/react';
 import { supplierService } from '../../services/api/supplierService';
 
 const formatCurrency = (amount, currency) => {
@@ -94,7 +94,7 @@ const SupplierStatementModal = ({ supplier, onClose }) => {
                     <div className="bg-gray-50 flex flex-col min-h-[500px] max-h-[80vh]">
                         {loading ? (
                             <div className="flex-1 flex flex-col items-center justify-center">
-                                <Loader className="h-10 w-10 text-blue-600 animate-spin mb-4" />
+                                <CircleNotch className="h-10 w-10 text-blue-600 animate-spin mb-4" />
                                 <p className="text-gray-500 font-medium">Generando balance financiero...</p>
                             </div>
                         ) : error ? (

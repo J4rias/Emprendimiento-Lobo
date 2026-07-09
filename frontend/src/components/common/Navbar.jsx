@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Menu, LogOut, User, Settings } from 'lucide-react'
+import { List, SignOut, User, Gear } from '@phosphor-icons/react'
 import { Sun, Moon } from '@phosphor-icons/react'
 import { useAuth } from '../../context/AuthContext'
 import { useCompany } from '../../context/CompanyContext'
@@ -33,7 +33,7 @@ const Navbar = ({ onMenuClick }) => {
                 onClick={onMenuClick}
                 className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 lg:hidden"
               >
-                <Menu className="h-6 w-6" />
+                <List className="h-6 w-6" />
               </button>
               <div className="flex-shrink-0 flex items-center ml-4 lg:ml-0">
                 <h1 className="text-xl font-bold text-primary-600">
@@ -68,7 +68,7 @@ const Navbar = ({ onMenuClick }) => {
                   className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   title="Configuración"
                 >
-                  <Settings className="h-5 w-5" />
+                  <Gear className="h-5 w-5" />
                 </button>
 
                 <button
@@ -76,7 +76,7 @@ const Navbar = ({ onMenuClick }) => {
                   className="p-2 rounded-md text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
                   title="Cerrar sesión"
                 >
-                  <LogOut className="h-5 w-5" />
+                  <SignOut className="h-5 w-5" />
                 </button>
               </div>
             </div>

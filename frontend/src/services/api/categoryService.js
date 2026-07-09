@@ -7,9 +7,9 @@ export const categoryService = {
     return response.data;
   },
 
-  // Get categories with product count
+  // Get categories with product count (all, no pagination limit)
   getWithProductCount: async () => {
-    const response = await api.get('/categories/with-count');
+    const response = await api.get('/categories', { params: { limit: 1000 } });
     return response.data;
   },
 

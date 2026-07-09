@@ -69,7 +69,7 @@ export const productService = {
   },
 
   searchByBarcode: async (barcode: string): Promise<ProductResponse> => {
-    const response = await api.get(`/products/barcode/${barcode}`);
+    const response = await api.get('/products', { params: { barcode } });
     return response.data;
   },
 

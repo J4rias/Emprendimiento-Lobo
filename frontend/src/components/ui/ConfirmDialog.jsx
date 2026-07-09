@@ -1,4 +1,4 @@
-import { Trash, Warning, Info } from '@phosphor-icons/react'
+import { Trash, Warning, Info, CheckCircle } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { cn } from '../../lib/utils'
@@ -20,6 +20,12 @@ const variants = {
     Icon: Info,
     iconClass: 'text-blue-500',
     confirmVariant: 'primary',
+    defaultConfirmLabel: 'Confirmar',
+  },
+  success: {
+    Icon: CheckCircle,
+    iconClass: 'text-green-500',
+    confirmVariant: 'success',
     defaultConfirmLabel: 'Confirmar',
   },
 }

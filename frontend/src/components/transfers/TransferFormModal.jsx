@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Package, Search, Check } from 'lucide-react';
+import { X, Plus, Trash, Package, MagnifyingGlass, Check } from '@phosphor-icons/react';
 import { warehouseService } from '../../services/api/warehouseService';
 import { inventoryService } from '../../services/api/inventoryService';
 import { toast } from 'sonner';
@@ -401,7 +401,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                           onClick={() => removeItem(index)}
                           className="text-red-600 hover:text-red-800"
                         >
-                          <Trash2 size={18} />
+                          <Trash size={18} />
                         </button>
                       </div>
 
@@ -412,7 +412,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                             Producto *
                           </label>
                           <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={18} />
+                            <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={18} />
                             <input
                               type="text"
                               placeholder="Buscar y seleccionar producto..."

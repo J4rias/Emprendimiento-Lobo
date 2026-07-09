@@ -1,5 +1,4 @@
-import { Eye, Edit2, XCircle } from 'lucide-react';
-import { Badge, Button, Table } from '../ui';
+import { Badge, Table, ViewAction, EditAction, CancelAction } from '../ui';
 
 const STATUS_LABEL = { recorded: 'Registrado', confirmed: 'Confirmado', cancelled: 'Cancelado' };
 const STATUS_VARIANT = { recorded: 'warning', confirmed: 'success', cancelled: 'error' };
@@ -118,18 +117,12 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
       accessor: 'id',
       render: (_, p) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" title="Ver detalle" onClick={() => onView(p)}>
-            <Eye className="w-4 h-4 text-primary-600" />
-          </Button>
+          <ViewAction onClick={() => onView(p)} />
           {hasPermission('supplier_payments.update') && p.status !== 'cancelled' && (
-            <Button variant="ghost" size="icon-sm" title="Editar" onClick={() => onEdit(p)}>
-              <Edit2 className="w-4 h-4 text-amber-600" />
-            </Button>
+            <EditAction onClick={() => onEdit(p)} />
           )}
           {hasPermission('supplier_payments.delete') && p.status !== 'cancelled' && (
-            <Button variant="ghost" size="icon-sm" title="Anular" onClick={() => onCancel(p)}>
-              <XCircle className="w-4 h-4 text-red-500" />
-            </Button>
+            <CancelAction onClick={() => onCancel(p)} title="Anular" />
           )}
         </div>
       ),

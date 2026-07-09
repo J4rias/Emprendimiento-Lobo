@@ -9,13 +9,16 @@ import { formatMoney } from '../utils/formatUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { toast } from 'sonner';
 import {
-  Plus, Eye, Edit, Check, X, Package, FileText,
-  DollarSign, TrendingUp, Clock, AlertCircle, XCircle, CreditCard,
-} from 'lucide-react';
+  Plus, XCircle,
+  CurrencyDollar, TrendUp, Clock,
+} from '@phosphor-icons/react';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Modal,
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
+  ViewAction, PaymentAction, EditAction, ApproveAction,
+  ReceiveAction, PartialReceiveAction, CancelAction,
 } from '../components/ui';
+import PurchaseOrderViewSheet from '../components/purchaseOrders/PurchaseOrderViewSheet';
 
 // ── Status / payment config ───────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -241,62 +244,29 @@ const PurchaseOrdersPage = () => {
     {
       key: 'actions',
       header: 'Acciones',
+      className: 'w-px',
       render: (_, row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row)} title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </Button>
+          <ViewAction onClick={() => handleView(row)} />
           {['partially_received', 'received'].includes(row.status) && hasPermission('supplier_payments.create') && (
-            <Button
-              variant="ghost" size="sm"
+            <PaymentAction
               onClick={() => navigate('/supplier-payments', { state: { prefillOrder: row } })}
               title="Registrar Pago"
-              className="text-emerald-600 hover:bg-emerald-50"
-            >
-              <CreditCard className="h-4 w-4" />
-            </Button>
+            />
           )}
           {row.status === 'draft' && hasPermission('purchases.update') && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => navigate(`/purchase-orders/edit/${row.id}`)}
-              title="Editar"
-              className="text-green-600 hover:bg-green-50"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+            <EditAction onClick={() => navigate(`/purchase-orders/edit/${row.id}`)} />
           )}
           {row.status === 'draft' && hasPermission('purchases.approve') && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => setApprovingOrderId(row.id)}
-              title="Aprobar"
-              className="text-purple-600 hover:bg-purple-50"
-            >
-              <Check className="h-4 w-4" />
-            </Button>
+            <ApproveAction onClick={() => setApprovingOrderId(row.id)} />
           )}
           {['sent', 'confirmed', 'partially_received'].includes(row.status) && hasPermission('purchases.receive') && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => navigate(`/purchase-orders/receive/${row.id}`)}
-              title={row.status === 'partially_received' ? 'Continuar recepción parcial' : 'Recibir mercancía'}
-              className={row.status === 'partially_received' ? 'text-amber-600 hover:bg-amber-100' : 'text-indigo-600 hover:bg-indigo-50'}
-            >
-              {row.status === 'partially_received'
-                ? <AlertCircle className="h-4 w-4" />
-                : <Package className="h-4 w-4" />}
-            </Button>
+            row.status === 'partially_received'
+              ? <PartialReceiveAction onClick={() => navigate(`/purchase-orders/receive/${row.id}`)} />
+              : <ReceiveAction onClick={() => navigate(`/purchase-orders/receive/${row.id}`)} />
           )}
           {!['received', 'cancelled'].includes(row.status) && hasPermission('purchases.delete') && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => { setCancellingOrderId(row.id); setCancelReason(''); }}
-              title="Cancelar"
-              className="text-red-600 hover:bg-red-50"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <CancelAction onClick={() => { setCancellingOrderId(row.id); setCancelReason(''); }} />
           )}
         </div>
       ),
@@ -349,7 +319,7 @@ const PurchaseOrdersPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Valor Total (COP)</span>
-              <DollarSign className="w-5 h-5 text-green-600" />
+              <CurrencyDollar className="w-5 h-5 text-green-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900 break-all">
               {formatMoney(totalValueInCOP(), '$', 0)}
@@ -358,7 +328,7 @@ const PurchaseOrdersPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">{PERIOD_LABELS[statsPeriod]}</span>
-              <TrendingUp className="w-5 h-5 text-purple-600" />
+              <TrendUp className="w-5 h-5 text-purple-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats.total_orders || 0}</p>
           </Card>
@@ -430,192 +400,12 @@ const PurchaseOrdersPage = () => {
         />
       </Card>
 
-      {/* ── View modal ────────────────────────────────────────────────────────── */}
-      <Modal
+      {/* ── View sheet ────────────────────────────────────────────────────────── */}
+      <PurchaseOrderViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingOrder(null); }}
-        title={viewingOrder ? `Orden de Compra: ${viewingOrder.order_number}` : ''}
-        size="xl"
-      >
-        {viewingOrder && (
-          <div className="space-y-6">
-            {/* Header info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Proveedor</p>
-                <p className="text-gray-900">{viewingOrder.supplier?.name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Almacén</p>
-                <p className="text-gray-900">{viewingOrder.warehouse?.name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Fecha de Orden</p>
-                <p className="text-gray-900">
-                  {new Date(viewingOrder.order_date).toLocaleDateString('es-VE')}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
-                <div className="mt-1 flex flex-col items-start gap-1">
-                  <Badge variant={STATUS_VARIANT[viewingOrder.status] || 'neutral'}>
-                    {STATUS_LABEL[viewingOrder.status] || viewingOrder.status}
-                  </Badge>
-                  {viewingOrder.payment_status && PAYMENT_LABEL[viewingOrder.payment_status] && (
-                    <Badge variant={PAYMENT_VARIANT[viewingOrder.payment_status] || 'neutral'}>
-                      {PAYMENT_LABEL[viewingOrder.payment_status]}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {viewingOrder.invoices?.length > 0 && (
-                <div className="col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100 ring-1 ring-blue-500/20">
-                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
-                    Documentos / Facturas del Proveedor
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {viewingOrder.invoices.map((inv, i) => (
-                      <span key={i} className="px-3 py-1 bg-white text-blue-700 font-bold rounded-full border border-blue-200 shadow-sm text-sm">
-                        #{inv}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Products table */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-3">Productos</h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['Producto', 'Presentación', 'Ordenado', 'Recibido', 'Costo Unit.', 'Total'].map(h => (
-                        <th key={h} className={`px-4 py-2 text-xs font-medium text-gray-500 ${['Ordenado','Recibido','Costo Unit.','Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {viewingOrder.details?.map(d => (
-                      <tr key={d.id}>
-                        <td className="px-4 py-2 text-sm text-gray-900">{d.product?.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{d.presentation?.name}</td>
-                        <td className="px-4 py-2 text-sm text-right">{d.package_quantity}p + {d.loose_units}u</td>
-                        <td className="px-4 py-2 text-sm text-gray-600 text-right">{d.received_package_quantity}p + {d.received_loose_units}u</td>
-                        <td className="px-4 py-2 text-sm text-right">{formatMoney(d.unit_cost, viewingOrder.currency)}</td>
-                        <td className="px-4 py-2 text-sm font-medium text-right">{formatMoney(d.line_total, viewingOrder.currency)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Totals */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              {[
-                { label: 'Subtotal', value: formatMoney(viewingOrder.subtotal, viewingOrder.currency) },
-                { label: 'Descuento', value: `-${formatMoney(viewingOrder.discount_amount, viewingOrder.currency)}`, cls: 'text-red-600' },
-                { label: 'Impuestos', value: formatMoney(viewingOrder.tax_amount, viewingOrder.currency) },
-              ].map(({ label, value, cls }) => (
-                <div key={label} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{label}:</span>
-                  <span className={`font-medium ${cls || ''}`}>{value}</span>
-                </div>
-              ))}
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total:</span>
-                <span className="text-blue-600">{formatMoney(viewingOrder.total, viewingOrder.currency)}</span>
-              </div>
-            </div>
-
-            {/* Reception history */}
-            {viewingOrder.reception_history?.length > 0 && (
-              <div className="border-t border-gray-100 pt-6">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-green-500 rounded-full" />
-                  Historial de Recepciones
-                </h3>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-[#f8fafc]">
-                      <tr>
-                        {['Fecha', 'Documento', 'Cantidad (U)', 'Recibido por'].map((h, i) => (
-                          <th key={h} className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase ${i === 2 ? 'text-center' : 'text-left'}`}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {viewingOrder.reception_history.map(rec => (
-                        <tr key={rec.id} className="hover:bg-blue-50/30 transition-colors">
-                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                            {new Date(rec.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold text-blue-600">
-                            {rec.document_number || viewingOrder.order_number}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-center font-bold text-green-600">
-                            +{parseFloat(rec.quantity).toLocaleString('es-VE')}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 italic">{rec.user}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Payment history */}
-            {viewingOrder.payment_history?.length > 0 && (
-              <div className="border-t border-gray-100 pt-6">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
-                  Historial de Pagos
-                </h3>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-[#f8fafc]">
-                      <tr>
-                        {['Fecha', 'Referencia de Pago', 'Método', 'Monto Distribuido (OC)'].map((h, i) => (
-                          <th key={h} className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {viewingOrder.payment_history.map((pay, i) => (
-                        <tr key={pay.id || i} className="hover:bg-blue-50/30 transition-colors">
-                          <td className="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
-                            {new Date(pay.payment_date).toLocaleDateString('es-VE')}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold text-blue-600">{pay.payment_number}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${PAYMENT_METHOD_COLOR[pay.payment_method] || PAYMENT_METHOD_COLOR.other}`}>
-                              {PAYMENT_METHOD_LABEL[pay.payment_method] || pay.payment_method}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-bold text-gray-900">
-                            {viewingOrder.currency} {parseFloat(pay.allocated_amount_po_currency).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {viewingOrder.notes && (
-              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Notas de la Orden</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingOrder.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        order={viewingOrder}
+      />
 
       {/* ── Cancel modal ──────────────────────────────────────────────────────── */}
       <Modal

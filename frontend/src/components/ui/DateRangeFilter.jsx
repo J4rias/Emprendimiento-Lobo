@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react'
+import { ArrowCounterClockwise } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import { Button } from './Button'
 
@@ -135,7 +135,7 @@ export function DateRangeFilter({
             onClick={() => onChange(getDefaultDateRange(defaultDays))}
             title="Restaurar rango por defecto"
           >
-            <RotateCcw size={15} />
+            <ArrowCounterClockwise size={15} />
           </Button>
         )}
       </div>

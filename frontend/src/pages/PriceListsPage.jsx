@@ -6,10 +6,10 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    Search, Download,
-    CheckCircle, AlertCircle, X,
-    Package, Printer, Lock, Unlock
-} from 'lucide-react';
+    MagnifyingGlass, DownloadSimple,
+    CheckCircle, WarningCircle, X,
+    Package, Printer, Lock, LockOpen
+} from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
 const PriceListsPage = () => {
@@ -450,7 +450,7 @@ const PriceListsPage = () => {
                                 )}
                                 {autoSaveStatus === 'error' && (
                                     <span className="text-red-600 flex items-center gap-1">
-                                        <AlertCircle className="w-3.5 h-3.5" /> Error al guardar
+                                        <WarningCircle className="w-3.5 h-3.5" /> Error al guardar
                                     </span>
                                 )}
                             </div>
@@ -461,7 +461,7 @@ const PriceListsPage = () => {
                                     <Printer className="w-4 h-4" /> Imprimir
                                 </button>
                                 <button onClick={() => handleExportCSV(editingList.id)} className="btn-secondary flex items-center gap-2" title="Exportar CSV">
-                                    <Download className="w-4 h-4" /> CSV
+                                    <DownloadSimple className="w-4 h-4" /> CSV
                                 </button>
                             </>
                         )}
@@ -476,7 +476,7 @@ const PriceListsPage = () => {
                                 <Package className="w-5 h-5 text-blue-600" /> Productos ({details.length})
                             </h2>
                             <div className="relative w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <input
                                     type="text"
                                     value={detailSearch}
@@ -553,7 +553,7 @@ const PriceListsPage = () => {
                                                                             className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
                                                                         </button>
                                                                         <span className="text-gray-500 font-medium text-xs">COP</span>
                                                                         <input
@@ -586,7 +586,7 @@ const PriceListsPage = () => {
                                                                             className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
                                                                         </button>
                                                                         <span className="text-gray-500 font-medium text-xs">{d.base_currency}</span>
                                                                         <input

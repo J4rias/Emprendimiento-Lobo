@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { inventoryService } from '../services/api/inventoryService';
-import { ArrowLeft, Package, Plus, Minus, AlertCircle, Check, X } from 'lucide-react';
+import { ArrowLeft, Package, Plus, Minus, WarningCircle, Check, X } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
 const InventoryAdjustPage = () => {
@@ -160,7 +160,7 @@ const InventoryAdjustPage = () => {
         
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <WarningCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium">Error</p>
               <p className="text-sm">{error}</p>
@@ -452,13 +452,13 @@ const InventoryAdjustPage = () => {
           {/* Validation warnings */}
           {!selectedPresentation && (
             <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <WarningCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <p>Debes seleccionar una presentación para continuar</p>
             </div>
           )}
           {totalUnits === 0 && selectedPresentation && (
             <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <WarningCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <p>Debes ingresar al menos un paquete o una unidad suelta</p>
             </div>
           )}

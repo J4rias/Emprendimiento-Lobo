@@ -1,4 +1,4 @@
-import { Edit, Image as ImageIcon, Package, DollarSign, Star } from 'lucide-react';
+import { PencilSimple, Image as ImageIcon, Package, CurrencyDollar, Star } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || window.location.origin;
@@ -133,7 +133,7 @@ const ProductViewSheet = ({ open, onClose, product, onEdit, hasPermission }) => 
                   </div>
                   <div className="bg-white rounded p-2 border border-gray-200 mt-2 flex gap-4 text-xs">
                     <div className="flex items-center gap-1">
-                      <DollarSign className="h-3 w-3 text-gray-400" />
+                      <CurrencyDollar className="h-3 w-3 text-gray-400" />
                       <span className="text-gray-500">Precio: </span>
                       <span className="font-semibold text-gray-900">
                         ${parseFloat(pres.package_price || 0).toFixed(2)}
@@ -205,7 +205,7 @@ const ProductViewSheet = ({ open, onClose, product, onEdit, hasPermission }) => 
           </Button>
           {hasPermission('products.update') && product.is_active && (
             <Button onClick={onEdit} className="flex-1">
-              <Edit className="h-4 w-4" />
+              <PencilSimple className="h-4 w-4" />
               Editar
             </Button>
           )}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, User, Mail, Phone, Star, Trash2, Edit2 } from 'lucide-react';
+import { Plus, User, Envelope, Phone, Star, Trash, PencilSimple } from '@phosphor-icons/react';
 
 const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) => {
   const [localContacts, setLocalContacts] = useState([]);
@@ -85,7 +85,7 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
             <div className="text-sm text-gray-600">
               {getPrimaryContact().email && (
                 <div className="flex items-center">
-                  <Mail className="h-3 w-3 mr-1" />
+                  <Envelope className="h-3 w-3 mr-1" />
                   {getPrimaryContact().email}
                 </div>
               )}
@@ -171,7 +171,7 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
                         {readonly ? (
                           contact.email && (
                             <div className="flex items-center text-gray-600">
-                              <Mail className="h-3 w-3 mr-1" />
+                              <Envelope className="h-3 w-3 mr-1" />
                               {contact.email}
                             </div>
                           )
@@ -237,7 +237,7 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
                         className="p-1 text-gray-400 hover:text-red-600"
                         title="Eliminar contacto"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash className="h-4 w-4" />
                       </button>
                     </div>
                   )}

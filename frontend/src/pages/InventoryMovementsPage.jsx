@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
-import { Package, TrendingUp, TrendingDown, Filter, FileText } from 'lucide-react';
+import { Package, TrendUp, TrendDown, Funnel, FileText } from '@phosphor-icons/react';
 
 const InventoryMovementsPage = () => {
   const [page, setPage] = useState(1);
@@ -28,10 +28,10 @@ const InventoryMovementsPage = () => {
     switch (type) {
       case 'ingreso':
       case 'ajuste_positivo':
-        return <TrendingUp className="w-5 h-5 text-green-600" />;
+        return <TrendUp className="w-5 h-5 text-green-600" />;
       case 'egreso':
       case 'ajuste_negativo':
-        return <TrendingDown className="w-5 h-5 text-red-600" />;
+        return <TrendDown className="w-5 h-5 text-red-600" />;
       default:
         return <Package className="w-5 h-5 text-gray-600" />;
     }
@@ -92,7 +92,7 @@ const InventoryMovementsPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Filter className="h-4 w-4 inline mr-1" />
+              <Funnel className="h-4 w-4 inline mr-1" />
               Tipo de Movimiento
             </label>
             <select

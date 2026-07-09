@@ -1,32 +1,32 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
+  SquaresFour,
   Package,
   Scan,
   Warehouse,
   ShoppingCart,
-  TrendingUp,
+  TrendUp,
   Users,
-  Settings,
-  ChevronDown,
-  ChevronRight,
+  Gear,
+  CaretDown,
+  CaretRight,
   Shield,
-  UserCog,
+  UserGear,
   UserCheck,
-  FileSpreadsheet,
+  ReadCvLogo,
   ShoppingBag,
-  BarChart3,
+  ChartBar,
   CreditCard,
-  ArrowRightLeft,
+  ArrowsLeftRight,
   X,
   Truck,
   FileX,
   Receipt,
   Calculator,
   BookOpen,
-  ClipboardList,
-  Bot,
-} from 'lucide-react';
+  ClipboardText,
+  Robot,
+} from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
 
@@ -64,7 +64,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const menuItems = [
     {
       name: 'Dashboard',
-      icon: LayoutDashboard,
+      icon: SquaresFour,
       path: '/dashboard',
       permission: null,
     },
@@ -82,7 +82,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       name: 'Transferencias',
-      icon: ArrowRightLeft,
+      icon: ArrowsLeftRight,
       path: '/transferencias',
       permission: 'inventory.transfer',
 
@@ -153,13 +153,13 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       name: 'Cotizaciones',
-      icon: FileSpreadsheet,
+      icon: ReadCvLogo,
       path: '/cotizaciones',
       permission: 'sales.quotes.view',
     },
     {
       name: 'Pre-Pedidos',
-      icon: Bot,
+      icon: Robot,
       path: '/pre-pedidos',
       permission: 'pre_orders.view',
     },
@@ -189,7 +189,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       name: 'Cuentas por Pagar',
-      icon: ClipboardList,
+      icon: ClipboardText,
       path: '/cuentas-por-pagar',
       permission: 'suppliers.view',
     },
@@ -213,7 +213,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       name: 'Reportes',
-      icon: BarChart3,
+      icon: ChartBar,
       path: '/reportes',
       permission: 'reports.view',
     },
@@ -286,9 +286,9 @@ const Sidebar = ({ isOpen, onClose }) => {
               {item.name}
             </div>
             {isOpen ? (
-              <ChevronDown className="h-4 w-4" />
+              <CaretDown className="h-4 w-4" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <CaretRight className="h-4 w-4" />
             )}
           </button>
 

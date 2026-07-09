@@ -1,5 +1,5 @@
-import { Eye, Edit, Trash2, Image as ImageIcon, Package } from 'lucide-react';
-import { Button, Badge, EmptyState, SkeletonTable, Pagination } from '../ui';
+import { Image as ImageIcon, Package } from '@phosphor-icons/react';
+import { Badge, EmptyState, SkeletonTable, Pagination, ViewAction, EditAction, DeleteAction } from '../ui';
 import { formatMoney } from '../../utils/formatUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -144,34 +144,12 @@ const ProductTable = ({
                       {hasActions && (
                         <td className="text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => onView(product)}
-                              title="Ver detalles"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <ViewAction onClick={() => onView(product)} />
                             {hasPermission('products.update') && product.is_active && (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => onEdit(product)}
-                                title="Editar"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              <EditAction onClick={() => onEdit(product)} />
                             )}
                             {hasPermission('products.delete') && product.is_active && (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => onDelete(product.id)}
-                                title="Eliminar"
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <DeleteAction onClick={() => onDelete(product.id)} />
                             )}
                           </div>
                         </td>

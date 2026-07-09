@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Phone, MapPin, BadgeDollarSign, AlertCircle, X } from 'lucide-react';
+import { User, Phone, MapPin, CurrencyCircleDollar, WarningCircle, X } from '@phosphor-icons/react';
 import { customerService } from '../services/api/customerService';
 
 const VE_DOC_TYPES = [
@@ -116,7 +116,7 @@ const CustomerQuickAdd = ({ onSave, onCancel, renderFooter = true }) => {
         <form id="customer-quick-add-form" onSubmit={handleSubmit} className="space-y-4 py-1">
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    <WarningCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-red-800 flex-1">{error}</p>
                     <button type="button" onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
                         <X className="h-3.5 w-3.5" />
@@ -210,7 +210,7 @@ const CustomerQuickAdd = ({ onSave, onCancel, renderFooter = true }) => {
 
                     <div className="mt-auto">
                         <div className="flex items-center gap-2 pb-1 border-b border-gray-100 mb-4">
-                            <BadgeDollarSign className="h-4 w-4 text-gray-400" />
+                            <CurrencyCircleDollar className="h-4 w-4 text-gray-400" />
                             <h3 className="text-xs font-semibold text-gray-500 uppercase">Crédito / Descuento</h3>
                         </div>
 
