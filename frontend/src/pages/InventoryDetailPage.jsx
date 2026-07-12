@@ -1,451 +1,518 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
-import { ArrowLeft, Package, Calendar, DollarSign, AlertTriangle, Warehouse, Edit, ArrowRightLeft } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { exchangeRateService } from '../services/api/exchangeRateService';
+import {
+  ArrowLeft, Package, Calendar, CurrencyDollar, Warning,
+  Warehouse, PencilSimple, ArrowsLeftRight,
+} from '@phosphor-icons/react';
+import {
+  Alert, Badge, Button, Card, DateRangeFilter, ExportCsvAction, getDefaultDateRange,
+  Pagination, Select, Spinner, useTableLimit,
+} from '../components/ui';
+import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
+import { downloadCSV } from '../utils/csvUtils';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const CURRENCIES = [
+  { code: 'USD', symbol: '$' },
+  { code: 'COP', symbol: 'COP$' },
+  { code: 'VES', symbol: 'Bs' },
+];
+
+// ─── Página ───────────────────────────────────────────────────────────────────
 
 const InventoryDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { token } = useAuth();
-  const [inventory, setInventory] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedCurrency, setSelectedCurrency] = useState('USD');
-  const [convertedValue, setConvertedValue] = useState(null);
-  const [movements, setMovements] = useState([]);
+  const [selectedCurrency, setSelectedCurrency] = useState(null);
 
-  const currencies = [
-    { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
-    { code: 'COP', name: 'Peso Colombiano', symbol: '$' },
-    { code: 'VES', name: 'Bolívar Venezolano', symbol: 'Bs' }
-  ];
+  // ── Filtros del kardex ─────────────────────────────────────────────────────
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
+  const [movType, setMovType]     = useState('');
+  const [movPage, setMovPage]     = useState(1);
+  const [movLimit, setMovLimit]   = useTableLimit();
 
-  useEffect(() => {
-    fetchInventoryDetail();
-    fetchMovements();
-  }, [id]);
+  const handleDateChange = (range) => { setDateRange(range); setMovPage(1); };
+  const handleTypeChange = (val)   => { setMovType(val);     setMovPage(1); };
 
-  const fetchMovements = async () => {
-    try {
-      const response = await inventoryService.getMovements({
-        product_id: inventory?.product_id, // We'll get this from inventory state later if needed
-        limit: 10
-      });
-      setMovements(response.data);
-    } catch (err) {
-      console.error('Error fetching movements:', err);
+  // ── Detalle de inventario ──────────────────────────────────────────────────
+  const {
+    data: inventory,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['inventory-detail', id],
+    queryFn: () => inventoryService.getById(id).then(r => r.data),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    onSuccess: (data) => {
+      const pres = data?.product?.presentations?.[0];
+      if (pres?.purchase_currency && !selectedCurrency) {
+        setSelectedCurrency(pres.purchase_currency);
+      }
+    },
+  });
+
+  // ── Historial de movimientos (Kardex) ─────────────────────────────────────
+  // Se cargan todos para que el balance corriente sea siempre exacto,
+  // sin importar el filtro de fechas o tipo activo.
+  const { data: movementsRaw = [], isLoading: loadingMovements } = useQuery({
+    queryKey: ['inventory-movements', inventory?.product_id],
+    queryFn: () =>
+      inventoryService.getMovements({ product_id: inventory.product_id, limit: 9999 })
+        .then(r => r.data || r),
+    enabled: !!inventory?.product_id,
+    staleTime: 60_000,
+  });
+
+  // ── Balance corriente ──────────────────────────────────────────────────────
+  // 1. Ordenar de más antiguo a más nuevo
+  // 2. Calcular saldo acumulado
+  // 3. Invertir (más nuevo primero)
+  // 4. Filtrar por fecha y tipo
+  // 5. Paginar
+  const { allKardex, filteredKardex, pagedKardex, totalMovPages } = (() => {
+    if (!movementsRaw.length) {
+      return { allKardex: [], filteredKardex: [], pagedKardex: [], totalMovPages: 1 };
     }
+
+    const sorted = [...movementsRaw].sort(
+      (a, b) => new Date(a.created_at) - new Date(b.created_at)
+    );
+
+    let balance = 0;
+    const withBalance = sorted.map(m => {
+      const rawQty = parseFloat(m.quantity) || 0;
+      // 'transferencia' persiste el signo en quantity (salida negativa, entrada positiva)
+      const delta = m.movement_type === 'transferencia'
+        ? rawQty
+        : (isPositiveMovement(m.movement_type) ? rawQty : -rawQty);
+      balance += delta;
+      return { ...m, qty: Math.abs(rawQty), positive: delta >= 0, balance };
+    });
+
+    const all = withBalance.reverse();
+
+    const dateFrom = dateRange.start_date ? new Date(`${dateRange.start_date}T00:00:00`) : null;
+    const dateTo   = dateRange.end_date   ? new Date(`${dateRange.end_date}T23:59:59`)   : null;
+
+    const filtered = all.filter(m => {
+      const d = new Date(m.created_at);
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo   && d > dateTo)   return false;
+      if (movType  && m.movement_type !== movType) return false;
+      return true;
+    });
+
+    const pages    = Math.max(1, Math.ceil(filtered.length / movLimit));
+    const safePage = Math.min(movPage, pages);
+    const paged    = filtered.slice((safePage - 1) * movLimit, safePage * movLimit);
+
+    return { allKardex: all, filteredKardex: filtered, pagedKardex: paged, totalMovPages: pages };
+  })();
+
+  // ── Conversión de moneda ───────────────────────────────────────────────────
+  const defaultPresentation = inventory?.product?.presentations?.find(p => p.is_default)
+    || inventory?.product?.presentations?.[0];
+  const originalCurrency  = defaultPresentation?.purchase_currency || 'USD';
+  const effectiveCurrency = selectedCurrency || originalCurrency;
+  const needsConversion   = effectiveCurrency !== originalCurrency;
+
+  const { data: conversionData } = useQuery({
+    queryKey: ['currency-convert', defaultPresentation?.cost, originalCurrency, effectiveCurrency],
+    queryFn: () =>
+      exchangeRateService.convert(
+        parseFloat(defaultPresentation.cost),
+        originalCurrency,
+        effectiveCurrency
+      ).then(r => r.data),
+    enabled: needsConversion && !!defaultPresentation?.cost,
+    staleTime: 5 * 60_000,
+  });
+
+  // ── Export CSV ────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const headers = ['Fecha', 'Tipo', 'Referencia', 'Entrada', 'Salida', 'Existencia', 'Motivo', 'Usuario'];
+    const rows = filteredKardex.map(m => [
+      new Date(m.created_at).toLocaleString('es-VE'),
+      m.movement_type,
+      m.document_number || '',
+      m.positive ? m.qty : '',
+      !m.positive ? m.qty : '',
+      Math.max(0, Math.round(m.balance)),
+      m.reason || '',
+      m.user
+        ? `${m.user.first_name || ''} ${m.user.last_name || ''}`.trim() || m.user.username
+        : 'Sistema',
+    ]);
+    const productName = inventory?.product?.name?.replace(/\s+/g, '_') || 'kardex';
+    downloadCSV(`kardex_${productName}`, headers, rows);
   };
 
-  const fetchInventoryDetail = async () => {
-    try {
-      const response = await inventoryService.getById(id);
-      setInventory(response.data);
+  // ─── Estados de carga/error ────────────────────────────────────────────────
 
-      // Set selected currency to the product's original currency
-      const presentation = response.data?.product?.presentations?.[0];
-      if (presentation?.purchase_currency) {
-        setSelectedCurrency(presentation.purchase_currency);
-      }
-
-      // Also fetch movements once we have the product_id
-      const movResponse = await inventoryService.getMovements({
-        product_id: response.data.product_id,
-        limit: 10
-      });
-      setMovements(movResponse.data || []);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar detalles del inventario');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const presentation = inventory?.product?.presentations?.[0];
-  const unitCost = parseFloat(presentation?.cost || 0);
-
-  // Convert unit cost when currency changes
-  useEffect(() => {
-    const convertValue = async () => {
-      if (!presentation) {
-        setConvertedValue(null);
-        return;
-      }
-
-      const originalCurrency = presentation.purchase_currency || 'USD';
-
-      // If selected currency is the same as original, no conversion needed
-      if (selectedCurrency === originalCurrency) {
-        setConvertedValue(null);
-        return;
-      }
-
-      try {
-        const unitCost = parseFloat(presentation.cost);
-        const response = await fetch(
-          `${API_URL}/exchange-rates/convert?amount=${unitCost}&from_currency=${originalCurrency}&to_currency=${selectedCurrency}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setConvertedValue(data.data);
-        } else {
-          setConvertedValue({ error: true });
-        }
-      } catch (error) {
-        console.error('Error converting currency:', error);
-        setConvertedValue({ error: true });
-      }
-    };
-
-    convertValue();
-  }, [selectedCurrency, inventory, token]);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando detalles...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Spinner size="lg" />
+        <p className="text-gray-500">Cargando detalles del inventario...</p>
       </div>
     );
   }
 
-  if (error || !inventory) {
+  if (isError || !inventory) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
-          <p className="font-medium">Error</p>
-          <p className="text-sm">{error}</p>
-        </div>
+        <Alert variant="error">
+          {error?.response?.data?.message || 'Error al cargar detalles del inventario'}
+        </Alert>
       </div>
     );
   }
 
-  return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/inventario')}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Detalles del Inventario</h1>
-            <p className="text-gray-600">Información detallada del producto en inventario</p>
+  // ─── Helpers de stock ─────────────────────────────────────────────────────
+
+  const totalUnits   = Math.floor(inventory.quantity);
+  const unitsPerPkg  = defaultPresentation?.units_per_package || 1;
+  const totalPackages = Math.floor(totalUnits / unitsPerPkg);
+  const looseUnits   = totalUnits % unitsPerPkg;
+  const reorderPoint = Math.floor(inventory.product.reorder_point || 0);
+
+  const stockStatus = totalUnits === 0
+    ? { label: 'Agotado', variant: 'error' }
+    : totalUnits <= reorderPoint
+    ? { label: 'Stock Bajo', variant: 'warning' }
+    : { label: 'Normal', variant: 'success' };
+
+  // ─── Costo ────────────────────────────────────────────────────────────────
+
+  const costValue = (() => {
+    const sym = CURRENCIES.find(c => c.code === effectiveCurrency)?.symbol || '$';
+    if (!needsConversion || !conversionData) {
+      const raw = parseFloat(defaultPresentation?.cost || 0);
+      return `${sym} ${raw.toFixed(2)} ${originalCurrency}`;
+    }
+    if (conversionData.error) return 'Tasa no disponible';
+    return `${sym} ${parseFloat(conversionData.converted_amount || 0).toFixed(2)} ${effectiveCurrency}`;
+  })();
+
+  // ─── Columnas del kardex ──────────────────────────────────────────────────
+
+  const kardexColumns = [
+    {
+      header: 'Fecha',
+      accessor: 'created_at',
+      render: (_, m) => (
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          {new Date(m.created_at).toLocaleString('es-VE', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          })}
+        </span>
+      ),
+    },
+    {
+      header: 'Tipo',
+      accessor: 'movement_type',
+      render: (_, m) => <MovementTypeBadge type={m.movement_type} />,
+    },
+    {
+      header: 'Referencia',
+      accessor: 'document_number',
+      render: (_, m) =>
+        m.document_number
+          ? <span className="text-xs font-mono text-gray-600">{m.document_number}</span>
+          : <span className="text-xs text-gray-400">—</span>,
+    },
+    {
+      header: 'Entrada',
+      accessor: 'qty_in',
+      cellClassName: 'text-right',
+      render: (_, m) =>
+        m.positive
+          ? <span className="text-sm font-semibold text-green-600">+{m.qty}</span>
+          : <span className="text-xs text-gray-300">—</span>,
+    },
+    {
+      header: 'Salida',
+      accessor: 'qty_out',
+      cellClassName: 'text-right',
+      render: (_, m) =>
+        !m.positive
+          ? <span className="text-sm font-semibold text-red-600">−{m.qty}</span>
+          : <span className="text-xs text-gray-300">—</span>,
+    },
+    {
+      header: 'Existencia',
+      accessor: 'balance',
+      cellClassName: 'text-right',
+      render: (_, m) => (
+        <span className="text-sm font-medium text-gray-900">
+          {Math.max(0, Math.round(m.balance))}
+        </span>
+      ),
+    },
+    {
+      header: 'Motivo / Usuario',
+      accessor: 'reason',
+      render: (_, m) => (
+        <div className="text-xs">
+          {m.reason && <div className="text-gray-600">{m.reason}</div>}
+          <div className="text-gray-400 mt-0.5">
+            {m.user
+              ? `${m.user.first_name || ''} ${m.user.last_name || ''}`.trim() || m.user.username
+              : 'Sistema'}
           </div>
         </div>
-        <button
-          onClick={() => navigate(`/inventario/${id}/adjust`)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+      ),
+    },
+  ];
+
+  // ─── Layout ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-6">
+      {/* Cabecera */}
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/inventario')}
+          className="mb-4 -ml-2 text-gray-600"
         >
-          <Edit className="w-4 h-4" />
-          Ajustar Stock
-        </button>
+          <ArrowLeft className="w-4 h-4" />
+          Volver al Inventario
+        </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{inventory.product.name}</h1>
+            <p className="text-gray-500 mt-0.5">SKU: {inventory.product.sku}</p>
+          </div>
+          <Button onClick={() => navigate(`/inventario/${id}/adjust`)}>
+            <PencilSimple className="w-4 h-4" />
+            Ajustar Stock
+          </Button>
+        </div>
       </div>
 
-      {/* Product Info */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Información del Producto</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Cards de resumen */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card variant="compact" className="text-center">
+          <Package className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+          <p className="text-xs text-gray-500 mb-1">Stock Actual</p>
+          <p className="text-3xl font-bold text-blue-600">{totalUnits}</p>
+          <p className="text-xs text-blue-700 mt-1 font-medium">
+            {totalPackages} pqt + {looseUnits} uds sueltas
+          </p>
+          <div className="mt-2">
+            <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
+          </div>
+        </Card>
+
+        <Card variant="compact" className="text-center">
+          <CurrencyDollar className="w-8 h-8 text-green-500 mx-auto mb-2" />
+          <p className="text-xs text-gray-500 mb-1">Costo Unitario</p>
+          <p className="text-xl font-bold text-green-600">{costValue}</p>
+          <div className="flex items-center justify-center gap-1 mt-2">
+            <select
+              value={effectiveCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-primary-200 bg-white"
+            >
+              {CURRENCIES.map(c => (
+                <option key={c.code} value={c.code}>{c.code}</option>
+              ))}
+            </select>
+          </div>
+        </Card>
+
+        <Card variant="compact" className="text-center">
+          <Warning className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+          <p className="text-xs text-gray-500 mb-1">Punto de Reorden</p>
+          <p className="text-3xl font-bold text-yellow-600">{reorderPoint}</p>
+          <p className="text-xs text-gray-400 mt-1">unidades mínimas</p>
+        </Card>
+      </div>
+
+      {/* Información del producto */}
+      <Card>
+        <h2 className="text-base font-semibold text-gray-900 mb-4">Información del Producto</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <p className="text-sm text-gray-600">Nombre del Producto</p>
-            <p className="font-medium">{inventory.product.name}</p>
+            <p className="text-xs text-gray-500 mb-0.5">Categoría</p>
+            <p className="font-medium text-gray-900">{inventory.product.category?.name || '—'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">SKU</p>
-            <p className="font-medium">{inventory.product.sku}</p>
+            <p className="text-xs text-gray-500 mb-0.5">Marca</p>
+            <p className="font-medium text-gray-900">{inventory.product.brand?.name || '—'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Categoría</p>
-            <p className="font-medium">{inventory.product.category?.name || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Marca</p>
-            <p className="font-medium">{inventory.product.brand?.name || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Tamaño de Unidad</p>
-            <p className="font-medium">
+            <p className="text-xs text-gray-500 mb-0.5">Tamaño</p>
+            <p className="font-medium text-gray-900">
               {inventory.product.unit_size
                 ? `${parseFloat(inventory.product.unit_size)} ${inventory.product.unit_size_measure || 'UND'}`
-                : inventory.product.unit_size_measure || 'UND'
-              }
+                : inventory.product.unit_size_measure || 'UND'}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Depósito</p>
-            <p className="font-medium flex items-center gap-2">
-              <Warehouse className="w-4 h-4" />
-              {inventory.warehouse?.name || 'N/A'}
+            <p className="text-xs text-gray-500 mb-0.5">Almacén</p>
+            <p className="font-medium text-gray-900 flex items-center gap-1">
+              <Warehouse className="w-3.5 h-3.5 text-gray-400" />
+              {inventory.warehouse?.name || '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5">Última actualización</p>
+            <p className="font-medium text-gray-900 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              {new Date(inventory.updated_at).toLocaleString('es-VE')}
             </p>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Presentations Info */}
-      {inventory.product.presentations && inventory.product.presentations.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Presentaciones del Producto
+      {/* Presentaciones */}
+      {inventory.product.presentations?.length > 0 && (
+        <Card>
+          <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Package className="w-4 h-4 text-gray-500" />
+            Presentaciones
           </h2>
           <div className="space-y-3">
-            {inventory.product.presentations.map((presentation) => (
+            {inventory.product.presentations.map((pres) => (
               <div
-                key={presentation.id}
-                className={`p-4 rounded-lg border-2 ${presentation.is_default
-                  ? 'bg-blue-50 border-blue-300'
-                  : 'bg-gray-50 border-gray-200'
-                  }`}
+                key={pres.id}
+                className={`p-4 rounded-lg border-2 ${
+                  pres.is_default ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900">{presentation.name}</h3>
-                      {presentation.is_default && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-600 text-white rounded-full">
-                          Predeterminada
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Código de barras: {presentation.barcode || 'N/A'}
-                    </p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="font-semibold text-gray-900 text-sm">{pres.name}</p>
+                  {pres.is_default && <Badge variant="primary">Predeterminada</Badge>}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
+                  <div>
+                    <span className="font-medium">Uds/paquete:</span> {pres.units_per_package}
+                  </div>
+                  <div>
+                    <span className="font-medium">Costo paquete:</span> ${parseFloat(pres.package_cost || 0).toFixed(2)} {pres.purchase_currency}
+                  </div>
+                  <div>
+                    <span className="font-medium">Precio paquete:</span> ${parseFloat(pres.package_price || 0).toFixed(2)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Costo unitario:</span> ${parseFloat(pres.cost || 0).toFixed(2)}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-600">Unidades por paquete</p>
-                    <p className="font-semibold text-gray-900">{presentation.units_per_package} uds</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Costo por paquete</p>
-                    <p className="font-semibold text-gray-900">
-                      ${parseFloat(presentation.package_cost || 0).toFixed(2)} {presentation.purchase_currency || 'USD'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Precio por paquete</p>
-                    <p className="font-semibold text-green-600">
-                      ${parseFloat(presentation.package_price || 0).toFixed(2)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Costo por unidad</p>
-                    <p className="font-semibold text-gray-900">
-                      ${parseFloat(presentation.cost || 0).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-
-                {presentation.description && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs text-gray-600">Descripción</p>
-                    <p className="text-sm text-gray-700">{presentation.description}</p>
-                  </div>
+                {pres.barcode && (
+                  <p className="text-xs text-gray-400 mt-1">Código: {pres.barcode}</p>
                 )}
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Stock Info */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Información de Stock</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Stock Actual</p>
-            <p className="text-2xl font-bold text-blue-600 mb-1">{Math.floor(inventory.quantity)}</p>
-            {(() => {
-              const defaultPres = inventory?.product?.presentations?.find(p => p.is_default) || inventory?.product?.presentations?.[0];
-              const unitsPerPacking = defaultPres?.units_per_package || 1;
-              const totalUnits = Math.floor(inventory.quantity);
-              const totalPackages = Math.floor(totalUnits / unitsPerPacking);
-              const totalUnitsInPackages = totalPackages * unitsPerPacking;
-              const totalLooseUnits = totalUnits % unitsPerPacking;
-
-              return (
-                <div className="text-xs text-blue-700 font-medium">
-                  {totalPackages} {totalPackages === 1 ? 'Paquete' : 'Paquetes'} ({totalUnitsInPackages} uds)
-                  <br />
-                  y {totalLooseUnits} {totalLooseUnits === 1 ? 'unidad suelta' : 'unidades sueltas'}
-                </div>
-              );
-            })()}
+      {/* Kardex de movimientos */}
+      <Card variant="flat" className="overflow-hidden">
+        {/* Header del kardex */}
+        <div className="px-4 pt-4 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ArrowsLeftRight className="w-4 h-4 text-gray-500" />
+            <h2 className="text-base font-semibold text-gray-900">Kardex de Movimientos</h2>
+            {filteredKardex.length > 0 && (
+              <span className="text-xs text-gray-400">
+                ({filteredKardex.length} movimientos)
+              </span>
+            )}
           </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <p className="text-sm text-gray-600">Valor Unitario</p>
-              <select
-                value={selectedCurrency}
-                onChange={(e) => setSelectedCurrency(e.target.value)}
-                className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
-                title="Seleccionar moneda"
-              >
-                {currencies.map((currency) => (
-                  <option key={currency.code} value={currency.code}>
-                    {currency.code}
-                  </option>
-                ))}
-              </select>
+          {filteredKardex.length > 0 && (
+            <ExportCsvAction onClick={handleExportCSV} title="Exportar kardex" />
+          )}
+        </div>
+
+        {/* Filtros */}
+        <div className="px-4 pb-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-end gap-3">
+            <DateRangeFilter
+              startDate={dateRange.start_date}
+              endDate={dateRange.end_date}
+              onChange={handleDateChange}
+              showPresets
+            />
+            <div className="w-44">
+              <Select
+                value={movType}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                options={MOVEMENT_TYPE_OPTIONS}
+              />
             </div>
-            {(() => {
-              const originalCurrency = presentation?.purchase_currency || 'USD';
-              const cost = presentation?.cost || '0.00';
-              const originalCurrencyInfo = currencies.find(c => c.code === originalCurrency);
-
-              if (convertedValue?.error) {
-                return (
-                  <div>
-                    <p className="text-2xl font-bold text-gray-400">
-                      N/A {selectedCurrency}
-                    </p>
-                    <p className="text-xs text-red-500 mt-1">
-                      Tasa no disponible
-                    </p>
-                  </div>
-                );
-              }
-
-              if (!convertedValue) {
-                // Show in original currency
-                return (
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">
-                      {originalCurrencyInfo?.symbol}{parseFloat(cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {originalCurrency}
-                    </p>
-                  </div>
-                );
-              } else {
-                // Show converted value
-                const selectedCurrencyInfo = currencies.find(c => c.code === selectedCurrency);
-                return (
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">
-                      {selectedCurrencyInfo?.symbol}{convertedValue.converted_amount?.toFixed(2)} {selectedCurrency}
-                    </p>
-                    <div className="flex items-center justify-center gap-1 mt-1">
-                      <ArrowRightLeft className="w-3 h-3 text-gray-400" />
-                      <p className="text-xs text-gray-500">
-                        {originalCurrencyInfo?.symbol}{parseFloat(cost).toFixed(2)} {originalCurrency} × {convertedValue.rate?.toFixed(4)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-            })()}
-          </div>
-          <div className="text-center p-4 bg-yellow-50 rounded-lg">
-            <AlertTriangle className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Punto de Pedido</p>
-            <p className="text-2xl font-bold text-yellow-600">{Math.floor(inventory.product.reorder_point)}</p>
           </div>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm text-gray-600">Última Actualización</p>
-              <p className="font-medium flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                {new Date(inventory.updated_at).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Estado</p>
-              <p className="font-medium">
-                {inventory.quantity === 0 ? (
-                  <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-                    Agotado
-                  </span>
-                ) : inventory.quantity <= inventory.product.reorder_point ? (
-                  <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                    Stock Bajo
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                    Normal
-                  </span>
-                )}
-              </p>
-            </div>
+        {/* Tabla */}
+        {loadingMovements ? (
+          <div className="flex items-center justify-center py-12">
+            <Spinner size="lg" />
           </div>
-        </div>
-      </div>
-
-      {/* Movement History */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <ArrowRightLeft className="w-5 h-5 text-gray-500" />
-          Historial de Movimientos
-        </h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-gray-500">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-              <tr>
-                <th className="px-4 py-3">Fecha</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Cantidad</th>
-                <th className="px-4 py-3">Motivo</th>
-                <th className="px-4 py-3">Usuario</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {movements.length > 0 ? (
-                movements.map((movement) => (
-                  <tr key={movement.id} className="bg-white hover:bg-gray-50 text-gray-900">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {new Date(movement.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${movement.movement_type.includes('positivo') || ['compra', 'devolucion_cliente'].includes(movement.movement_type)
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                        }`}>
-                        {movement.movement_type.replace(/_/g, ' ').toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium">
-                      {movement.movement_type.includes('positivo') || ['compra', 'devolucion_cliente'].includes(movement.movement_type) ? '+' : '-'}
-                      {parseFloat(movement.quantity)} uds
-                    </td>
-                    <td className="px-4 py-3">
-                      {movement.reason || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {movement.user ? `${movement.user.first_name || ''} ${movement.user.last_name || ''}`.trim() || movement.user.username : 'Sistema'}
-                    </td>
+        ) : allKardex.length === 0 ? (
+          <p className="text-center text-gray-400 py-10 text-sm">
+            No hay movimientos registrados para este producto
+          </p>
+        ) : filteredKardex.length === 0 ? (
+          <p className="text-center text-gray-400 py-10 text-sm">
+            No hay movimientos con los filtros activos
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {kardexColumns.map(col => (
+                      <th
+                        key={col.accessor}
+                        className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                          col.cellClassName?.includes('text-right') ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {col.header}
+                      </th>
+                    ))}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-gray-400">
-                    No hay movimientos registrados para este producto
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pagedKardex.map((m) => (
+                    <tr key={m.id} className="hover:bg-gray-50">
+                      {kardexColumns.map(col => (
+                        <td
+                          key={col.accessor}
+                          className={`px-4 py-3 ${col.cellClassName || ''}`}
+                        >
+                          {col.render(null, m)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              page={Math.min(movPage, totalMovPages)}
+              totalPages={totalMovPages}
+              total={filteredKardex.length}
+              limit={movLimit}
+              onPageChange={setMovPage}
+              onLimitChange={(l) => { setMovLimit(l); setMovPage(1); }}
+            />
+          </>
+        )}
+      </Card>
     </div>
   );
 };

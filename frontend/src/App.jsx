@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
 import Navbar from './components/common/Navbar';
@@ -42,6 +42,7 @@ const AccountsReceivablePage       = lazy(() => import('./pages/AccountsReceivab
 const ARCustomerDetailPage         = lazy(() => import('./pages/ARCustomerDetailPage'));
 const CatalogPage                  = lazy(() => import('./pages/CatalogPage'));
 const PreOrdersPage                = lazy(() => import('./pages/PreOrdersPage'));
+const SupplierStatementPage        = lazy(() => import('./pages/SupplierStatementPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-[400px] flex items-center justify-center">
@@ -69,14 +70,32 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+const COLLAPSED_KEY = 'atlas-sidebar-collapsed';
+
 const AppLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+
+  const handleCollapse = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(COLLAPSED_KEY, next); } catch {}
+      return next;
+    });
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <Navbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={collapsed}
+          onCollapse={handleCollapse}
+        />
         <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <ErrorBoundary>{children}</ErrorBoundary>
@@ -228,6 +247,16 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <SuppliersPage />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/proveedores/:id/estado-cuenta"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <SupplierStatementPage />
             </AppLayout>
           </PrivateRoute>
         }
@@ -446,28 +475,10 @@ function App() {
         <AppRoutes />
       </CompanyProvider>
       <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 4000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
+        position="bottom-right"
+        richColors
+        closeButton
+        toastOptions={{ duration: 3000 }}
       />
     </AuthProvider>
   );

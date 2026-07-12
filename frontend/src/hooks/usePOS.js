@@ -11,7 +11,7 @@ import { saleService } from '../services/api/saleService';
 import { posReservationService } from '../services/api/posReservationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // ============= CONSTANTS =============
 export const CURRENCIES = [
@@ -426,7 +426,7 @@ export function usePOS() {
     if (Object.keys(priceMap).length > 0) {
       recalculateCartPrices(activeTabId, priceMap);
     }
-  }, [displayCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayCurrency]);  
 
   // ============= STOCK HELPERS =============
   const getProductStockDetails = useCallback((product, presentation) => {
@@ -812,7 +812,7 @@ export function usePOS() {
       setPaymentLines([]);
       setNotes('');
 
-      toast.remove();
+      toast.dismiss();
       toast.success('¡Venta completada!');
     } catch (err) {
       if (err.response?.status === 409) {

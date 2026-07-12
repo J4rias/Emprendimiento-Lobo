@@ -6,11 +6,12 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import {
-    Search, Download,
-    CheckCircle, AlertCircle, X,
-    Package, Printer, Lock, Unlock
-} from 'lucide-react';
-import { toast } from 'react-hot-toast';
+    MagnifyingGlass, FileCsv,
+    CheckCircle, WarningCircle, X,
+    Package, Printer, Lock, LockOpen
+} from '@phosphor-icons/react';
+import { toast } from 'sonner';
+import { Button } from '../components/ui';
 
 const PriceListsPage = () => {
     useAuth();
@@ -57,7 +58,7 @@ const PriceListsPage = () => {
                 toast.error('Error al cargar la lista de precios');
             }
         })();
-    }, [ratesData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [ratesData]);  
 
     // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(
@@ -65,8 +66,8 @@ const PriceListsPage = () => {
         []
     );
     const autoSaveOnConflict = useCallback(() => {
-        if (editingListRef.current) openEditor(editingListRef.current); // eslint-disable-line react-hooks/exhaustive-deps
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        if (editingListRef.current) openEditor(editingListRef.current);  
+    }, []);  
 
     const { save: autoSaveDetail, status: autoSaveStatus, errorKeys: autoSaveErrorKeys } = useAutoSave({
         saveFn: autoSaveFn,
@@ -450,7 +451,7 @@ const PriceListsPage = () => {
                                 )}
                                 {autoSaveStatus === 'error' && (
                                     <span className="text-red-600 flex items-center gap-1">
-                                        <AlertCircle className="w-3.5 h-3.5" /> Error al guardar
+                                        <WarningCircle className="w-3.5 h-3.5" /> Error al guardar
                                     </span>
                                 )}
                             </div>
@@ -460,9 +461,9 @@ const PriceListsPage = () => {
                                 <button onClick={handlePrint} className="btn-secondary flex items-center gap-2" title="Imprimir">
                                     <Printer className="w-4 h-4" /> Imprimir
                                 </button>
-                                <button onClick={() => handleExportCSV(editingList.id)} className="btn-secondary flex items-center gap-2" title="Exportar CSV">
-                                    <Download className="w-4 h-4" /> CSV
-                                </button>
+                                <Button variant="secondary" size="icon" onClick={() => handleExportCSV(editingList.id)} title="Exportar CSV">
+                                    <FileCsv className="w-4 h-4 text-emerald-600" />
+                                </Button>
                             </>
                         )}
                     </div>
@@ -476,12 +477,12 @@ const PriceListsPage = () => {
                                 <Package className="w-5 h-5 text-blue-600" /> Productos ({details.length})
                             </h2>
                             <div className="relative w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <input
                                     type="text"
                                     value={detailSearch}
                                     onChange={e => setDetailSearch(e.target.value)}
-                                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent text-sm"
                                     placeholder="Buscar producto..."
                                 />
                                 {detailSearch && (
@@ -553,7 +554,7 @@ const PriceListsPage = () => {
                                                                             className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
                                                                         </button>
                                                                         <span className="text-gray-500 font-medium text-xs">COP</span>
                                                                         <input
@@ -566,7 +567,7 @@ const PriceListsPage = () => {
                                                                                 : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
                                                                             }
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                     <div className="text-gray-500 font-medium text-[11px]">
@@ -586,7 +587,7 @@ const PriceListsPage = () => {
                                                                             className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
                                                                         </button>
                                                                         <span className="text-gray-500 font-medium text-xs">{d.base_currency}</span>
                                                                         <input
@@ -595,7 +596,7 @@ const PriceListsPage = () => {
                                                                             min="0"
                                                                             value={d.package_price || ''}
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                 </>
@@ -609,7 +610,7 @@ const PriceListsPage = () => {
                                                             min="0"
                                                             value={d.package_price_usd || ''}
                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
-                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
+                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">

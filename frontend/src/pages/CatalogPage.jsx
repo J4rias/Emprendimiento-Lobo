@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ChevronUp, Flame, Sparkles, Package } from 'lucide-react';
+import { MagnifyingGlass, CaretUp, Fire, Sparkle, Package } from '@phosphor-icons/react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -100,13 +100,13 @@ const CatalogPage = () => {
             <p className="text-[10px] text-slate-400 leading-tight">Catálogo de Precios</p>
           </div>
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar producto..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-200 focus:border-transparent outline-none transition-all"
             />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold">
@@ -142,7 +142,7 @@ const CatalogPage = () => {
       <main ref={contentRef} className="flex-1 overflow-y-auto scroll-smooth">
         <div className="max-w-7xl mx-auto px-3 py-4 space-y-6">
 
-          {/* Search Results */}
+          {/* MagnifyingGlass Results */}
           {isSearching ? (
             <section>
               <p className="text-sm text-gray-500 mb-3">
@@ -163,7 +163,7 @@ const CatalogPage = () => {
               {/* Top Products */}
               {topProductsList.length > 0 && (
                 <section>
-                  <SectionTitle icon={<Flame className="w-4 h-4 text-orange-500" />} title="Productos Top" />
+                  <SectionTitle icon={<Fire className="w-4 h-4 text-orange-500" />} title="Productos Top" />
                   <HorizontalScroll products={topProductsList} />
                 </section>
               )}
@@ -171,7 +171,7 @@ const CatalogPage = () => {
               {/* New Arrivals */}
               {newArrivalsList.length > 0 && (
                 <section>
-                  <SectionTitle icon={<Sparkles className="w-4 h-4 text-emerald-500" />} title="Recién Llegados" />
+                  <SectionTitle icon={<Sparkle className="w-4 h-4 text-emerald-500" />} title="Recién Llegados" />
                   <HorizontalScroll products={newArrivalsList} />
                 </section>
               )}
@@ -217,7 +217,7 @@ const CatalogPage = () => {
           onClick={scrollToTop}
           className="fixed bottom-5 right-5 z-50 bg-slate-800 text-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
         >
-          <ChevronUp className="w-5 h-5" />
+          <CaretUp className="w-5 h-5" />
         </button>
       )}
     </div>

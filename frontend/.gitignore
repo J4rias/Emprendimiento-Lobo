@@ -1,0 +1,6 @@
+
+# Local-only tests (never commit)
+src/__tests__/local/
+e2e/
+playwright-report/
+test-results/

@@ -9,7 +9,7 @@ export const customerService = {
 
   // Get active customers (for dropdowns)
   getActive: async () => {
-    const response = await api.get('/customers/active');
+    const response = await api.get('/customers', { params: { is_active: true, limit: 1000 } });
     return response.data;
   },
 

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, refactor/frontend]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend — TypeScript + Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm tsc:check
+
+      - name: Paranoid model check
+        run: pnpm check:paranoid
+
+      - name: Security audit
+        run: pnpm audit:ci
+        continue-on-error: true  # informativo hasta limpiar xlsx/nodemailer
+
+  frontend:
+    name: Frontend — Build + Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build

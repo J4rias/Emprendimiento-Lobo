@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, RefreshCcw, FileX } from 'lucide-react';
+import { ShoppingBag, ArrowCounterClockwise, FileX } from '@phosphor-icons/react';
 import { creditNoteService } from '../../services/api/creditNoteService';
 import Modal from '../common/Modal';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
     const [returnItems, setReturnItems] = useState([]);
@@ -172,7 +172,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
             onClose={() => !submitting && onClose()}
             title={
                 <div className="flex items-center gap-2 text-rose-600">
-                    <RefreshCcw className="w-5 h-5" />
+                    <ArrowCounterClockwise className="w-5 h-5" />
                     <span>Generar Devolución - Venta {sale.sale_number}</span>
                 </div>
             }
@@ -186,7 +186,9 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                         <p className="text-xs font-semibold text-gray-500 uppercase">Cliente</p>
                         <p className="text-sm font-medium text-gray-900">
                             {sale.customer
-                                ? (sale.customer.businessName || `${sale.customer.firstName || ''} ${sale.customer.lastName || ''}`.trim() || 'Consumidor Final')
+                                ? (sale.customer.business_name || sale.customer.businessName
+                                    || `${sale.customer.first_name || sale.customer.firstName || ''} ${sale.customer.last_name || sale.customer.lastName || ''}`.trim()
+                                    || 'Consumidor Final')
                                 : 'Consumidor Final'}
                         </p>
                     </div>
@@ -239,7 +241,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                                     value={item.returnQuantity === 0 ? '' : item.returnQuantity}
                                                     onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                                                     placeholder="0"
-                                                    className="w-20 px-2 py-1 text-center border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    className="w-20 px-2 py-1 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
                                                 />
                                                 <button
                                                     type="button"
@@ -305,7 +307,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                 required
                                 value={refundMethod}
                                 onChange={(e) => setRefundMethod(e.target.value)}
-                                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-medium text-blue-900 bg-blue-50"
+                                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-primary-200 focus:border-primary-500 font-medium text-blue-900 bg-blue-50"
                             >
                                 <option value="credit_balance" disabled={!sale?.customer_id}>💰 Monedero (Saldo a Favor del Cliente){!sale?.customer_id ? ' — N/A Consumidor Final' : ''}</option>
                                 <option value="cash">💵 Entregar Efectivo Físico</option>

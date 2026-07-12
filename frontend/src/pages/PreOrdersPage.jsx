@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ViewAction } from '../components/ui';
 import {
-  Search,
-  Eye,
+  MagnifyingGlass,
   CheckCircle,
   XCircle,
   Clock,
   ShoppingCart,
-  MessageCircle,
-  Send,
+  ChatCircle,
+  PaperPlaneTilt,
   Globe,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react';
+  CaretLeft,
+  CaretRight,
+  ArrowClockwise,
+  Warning,
+} from '@phosphor-icons/react';
 import { preOrderService } from '../services/api/preOrderService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const PreOrdersPage = () => {
   const queryClient = useQueryClient();
@@ -102,8 +102,8 @@ const PreOrdersPage = () => {
 
   const getChannelIcon = (channel) => {
     switch (channel) {
-      case 'messenger': return <MessageCircle className="w-4 h-4 text-blue-500" title="Messenger" />;
-      case 'telegram': return <Send className="w-4 h-4 text-sky-500" title="Telegram" />;
+      case 'messenger': return <ChatCircle className="w-4 h-4 text-blue-500" title="Messenger" />;
+      case 'telegram': return <PaperPlaneTilt className="w-4 h-4 text-sky-500" title="Telegram" />;
       case 'web': return <Globe className="w-4 h-4 text-gray-500" title="Web" />;
       default: return null;
     }
@@ -120,7 +120,7 @@ const PreOrdersPage = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -130,7 +130,7 @@ const PreOrdersPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
           <div className="text-sm text-yellow-600">Pendientes</div>
@@ -176,7 +176,7 @@ const PreOrdersPage = () => {
           }}
           className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
-          <RefreshCw className="w-4 h-4" /> Actualizar
+          <ArrowClockwise className="w-4 h-4" /> Actualizar
         </button>
       </div>
 
@@ -220,13 +220,7 @@ const PreOrdersPage = () => {
                     {new Date(order.createdAt).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => openDetail(order)}
-                      className="text-primary-600 hover:text-primary-800"
-                      title="Ver detalle"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
+                    <ViewAction onClick={() => openDetail(order)} />
                   </td>
                 </tr>
               ))}
@@ -246,7 +240,7 @@ const PreOrdersPage = () => {
                 onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}
                 className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <CaretLeft className="w-5 h-5" />
               </button>
               <span className="text-sm text-gray-600">{pagination.page} / {pagination.totalPages}</span>
               <button
@@ -254,7 +248,7 @@ const PreOrdersPage = () => {
                 onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}
                 className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
               >
-                <ChevronRight className="w-5 h-5" />
+                <CaretRight className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -369,7 +363,7 @@ const PreOrdersPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-yellow-500" />
+              <Warning className="w-6 h-6 text-yellow-500" />
               <h3 className="text-lg font-bold text-gray-800">Convertir a venta</h3>
             </div>
             <p className="text-sm text-gray-600">

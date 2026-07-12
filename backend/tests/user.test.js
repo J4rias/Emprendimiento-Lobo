@@ -28,14 +28,21 @@ describe('Users API', () => {
       .get('/api/users')
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.data.users)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('POST /api/users con datos validos (username: TEST_USERNAME, password, role_id: 1) -> 201, body.data tiene id; guardar en createdUserId', async () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ username: TEST_USERNAME, password: 'password123', role_id: 1 });
+      .send({
+        username: TEST_USERNAME,
+        password: 'password123',
+        role_id: 1,
+        email: `${TEST_USERNAME}@test.local`,
+        first_name: 'Test',
+        last_name: 'Smoke',
+      });
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBeDefined();
     createdUserId = res.body.data.id;
@@ -45,7 +52,14 @@ describe('Users API', () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ username: TEST_USERNAME, password: 'password123', role_id: 1 });
+      .send({
+        username: TEST_USERNAME,
+        password: 'password123',
+        role_id: 1,
+        email: `${TEST_USERNAME}@test.local`,
+        first_name: 'Test',
+        last_name: 'Smoke',
+      });
     expect(res.status).toBe(409);
   });
 

@@ -1,34 +1,49 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Lock, Unlock } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
+import { useTableSort } from '../hooks/useTableSort';
+import { Plus } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api/userService';
+import {
+  Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, SearchInput, Select, Table,
+  EditAction, ToggleLockAction,
+} from '../components/ui';
+
+const emptyForm = () => ({
+  username: '',
+  email: '',
+  password: '',
+  first_name: '',
+  last_name: '',
+  phone: '',
+  role_id: '',
+  is_active: true,
+});
 
 const UsersPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
+
+  // ─── Filtros ─────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+
+  // ─── UI state ────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    first_name: '',
-    last_name: '',
-    phone: '',
-    role_id: '',
-    is_active: true,
-  });
+  const [toggleTarget, setToggleTarget] = useState(null);
+  const [formData, setFormData] = useState(emptyForm());
 
-  const { data: usersData, isLoading: loading } = useQuery({
+  // ─── Queries ─────────────────────────────────────────────────────────────────
+  const {
+    data: usersData,
+    isLoading,
+    isError: fetchError,
+  } = useQuery({
     queryKey: ['users', search, roleFilter],
     queryFn: () => userService.getAll({
-      ...(search && { search }),
+      ...(search    && { search }),
       ...(roleFilter && { roleId: roleFilter }),
     }),
     staleTime: 30_000,
@@ -40,139 +55,108 @@ const UsersPage = () => {
     staleTime: Infinity,
   });
 
-  const users = usersData?.data?.users || [];
-  const roles = rolesData?.data?.roles || [];
+  const usersRaw = usersData?.data || [];
+  const roles    = rolesData?.data?.roles || [];
+
+  const { sortBy: userSortBy, sortDir: userSortDir, onSort: userOnSort, sortedData: users } = useTableSort(usersRaw);
+
+  // ─── Mutations ───────────────────────────────────────────────────────────────
+  const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['users'] });
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      if (editingUser) {
-        return userService.update(editingUser.id, data);
-      }
+      if (editingUser) return userService.update(editingUser.id, data);
       return userService.create(data);
     },
     onSuccess: () => {
-      toast.success(editingUser ? 'Usuario actualizado' : 'Usuario creado');
-      setShowModal(false);
-      resetForm();
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(editingUser ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
+      handleCloseModal();
+      invalidateUsers();
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Error al guardar el usuario');
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Error al guardar el usuario');
     },
   });
 
   const toggleMutation = useMutation({
     mutationFn: (user) => userService.update(user.id, { is_active: !user.is_active }),
-    onSuccess: () => {
-      toast.success('Usuario actualizado');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+    onSuccess: (_, user) => {
+      toast.success(user.is_active ? 'Usuario desactivado' : 'Usuario activado');
+      invalidateUsers();
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Error al actualizar el usuario');
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Error al actualizar el usuario');
     },
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const payload = { ...formData };
-    if (editingUser && !payload.password) {
-      delete payload.password;
-    }
-    saveMutation.mutate(payload);
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData(emptyForm());
   };
 
   const handleEdit = (user) => {
     setEditingUser(user);
     setFormData({
-      username: user.username,
-      email: user.email,
-      password: '',
+      username:   user.username,
+      email:      user.email,
+      password:   '',
       first_name: user.first_name,
-      last_name: user.last_name,
-      phone: user.phone || '',
-      role_id: user.role_id,
-      is_active: user.is_active,
+      last_name:  user.last_name,
+      phone:      user.phone || '',
+      role_id:    user.role_id,
+      is_active:  user.is_active,
     });
     setShowModal(true);
   };
 
-  const handleToggleActive = async (user) => {
-    if (!window.confirm(`¿Está seguro de ${user.is_active ? 'desactivar' : 'activar'} este usuario?`)) return;
-    toggleMutation.mutate(user);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const payload = { ...formData };
+    if (editingUser && !payload.password) delete payload.password;
+    saveMutation.mutate(payload);
   };
 
-  const resetForm = () => {
-    setEditingUser(null);
-    setFormData({
-      username: '',
-      email: '',
-      password: '',
-      first_name: '',
-      last_name: '',
-      phone: '',
-      role_id: '',
-      is_active: true,
-    });
-  };
+  const set = (field) => (e) =>
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
+  // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { header: 'Usuario', accessor: 'username' },
+    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v) => v },
+    { key: 'name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_, r) => `${r.first_name} ${r.last_name}` },
+    { key: 'email',     header: 'Email',    render: (v) => v },
+    { key: 'phone',     header: 'Teléfono', render: (_, r) => r.phone || '—' },
+    { key: 'role',      header: 'Rol',      render: (_, r) => r.role?.name || '—' },
     {
-      header: 'Nombre',
-      accessor: (row) => `${row.first_name} ${row.last_name}`,
-    },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Teléfono', accessor: (row) => row.phone || '-' },
-    {
-      header: 'Rol',
-      accessor: (row) => row.role?.name || '-',
-    },
-    {
+      key: 'status',
       header: 'Estado',
-      accessor: (row) => (
-        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-          row.is_active
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {row.is_active ? 'Activo' : 'Inactivo'}
-        </span>
+      render: (_, r) => (
+        <Badge variant={r.is_active ? 'success' : 'neutral'}>
+          {r.is_active ? 'Activo' : 'Inactivo'}
+        </Badge>
       ),
     },
     {
+      key: 'last_login',
       header: 'Último acceso',
-      accessor: (row) => row.last_login
-        ? new Date(row.last_login).toLocaleDateString('es-PE')
-        : 'Nunca',
+      sortable: true,
+      sortKey: 'last_login',
+      render: (_, r) =>
+        r.last_login
+          ? new Date(r.last_login).toLocaleDateString('es-VE')
+          : 'Nunca',
     },
     {
+      key: 'actions',
       header: 'Acciones',
-      accessor: (row) => (
-        <div className="flex gap-2">
+      className: 'w-px',
+      render: (_, r) => (
+        <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
-              <button
-                onClick={() => handleEdit(row)}
-                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                title="Editar"
-              >
-                <Edit className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => handleToggleActive(row)}
-                className={`p-1 ${
-                  row.is_active
-                    ? 'text-orange-600 hover:bg-orange-50'
-                    : 'text-green-600 hover:bg-green-50'
-                } rounded`}
-                title={row.is_active ? 'Desactivar' : 'Activar'}
-              >
-                {row.is_active ? (
-                  <Lock className="h-4 w-4" />
-                ) : (
-                  <Unlock className="h-4 w-4" />
-                )}
-              </button>
+              <EditAction onClick={() => handleEdit(r)} />
+              <ToggleLockAction active={r.is_active} onClick={() => setToggleTarget(r)} />
             </>
           )}
         </div>
@@ -180,216 +164,160 @@ const UsersPage = () => {
     },
   ];
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
-          <p className="text-gray-600 mt-1">Gestiona los usuarios del sistema</p>
+          <h1 className="text-2xl font-bold text-gray-800">Usuarios</h1>
+          <p className="text-gray-500 mt-1">Gestiona los usuarios del sistema</p>
         </div>
         {hasPermission('users.create') && (
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-5 w-5" />
-            Nuevo Usuario
-          </button>
+          <Button onClick={() => { setFormData(emptyForm()); setEditingUser(null); setShowModal(true); }}>
+            <Plus className="h-4 w-4" /> Nuevo Usuario
+          </Button>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, usuario, email..."
+      {/* ── Error de carga ────────────────────────────────────────────────────── */}
+      {fetchError && (
+        <Alert variant="error" className="mb-4" dismissible>
+          Error al cargar los usuarios. Intenta de nuevo.
+        </Alert>
+      )}
+
+      {/* ── Filtros ───────────────────────────────────────────────────────────── */}
+      <Card variant="flat" >
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
+              onChange={setSearch}
+              placeholder="Buscar por nombre, usuario, email..."
             />
           </div>
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="input"
-          >
-            <option value="">Todos los roles</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-52">
+            <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+              <option value="">Todos los roles</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>{role.name}</option>
+              ))}
+            </Select>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
+      {/* ── Tabla ─────────────────────────────────────────────────────────────── */}
+      <Card variant="flat" className="overflow-hidden">
+        <Table
           columns={columns}
           data={users}
-          loading={loading}
+          loading={isLoading}
           emptyMessage="No se encontraron usuarios"
+          sortBy={userSortBy}
+          sortDir={userSortDir}
+          onSort={userOnSort}
         />
-      </div>
+      </Card>
 
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-          title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-        >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario *
-                </label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  className="input"
-                  required
-                  disabled={!!editingUser}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre *
-                </label>
-                <input
-                  type="text"
-                  value={formData.first_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, first_name: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellido *
-                </label>
-                <input
-                  type="text"
-                  value={formData.last_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, last_name: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={formData.role_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role_id: e.target.value })
-                  }
-                  className="input"
-                  required
-                >
-                  <option value="">Seleccione un rol</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contraseña {editingUser && '(dejar en blanco para no cambiar)'}
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="input"
-                  required={!editingUser}
-                  placeholder={editingUser ? 'Dejar en blanco para no cambiar' : ''}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) =>
-                      setFormData({ ...formData, is_active: e.target.checked })
-                    }
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Usuario activo</span>
-                </label>
-              </div>
+      {/* ── Modal crear / editar ──────────────────────────────────────────────── */}
+      <Modal
+        open={showModal}
+        onClose={handleCloseModal}
+        title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="user-form" loading={saveMutation.isPending}>
+              {editingUser ? 'Actualizar' : 'Crear'} Usuario
+            </Button>
+          </>
+        }
+      >
+        <form id="user-form" onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Usuario *"
+              value={formData.username}
+              onChange={set('username')}
+              required
+              disabled={!!editingUser}
+            />
+            <Input
+              label="Email *"
+              type="email"
+              value={formData.email}
+              onChange={set('email')}
+              required
+            />
+            <Input
+              label="Nombre *"
+              value={formData.first_name}
+              onChange={set('first_name')}
+              required
+            />
+            <Input
+              label="Apellido *"
+              value={formData.last_name}
+              onChange={set('last_name')}
+              required
+            />
+            <Input
+              label="Teléfono"
+              value={formData.phone}
+              onChange={set('phone')}
+            />
+            <Select
+              label="Rol *"
+              value={formData.role_id}
+              onChange={set('role_id')}
+              required
+            >
+              <option value="">Seleccione un rol</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>{role.name}</option>
+              ))}
+            </Select>
+            <div className="col-span-2">
+              <Input
+                label={editingUser ? 'Contraseña (dejar en blanco para no cambiar)' : 'Contraseña *'}
+                type="password"
+                value={formData.password}
+                onChange={set('password')}
+                required={!editingUser}
+                placeholder={editingUser ? 'Dejar en blanco para no cambiar' : ''}
+              />
             </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Usuario activo</span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary">
-                {editingUser ? 'Actualizar' : 'Crear'} Usuario
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {/* ── Confirmar cambio de estado ────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!toggleTarget}
+        onClose={() => setToggleTarget(null)}
+        onConfirm={() => { toggleMutation.mutate(toggleTarget); setToggleTarget(null); }}
+        loading={toggleMutation.isPending}
+        title={`${toggleTarget?.is_active ? 'Desactivar' : 'Activar'} usuario`}
+        description={`${toggleTarget?.first_name} ${toggleTarget?.last_name} ${toggleTarget?.is_active ? 'perderá acceso al sistema.' : 'recuperará acceso al sistema.'}`}
+        confirmLabel={toggleTarget?.is_active ? 'Desactivar' : 'Activar'}
+        variant="warning"
+      />
     </div>
   );
 };

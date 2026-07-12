@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Eye, X, AlertCircle, User, Phone, MapPin, BadgeDollarSign, Receipt } from 'lucide-react';
-import DataTable from '../components/common/DataTable';
-import Modal from '../components/common/Modal';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableSort } from '../hooks/useTableSort';
+import { Plus, User, Phone, MapPin, CurrencyCircleDollar } from '@phosphor-icons/react';
 import CustomerStatementModal from '../components/customers/CustomerStatementModal';
+import CustomerViewSheet from '../components/customers/CustomerViewSheet';
 import { useAuth } from '../context/AuthContext';
 import { customerService } from '../services/api/customerService';
+import {
+  Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, Pagination,
+  SearchInput, Select, Table, Textarea, useTableLimit,
+  ViewAction, StatementAction, EditAction, DeleteAction,
+} from '../components/ui';
 
-// Venezuelan document types
+// ── Venezuelan document types ────────────────────────────────────────────────
 const VE_DOC_TYPES = [
   { value: 'V', label: 'V - Venezolano/a' },
   { value: 'E', label: 'E - Extranjero/a' },
@@ -20,6 +26,9 @@ const DOC_TYPES_BY_TYPE = {
   natural: ['V', 'E', 'P'],
   juridical: ['J', 'G'],
 };
+
+const STATUS_VARIANT = { active: 'success', inactive: 'neutral', blocked: 'error' };
+const STATUS_LABEL   = { active: 'Activo', inactive: 'Inactivo', blocked: 'Bloqueado' };
 
 const emptyForm = () => ({
   type: 'natural',
@@ -45,512 +54,443 @@ const emptyForm = () => ({
 const CustomersPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState(null);
-  const [formError, setFormError] = useState(null);
+  const [limit, setLimit] = useTableLimit();
+
+  // ─── Filtros y paginación ────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
+  // ─── UI state ────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [viewingCustomer, setViewingCustomer] = useState(null);
   const [statementCustomer, setStatementCustomer] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
-  const [saving, setSaving] = useState(false);
 
-  const statusLabels = {
-    active: { text: 'Activo', class: 'bg-green-100 text-green-800' },
-    inactive: { text: 'Inactivo', class: 'bg-gray-100 text-gray-800' },
-    blocked: { text: 'Bloqueado', class: 'bg-red-100 text-red-800' },
-  };
+  // ─── Sort (server-side) ───────────────────────────────────────────────────────
+  const { sortBy: custSortBy, sortDir: custSortDir, onSort: _custOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
+  const custOnSort = (f, d) => { _custOnSort(f, d); setCurrentPage(1); };
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const { data: customersData, isLoading, error: fetchError } = useQuery({
-    queryKey: ['customers', currentPage, debouncedSearch, typeFilter, statusFilter],
+  // ─── Query ───────────────────────────────────────────────────────────────────
+  const {
+    data: customersData = {},
+    isLoading,
+    isError: fetchError,
+  } = useQuery({
+    queryKey: ['customers', currentPage, search, typeFilter, statusFilter, limit, custSortBy, custSortDir],
     queryFn: () => customerService.getAll({
-      page: currentPage, limit: 20,
-      search: debouncedSearch,
+      page: currentPage,
+      limit,
+      search: search || undefined,
       type: typeFilter || undefined,
       status: statusFilter || undefined,
+      sort_by: custSortBy,
+      sort_dir: custSortDir,
     }),
-    keepPreviousData: true,
     staleTime: 30_000,
   });
 
-  const customers = customersData?.data || [];
+  const customers  = customersData?.data || [];
   const totalPages = customersData?.pagination?.totalPages || 1;
-  const loading = isLoading;
-  const error = fetchError?.message || mutationError;
+  const total      = customersData?.pagination?.total || 0;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setFormError(null);
-    try {
-      if (editingCustomer) {
-        await customerService.update(editingCustomer.id, formData);
-      } else {
-        await customerService.create(formData);
-      }
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+  // ─── Mutations ───────────────────────────────────────────────────────────────
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['customers'] });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => customerService.create(data),
+    onSuccess: () => {
+      toast.success('Cliente creado exitosamente');
       handleCloseModal();
-    } catch (err) {
-      console.error('Save error:', err);
-      let msg = 'Error al guardar el cliente.';
+      invalidate();
+    },
+    onError: (err) => {
+      const d = err.response?.data;
+      let msg = d?.message || 'Error al crear el cliente';
+      if (d?.errors?.length) msg += ': ' + d.errors.map((e) => e.message).join(', ');
+      toast.error(msg);
+    },
+  });
 
-      if (err.response?.data) {
-        const data = err.response.data;
-        if (data.message) msg = data.message;
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => customerService.update(id, data),
+    onSuccess: () => {
+      toast.success('Cliente actualizado exitosamente');
+      handleCloseModal();
+      invalidate();
+    },
+    onError: (err) => {
+      const d = err.response?.data;
+      let msg = d?.message || 'Error al actualizar el cliente';
+      if (d?.errors?.length) msg += ': ' + d.errors.map((e) => e.message).join(', ');
+      toast.error(msg);
+    },
+  });
 
-        // Handle Sequelize/Backend validation array
-        if (data.errors && Array.isArray(data.errors)) {
-          const detail = data.errors.map(e => e.message).join(', ');
-          msg = `${msg}: ${detail}`;
-        }
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id) => customerService.delete(id),
+    onSuccess: () => {
+      toast.success('Cliente eliminado exitosamente');
+      setDeleteTarget(null);
+      invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Error al eliminar el cliente');
+      setDeleteTarget(null);
+    },
+  });
 
-      setFormError(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const handleView = (customer) => { setViewingCustomer(customer); setShowViewModal(true); };
-  const handleShowStatement = (customer) => { setStatementCustomer(customer); };
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+  const handleSearchChange = (value) => { setSearch(value); setCurrentPage(1); };
+  const handleTypeFilter   = (e) => { setTypeFilter(e.target.value); setCurrentPage(1); };
+  const handleStatusFilter = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+
+  const handleView          = (c) => { setViewingCustomer(c); setShowViewModal(true); };
+  const handleShowStatement = (c) => setStatementCustomer(c);
 
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
     setFormData({
-      type: customer.type || 'natural',
-      documentType: customer.documentType || 'V',
-      documentNumber: customer.documentNumber || '',
-      businessName: customer.businessName || '',
-      tradeName: customer.tradeName || '',
-      firstName: customer.firstName || '',
-      lastName: customer.lastName || '',
-      email: customer.email || '',
-      phone: customer.phone || '',
-      mobile: customer.mobile || '',
-      address: customer.address || '',
-      city: customer.city || '',
-      state: customer.state || '',
-      creditLimit: customer.creditLimit || 0,
-      creditDays: customer.creditDays || 0,
-      priceListId: customer.priceListId || null,
+      type:               customer.type || 'natural',
+      documentType:       customer.documentType || 'V',
+      documentNumber:     customer.documentNumber || '',
+      businessName:       customer.businessName || '',
+      tradeName:          customer.tradeName || '',
+      firstName:          customer.firstName || '',
+      lastName:           customer.lastName || '',
+      email:              customer.email || '',
+      phone:              customer.phone || '',
+      mobile:             customer.mobile || '',
+      address:            customer.address || '',
+      city:               customer.city || '',
+      state:              customer.state || '',
+      creditLimit:        customer.creditLimit || 0,
+      creditDays:         customer.creditDays || 0,
+      priceListId:        customer.priceListId || null,
       discountPercentage: customer.discountPercentage || 0,
-      notes: customer.notes || '',
+      notes:              customer.notes || '',
     });
-    setFormError(null);
     setShowModal(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este cliente?')) {
-      try {
-        await customerService.delete(id);
-        queryClient.invalidateQueries({ queryKey: ['customers'] });
-      } catch (err) {
-        setMutationError(err.response?.data?.message || 'Error al eliminar el cliente');
-      }
-    }
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingCustomer(null);
     setFormData(emptyForm());
-    setFormError(null);
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'type') {
       const validDocs = DOC_TYPES_BY_TYPE[value];
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         type: value,
         documentType: validDocs.includes(prev.documentType) ? prev.documentType : validDocs[0],
       }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
-  const availableDocTypes = VE_DOC_TYPES.filter(d => DOC_TYPES_BY_TYPE[formData.type]?.includes(d.value));
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editingCustomer) {
+      updateMutation.mutate({ id: editingCustomer.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
 
+  const availableDocTypes = VE_DOC_TYPES.filter((d) =>
+    DOC_TYPES_BY_TYPE[formData.type]?.includes(d.value)
+  );
+
+  // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { header: 'Código', accessor: 'code' },
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v) => v },
     {
+      key: 'name',
       header: 'Nombre / Razón Social',
-      accessor: (row) => row.type === 'juridical'
-        ? (row.businessName || row.tradeName)
-        : `${row.firstName} ${row.lastName}`,
+      sortable: true,
+      sortKey: 'firstName',
+      render: (_, row) =>
+        row.type === 'juridical'
+          ? row.businessName || row.tradeName
+          : `${row.firstName} ${row.lastName}`,
     },
-    { header: 'Tipo', accessor: (row) => row.type === 'natural' ? 'Natural' : 'Jurídica' },
-    { header: 'Documento', accessor: (row) => `${row.documentType}-${row.documentNumber}` },
-    { header: 'Teléfono', accessor: (row) => row.phone || row.mobile || '-' },
     {
+      key: 'type',
+      header: 'Tipo',
+      render: (_, row) => (row.type === 'natural' ? 'Natural' : 'Jurídica'),
+    },
+    {
+      key: 'document',
+      header: 'Documento',
+      render: (_, row) => `${row.documentType}-${row.documentNumber}`,
+    },
+    {
+      key: 'phone',
+      header: 'Teléfono',
+      render: (_, row) => row.phone || row.mobile || '—',
+    },
+    {
+      key: 'status',
       header: 'Estado',
-      accessor: (row) => {
-        const s = statusLabels[row.status] || statusLabels.active;
-        return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${s.class}`}>{s.text}</span>;
-      },
+      sortable: true,
+      sortKey: 'status',
+      render: (_, row) => (
+        <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
+          {STATUS_LABEL[row.status] || row.status}
+        </Badge>
+      ),
     },
     {
+      key: 'actions',
       header: 'Acciones',
-      accessor: (row) => (
-        <div className="flex gap-2">
-          <button onClick={() => handleView(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Ver detalles">
-            <Eye className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleShowStatement(row)} className="p-1 text-teal-600 hover:bg-teal-50 rounded" title="Estado de Cuenta (Kardex)">
-            <Receipt className="h-4 w-4" />
-          </button>
+      className: 'w-px',
+      render: (_, row) => (
+        <div className="flex gap-1">
+          <ViewAction onClick={() => handleView(row)} />
+          <StatementAction onClick={() => handleShowStatement(row)} />
           {hasPermission('customers.update') && (
-            <button onClick={() => handleEdit(row)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Editar">
-              <Edit className="h-4 w-4" />
-            </button>
+            <EditAction onClick={() => handleEdit(row)} />
           )}
           {hasPermission('customers.delete') && (
-            <button onClick={() => handleDelete(row.id)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Eliminar">
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <DeleteAction onClick={() => setDeleteTarget(row)} />
           )}
         </div>
       ),
     },
   ];
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Page-level Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-          <p className="text-red-800 flex-1">{error}</p>
-          <button onClick={() => setMutationError(null)} className="text-red-500 hover:text-red-700">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Header */}
+      {/* ── Cabecera ──────────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-          <p className="text-gray-500 mt-1 text-sm">Gestiona la información de tus clientes</p>
+          <h1 className="text-2xl font-bold text-gray-800">Clientes</h1>
+          <p className="text-gray-500 mt-1">Gestiona la información de tus clientes</p>
         </div>
         {hasPermission('customers.create') && (
-          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
-            <Plus className="h-5 w-5" /> Nuevo Cliente
-          </button>
+          <Button onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4" /> Nuevo Cliente
+          </Button>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input type="text" placeholder="Buscar por nombre, documento..." value={search}
-              onChange={(e) => setSearch(e.target.value)} className="input pl-10 w-full" />
+      {/* ── Error de carga ────────────────────────────────────────────────────── */}
+      {fetchError && (
+        <Alert variant="error" className="mb-4" dismissible>
+          Error al cargar los clientes. Intenta de nuevo.
+        </Alert>
+      )}
+
+      {/* ── Filtros ───────────────────────────────────────────────────────────── */}
+      <Card variant="flat" >
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <SearchInput
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Buscar por nombre, documento..."
+            />
           </div>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="input">
-            <option value="">Todos los tipos</option>
-            <option value="natural">Persona Natural</option>
-            <option value="juridical">Persona Jurídica</option>
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input">
-            <option value="">Todos los estados</option>
-            <option value="active">Activo</option>
-            <option value="inactive">Inactivo</option>
-            <option value="blocked">Bloqueado</option>
-          </select>
+          <div className="w-52">
+            <Select value={typeFilter} onChange={handleTypeFilter}>
+              <option value="">Todos los tipos</option>
+              <option value="natural">Persona Natural</option>
+              <option value="juridical">Persona Jurídica</option>
+            </Select>
+          </div>
+          <div className="w-44">
+            <Select value={statusFilter} onChange={handleStatusFilter}>
+              <option value="">Todos los estados</option>
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+              <option value="blocked">Bloqueado</option>
+            </Select>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <DataTable columns={columns} data={customers} loading={loading}
-          emptyMessage="No se encontraron clientes. Crea el primero con 'Nuevo Cliente'." />
-      </div>
+      {/* ── Tabla ─────────────────────────────────────────────────────────────── */}
+      <Card variant="flat" className="overflow-hidden">
+        <Table
+          columns={columns}
+          data={customers}
+          loading={isLoading}
+          emptyMessage="No se encontraron clientes. Crea el primero con 'Nuevo Cliente'."
+          sortBy={custSortBy}
+          sortDir={custSortDir}
+          onSort={custOnSort}
+        />
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={setCurrentPage}
+          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+        />
+      </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}
-            className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">Anterior</button>
-          <span className="px-3 py-1.5 text-sm text-gray-600">{currentPage} / {totalPages}</span>
-          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}
-            className="px-3 py-1.5 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">Siguiente</button>
-        </div>
-      )}
+      {/* ── Modal crear / editar ──────────────────────────────────────────────── */}
+      <Modal
+        open={showModal}
+        onClose={handleCloseModal}
+        title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
 
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <Modal isOpen={showModal} onClose={handleCloseModal}
-          title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'} size="lg">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ── Identificación ── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+              <User className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Identificación</h3>
+            </div>
 
-            {/* Form-level error */}
-            {formError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-red-800 flex-1">{formError}</p>
-                <button type="button" onClick={() => setFormError(null)} className="text-red-500 hover:text-red-700">
-                  <X className="h-3.5 w-3.5" />
-                </button>
+            <div className="grid grid-cols-2 gap-4">
+              <Select label="Tipo de Cliente *" name="type" value={formData.type} onChange={handleChange} required>
+                <option value="natural">Persona Natural</option>
+                <option value="juridical">Persona Jurídica</option>
+              </Select>
+              <Select
+                label="Tipo de Documento *"
+                name="documentType"
+                value={formData.documentType}
+                onChange={handleChange}
+                required
+                options={availableDocTypes}
+              />
+            </div>
+
+            {/* Número de documento con prefijo */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Número de Documento <span className="text-red-500">*</span>
+              </label>
+              <div className="flex">
+                <span className="inline-flex items-center px-3 border border-r-0 border-gray-300 rounded-l-md bg-gray-50 text-gray-700 text-sm font-bold">
+                  {formData.documentType}-
+                </span>
+                <input
+                  type="text"
+                  name="documentNumber"
+                  value={formData.documentNumber}
+                  onChange={handleChange}
+                  required
+                  placeholder={formData.documentType === 'J' ? 'Ej: 12345678-9' : 'Ej: 12345678'}
+                  className="flex-1 h-9 px-3 text-sm rounded-r-md border border-gray-300 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-primary-500 focus:ring-primary-200"
+                />
               </div>
-            )}
+            </div>
 
-            {/* ── Identificación ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                <User className="h-4 w-4 text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Identificación</h3>
-              </div>
-
+            {formData.type === 'natural' ? (
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Cliente <span className="text-red-500">*</span>
-                  </label>
-                  <select name="type" value={formData.type} onChange={handleChange} className="input w-full" required>
-                    <option value="natural">Persona Natural</option>
-                    <option value="juridical">Persona Jurídica</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Documento <span className="text-red-500">*</span>
-                  </label>
-                  <select name="documentType" value={formData.documentType} onChange={handleChange} className="input w-full" required>
-                    {availableDocTypes.map(d => (
-                      <option key={d.value} value={d.value}>{d.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Input label="Nombre *" name="firstName" value={formData.firstName} onChange={handleChange} required placeholder="Ej: Juan" />
+                <Input label="Apellido *" name="lastName" value={formData.lastName} onChange={handleChange} required placeholder="Ej: Pérez" />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Número de Documento <span className="text-red-500">*</span>
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-700 text-sm font-bold">
-                    {formData.documentType}-
-                  </span>
-                  <input type="text" name="documentNumber" value={formData.documentNumber}
-                    onChange={handleChange} className="input flex-1 rounded-l-none" required
-                    placeholder={formData.documentType === 'J' ? 'Ej: 12345678-9' : 'Ej: 12345678'} />
-                </div>
-              </div>
-
-              {formData.type === 'natural' ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre <span className="text-red-500">*</span></label>
-                    <input type="text" name="firstName" value={formData.firstName} onChange={handleChange}
-                      className="input w-full" required placeholder="Ej: Juan" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Apellido <span className="text-red-500">*</span></label>
-                    <input type="text" name="lastName" value={formData.lastName} onChange={handleChange}
-                      className="input w-full" required placeholder="Ej: Pérez" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social <span className="text-red-500">*</span></label>
-                    <input type="text" name="businessName" value={formData.businessName} onChange={handleChange}
-                      className="input w-full" required placeholder="Ej: Mi Empresa C.A." />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Comercial</label>
-                    <input type="text" name="tradeName" value={formData.tradeName} onChange={handleChange}
-                      className="input w-full" placeholder="Opcional" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Contacto ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Contacto</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleChange}
-                    className="input w-full" placeholder="correo@ejemplo.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                  <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
-                    className="input w-full" placeholder="0212-000-0000" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
-                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                    className="input w-full" placeholder="0414-000-0000" />
-                </div>
-              </div>
-            </div>
-
-            {/* ── Dirección ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                <MapPin className="h-4 w-4 text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Dirección</h3>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                <input type="text" name="address" value={formData.address} onChange={handleChange}
-                  className="input w-full" placeholder="Calle, Urbanización, Edificio..." />
-              </div>
+            ) : (
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad / Municipio</label>
-                  <input type="text" name="city" value={formData.city} onChange={handleChange}
-                    className="input w-full" placeholder="Ej: Caracas" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                  <input type="text" name="state" value={formData.state} onChange={handleChange}
-                    className="input w-full" placeholder="Ej: Miranda" />
-                </div>
-              </div>
-            </div>
-
-            {/* ── Crédito ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                <BadgeDollarSign className="h-4 w-4 text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Información de Crédito</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Límite de Crédito (COP)</label>
-                  <input type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange}
-                    min="0" step="1" className="input w-full" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Días de Crédito</label>
-                  <input type="number" name="creditDays" value={formData.creditDays} onChange={handleChange}
-                    min="0" className="input w-full" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descuento (%)</label>
-                  <input type="number" name="discountPercentage" value={formData.discountPercentage}
-                    onChange={handleChange} min="0" max="100" step="0.01" className="input w-full" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-              <textarea name="notes" value={formData.notes} onChange={handleChange} rows="2"
-                className="input w-full resize-none" placeholder="Observaciones opcionales..." />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-3 border-t">
-              <button type="button" onClick={handleCloseModal} className="btn-secondary">Cancelar</button>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Guardando...' : (editingCustomer ? 'Actualizar Cliente' : 'Crear Cliente')}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* View Modal */}
-      {showViewModal && viewingCustomer && (
-        <Modal isOpen={showViewModal} onClose={() => { setShowViewModal(false); setViewingCustomer(null); }}
-          title={`Cliente ${viewingCustomer.code}`} size="lg">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Tipo</p>
-              <p className="text-gray-900">{viewingCustomer.type === 'natural' ? 'Persona Natural' : 'Persona Jurídica'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Estado</p>
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusLabels[viewingCustomer.status]?.class}`}>
-                {statusLabels[viewingCustomer.status]?.text}
-              </span>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Documento</p>
-              <p className="text-gray-900">{viewingCustomer.documentType}-{viewingCustomer.documentNumber}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Nombre / Razón Social</p>
-              <p className="text-gray-900">
-                {viewingCustomer.type === 'natural'
-                  ? `${viewingCustomer.firstName} ${viewingCustomer.lastName}`
-                  : viewingCustomer.businessName}
-              </p>
-            </div>
-            {viewingCustomer.email && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Email</p>
-                <p className="text-gray-900">{viewingCustomer.email}</p>
-              </div>
-            )}
-            {(viewingCustomer.phone || viewingCustomer.mobile) && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Teléfono</p>
-                <p className="text-gray-900">{viewingCustomer.phone || viewingCustomer.mobile}</p>
-              </div>
-            )}
-            {viewingCustomer.address && (
-              <div className="col-span-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Dirección</p>
-                <p className="text-gray-900">
-                  {viewingCustomer.address}
-                  {viewingCustomer.city ? `, ${viewingCustomer.city}` : ''}
-                  {viewingCustomer.state ? `, ${viewingCustomer.state}` : ''}
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Límite de Crédito</p>
-              <p className="text-gray-900">COP {Math.round(parseFloat(viewingCustomer.creditLimit || 0)).toLocaleString('de-DE')}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Días de Crédito</p>
-              <p className="text-gray-900">{viewingCustomer.creditDays || 0} días</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Descuento</p>
-              <p className="text-gray-900">{parseFloat(viewingCustomer.discountPercentage || 0).toFixed(2)}%</p>
-            </div>
-            {viewingCustomer.notes && (
-              <div className="col-span-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-0.5">Notas</p>
-                <p className="text-gray-900 whitespace-pre-wrap">{viewingCustomer.notes}</p>
+                <Input label="Razón Social *" name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="Ej: Mi Empresa C.A." />
+                <Input label="Nombre Comercial" name="tradeName" value={formData.tradeName} onChange={handleChange} placeholder="Opcional" />
               </div>
             )}
           </div>
-        </Modal>
-      )}
 
-      {/* Statement Modal */}
+          {/* ── Contacto ── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+              <Phone className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Contacto</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="correo@ejemplo.com" />
+              <Input label="Teléfono" type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="0212-000-0000" />
+              <Input label="Celular" type="tel" name="mobile" value={formData.mobile} onChange={handleChange} placeholder="0414-000-0000" />
+            </div>
+          </div>
+
+          {/* ── Dirección ── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+              <MapPin className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Dirección</h3>
+            </div>
+            <Input label="Dirección" name="address" value={formData.address} onChange={handleChange} placeholder="Calle, Urbanización, Edificio..." />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Ciudad / Municipio" name="city" value={formData.city} onChange={handleChange} placeholder="Ej: Caracas" />
+              <Input label="Estado" name="state" value={formData.state} onChange={handleChange} placeholder="Ej: Miranda" />
+            </div>
+          </div>
+
+          {/* ── Crédito ── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+              <CurrencyCircleDollar className="h-4 w-4 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Información de Crédito</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Input label="Límite de Crédito (COP)" type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange} min="0" step="1" />
+              <Input label="Días de Crédito" type="number" name="creditDays" value={formData.creditDays} onChange={handleChange} min="0" />
+              <Input label="Descuento (%)" type="number" name="discountPercentage" value={formData.discountPercentage} onChange={handleChange} min="0" max="100" step="0.01" />
+            </div>
+          </div>
+
+          <Textarea label="Notas" name="notes" value={formData.notes} onChange={handleChange} rows={2} placeholder="Observaciones opcionales..." />
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
+            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isPending}>
+              {editingCustomer ? 'Actualizar Cliente' : 'Crear Cliente'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Sheet ver detalle ─────────────────────────────────────────────────── */}
+      <CustomerViewSheet
+        open={showViewModal}
+        onClose={() => { setShowViewModal(false); setViewingCustomer(null); }}
+        customer={viewingCustomer}
+        onEdit={() => { setShowViewModal(false); handleEdit(viewingCustomer); }}
+        hasPermission={hasPermission}
+      />
+
+      {/* ── Estado de cuenta ──────────────────────────────────────────────────── */}
       {statementCustomer && (
         <CustomerStatementModal
           customer={statementCustomer}
           onClose={() => setStatementCustomer(null)}
         />
       )}
+
+      {/* ── Confirmar eliminación ─────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
+        loading={deleteMutation.isPending}
+        variant="danger"
+        title="¿Eliminar este cliente?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.type === 'natural' ? `${deleteTarget.firstName} ${deleteTarget.lastName}` : deleteTarget.businessName}" será eliminado permanentemente.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 };

@@ -1,8 +1,8 @@
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePOSStore } from '../../stores/posStore';
-import { Plus, X } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { Plus, X } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 
 /**
  * POS Tabs Component
@@ -23,12 +23,12 @@ export default function POSTabs({ onTabClose = null }) {
 
   const handleAddTab = () => {
     if (tabs.length >= MAX_TABS) {
-      toast.remove();
+      toast.dismiss();
       toast.error(`Máximo ${MAX_TABS} pestañas abiertas simultáneamente`);
       return;
     }
     addTab();
-    toast.remove();
+    toast.dismiss();
     toast.success('Nueva venta abierta');
   };
 
@@ -49,7 +49,7 @@ export default function POSTabs({ onTabClose = null }) {
     }
 
     closeTab(tabId);
-    toast.remove();
+    toast.dismiss();
     toast.success('Venta cerrada');
   };
 

@@ -1,25 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": [
-      "ES2020"
-    ],
+    "target": "ES2022",
+    "module": "nodenext",
+    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./",
-    "strict": false,
-    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "allowJs": false,
     "checkJs": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "declaration": false,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node"
-    ]
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "**/*.ts"
@@ -27,6 +24,8 @@
   "exclude": [
     "node_modules",
     "dist",
-    "coverage"
+    "coverage",
+    "scripts",
+    "migrations"
   ]
 }

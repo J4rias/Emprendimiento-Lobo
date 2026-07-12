@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, User, AlertCircle, CreditCard, ChevronRight, UserPlus } from 'lucide-react';
+import { MagnifyingGlass, X, User, WarningCircle, CreditCard, CaretRight, UserPlus } from '@phosphor-icons/react';
 import { customerService } from '../services/api/customerService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import Modal from './common/Modal';
@@ -98,23 +98,23 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
             />
           ) : (
             <div className="space-y-4 py-1">
-              {/* Search Input */}
+              {/* MagnifyingGlass Input */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   placeholder="Buscar por nombre, documento o teléfono..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
                 />
               </div>
 
               {/* Error Alert */}
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <WarningCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-red-800">{error}</p>
                   </div>
@@ -174,7 +174,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                               </div>
                             )}
                           </div>
-                          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                          <CaretRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
                         </div>
                       </button>
                     ))}

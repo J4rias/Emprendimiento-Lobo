@@ -33,10 +33,13 @@ build/
 .DS_Store
 Thumbs.db
 
-# Uploads
+# Uploads — user content, not in git
 backend/uploads/*
 !backend/uploads/.gitkeep
-backend/public/uploads/products/image-*
+backend/public/uploads/brands/*
+backend/public/uploads/products/*
+!backend/public/uploads/products/placeholder.png
+backend/public/uploads/temp/
 
 # Test coverage
 coverage/
@@ -64,12 +67,34 @@ scripts/orchestrator.py
 tmp/orchestrator-state.json
 tmp/orchestrator-report.md
 
+# API test scripts — locales, no se suben
+scripts/api-tests/
+scripts/api_test_orchestrator.py
+tmp/api-test-state.json
+tmp/orq*-state.json
+
 # Claude Code
 .claude/
 
-# Markdown
+# Markdown (excepto docs del proyecto)
 *.md
+!frontend/docs/*.md
+!backend/README.md
 # Orchestrator local (groundctl only)
 scripts/orchestrator.py
 tmp/orchestrator-state.json
 tmp/orchestrator-report.md
+scripts/ts_model_orchestrator.py
+scripts/ts_model_orchestrator_gemma4.py
+scripts/ts_controller_orchestrator_gemma4.py
+scripts/orq4_model_configs.py
+scripts/bench_gemma4.py
+scripts/orq5_*.py
+scripts/orq6_*.py
+scripts/orq7_*.py
+scripts/orq8_*.py
+scripts/orq9_*.py
+scripts/orq10_*.py
+scripts/orq11_*.py
+scripts/__pycache__/
+scripts/api-tests/__pycache__/

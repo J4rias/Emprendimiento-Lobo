@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Camera, AlertCircle } from 'lucide-react';
+import { UploadSimple, X, Camera, WarningCircle } from '@phosphor-icons/react';
 import api from '../../services/api/axios';
 
 const ImageUpload = ({
@@ -22,7 +22,7 @@ const ImageUpload = ({
   const fileInputRef = useRef(null);
 
   // Get base URL for images (API URL without /api suffix)
-  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'window.location.origin';
+  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || window.location.origin;
 
   const handleFileSelect = async (files) => {
     if (!files || files.length === 0) return;
@@ -144,12 +144,14 @@ const ImageUpload = ({
       fullUrl = `${baseUrl}${url}`;
     }
 
+    const isFullWidth = previewSize.includes('w-full');
+
     return (
-      <div key={index || 'preview'} className="relative group">
+      <div key={index || 'preview'} className={`relative group${isFullWidth ? ' w-full' : ''}`}>
         <img
           src={fullUrl}
           alt="Preview"
-          className={`${previewSize} object-cover rounded-lg border-2 border-gray-200 max-w-full max-h-full`}
+          className={`${previewSize} object-contain object-center rounded-lg border-2 border-gray-200`}
         />
         {!disabled && (
           <button
@@ -179,7 +181,7 @@ const ImageUpload = ({
 
       {/* Vista previa */}
       {showPreview && value && (
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2${previewSize.includes('w-full') ? ' w-full' : ' justify-center'}`}>
           {Array.isArray(value) ? (
             value.map((url, index) => renderPreview(url, index))
           ) : (
@@ -216,7 +218,7 @@ const ImageUpload = ({
             </div>
           ) : (
             <div className="space-y-2">
-              <Upload className="h-12 w-12 text-gray-400 mx-auto" />
+              <UploadSimple className="h-12 w-12 text-gray-400 mx-auto" />
               <p className="text-sm text-gray-600">{placeholder}</p>
               <p className="text-xs text-gray-500">
                 {multiple ? `Arrastra o click para subir hasta ${maxFiles} imágenes` : 'Arrastra o click para subir una imagen'}
@@ -229,7 +231,7 @@ const ImageUpload = ({
       {/* Error */}
       {error && (
         <div className="flex items-center gap-2 text-red-600 text-sm">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircle className="h-4 w-4" />
           <span>{error}</span>
         </div>
       )}

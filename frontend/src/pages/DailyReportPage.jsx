@@ -4,8 +4,8 @@ import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
 import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, Download, Printer, DollarSign, Wallet, Users, AlertCircle, CreditCard, ShoppingCart, RefreshCcw } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { Calendar, Printer, CurrencyDollar, Wallet, Users, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();
@@ -125,23 +125,18 @@ const DailyReportPage = () => {
                         <td style="font-size:12px;">Cantidad</td>
                         <td style="text-align:right; font-size:12px; font-weight:bold;">${report.cashRefunds.refund_count}</td>
                     </tr>
+                    ${Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `
                     <tr>
-                        <td style="font-size:12px;">Total USD</td>
-                        <td style="text-align:right; font-size:12px; font-weight:bold;">$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}</td>
-                    </tr>
-                    <tr>
-                        <td style="font-size:12px;">Total COP</td>
-                        <td style="text-align:right; font-size:12px; font-weight:bold;">${fmtAmount(report.cashRefunds.refund_cop, 'COP')}</td>
-                    </tr>
+                        <td style="font-size:12px;">Total ${cur}</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)}</td>
+                    </tr>`).join('')}
                 </table>
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
                 ` : ''}
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">CUADRE FÍSICO (EFECTIVO)</div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
                     ${(() => {
-                        const refundUSD = report.cashRefunds?.refund_usd || 0;
-                        const refundCOP = report.cashRefunds?.refund_cop || 0;
-                        const refundMap = { USD: refundUSD, COP: refundCOP };
+                        const refundMap = report.cashRefunds?.refund_by_currency || {};
                         return Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
                                 const cash = methods.cash || 0;
@@ -186,7 +181,7 @@ const DailyReportPage = () => {
                         <select
                             value={filters.user_id}
                             onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-48"
+                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-48"
                         >
                             <option value="">Todos los cajeros</option>
                             {users.map(u => (
@@ -199,7 +194,7 @@ const DailyReportPage = () => {
                         type="date"
                         value={filters.date}
                         onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
-                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
+                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-auto"
                     />
 
                     <button
@@ -243,7 +238,7 @@ const DailyReportPage = () => {
                                 {currencyTotals.map(([currency, total]) => (
                                     <div key={currency} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                                         <div className={`p-4 rounded-lg ${iconStyles[currency] || 'bg-gray-100 text-gray-600'}`}>
-                                            <DollarSign className="w-8 h-8" />
+                                            <CurrencyDollar className="w-8 h-8" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Recibido {currency}</p>
@@ -312,7 +307,7 @@ const DailyReportPage = () => {
                             {hasCreditCollections && (
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                                     <div className="p-4 bg-teal-100 rounded-lg text-teal-600">
-                                        <DollarSign className="w-8 h-8" />
+                                        <CurrencyDollar className="w-8 h-8" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Cobros de Credito</p>
@@ -331,12 +326,12 @@ const DailyReportPage = () => {
                             {hasRefunds && (
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-rose-200 flex items-center gap-4">
                                     <div className="p-4 bg-rose-100 rounded-lg text-rose-600">
-                                        <RefreshCcw className="w-8 h-8" />
+                                        <ArrowCounterClockwise className="w-8 h-8" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Devoluciones</p>
                                         <div className="text-2xl font-bold text-rose-600 mt-1">
-                                            $ {fmtAmount(report.cashRefunds.refund_usd, 'USD')}
+                                            {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}`}
                                         </div>
                                         <p className="text-sm text-gray-500 mt-1">
                                             {report.cashRefunds.refund_count} devoluci{report.cashRefunds.refund_count !== 1 ? 'ones' : 'on'} en efectivo
@@ -358,7 +353,7 @@ const DailyReportPage = () => {
                         <div className="p-6">
                             {Object.keys(report.paymentsBreakdown || {}).length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
-                                    <AlertCircle className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                                    <WarningCircle className="w-8 h-8 mx-auto text-gray-300 mb-2" />
                                     No se registraron pagos finalizados para esta fecha.
                                 </div>
                             ) : (
@@ -399,9 +394,7 @@ const DailyReportPage = () => {
 
                     {/* Cuadre Físico — solo efectivo por moneda, menos devoluciones */}
                     {(() => {
-                        const refundUSD = report.cashRefunds?.refund_usd || 0;
-                        const refundCOP = report.cashRefunds?.refund_cop || 0;
-                        const refundMap = { USD: refundUSD, COP: refundCOP };
+                        const refundMap = report.cashRefunds?.refund_by_currency || {};
                         const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
                                 const cash = methods.cash || 0;
@@ -412,7 +405,8 @@ const DailyReportPage = () => {
                         // USDT total across all currencies
                         const usdtTotal = Object.values(report.paymentsBreakdown || {})
                             .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
-                        if (cashByCurrency.length === 0 && !refundUSD && !usdtTotal) return null;
+                        const hasAnyRefund = Object.values(refundMap).some(v => v > 0);
+                        if (cashByCurrency.length === 0 && !hasAnyRefund && !usdtTotal) return null;
                         return (
                             <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
                                 <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
@@ -432,9 +426,9 @@ const DailyReportPage = () => {
                                         <p className="text-xl font-bold text-cyan-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
                                     </div>
                                 )}
-                                {(refundUSD > 0 || refundCOP > 0) && (
+                                {hasAnyRefund && (
                                     <p className="text-xs text-slate-400 mt-2">
-                                        Incluye descuento por devoluciones: {refundUSD > 0 ? `$ ${fmtAmount(refundUSD, 'USD')} USD` : ''}{refundUSD > 0 && refundCOP > 0 ? ' / ' : ''}{refundCOP > 0 ? `${fmtAmount(refundCOP, 'COP')} COP` : ''}
+                                        Incluye descuento por devoluciones: {Object.entries(refundMap).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ')}
                                     </p>
                                 )}
                             </div>

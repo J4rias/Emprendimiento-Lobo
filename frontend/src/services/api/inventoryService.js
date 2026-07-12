@@ -2,14 +2,12 @@ import api from './axios';
 
 export const inventoryService = {
   getByWarehouse: async (warehouseId, params = {}) => {
-    const response = await api.get(`/inventory/warehouse/${warehouseId}`, { params });
+    const response = await api.get('/inventory', { params: { ...params, warehouse_id: warehouseId } });
     return response.data;
   },
 
   getAll: async (params = {}) => {
-    // Default to warehouse 1 if not specified
-    const warehouseId = params.warehouse_id || 1;
-    const response = await api.get(`/inventory/warehouse/${warehouseId}`, { params });
+    const response = await api.get('/inventory', { params });
     return response.data;
   },
 
@@ -19,7 +17,7 @@ export const inventoryService = {
   },
 
   getByProduct: async (productId) => {
-    const response = await api.get(`/inventory/product/${productId}`);
+    const response = await api.get('/inventory', { params: { product_id: productId } });
     return response.data;
   },
 

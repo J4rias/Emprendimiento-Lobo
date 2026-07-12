@@ -1,29 +1,35 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { Plus, CurrencyDollar, Calendar, TrendUp, ArrowClockwise } from '@phosphor-icons/react';
 import {
-  Plus,
-  Edit,
-  Trash2,
-  DollarSign,
-  Calendar,
-  TrendingUp,
-  X,
-  AlertCircle,
-  RefreshCw
-} from 'lucide-react';
+  Button,
+  Badge,
+  Alert,
+  Card,
+  EditAction,
+  DeleteAction,
+  Input,
+  ConfirmDialog,
+  Modal,
+  Table,
+} from '../components/ui';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const ExchangeRatesPage = () => {
   const { token, hasPermission } = useAuth();
-  const [rates, setRates] = useState([]);
+  const [ratesRaw, setRatesRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingRate, setEditingRate] = useState(null);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rateSortBy, setRateSortBy] = useState('effective_date');
+  const [rateSortDir, setRateSortDir] = useState('desc');
   const [formData, setFormData] = useState({
     from_currency: 'USD',
     to_currency: 'VES',
@@ -41,7 +47,7 @@ const ExchangeRatesPage = () => {
 
   useEffect(() => {
     fetchRates();
-  }, [currentPage, selectedDate]);
+  }, [currentPage, selectedDate, rateSortBy, rateSortDir]);
 
   const fetchRates = async () => {
     setLoading(true);
@@ -52,19 +58,19 @@ const ExchangeRatesPage = () => {
         page: currentPage,
         limit: 20,
         date_from: selectedDate,
-        date_to: selectedDate
+        date_to: selectedDate,
+        sort_by: rateSortBy,
+        sort_dir: rateSortDir,
       });
 
       const response = await fetch(`${API_URL}/exchange-rates?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error('Error al cargar tasas de cambio');
 
       const data = await response.json();
-      setRates(data.data || []);
+      setRatesRaw(data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
     } catch (err) {
       setError(err.message);
@@ -76,17 +82,14 @@ const ExchangeRatesPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       const url = editingRate
         ? `${API_URL}/exchange-rates/${editingRate.id}`
         : `${API_URL}/exchange-rates`;
 
-      const method = editingRate ? 'PUT' : 'POST';
-
       const response = await fetch(url, {
-        method,
+        method: editingRate ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -99,10 +102,11 @@ const ExchangeRatesPage = () => {
         throw new Error(errorData.message || 'Error al guardar tasa de cambio');
       }
 
+      toast.success(editingRate ? 'Tasa actualizada' : 'Tasa registrada');
       await fetchRates();
       handleCloseModal();
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -121,15 +125,15 @@ const ExchangeRatesPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Está seguro de eliminar esta tasa de cambio?')) return;
+  const handleDelete = (id) => {
+    setDeleteTargetId(id);
+  };
 
+  const confirmDelete = async () => {
     try {
-      const response = await fetch(`${API_URL}/exchange-rates/${id}`, {
+      const response = await fetch(`${API_URL}/exchange-rates/${deleteTargetId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -137,9 +141,12 @@ const ExchangeRatesPage = () => {
         throw new Error(errorData.message || 'Error al eliminar tasa');
       }
 
+      toast.success('Tasa eliminada');
       await fetchRates();
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
@@ -159,19 +166,90 @@ const ExchangeRatesPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const getCurrencySymbol = (code) => {
-    return currencies.find(c => c.code === code)?.symbol || code;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const getCurrencyName = (code) => {
     return currencies.find(c => c.code === code)?.name || code;
   };
+
+  const rates = ratesRaw;
+  const rateOnSort = (f, d) => { setRateSortBy(f); setRateSortDir(d); setCurrentPage(1); };
+
+  const columns = [
+    {
+      header: 'Desde',
+      sortable: true,
+      sortKey: 'from_currency',
+      render: (_, rate) => (
+        <div>
+          <div className="font-medium">{rate.from_currency}</div>
+          <div className="text-xs text-gray-500">{getCurrencyName(rate.from_currency)}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Hacia',
+      sortable: true,
+      sortKey: 'to_currency',
+      render: (_, rate) => (
+        <div>
+          <div className="font-medium">{rate.to_currency}</div>
+          <div className="text-xs text-gray-500">{getCurrencyName(rate.to_currency)}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Tasa',
+      sortable: true,
+      sortKey: 'rate',
+      render: (_, rate) => (
+        <div>
+          <div className="flex items-center gap-2">
+            <TrendUp className="h-4 w-4 text-green-600" />
+            <span className="font-mono text-lg font-semibold">{parseFloat(rate.rate).toFixed(6)}</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            1 {rate.from_currency} = {parseFloat(rate.rate).toFixed(2)} {rate.to_currency}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Fecha Efectiva',
+      sortable: true,
+      sortKey: 'effective_date',
+      render: (_, rate) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-gray-400" />
+          {new Date(rate.effective_date + 'T00:00:00').toLocaleDateString('es-VE')}
+        </div>
+      ),
+    },
+    {
+      header: 'Fuente',
+      render: (_, rate) => <Badge variant="info">{rate.source || 'Manual'}</Badge>,
+    },
+    {
+      header: 'Creado por',
+      render: (_, rate) => (
+        <div>
+          <div className="text-sm">{rate.creator?.first_name || rate.creator?.username || 'N/A'}</div>
+          <div className="text-xs text-gray-500">{new Date(rate.created_at).toLocaleString('es-VE')}</div>
+        </div>
+      ),
+    },
+    ...(hasPermission('settings.manage') ? [{
+      header: 'Acciones',
+      className: 'text-right',
+      render: (_, rate) => (
+        <div className="flex items-center gap-1">
+          <EditAction onClick={() => handleEdit(rate)} />
+          <DeleteAction onClick={() => handleDelete(rate.id)} />
+        </div>
+      ),
+    }] : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -182,174 +260,65 @@ const ExchangeRatesPage = () => {
           <p className="text-gray-600">Gestión de tasas de cambio diarias para valoración multimoneda</p>
         </div>
         {hasPermission('settings.manage') && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-5 w-5" />
+          <Button onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4" />
             Nueva Tasa
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{error}</p>
-          </div>
-          <button
-            onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <Alert key={error} variant="error" title="Error" dismissible>
+          {error}
+        </Alert>
       )}
 
       {/* Date Filter */}
-      <div className="card">
+      <Card variant="flat">
         <div className="flex items-center gap-4">
-          <Calendar className="h-5 w-5 text-gray-400" />
+          <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de consulta
-            </label>
-            <input
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de consulta</label>
+            <Input
               type="date"
               value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input max-w-xs"
+              onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
+              className="max-w-xs"
             />
           </div>
-          <button
-            onClick={fetchRates}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
+          <Button variant="secondary" onClick={fetchRates}>
+            <ArrowClockwise className="h-4 w-4" />
             Actualizar
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Exchange Rates Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Desde</th>
-                <th>Hacia</th>
-                <th>Tasa</th>
-                <th>Fecha Efectiva</th>
-                <th>Fuente</th>
-                <th>Creado por</th>
-                {hasPermission('settings.manage') && <th>Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="text-center py-12">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-                      <p className="mt-4 text-gray-500 text-sm">Cargando tasas de cambio...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : rates.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500">
-                    <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                    No se encontraron tasas de cambio para esta fecha
-                  </td>
-                </tr>
-              ) : (
-                rates.map((rate) => (
-                  <tr key={rate.id}>
-                    <td>
-                      <div>
-                        <div className="font-medium">{rate.from_currency}</div>
-                        <div className="text-sm text-gray-500">
-                          {getCurrencyName(rate.from_currency)}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div>
-                        <div className="font-medium">{rate.to_currency}</div>
-                        <div className="text-sm text-gray-500">
-                          {getCurrencyName(rate.to_currency)}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="font-mono text-lg font-semibold">
-                          {parseFloat(rate.rate).toFixed(6)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        1 {rate.from_currency} = {parseFloat(rate.rate).toFixed(2)} {rate.to_currency}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {new Date(rate.effective_date + 'T00:00:00').toLocaleDateString('es-VE')}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                        {rate.source || 'Manual'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="text-sm">
-                        {rate.creator?.first_name || rate.creator?.username || 'N/A'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(rate.created_at).toLocaleString('es-VE')}
-                      </div>
-                    </td>
-                    {hasPermission('settings.manage') && (
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEdit(rate)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(rate.id)}
-                            className="p-1 text-red-600 hover:text-red-800"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card variant="flat" className="overflow-hidden">
+        <Table
+          columns={columns}
+          data={rates}
+          loading={loading}
+          emptyIcon={CurrencyDollar}
+          emptyMessage="No hay tasas para esta fecha"
+          emptyDescription="Agrega una tasa de cambio para comenzar"
+          emptyAction={hasPermission('settings.manage') ? (
+            <Button onClick={() => setShowModal(true)}>
+              <Plus className="h-4 w-4" />
+              Nueva Tasa
+            </Button>
+          ) : undefined}
+          sortBy={rateSortBy}
+          sortDir={rateSortDir}
+          onSort={rateOnSort}
+        />
+      </Card>
 
       {/* Quick Reference Card */}
-      <div className="card bg-blue-50 border-blue-200">
+      <Card className="bg-blue-50 border-blue-200">
         <div className="flex items-start gap-3">
-          <DollarSign className="h-6 w-6 text-blue-600 mt-1" />
+          <CurrencyDollar className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Sobre las Tasas de Cambio</h3>
             <ul className="text-sm text-gray-700 space-y-1">
@@ -360,147 +329,109 @@ const ExchangeRatesPage = () => {
             </ul>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-lg w-full">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900">
-                {editingRate ? 'Editar Tasa de Cambio' : 'Nueva Tasa de Cambio'}
-              </h2>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
+      {/* Create/PencilSimple Modal */}
+      <Modal
+        open={showModal}
+        onClose={handleCloseModal}
+        title={editingRate ? 'Editar Tasa de Cambio' : 'Nueva Tasa de Cambio'}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
+            <Button type="submit" form="rate-form" loading={loading}>
+              {editingRate ? 'Actualizar' : 'Crear Tasa'}
+            </Button>
+          </>
+        }
+      >
+        <form id="rate-form" onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Moneda Origen *</label>
+              <select name="from_currency" value={formData.from_currency} onChange={handleChange} required className="input">
+                {currencies.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                ))}
+              </select>
             </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Moneda Origen *
-                  </label>
-                  <select
-                    name="from_currency"
-                    value={formData.from_currency}
-                    onChange={handleChange}
-                    required
-                    className="input"
-                  >
-                    {currencies.map((currency) => (
-                      <option key={currency.code} value={currency.code}>
-                        {currency.code} - {currency.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Moneda Destino *
-                  </label>
-                  <select
-                    name="to_currency"
-                    value={formData.to_currency}
-                    onChange={handleChange}
-                    required
-                    className="input"
-                  >
-                    {currencies.map((currency) => (
-                      <option key={currency.code} value={currency.code}>
-                        {currency.code} - {currency.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tasa de Cambio *
-                </label>
-                <input
-                  type="number"
-                  name="rate"
-                  value={formData.rate}
-                  onChange={handleChange}
-                  required
-                  min="0"
-                  step="0.000001"
-                  className="input"
-                  placeholder="Ej: 36.50"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  1 {formData.from_currency} = {formData.rate || '0'} {formData.to_currency}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha Efectiva *
-                </label>
-                <input
-                  type="date"
-                  name="effective_date"
-                  value={formData.effective_date}
-                  onChange={handleChange}
-                  required
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fuente
-                </label>
-                <input
-                  type="text"
-                  name="source"
-                  value={formData.source}
-                  onChange={handleChange}
-                  className="input"
-                  placeholder="Ej: BCV, Banco Central, Manual"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notas
-                </label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  rows="3"
-                  className="input"
-                  placeholder="Notas adicionales sobre esta tasa..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="btn-secondary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary disabled:opacity-50"
-                >
-                  {loading ? 'Guardando...' : editingRate ? 'Actualizar' : 'Crear Tasa'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Moneda Destino *</label>
+              <select name="to_currency" value={formData.to_currency} onChange={handleChange} required className="input">
+                {currencies.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tasa de Cambio *</label>
+            <input
+              type="number"
+              name="rate"
+              value={formData.rate}
+              onChange={handleChange}
+              required
+              min="0"
+              step="0.000001"
+              className="input"
+              placeholder="Ej: 36.50"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              1 {formData.from_currency} = {formData.rate || '0'} {formData.to_currency}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Efectiva *</label>
+            <input
+              type="date"
+              name="effective_date"
+              value={formData.effective_date}
+              onChange={handleChange}
+              required
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fuente</label>
+            <input
+              type="text"
+              name="source"
+              value={formData.source}
+              onChange={handleChange}
+              className="input"
+              placeholder="Ej: BCV, Banco Central, Manual"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              rows="3"
+              className="input"
+              placeholder="Notas adicionales sobre esta tasa..."
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        title="Eliminar tasa de cambio"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 };

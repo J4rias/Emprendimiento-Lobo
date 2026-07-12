@@ -12,9 +12,9 @@ export const categoryService = {
     return response.data;
   },
 
-  // Get categories with product count
-  getWithProductCount: async (): Promise<Category[]> => {
-    const response = await api.get('/categories/with-count');
+  // Get categories with product count (all, no pagination limit)
+  getWithProductCount: async (): Promise<CategoryListResponse> => {
+    const response = await api.get('/categories', { params: { limit: 1000 } });
     return response.data;
   },
 
