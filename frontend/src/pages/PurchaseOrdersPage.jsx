@@ -38,7 +38,7 @@ const PAYMENT_METHOD_LABEL = {
   card: 'Tarjeta', credit_balance: 'Saldo a Favor', usdt: 'USDT',
 };
 const PAYMENT_METHOD_COLOR = {
-  cash: 'bg-green-100 text-green-700', transfer: 'bg-blue-100 text-blue-700',
+  cash: 'bg-green-100 text-green-700', transfer: 'bg-primary-100 text-primary-700',
   check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700',
   credit_balance: 'bg-indigo-100 text-indigo-700', usdt: 'bg-cyan-100 text-cyan-700',
   other: 'bg-gray-100 text-gray-700',
@@ -320,7 +320,7 @@ const PurchaseOrdersPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Total Órdenes</span>
-              <FileText className="w-5 h-5 text-blue-600" />
+              <FileText className="w-5 h-5 text-primary-600" />
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats.total_orders || 0}</p>
           </Card>

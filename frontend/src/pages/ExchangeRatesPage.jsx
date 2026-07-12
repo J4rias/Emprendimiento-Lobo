@@ -316,9 +316,9 @@ const ExchangeRatesPage = () => {
       </Card>
 
       {/* Quick Reference Card */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="bg-primary-50 border-primary-200">
         <div className="flex items-start gap-3">
-          <CurrencyDollar className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+          <CurrencyDollar className="h-6 w-6 text-primary-600 mt-1 flex-shrink-0" />
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Sobre las Tasas de Cambio</h3>
             <ul className="text-sm text-gray-700 space-y-1">

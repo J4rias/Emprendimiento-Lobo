@@ -50,7 +50,7 @@ const ProductForm = ({
           <button
             type="button"
             onClick={() => onToggleBarcodeScanner(!showBarcodeScanner)}
-            className="hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Camera className="w-5 h-5" />
             Escanear código de barras
@@ -61,10 +61,10 @@ const ProductForm = ({
         <div className="lg:col-span-2 space-y-4">
           {/* Barcode Scanner */}
           {showBarcodeScanner && (
-            <div className="bg-gray-50 rounded-lg p-4 border-2 border-blue-200">
+            <div className="bg-gray-50 rounded-lg p-4 border-2 border-primary-200">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <Camera className="w-5 h-5 text-blue-600" />
+                  <Camera className="w-5 h-5 text-primary-600" />
                   Escanear Código de Barras
                 </h3>
                 <button
@@ -89,7 +89,7 @@ const ProductForm = ({
                       <button
                         type="button"
                         onClick={() => onToggleBarcodeScanner(false)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                       >
                         Cerrar
                       </button>
@@ -173,7 +173,7 @@ const ProductForm = ({
                   <button
                     type="button"
                     onClick={() => onToggleBarcodeScanner(!showBarcodeScanner)}
-                    className="lg:hidden px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm"
+                    className="lg:hidden px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-1 text-sm"
                   >
                     <Camera className="w-4 h-4" />
                     Escanear

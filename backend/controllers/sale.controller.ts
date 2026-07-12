@@ -530,6 +530,29 @@ export const getSalesStats = async (req: Request, res: Response) => {
       return json;
     });
 
+    // Ventas por modo del POS (currency_mode): cantidad y monto nativo.
+    // USD mode → total en USD; COP mode → total × exchange_rate de cada venta.
+    const modeRows = await Sale.findAll({
+      where: { ...where, status: { [Op.in]: ['completed', 'pending'] } } as any,
+      attributes: [
+        'currency_mode',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'sale_count'],
+        [sequelize.fn('SUM', sequelize.col('total')), 'total_usd'],
+        [sequelize.fn('SUM', sequelize.literal('total * exchange_rate')), 'total_cop']
+      ],
+      group: ['currency_mode'],
+      raw: true
+    }) as any[];
+    const salesByMode: any = {};
+    modeRows.forEach((r: any) => {
+      const mode = r.currency_mode || 'USD';
+      salesByMode[mode] = {
+        count: parseInt(r.sale_count) || 0,
+        total_usd: parseFloat(r.total_usd) || 0,
+        total_cop: Math.round(parseFloat(r.total_cop) || 0)
+      };
+    });
+
     // Sales count and total by currency
     let salesByCurrency: any = {};
     if (totalSales > 0) {
@@ -570,7 +593,8 @@ export const getSalesStats = async (req: Request, res: Response) => {
         salesByType,
         salesByStatus,
         topProducts: topProductsWithMargin,
-        salesByCurrency
+        salesByCurrency,
+        salesByMode
       }
     });
 

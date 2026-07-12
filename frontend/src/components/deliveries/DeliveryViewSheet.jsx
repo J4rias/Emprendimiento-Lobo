@@ -76,7 +76,7 @@ const DeliveryViewSheet = ({ open, onClose, delivery }) => {
             {delivery.carrier && <Field label="Transportadora">{delivery.carrier}</Field>}
             {delivery.tracking_number && (
               <Field label="Tracking" full>
-                <span className="text-blue-600 font-medium">{delivery.tracking_number}</span>
+                <span className="text-primary-600 font-medium">{delivery.tracking_number}</span>
               </Field>
             )}
           </div>

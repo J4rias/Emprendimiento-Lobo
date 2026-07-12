@@ -202,7 +202,7 @@ const DeliveriesPage = () => {
       header: 'Venta',
       render: (_, row) => (
         <div>
-          <div className="font-medium text-blue-600">{row.sale?.sale_number}</div>
+          <div className="font-medium text-primary-600">{row.sale?.sale_number}</div>
           <div className="text-xs text-gray-500">
             {new Date(row.sale?.sale_date).toLocaleDateString('es-VE')}
           </div>
@@ -287,13 +287,13 @@ const DeliveriesPage = () => {
       {/* Stats cards */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <div className="bg-primary-50 rounded-lg p-4 border border-primary-100">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-700">Total Entregas</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.total_deliveries}</p>
+                <p className="text-sm text-primary-700">Total Entregas</p>
+                <p className="text-2xl font-bold text-primary-900">{stats.total_deliveries}</p>
               </div>
-              <Package className="w-10 h-10 text-blue-600 opacity-50" />
+              <Package className="w-10 h-10 text-primary-600 opacity-50" />
             </div>
           </div>
           <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">

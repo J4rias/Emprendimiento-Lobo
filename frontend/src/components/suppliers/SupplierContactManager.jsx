@@ -70,10 +70,10 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
     <div className="space-y-4">
       {/* Contacto Principal */}
       {getPrimaryContact() && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
           <div className="flex items-center mb-2">
-            <Star className="h-5 w-5 text-blue-600 mr-2" />
-            <span className="font-medium text-blue-900">Contacto Principal</span>
+            <Star className="h-5 w-5 text-primary-600 mr-2" />
+            <span className="font-medium text-primary-900">Contacto Principal</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -147,7 +147,7 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
                         />
                       )}
                       {contact.is_primary && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
                           Principal
                         </span>
                       )}
@@ -225,7 +225,7 @@ const SupplierContactManager = ({ contacts = [], onChange, readonly = false }) =
                         <button
                           type="button"
                           onClick={() => updateContact(index, 'is_primary', true)}
-                          className="p-1 text-gray-400 hover:text-blue-600"
+                          className="p-1 text-gray-400 hover:text-primary-600"
                           title="Marcar como principal"
                         >
                           <Star className="h-4 w-4" />

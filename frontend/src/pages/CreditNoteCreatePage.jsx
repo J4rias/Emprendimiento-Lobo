@@ -232,25 +232,25 @@ const CreditNoteCreatePage = () => {
       {sale && (
         <>
           {/* ── Info de la venta ── */}
-          <Card className="bg-blue-50 border-blue-200 mb-6">
+          <Card className="bg-primary-50 border-primary-200 mb-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-blue-700">Número de Venta</p>
-                <p className="font-medium text-blue-900">{sale.sale_number}</p>
+                <p className="text-primary-700">Número de Venta</p>
+                <p className="font-medium text-primary-900">{sale.sale_number}</p>
               </div>
               <div>
-                <p className="text-blue-700">Fecha</p>
-                <p className="font-medium text-blue-900">
+                <p className="text-primary-700">Fecha</p>
+                <p className="font-medium text-primary-900">
                   {new Date(sale.sale_date).toLocaleDateString('es-VE')}
                 </p>
               </div>
               <div>
-                <p className="text-blue-700">Cliente</p>
-                <p className="font-medium text-blue-900">{sale.customer?.name || 'Cliente General'}</p>
+                <p className="text-primary-700">Cliente</p>
+                <p className="font-medium text-primary-900">{sale.customer?.name || 'Cliente General'}</p>
               </div>
               <div>
-                <p className="text-blue-700">Total Venta</p>
-                <p className="font-medium text-blue-900">$ {parseFloat(sale.total).toFixed(2)}</p>
+                <p className="text-primary-700">Total Venta</p>
+                <p className="font-medium text-primary-900">$ {parseFloat(sale.total).toFixed(2)}</p>
               </div>
             </div>
           </Card>
@@ -336,19 +336,19 @@ const CreditNoteCreatePage = () => {
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Sel.</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Vendido</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">A Devolver</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-primary-50">A Devolver</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Al Stock</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {returnItems.map((item, index) => (
-                        <tr key={index} className={item.selected ? 'bg-blue-50' : 'bg-white'}>
+                        <tr key={index} className={item.selected ? 'bg-primary-50' : 'bg-white'}>
                           <td className="px-4 py-3 text-center">
                             <input
                               type="checkbox"
                               checked={item.selected}
                               onChange={() => toggleItemSelection(index)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-primary-200"
+                              className="w-4 h-4 text-primary-600 rounded focus:ring-primary-200"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -359,7 +359,7 @@ const CreditNoteCreatePage = () => {
                             <div>{item.sold_packages}p + {item.sold_units}u</div>
                             <div className="text-xs text-gray-500">({item.total_units_sold} un.)</div>
                           </td>
-                          <td className="px-4 py-3 bg-blue-50">
+                          <td className="px-4 py-3 bg-primary-50">
                             <div className="flex items-center justify-center gap-2">
                               <div className="flex items-center gap-1">
                                 <input
@@ -390,7 +390,7 @@ const CreditNoteCreatePage = () => {
                               checked={item.return_to_stock}
                               onChange={(e) => updateReturnItem(index, 'return_to_stock', e.target.checked)}
                               disabled={!item.selected}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-primary-200 disabled:opacity-50"
+                              className="w-4 h-4 text-primary-600 rounded focus:ring-primary-200 disabled:opacity-50"
                             />
                           </td>
                         </tr>
@@ -417,7 +417,7 @@ const CreditNoteCreatePage = () => {
                     </div>
                     <div className="text-lg font-bold">
                       <span className="text-gray-900">Total: </span>
-                      <span className="text-blue-600">$ {totals.total.toFixed(2)}</span>
+                      <span className="text-primary-600">$ {totals.total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

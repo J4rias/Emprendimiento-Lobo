@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import {
@@ -12,6 +12,7 @@ import {
   Pagination, Select, Spinner, useTableLimit,
 } from '../components/ui';
 import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
+import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 import { downloadCSV } from '../utils/csvUtils';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -27,7 +28,9 @@ const CURRENCIES = [
 const InventoryDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedCurrency, setSelectedCurrency] = useState(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
   // ── Filtros del kardex ─────────────────────────────────────────────────────
   const [dateRange, setDateRange] = useState(getDefaultDateRange());
@@ -292,20 +295,25 @@ const InventoryDetailPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">{inventory.product.name}</h1>
             <p className="text-gray-500 mt-0.5">SKU: {inventory.product.sku}</p>
           </div>
-          <Button onClick={() => navigate(`/inventario/${id}/adjust`)}>
+          <Button onClick={() => setAdjustOpen(true)}>
             <PencilSimple className="w-4 h-4" />
             Ajustar Stock
           </Button>
+          <AdjustStockModal
+            item={adjustOpen ? inventory : null}
+            onClose={() => setAdjustOpen(false)}
+            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['inventory-detail', id] })}
+          />
         </div>
       </div>
 
       {/* Cards de resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Card variant="compact" className="text-center">
-          <Package className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+          <Package className="w-8 h-8 text-primary-500 mx-auto mb-2" />
           <p className="text-xs text-gray-500 mb-1">Stock Actual</p>
-          <p className="text-3xl font-bold text-blue-600">{totalUnits}</p>
-          <p className="text-xs text-blue-700 mt-1 font-medium">
+          <p className="text-3xl font-bold text-primary-600">{totalUnits}</p>
+          <p className="text-xs text-primary-700 mt-1 font-medium">
             {totalPackages} pqt + {looseUnits} uds sueltas
           </p>
           <div className="mt-2">
@@ -387,7 +395,7 @@ const InventoryDetailPage = () => {
               <div
                 key={pres.id}
                 className={`p-4 rounded-lg border-2 ${
-                  pres.is_default ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                  pres.is_default ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">

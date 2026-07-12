@@ -118,15 +118,15 @@ const SaleExpandedDetail = ({ transaction }) => {
       )}
 
       {appliedCNs.length > 0 && (
-        <div className="border border-blue-200 rounded-lg overflow-hidden">
-          <div className="bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Devoluciones Aplicadas</div>
+        <div className="border border-primary-200 rounded-lg overflow-hidden">
+          <div className="bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800">Devoluciones Aplicadas</div>
           <table className="w-full text-xs">
             <tbody>
               {appliedCNs.map(cn => (
-                <tr key={cn.id} className="border-t border-blue-100">
-                  <td className="px-3 py-1.5 text-blue-700 font-medium">{cn.number}</td>
+                <tr key={cn.id} className="border-t border-primary-100">
+                  <td className="px-3 py-1.5 text-primary-700 font-medium">{cn.number}</td>
                   <td className="px-3 py-1.5 text-gray-500">{fmtDate(cn.date)}</td>
-                  <td className="px-3 py-1.5 text-right font-bold text-blue-700">-{fmt(cn.total_cop)}</td>
+                  <td className="px-3 py-1.5 text-right font-bold text-primary-700">-{fmt(cn.total_cop)}</td>
                 </tr>
               ))}
             </tbody>
@@ -193,7 +193,7 @@ const CreditNoteExpandedDetail = ({ transaction }) => {
       <div><span className="font-medium block text-gray-500 mb-0.5">Reembolso</span>{refundLabels[note.refund_method] || note.refund_method}</div>
       <div>
         <span className="font-medium block text-gray-500 mb-0.5">Monto (COP)</span>
-        <span className="text-blue-700 font-semibold">{fmt(totalCOP)}</span>
+        <span className="text-primary-700 font-semibold">{fmt(totalCOP)}</span>
       </div>
     </div>
   );
@@ -481,7 +481,7 @@ const ARCustomerDetailPage = () => {
     if (isCharge) {
       typeLabel = 'Cargo'; TypeIcon = ArrowDownRight; rowBg = 'hover:bg-orange-50/50';
     } else if (isCredit) {
-      typeLabel = 'Devolución'; TypeIcon = ArrowUpRight; rowBg = 'hover:bg-blue-50/50';
+      typeLabel = 'Devolución'; TypeIcon = ArrowUpRight; rowBg = 'hover:bg-primary-50/50';
     } else if (entry.isInternal) {
       typeLabel = 'Uso Saldo'; TypeIcon = Wallet; rowBg = 'hover:bg-purple-50/50';
     } else {
@@ -511,7 +511,7 @@ const ARCustomerDetailPage = () => {
             <div className="flex items-center gap-2">
               {TypeIcon && (
                 <TypeIcon className={`h-3.5 w-3.5 flex-shrink-0 ${
-                  isCharge ? 'text-orange-500' : isCredit ? 'text-blue-500' : entry.isInternal ? 'text-purple-500' : 'text-green-600'
+                  isCharge ? 'text-orange-500' : isCredit ? 'text-primary-500' : entry.isInternal ? 'text-purple-500' : 'text-green-600'
                 }`} />
               )}
               <div>
@@ -535,7 +535,7 @@ const ARCustomerDetailPage = () => {
           </td>
           <td className="px-2 py-3 text-right text-xs">
             {!isCharge && (
-              <span className={entry.isInternal ? 'text-purple-600 font-medium' : isCredit ? 'text-blue-600 font-medium' : 'text-green-600 font-medium'}>
+              <span className={entry.isInternal ? 'text-purple-600 font-medium' : isCredit ? 'text-primary-600 font-medium' : 'text-green-600 font-medium'}>
                 {fmt(entry.amount)}
               </span>
             )}

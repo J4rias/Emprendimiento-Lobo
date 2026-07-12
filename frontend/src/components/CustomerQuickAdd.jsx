@@ -86,7 +86,7 @@ const CustomerQuickAdd = ({ onSave, onCancel, renderFooter = true }) => {
         if (validationErrors[fieldName]) {
             return `${baseStyle} border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-200`;
         }
-        return `${baseStyle} border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-blue-100`;
+        return `${baseStyle} border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-primary-100`;
     };
 
     const handleSubmit = async (e) => {
@@ -157,7 +157,7 @@ const CustomerQuickAdd = ({ onSave, onCancel, renderFooter = true }) => {
                                 {formData.documentType}-
                             </span>
                             <input type="text" name="documentNumber" value={formData.documentNumber} onChange={handleChange}
-                                className={`flex-1 text-sm border rounded-r-lg p-2 transition-all outline-none focus:ring-2 ${validationErrors.documentNumber ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-blue-100'}`}
+                                className={`flex-1 text-sm border rounded-r-lg p-2 transition-all outline-none focus:ring-2 ${validationErrors.documentNumber ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-primary-100'}`}
                                 placeholder="Número" />
                         </div>
                         {validationErrors.documentNumber && <p className="text-red-500 text-[10px] mt-1 font-medium">{validationErrors.documentNumber}</p>}
@@ -248,7 +248,7 @@ const CustomerQuickAdd = ({ onSave, onCancel, renderFooter = true }) => {
                     <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors" disabled={loading}>
                         Volver a búsqueda
                     </button>
-                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-sm transition-all" disabled={loading}>
+                    <button type="submit" className="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 shadow-sm transition-all" disabled={loading}>
                         {loading ? 'Guardando...' : 'Crear y Seleccionar'}
                     </button>
                 </div>

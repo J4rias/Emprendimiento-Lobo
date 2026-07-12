@@ -478,7 +478,7 @@ const PurchaseOrderCreatePage = () => {
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
-                <span className="text-blue-600">{formatMoney(totals.total, formData.currency)}</span>
+                <span className="text-primary-600">{formatMoney(totals.total, formData.currency)}</span>
               </div>
             </div>
           </Card>

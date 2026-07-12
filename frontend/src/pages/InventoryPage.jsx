@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { inventoryService } from '../services/api/inventoryService';
 import { warehouseService } from '../services/api/warehouseService';
@@ -18,6 +18,7 @@ import {
   Alert, Badge, Button, Card, EmptyState, ExportCsvAction, Input,
   Modal, SearchInput, Select, Spinner, Table, ViewAction, AdjustAction,
 } from '../components/ui';
+import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 
 const InventoryPage = () => {
   const navigate = useNavigate();
@@ -42,7 +43,6 @@ const InventoryPage = () => {
 
   // ── Individual Adjust ──────────────────────────────────────────────────────
   const [adjustItem, setAdjustItem]   = useState(null);
-  const [adjustForm, setAdjustForm]   = useState({ type: 'add', bultos: '', unidades: '', reason: '' });
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -113,18 +113,6 @@ const InventoryPage = () => {
     refetchOnWindowFocus: true,
     staleTime: 30000,
     refetchInterval: 60000,
-  });
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
-  const adjustMutation = useMutation({
-    mutationFn: (data) => inventoryService.adjustInventory(data),
-    onSuccess: () => {
-      toast.success('Stock ajustado correctamente');
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
-      setAdjustItem(null);
-    },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al ajustar inventario'),
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -225,30 +213,7 @@ const InventoryPage = () => {
   };
 
   // ── Individual Adjust ──────────────────────────────────────────────────────
-  const openAdjust = (item) => {
-    setAdjustItem(item);
-    setAdjustForm({ type: 'add', bultos: '', unidades: '', reason: '' });
-  };
-
-  const handleSubmitAdjust = () => {
-    const pres       = getDefaultPresentation(adjustItem);
-    const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-    const bultos     = parseFloat(adjustForm.bultos)   || 0;
-    const unidades   = parseFloat(adjustForm.unidades) || 0;
-    if ((bultos * unitsPerPkg) + unidades <= 0) {
-      toast.error('Ingresa al menos una cantidad');
-      return;
-    }
-    adjustMutation.mutate({
-      product_id:       adjustItem.product_id,
-      warehouse_id:     adjustItem.warehouse_id,
-      type:             adjustForm.type,
-      presentation_id:  pres.id || undefined,
-      package_quantity: bultos   || undefined,
-      loose_units:      unidades || undefined,
-      reason:           adjustForm.reason || undefined,
-    });
-  };
+  const openAdjust = (item) => setAdjustItem(item);
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
   const handleDownloadReport = () => {
@@ -378,7 +343,7 @@ const InventoryPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
             <button
               onClick={() => setShowHelp(!showHelp)}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-primary-600 hover:text-primary-800"
               title="Ayuda"
             >
               <Info className="w-5 h-5" />
@@ -421,12 +386,12 @@ const InventoryPage = () => {
 
       {/* Panel de ayuda */}
       {showHelp && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-primary-50 border-primary-200">
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+            <Info className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-2">¿Cómo funciona el inventario?</h3>
-              <div className="text-sm text-blue-800 space-y-1.5">
+              <h3 className="font-semibold text-primary-900 mb-2">¿Cómo funciona el inventario?</h3>
+              <div className="text-sm text-primary-800 space-y-1.5">
                 <p><strong>Bultos / Unidades:</strong> El stock se muestra como paquetes completos + unidades sueltas según la presentación por defecto del producto.</p>
                 <p><strong>Conteo Rápido:</strong> Ajusta el stock de múltiples productos a la vez sin salir de la página. Los cambios se guardan automáticamente.</p>
                 <p><strong>Ajuste individual:</strong> El botón de lápiz en cada fila abre un formulario para ajustar un producto específico.</p>
@@ -435,7 +400,7 @@ const InventoryPage = () => {
               </div>
               <button
                 onClick={() => setShowHelp(false)}
-                className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                className="mt-3 text-sm text-primary-600 hover:text-primary-800 font-medium"
               >
                 Cerrar ayuda
               </button>
@@ -486,11 +451,11 @@ const InventoryPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Items</p>
-              <p className="text-2xl font-bold text-blue-600">{inventoryData?.pagination?.total || 0}</p>
+              <p className="text-2xl font-bold text-primary-600">{inventoryData?.pagination?.total || 0}</p>
               <p className="text-xs text-gray-500 mt-1">En inventario</p>
             </div>
-            <div className="bg-blue-100 p-3 rounded-lg shrink-0">
-              <Package className="w-6 h-6 text-blue-600" />
+            <div className="bg-primary-100 p-3 rounded-lg shrink-0">
+              <Package className="w-6 h-6 text-primary-600" />
             </div>
           </div>
         </Card>
@@ -566,7 +531,7 @@ const InventoryPage = () => {
             >
               <Funnel className="w-4 h-4" />
               {hasActiveFilters && (
-                <span className="absolute -top-1.5 -right-1.5 bg-white text-blue-600 text-xs w-4 h-4 rounded-full font-bold border border-blue-600 flex items-center justify-center leading-none">
+                <span className="absolute -top-1.5 -right-1.5 bg-white text-primary-600 text-xs w-4 h-4 rounded-full font-bold border border-primary-600 flex items-center justify-center leading-none">
                   {activeFiltersCount}
                 </span>
               )}
@@ -592,7 +557,7 @@ const InventoryPage = () => {
                   type="checkbox"
                   checked={filters[key]}
                   onChange={(e) => setFilters(f => ({ ...f, [key]: e.target.checked }))}
-                  className="rounded text-blue-600 focus:ring-primary-200"
+                  className="rounded text-primary-600 focus:ring-primary-200"
                 />
                 <span className="text-sm text-gray-700">{label}</span>
               </label>
@@ -629,8 +594,8 @@ const InventoryPage = () => {
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Stock Actual (ref.)</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Bultos Nuevos</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50/50">Uds. Nuevas</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-primary-600 uppercase tracking-wider bg-primary-50/50">Bultos Nuevos</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-primary-600 uppercase tracking-wider bg-primary-50/50">Uds. Nuevas</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                 </tr>
               </thead>
@@ -646,7 +611,7 @@ const InventoryPage = () => {
                   const nextItem   = inventoryData.data[index + 1];
 
                   return (
-                    <tr key={item.id} className={edit.dirty ? 'bg-blue-50/40' : 'hover:bg-gray-50'}>
+                    <tr key={item.id} className={edit.dirty ? 'bg-primary-50/40' : 'hover:bg-gray-50'}>
                       <td className="px-6 py-3">
                         <div className="font-medium text-gray-900">{item.product.name}</div>
                         {selectedWarehouse === 'all' && (
@@ -656,7 +621,7 @@ const InventoryPage = () => {
                       <td className="px-6 py-3 text-center text-sm text-gray-400">
                         {bultos} bultos + {unidades} sueltas
                       </td>
-                      <td className="px-6 py-3 text-center bg-blue-50/20">
+                      <td className="px-6 py-3 text-center bg-primary-50/20">
                         <input
                           type="number" min="0" step="1"
                           value={edit.bultos !== undefined ? edit.bultos : ''}
@@ -666,10 +631,10 @@ const InventoryPage = () => {
                             if (e.key === 'Enter') inputRefs.current[`${item.id}-unidades`]?.focus();
                           }}
                           ref={(el) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
-                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
+                          className="w-20 px-2 py-1.5 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
-                      <td className="px-6 py-3 text-center bg-blue-50/20">
+                      <td className="px-6 py-3 text-center bg-primary-50/20">
                         <input
                           type="number" min="0" step="1"
                           value={edit.unidades !== undefined ? edit.unidades : ''}
@@ -679,7 +644,7 @@ const InventoryPage = () => {
                             if (e.key === 'Enter' && nextItem) inputRefs.current[`${nextItem.id}-bultos`]?.focus();
                           }}
                           ref={(el) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
-                          className="w-20 px-2 py-1.5 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
+                          className="w-20 px-2 py-1.5 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
                       <td className="px-6 py-3 text-center">
@@ -721,73 +686,7 @@ const InventoryPage = () => {
       )}
 
       {/* Modal: Ajuste individual */}
-      <Modal
-        open={!!adjustItem}
-        onClose={() => setAdjustItem(null)}
-        title={adjustItem ? `Ajustar Stock — ${adjustItem.product.name}` : ''}
-        size="sm"
-      >
-        {adjustItem && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-              <Select
-                value={adjustForm.type}
-                onChange={(e) => setAdjustForm(f => ({ ...f, type: e.target.value }))}
-              >
-                <option value="add">➕ Entrada (agregar stock)</option>
-                <option value="remove">➖ Salida (retirar stock)</option>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bultos</label>
-                <Input
-                  type="number" min="0" step="1"
-                  value={adjustForm.bultos}
-                  onChange={(e) => setAdjustForm(f => ({ ...f, bultos: e.target.value }))}
-                  placeholder="0"
-                  className="text-center"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unidades sueltas</label>
-                <Input
-                  type="number" min="0" step="1"
-                  value={adjustForm.unidades}
-                  onChange={(e) => setAdjustForm(f => ({ ...f, unidades: e.target.value }))}
-                  placeholder="0"
-                  className="text-center"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
-              <Input
-                value={adjustForm.reason}
-                onChange={(e) => setAdjustForm(f => ({ ...f, reason: e.target.value }))}
-                placeholder="Ej: Compra de proveedor, pérdida..."
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary" className="flex-1"
-                onClick={() => setAdjustItem(null)}
-                disabled={adjustMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleSubmitAdjust}
-                loading={adjustMutation.isPending}
-              >
-                {adjustMutation.isPending ? 'Guardando...' : 'Guardar Ajuste'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <AdjustStockModal item={adjustItem} onClose={() => setAdjustItem(null)} />
 
       {/* Modal: Desglose de moneda */}
       <Modal

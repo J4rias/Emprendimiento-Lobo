@@ -374,7 +374,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                 type="button"
                 onClick={addItem}
                 disabled={!formData.origin_warehouse_id || !formData.destination_warehouse_id}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400"
+                className="flex items-center gap-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400"
                 title={!formData.origin_warehouse_id || !formData.destination_warehouse_id ? 'Selecciona ambos almacenes primero' : ''}
               >
                 <Plus size={16} />
@@ -449,7 +449,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                                         updateItem(index, 'product_id', p.id.toString());
                                         updateSearchTerm(index, undefined);
                                       }}
-                                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                      className="px-4 py-2 hover:bg-primary-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                                     >
                                       <div className="flex justify-between items-start">
                                         <div className="flex-1">
@@ -457,7 +457,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                                           {p.sku && <div className="text-xs text-gray-500">SKU: {p.sku}</div>}
                                         </div>
                                         <div className="ml-4 text-right">
-                                          <div className="text-xs font-medium text-blue-600">Disponible:</div>
+                                          <div className="text-xs font-medium text-primary-600">Disponible:</div>
                                           <div className="text-xs text-gray-600">{p.available_quantity} uds.</div>
                                           {p.reserved_quantity > 0 && (
                                             <div className="text-xs text-orange-600">({p.reserved_quantity} reservadas)</div>
@@ -523,9 +523,9 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
                             {item.presentation_id && (() => {
                               const selectedPresentation = product.presentations.find(p => p.id === parseInt(item.presentation_id));
                               return selectedPresentation && (
-                                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-gray-700">
+                                <div className="mt-2 p-2 bg-primary-50 border border-primary-200 rounded text-xs text-gray-700">
                                   <div className="flex items-center gap-2">
-                                    <Package size={14} className="text-blue-600" />
+                                    <Package size={14} className="text-primary-600" />
                                     <span className="font-medium">Cada paquete contiene: {selectedPresentation.units_per_package} unidades</span>
                                   </div>
                                   {selectedPresentation.package_cost > 0 && (
@@ -659,7 +659,7 @@ const TransferFormModal = ({ isOpen, onClose, onSubmit, preselectedItems = [], s
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
                 <>

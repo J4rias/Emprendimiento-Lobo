@@ -148,10 +148,10 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
     <div className="space-y-4">
       {/* Presentación Predeterminada */}
       {getDefaultPresentation() && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
           <div className="flex items-center mb-2">
-            <Star className="h-5 w-5 text-blue-600 mr-2 fill-current" />
-            <span className="font-medium text-blue-900">Presentación Predeterminada</span>
+            <Star className="h-5 w-5 text-primary-600 mr-2 fill-current" />
+            <span className="font-medium text-primary-900">Presentación Predeterminada</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -208,7 +208,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                       {presentation.name || 'Sin nombre'}
                     </span>
                     {presentation.is_default && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
                         <Star className="h-3 w-3 mr-1 fill-current" />
                         Predeterminada
                       </span>
@@ -221,7 +221,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                         <button
                           type="button"
                           onClick={() => updatePresentation(index, 'is_default', true)}
-                          className="p-1 text-gray-400 hover:text-blue-600"
+                          className="p-1 text-gray-400 hover:text-primary-600"
                           title="Marcar como predeterminada"
                         >
                           <Star className="h-4 w-4" />
@@ -333,7 +333,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                       />
                     )}
                     {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
-                      <p className="text-xs text-blue-600 mt-0.5">
+                      <p className="text-xs text-primary-600 mt-0.5">
                         Unitario: {formatMoney((parseFloat(presentation.package_cost) / (parseInt(presentation.units_per_package) || 1)), currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
                       </p>
                     )}
@@ -367,7 +367,7 @@ const PresentationManager = ({ presentations = [], onChange, readonly = false, p
                           type="checkbox"
                           checked={presentation.is_active}
                           onChange={(e) => updatePresentation(index, 'is_active', e.target.checked)}
-                          className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-primary-200"
+                          className="mr-2 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-200"
                         />
                         <span className="text-sm text-gray-700">Activa</span>
                       </label>

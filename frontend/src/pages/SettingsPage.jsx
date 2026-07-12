@@ -644,7 +644,7 @@ const SettingsPage = () => {
                         {perms.map(permission => (
                           <label
                             key={permission.id}
-                            className="flex items-start gap-3 text-sm cursor-pointer group hover:bg-blue-50/50 p-1.5 rounded transition-all"
+                            className="flex items-start gap-3 text-sm cursor-pointer group hover:bg-primary-50/50 p-1.5 rounded transition-all"
                           >
                             <div className="pt-0.5">
                               <input
@@ -654,7 +654,7 @@ const SettingsPage = () => {
                                 className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                               />
                             </div>
-                            <span className="text-gray-700 group-hover:text-blue-700 leading-tight">
+                            <span className="text-gray-700 group-hover:text-primary-700 leading-tight">
                               {permission.description}
                             </span>
                           </label>

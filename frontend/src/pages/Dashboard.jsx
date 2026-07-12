@@ -1,11 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Package, ShoppingCart, Warning, CurrencyDollar, Users, FileText, TrendUp, Calendar, Tag } from '@phosphor-icons/react';
+import {
+  Package, ShoppingCart, Warning, CurrencyDollar, Users, FileText,
+  TrendUp, Tag, Storefront, Receipt, CurrencyCircleDollar,
+} from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { inventoryService } from '../services/api/inventoryService';
 import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
-import { formatMoney } from '../utils/formatUtils';
+import { formatCOP, formatUSD } from '../utils/formatUtils';
+import { Alert, Button, Card, Skeleton, StatCard } from '../components/ui';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -13,126 +17,64 @@ const Dashboard = () => {
 
   const getDashboardStats = async () => {
     const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
-    const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0, productsWithStock: 0 } }));
+    const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
     const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
 
-    // Stats for TODAY
+    // Hoy (medianoche local — misma semántica que el cierre de caja)
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const todayStart = `${localDate}T00:00:00`;
-    const todayEnd = `${localDate}T23:59:59`;
-    const todayStats = await saleService.getSalesStats({ date_from: todayStart, date_to: todayEnd }).catch(() => ({ stats: { totalSales: 0, totalRevenueCOP: 0 } }));
+    const todayStats = await saleService.getSalesStats({
+      date_from: `${localDate}T00:00:00`,
+      date_to: `${localDate}T23:59:59`,
+      top_limit: 5,
+    }).catch(() => ({ data: {} }));
 
-    // Stats for MONTH
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthDate = `${firstDayOfMonth.getFullYear()}-${pad(firstDayOfMonth.getMonth() + 1)}-01`;
-    const monthStatsData = await saleService.getSalesStats({ date_from: `${monthDate}T00:00:00` }).catch(() => ({ stats: { totalRevenueCOP: 0 } }));
+    // Mes en curso (solo resumen)
+    const monthDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const monthStatsData = await saleService.getSalesStats({
+      date_from: `${monthDate}T00:00:00`,
+      summary_only: 'true',
+    }).catch(() => ({ data: {} }));
 
-    // Pending sales
+    // Facturas a crédito pendientes
     const pendingData = await saleService.getSales({ status: 'pending', limit: 1 }).catch(() => ({ pagination: { total: 0 } }));
 
     return {
-      productsWithStock: valuationData.data?.productsWithStock || 0,
-      todaySales: todayStats.stats?.totalSales || 0,
-      todayRevenue: todayStats.stats?.totalRevenue || 0,
-      todayRevenueCOP: todayStats.stats?.totalRevenueCOP || 0,
-      salesByCurrency: todayStats.stats?.salesByCurrency || {},
+      today: todayStats.data || todayStats.stats || {},
+      monthRevenueCOP: (monthStatsData.data || monthStatsData.stats || {}).totalRevenueCOP || 0,
       lowStock: lowStockData.data?.length || 0,
       inventoryValueUSD: valuationData.data?.totalValue || 0,
-      inventoryValueCOP: valuationData.data?.totalValueCOP || 0,
       inventoryByCurrency: valuationData.data?.totalsByCurrency || {},
       pendingSales: pendingData.pagination?.total || 0,
-      monthRevenueCOP: monthStatsData.stats?.totalRevenueCOP || 0,
-      categoriesStats: categoriesData.data || []
+      categoriesStats: categoriesData.data || [],
     };
   };
 
-  const { data: dashboardData = {}, isLoading: loading } = useQuery({
+  const { data = {}, isLoading: loading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardStats,
     staleTime: 60_000,
+    refetchOnWindowFocus: true,
   });
 
-  const stats = {
-    productsWithStock: dashboardData.productsWithStock || 0,
-    todaySales: dashboardData.todaySales || 0,
-    todayRevenue: dashboardData.todayRevenue || 0,
-    todayRevenueCOP: dashboardData.todayRevenueCOP || 0,
-    lowStock: dashboardData.lowStock || 0,
-    inventoryValueUSD: dashboardData.inventoryValueUSD || 0,
-    inventoryValueCOP: dashboardData.inventoryValueCOP || 0,
-    inventoryByCurrency: dashboardData.inventoryByCurrency || {},
-    pendingSales: dashboardData.pendingSales || 0,
-    monthRevenueCOP: dashboardData.monthRevenueCOP || 0,
-    salesByCurrency: dashboardData.salesByCurrency || {}
-  };
-
-  const categoriesStats = dashboardData.categoriesStats || [];
-
-  const statsCards = [
-    {
-      name: 'Productos con Stock',
-      value: stats.productsWithStock,
-      icon: Package,
-      color: 'bg-blue-500',
-      link: '/productos'
-    },
-    {
-      name: 'Ventas del Día',
-      render: () => {
-        const entries = Object.entries(stats.salesByCurrency);
-        if (entries.length === 0) return <p className="text-2xl font-bold text-gray-900">{stats.todaySales} ventas</p>;
-        return (
-          <div className="space-y-1 mt-1">
-            {entries.map(([c, d]) => {
-              const fmt = c === 'COP' ? Math.round(d.total).toLocaleString('de-DE') : d.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              return <p key={c} className="text-sm font-semibold text-gray-900">{c}: {fmt} <span className="text-gray-400 font-normal">({d.count})</span></p>;
-            })}
-          </div>
-        );
-      },
-      icon: ShoppingCart,
-      color: 'bg-green-500',
-      link: '/ventas'
-    },
-    {
-      name: 'Productos Stock Bajo',
-      value: stats.lowStock,
-      icon: Warning,
-      color: 'bg-yellow-500',
-      link: '/inventario'
-    },
-    {
-      name: 'Valor Inventario',
-      value: `COP ${Math.round(stats.inventoryValueCOP).toLocaleString('de-DE')}`,
-      subtitle: `USD ${formatMoney(stats.inventoryByCurrency.USD || 0)} · COP ${Math.round(stats.inventoryByCurrency.COP || 0).toLocaleString('de-DE')}`,
-      icon: CurrencyDollar,
-      color: 'bg-purple-500',
-      link: '/inventario'
-    },
-    {
-      name: 'Cuentas por Cobrar',
-      value: stats.pendingSales,
-      icon: FileText,
-      color: 'bg-orange-500',
-      link: '/cuentas-por-cobrar'
-    },
-    {
-      name: 'Ingresos del Mes',
-      value: `COP ${Math.round(stats.monthRevenueCOP).toLocaleString('de-DE')}`,
-      icon: TrendUp,
-      color: 'bg-indigo-500',
-      link: `/reportes?type=sales&start=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end=${new Date().toISOString().split('T')[0]}`
-    },
-  ];
+  const today = data.today || {};
+  const byMode = today.salesByMode || {};
+  const modeCOP = byMode.COP || { count: 0, total_cop: 0 };
+  const modeUSD = byMode.USD || { count: 0, total_usd: 0 };
+  const topProducts = (today.topProducts || []).slice(0, 5);
+  const categoriesStats = data.categoriesStats || [];
+  const monthName = new Date().toLocaleDateString('es-VE', { month: 'long' });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando estadísticas...</p>
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       </div>
     );
@@ -140,66 +82,152 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Bienvenido, {user?.name || 'Usuario'}
+            Bienvenido, {user?.first_name || user?.name || user?.username || 'Usuario'} — {new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/pos/new')}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <ShoppingCart className="w-5 h-5" />
+        <Button size="lg" onClick={() => navigate('/pos/new')}>
+          <Storefront className="w-5 h-5" />
           Ir al Punto de Venta
-        </button>
+        </Button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {statsCards.map((stat) => (
-          <div
-            key={stat.name}
-            onClick={() => stat.link && navigate(stat.link)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
-                {stat.render ? stat.render() : (
-                  <>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                    {stat.subtitle && (
-                      <p className="text-sm text-gray-500 mt-1">{stat.subtitle}</p>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className={`${stat.color} p-3 rounded-lg`}>
-                <stat.icon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Alerta de stock bajo */}
+      {data.lowStock > 0 && (
+        <Alert
+          variant="warning"
+          title={`${data.lowStock} producto${data.lowStock !== 1 ? 's' : ''} con stock bajo`}
+          description="Revisa el inventario para evitar desabastecimiento."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => navigate('/inventario')}>
+              Ver Inventario
+            </Button>
+          }
+        />
+      )}
+
+      {/* Ventas de hoy — por modo del POS */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Ventas de hoy</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Ventas en COP"
+            value={formatCOP(modeCOP.total_cop)}
+            detail={`${modeCOP.count} venta${modeCOP.count !== 1 ? 's' : ''} en modo COP`}
+            icon={CurrencyCircleDollar}
+            tone="primary"
+            onClick={() => navigate('/ventas')}
+          />
+          <StatCard
+            label="Ventas en USD"
+            value={formatUSD(modeUSD.total_usd)}
+            detail={`${modeUSD.count} venta${modeUSD.count !== 1 ? 's' : ''} en modo USD`}
+            icon={CurrencyDollar}
+            tone="success"
+            onClick={() => navigate('/ventas')}
+          />
+          <StatCard
+            label="Operaciones"
+            value={today.totalSales || 0}
+            detail={`Equivalente total: ${formatCOP(today.totalRevenueCOP || 0)}`}
+            icon={Receipt}
+            tone="neutral"
+            onClick={() => navigate('/ventas')}
+          />
+          <StatCard
+            label="Ingresos del mes"
+            value={formatCOP(data.monthRevenueCOP)}
+            detail={monthName.charAt(0).toUpperCase() + monthName.slice(1)}
+            icon={TrendUp}
+            tone="primary"
+            onClick={() => navigate(`/reportes?type=sales&start=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end=${new Date().toISOString().split('T')[0]}`)}
+          />
+        </div>
       </div>
 
-      {/* Categories Overview */}
-      {categoriesStats.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      {/* Estado del negocio */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Estado del negocio</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard
+            label="Stock bajo"
+            value={data.lowStock}
+            detail="Productos por debajo del punto de reorden"
+            icon={Warning}
+            tone={data.lowStock > 0 ? 'warning' : 'success'}
+            onClick={() => navigate('/inventario')}
+          />
+          <StatCard
+            label="Facturas por cobrar"
+            value={data.pendingSales}
+            detail="Ventas a crédito pendientes"
+            icon={FileText}
+            tone={data.pendingSales > 0 ? 'warning' : 'neutral'}
+            onClick={() => navigate('/cuentas-por-cobrar')}
+          />
+          <StatCard
+            label="Valor del inventario"
+            value={formatUSD(data.inventoryValueUSD)}
+            detail={[
+              data.inventoryByCurrency?.USD > 0 && `USD ${formatUSD(data.inventoryByCurrency.USD)}`,
+              data.inventoryByCurrency?.COP > 0 && formatCOP(data.inventoryByCurrency.COP),
+            ].filter(Boolean).join(' · ') || 'Al costo de compra'}
+            icon={Package}
+            tone="neutral"
+            onClick={() => navigate('/inventario')}
+          />
+        </div>
+      </div>
+
+      {/* Top productos de hoy + categorías */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Tag className="w-5 h-5" />
-              Productos por Categoría
+              <TrendUp className="w-5 h-5 text-gray-400" />
+              Más vendidos hoy
             </h2>
-            <button
-              onClick={() => navigate('/categorias')}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Ver todas
-            </button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/reportes')}>
+              Ver reporte
+            </Button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          {topProducts.length === 0 ? (
+            <p className="text-sm text-gray-400 py-6 text-center">Sin ventas registradas hoy</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {topProducts.map((p, i) => (
+                <div key={p.product_id || i} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-primary-50 text-primary-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm text-gray-900 truncate">{p.product?.name || p.product_name}</span>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <p className="text-sm font-semibold text-gray-900 tabular-nums">{Math.round(parseFloat(p.total_quantity) || 0)} uds</p>
+                    <p className="text-xs text-gray-500 tabular-nums">{formatUSD(p.total_amount)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Tag className="w-5 h-5 text-gray-400" />
+              Productos por categoría
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/categorias')}>
+              Ver todas
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {categoriesStats
               .filter(cat => cat.productCount > 0)
               .sort((a, b) => (b.productCount || 0) - (a.productCount || 0))
@@ -208,106 +236,49 @@ const Dashboard = () => {
                 <button
                   key={category.id}
                   onClick={() => navigate(`/productos?category=${category.id}`)}
-                  className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors group"
+                  className="flex flex-col items-center gap-2 p-3 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors"
                 >
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:shadow-md transition-shadow"
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm"
                     style={{ backgroundColor: category.color || '#6B7280' }}
                   >
                     {category.productCount || 0}
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs font-medium text-gray-900 truncate w-full">
-                      {category.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      producto{category.productCount !== 1 ? 's' : ''}
-                    </p>
-                  </div>
+                  <p className="text-xs font-medium text-gray-900 truncate w-full text-center">
+                    {category.name}
+                  </p>
                 </button>
               ))}
           </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Acciones Rápidas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <button
-            onClick={() => navigate('/pos/new')}
-            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <ShoppingCart className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-gray-900">Nueva Venta</p>
-              <p className="text-xs text-gray-500">Punto de venta</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/productos')}
-            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-green-100 p-2 rounded-lg">
-              <Package className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-gray-900">Productos</p>
-              <p className="text-xs text-gray-500">Gestionar catálogo</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/cotizaciones')}
-            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-purple-100 p-2 rounded-lg">
-              <FileText className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-gray-900">Cotizaciones</p>
-              <p className="text-xs text-gray-500">Nueva cotización</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/clientes')}
-            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-orange-100 p-2 rounded-lg">
-              <Users className="w-5 h-5 text-orange-600" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-gray-900">Clientes</p>
-              <p className="text-xs text-gray-500">Gestionar clientes</p>
-            </div>
-          </button>
-        </div>
+        </Card>
       </div>
 
-      {/* Alerts Section */}
-      {stats.lowStock > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <Warning className="w-5 h-5 text-yellow-600" />
-            <div className="flex-1">
-              <p className="font-medium text-yellow-900">
-                Tienes {stats.lowStock} producto{stats.lowStock !== 1 ? 's' : ''} con stock bajo
-              </p>
-              <p className="text-sm text-yellow-700">Revisa el inventario para evitar desabastecimiento</p>
-            </div>
+      {/* Acciones rápidas */}
+      <Card>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Acciones rápidas</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: ShoppingCart, label: 'Nueva venta', desc: 'Punto de venta', to: '/pos/new' },
+            { icon: Package, label: 'Productos', desc: 'Gestionar catálogo', to: '/productos' },
+            { icon: FileText, label: 'Cierre de caja', desc: 'Arqueo del día', to: '/cierre-caja' },
+            { icon: Users, label: 'Clientes', desc: 'Gestionar clientes', to: '/clientes' },
+          ].map(({ icon: Icon, label, desc, to }) => (
             <button
-              onClick={() => navigate('/inventario')}
-              className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+              key={to}
+              onClick={() => navigate(to)}
+              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-left"
             >
-              Ver Inventario
+              <div className="bg-primary-50 p-2 rounded-lg shrink-0">
+                <Icon className="w-5 h-5 text-primary-700" weight="duotone" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">{label}</p>
+                <p className="text-xs text-gray-500">{desc}</p>
+              </div>
             </button>
-          </div>
+          ))}
         </div>
-      )}
+      </Card>
     </div>
   );
 };

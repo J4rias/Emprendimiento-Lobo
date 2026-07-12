@@ -35,7 +35,7 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
       {/* Print actions */}
       <div className="flex gap-2 mb-5">
         <Button variant="ghost" size="sm" onClick={onPrint}
-          className="text-blue-600 hover:bg-blue-50 border border-blue-100 text-xs font-bold">
+          className="text-primary-600 hover:bg-primary-50 border border-primary-100 text-xs font-bold">
           <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir
         </Button>
         <Button variant="ghost" size="sm" onClick={onPrintPortable}
@@ -118,7 +118,7 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
                     </div>
                     {showRate && (
                       <p className="text-[10px] text-gray-400 pl-1">
-                        {p.currency} {parseFloat(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {p.currency} {parseFloat(p.amount).toLocaleString('es-VE', { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
                         {' @ '}{parseFloat(p.exchange_rate).toFixed(2)} | Equiv: $ {equivUSD.toFixed(2)}
                       </p>
                     )}
@@ -133,7 +133,7 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
           <div className="border-t border-gray-200 pt-3 space-y-1 text-sm">
             <div className="flex justify-between font-bold text-base text-gray-900">
               <span>Total</span>
-              <span className="text-blue-600">
+              <span className="text-primary-600">
                 {copFormat(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount || 0), sale.exchange_rate)}
               </span>
             </div>

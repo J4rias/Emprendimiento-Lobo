@@ -7,7 +7,7 @@ const PAYMENT_LABEL   = { pending:'Pago Pendiente', partial:'Pago Parcial', paid
 const PAYMENT_METHOD_LABEL = { cash:'Efectivo', transfer:'Transferencia', check:'Cheque', credit:'Crédito', other:'Otro' };
 const PAYMENT_METHOD_COLOR = {
   cash:     'bg-emerald-100 text-emerald-800',
-  transfer: 'bg-blue-100    text-blue-800',
+  transfer: 'bg-primary-100    text-primary-800',
   check:    'bg-purple-100  text-purple-800',
   credit:   'bg-amber-100   text-amber-800',
   other:    'bg-gray-100    text-gray-800',
@@ -44,11 +44,11 @@ const PurchaseOrderViewSheet = ({ open, onClose, order }) => {
       <div className="space-y-4">
         {/* Facturas */}
         {order.invoices?.length > 0 && (
-          <section className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Documentos / Facturas</p>
+          <section className="bg-primary-50 rounded-lg p-4 border border-primary-100">
+            <p className="text-xs font-bold text-primary-600 uppercase tracking-wider mb-2">Documentos / Facturas</p>
             <div className="flex flex-wrap gap-2">
               {order.invoices.map((inv, i) => (
-                <span key={i} className="px-3 py-1 bg-white text-blue-700 font-bold rounded-full border border-blue-200 text-sm">
+                <span key={i} className="px-3 py-1 bg-white text-primary-700 font-bold rounded-full border border-primary-200 text-sm">
                   #{inv}
                 </span>
               ))}
@@ -100,7 +100,7 @@ const PurchaseOrderViewSheet = ({ open, onClose, order }) => {
           ))}
           <div className="flex justify-between text-base font-bold border-t border-gray-200 pt-2">
             <span>Total:</span>
-            <span className="text-blue-600">{formatMoney(order.total, order.currency)}</span>
+            <span className="text-primary-600">{formatMoney(order.total, order.currency)}</span>
           </div>
         </section>
 
@@ -126,7 +126,7 @@ const PurchaseOrderViewSheet = ({ open, onClose, order }) => {
                       <td className="px-3 py-2 text-sm text-gray-900">
                         {new Date(rec.date).toLocaleDateString('es-VE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
                       </td>
-                      <td className="px-3 py-2 text-sm font-bold text-blue-600">{rec.document_number || order.order_number}</td>
+                      <td className="px-3 py-2 text-sm font-bold text-primary-600">{rec.document_number || order.order_number}</td>
                       <td className="px-3 py-2 text-sm text-center font-bold text-green-600">+{parseFloat(rec.quantity).toLocaleString('es-VE')}</td>
                       <td className="px-3 py-2 text-sm text-gray-600 italic">{rec.user}</td>
                     </tr>
@@ -141,7 +141,7 @@ const PurchaseOrderViewSheet = ({ open, onClose, order }) => {
         {order.payment_history?.length > 0 && (
           <section className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+              <div className="w-1.5 h-4 bg-primary-500 rounded-full" />
               Historial de Pagos
             </h4>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -159,7 +159,7 @@ const PurchaseOrderViewSheet = ({ open, onClose, order }) => {
                       <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">
                         {new Date(pay.payment_date).toLocaleDateString('es-VE')}
                       </td>
-                      <td className="px-3 py-2 text-sm font-bold text-blue-600">{pay.payment_number}</td>
+                      <td className="px-3 py-2 text-sm font-bold text-primary-600">{pay.payment_number}</td>
                       <td className="px-3 py-2 text-sm">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_METHOD_COLOR[pay.payment_method] || PAYMENT_METHOD_COLOR.other}`}>
                           {PAYMENT_METHOD_LABEL[pay.payment_method] || pay.payment_method}

@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { saleService } from '../services/api/saleService';
 import { userService } from '../services/api/userService';
 import { useAuth } from '../context/AuthContext';
-import { useCompany } from '../context/CompanyContext';
 import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
-import { Calendar, Printer, CurrencyDollar, Wallet, Users, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
+import { Printer, CurrencyDollar, Wallet, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { Button, Card, Input, Select, Spinner, StatCard } from '../components/ui';
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();
-    const { companySettings } = useCompany();
 
     const [loading, setLoading] = useState(false);
     const [report, setReport] = useState(null);
@@ -64,8 +63,8 @@ const DailyReportPage = () => {
 
     const fmtAmount = (amount, currency = 'USD') => {
         const val = parseFloat(amount || 0);
-        if (currency === 'COP') return Math.round(val).toLocaleString('de-DE');
-        return val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (currency === 'COP') return Math.round(val).toLocaleString('es-VE');
+        return val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const handlePrint = () => {
@@ -74,13 +73,13 @@ const DailyReportPage = () => {
         const userName = selectedUser ? (selectedUser.name || `${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim()) : 'Todos';
 
         const breakdownRows = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
-            const methodRows = Object.entries(methods).map(([method, amount]) =>
+            const methodRows = Object.entries(methods).filter(([k]) => k !== '_salesCount').map(([method, amount]) =>
                 `<tr>
                     <td style="padding:3px 0; font-size:12px;">${getMethodLabel(method)}</td>
                     <td style="padding:3px 0; text-align:right; font-size:12px; font-weight:bold;">${currency === 'USD' ? '$ ' : ''}${fmtAmount(amount, currency)}</td>
                 </tr>`
             ).join('');
-            const total = Object.values(methods).reduce((a, b) => a + b, 0);
+            const total = Object.entries(methods).filter(([k]) => k !== '_salesCount').reduce((a, [, b]) => a + b, 0);
             return `
                 <div style="margin-bottom:8px;">
                     <div style="font-weight:bold; font-size:13px; border-bottom:1px solid #000; padding-bottom:2px; margin-bottom:4px;">
@@ -178,44 +177,41 @@ const DailyReportPage = () => {
 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     {hasPermission('users.view') && (
-                        <select
-                            value={filters.user_id}
-                            onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-48"
-                        >
-                            <option value="">Todos los cajeros</option>
-                            {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                        </select>
+                        <div className="w-full md:w-48">
+                            <Select
+                                value={filters.user_id}
+                                onChange={e => setFilters(f => ({ ...f, user_id: e.target.value }))}
+                                options={[
+                                    { value: '', label: 'Todos los cajeros' },
+                                    ...users.map(u => ({ value: u.id, label: u.name })),
+                                ]}
+                            />
+                        </div>
                     )}
 
-                    <input
-                        type="date"
-                        value={filters.date}
-                        onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
-                        className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-200 w-full md:w-auto"
-                    />
+                    <div className="w-full md:w-auto">
+                        <Input
+                            type="date"
+                            value={filters.date}
+                            onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
+                        />
+                    </div>
 
-                    <button
-                        onClick={handlePrint}
-                        disabled={loading || !report}
-                        className="w-full md:w-auto px-4 py-2 bg-slate-800 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-slate-700 disabled:bg-slate-300"
-                    >
+                    <Button onClick={handlePrint} disabled={loading || !report} className="w-full md:w-auto">
                         <Printer className="w-4 h-4" />
                         Imprimir Arqueo
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                    <Spinner size="lg" />
                 </div>
             ) : !report ? (
-                <div className="text-center py-12 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
+                <Card className="text-center py-12 text-gray-500">
                     No hay datos para mostrar.
-                </div>
+                </Card>
             ) : (
                 <div className="space-y-6 print-container">
 
@@ -228,31 +224,23 @@ const DailyReportPage = () => {
                             return [currency, total];
                         }).filter(([, total]) => total > 0);
 
-                        const iconStyles = {
-                            USD: 'bg-emerald-100 text-emerald-600',
-                            COP: 'bg-blue-100 text-blue-600',
-                            VES: 'bg-amber-100 text-amber-600'
-                        };
+                        const tones = { USD: 'success', COP: 'primary', VES: 'warning' };
                         return currencyTotals.length > 0 ? (
                             <div className={`grid grid-cols-1 ${currencyTotals.length >= 3 ? 'md:grid-cols-3' : currencyTotals.length === 2 ? 'md:grid-cols-2' : ''} gap-4`}>
                                 {currencyTotals.map(([currency, total]) => (
-                                    <div key={currency} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                                        <div className={`p-4 rounded-lg ${iconStyles[currency] || 'bg-gray-100 text-gray-600'}`}>
-                                            <CurrencyDollar className="w-8 h-8" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Recibido {currency}</p>
-                                            <div className="text-3xl font-bold text-gray-900 mt-1">
-                                                {currency === 'USD' ? '$ ' : ''}{fmtAmount(total, currency)}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <StatCard
+                                        key={currency}
+                                        label={`Recibido ${currency}`}
+                                        value={`${currency === 'USD' ? '$ ' : ''}${fmtAmount(total, currency)}`}
+                                        icon={CurrencyDollar}
+                                        tone={tones[currency] || 'neutral'}
+                                    />
                                 ))}
                             </div>
                         ) : null;
                     })()}
 
-                    {/* Ventas del dia, operaciones, credito otorgado, cobros de credito */}
+                    {/* Ventas del día, operaciones, crédito otorgado, cobros de crédito */}
                     {(() => {
                         const hasCredit = report.creditTotalUSD > 0;
                         const creditCollected = report.creditCollectedByCurrency || {};
@@ -263,89 +251,69 @@ const DailyReportPage = () => {
 
                         return (
                         <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                                <div className="p-4 bg-indigo-100 rounded-lg text-indigo-600">
-                                    <ShoppingCart className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ventas del Dia</p>
-                                    <div className="text-2xl font-bold text-gray-900 mt-1">
-                                        $ {fmtAmount(report.totalSalesUSD || 0, 'USD')}
-                                    </div>
-                                    <p className="text-sm text-gray-500 mt-1">COP {fmtAmount(report.totalSalesCOP || 0, 'COP')}</p>
-                                </div>
-                            </div>
+                            <StatCard
+                                label="Ventas del día"
+                                value={`$ ${fmtAmount(report.totalSalesUSD || 0, 'USD')}`}
+                                detail={`COP ${fmtAmount(report.totalSalesCOP || 0, 'COP')}`}
+                                icon={ShoppingCart}
+                                tone="primary"
+                            />
 
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                                <div className="p-4 bg-blue-100 rounded-lg text-blue-600">
-                                    <Wallet className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Operaciones</p>
-                                    <div className="text-2xl font-bold text-gray-900 mt-1">
-                                        {report.salesCount || 0}
-                                    </div>
-                                    <p className="text-sm text-gray-500 mt-1">Facturas procesadas</p>
-                                </div>
-                            </div>
+                            <StatCard
+                                label="Operaciones"
+                                value={report.salesCount || 0}
+                                detail="Facturas procesadas"
+                                icon={Wallet}
+                                tone="neutral"
+                            />
 
                             {hasCredit && (
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                                    <div className="p-4 bg-orange-100 rounded-lg text-orange-600">
-                                        <CreditCard className="w-8 h-8" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Credito Otorgado</p>
-                                        <div className="text-2xl font-bold text-gray-900 mt-1">
-                                            $ {fmtAmount(report.creditTotalUSD, 'USD')}
-                                        </div>
-                                        <p className="text-sm text-gray-500 mt-1">Pendiente por cobrar</p>
-                                    </div>
-                                </div>
+                                <StatCard
+                                    label="Crédito otorgado"
+                                    value={`$ ${fmtAmount(report.creditTotalUSD, 'USD')}`}
+                                    detail="Pendiente por cobrar"
+                                    icon={CreditCard}
+                                    tone="warning"
+                                />
                             )}
 
                             {hasCreditCollections && (
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                                    <div className="p-4 bg-teal-100 rounded-lg text-teal-600">
-                                        <CurrencyDollar className="w-8 h-8" />
+                                <StatCard
+                                    label="Cobros de crédito"
+                                    detail="Abonos recibidos hoy"
+                                    icon={CurrencyDollar}
+                                    tone="success"
+                                >
+                                    <div className="mt-1 space-y-0.5">
+                                        {Object.entries(creditCollected).map(([currency, amount]) => (
+                                            <div key={currency} className="text-xl font-semibold text-gray-900">
+                                                {currency === 'USD' ? '$ ' : ''}{fmtAmount(amount, currency)} {currency}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Cobros de Credito</p>
-                                        <div className="mt-1 space-y-0.5">
-                                            {Object.entries(creditCollected).map(([currency, amount]) => (
-                                                <div key={currency} className="text-xl font-bold text-gray-900">
-                                                    {currency === 'USD' ? '$ ' : ''}{fmtAmount(amount, currency)} {currency}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p className="text-sm text-gray-500 mt-1">Abonos recibidos hoy</p>
-                                    </div>
-                                </div>
+                                </StatCard>
                             )}
 
                             {hasRefunds && (
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-rose-200 flex items-center gap-4">
-                                    <div className="p-4 bg-rose-100 rounded-lg text-rose-600">
-                                        <ArrowCounterClockwise className="w-8 h-8" />
+                                <StatCard
+                                    label="Devoluciones"
+                                    detail={`${report.cashRefunds.refund_count} devoluci${report.cashRefunds.refund_count !== 1 ? 'ones' : 'ón'} en efectivo`}
+                                    icon={ArrowCounterClockwise}
+                                    tone="error"
+                                    className="border-red-200"
+                                >
+                                    <div className="text-2xl font-semibold text-red-600 mt-1">
+                                        {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}`}
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Devoluciones</p>
-                                        <div className="text-2xl font-bold text-rose-600 mt-1">
-                                            {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}`}
-                                        </div>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            {report.cashRefunds.refund_count} devoluci{report.cashRefunds.refund_count !== 1 ? 'ones' : 'on'} en efectivo
-                                        </p>
-                                    </div>
-                                </div>
+                                </StatCard>
                             )}
                         </div>
                         );
                     })()}
 
-                    {/* Desglose de Caja Fuerte (Multimoneda) */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 bg-slate-50">
+                    {/* Desglose de Caja (Multimoneda) */}
+                    <Card variant="flat" className="overflow-hidden p-0">
+                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h2 className="text-lg font-semibold text-gray-800">Desglose Físico en Caja</h2>
                             <p className="text-sm text-gray-500 mt-1">Sumatoria exacta por divisa de pagos ingresados hoy.</p>
                         </div>
@@ -363,25 +331,25 @@ const DailyReportPage = () => {
                                         const paymentMethods = Object.entries(methods).filter(([k]) => k !== '_salesCount');
                                         return (
                                         <div key={currency} className="border border-gray-200 rounded-lg overflow-hidden">
-                                            <div className="bg-slate-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                                                <span className="font-bold text-slate-700">Recibido en {currency}</span>
-                                                {salesCount > 0 && <span className="text-xs text-slate-500">{salesCount} venta{salesCount !== 1 ? 's' : ''}</span>}
+                                            <div className="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                                <span className="font-bold text-gray-700">Recibido en {currency}</span>
+                                                {salesCount > 0 && <span className="text-xs text-gray-500">{salesCount} venta{salesCount !== 1 ? 's' : ''}</span>}
                                             </div>
                                             <div className="divide-y divide-gray-100">
                                                 {paymentMethods.map(([method, amount]) => (
-                                                    <div key={method} className="flex justify-between items-center px-4 py-3 hover:bg-slate-50">
+                                                    <div key={method} className="flex justify-between items-center px-4 py-3 hover:bg-gray-50">
                                                         <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
-                                                        <span className="font-semibold text-gray-900">
+                                                        <span className="font-semibold text-gray-900 tabular-nums">
                                                             {currency === 'USD' ? '$' : ''}
-                                                            {amount.toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                            {amount.toLocaleString('es-VE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 ))}
                                             </div>
-                                            <div className="bg-slate-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
-                                                <span className="text-slate-600">Total {currency}:</span>
-                                                <span className="text-slate-900">
-                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString('de-DE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
+                                                <span className="text-gray-600">Total {currency}:</span>
+                                                <span className="text-gray-900 tabular-nums">
+                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString('es-VE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
@@ -390,7 +358,7 @@ const DailyReportPage = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </Card>
 
                     {/* Cuadre Físico — solo efectivo por moneda, menos devoluciones */}
                     {(() => {
@@ -408,12 +376,12 @@ const DailyReportPage = () => {
                         const hasAnyRefund = Object.values(refundMap).some(v => v > 0);
                         if (cashByCurrency.length === 0 && !hasAnyRefund && !usdtTotal) return null;
                         return (
-                            <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
-                                <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
+                            <div className="bg-gray-900 text-white p-6 rounded-lg shadow-sm">
+                                <p className="text-sm font-medium text-gray-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
                                 <div className="flex flex-wrap justify-between gap-4">
                                     {cashByCurrency.map(([currency, amount]) => (
                                         <div key={currency}>
-                                            <p className="text-xs text-slate-400">{currency}</p>
+                                            <p className="text-xs text-gray-400">{currency}</p>
                                             <p className="text-2xl font-bold">
                                                 {fmtAmount(amount, currency)}
                                             </p>
@@ -421,13 +389,13 @@ const DailyReportPage = () => {
                                     ))}
                                 </div>
                                 {usdtTotal > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-slate-600">
-                                        <p className="text-xs text-cyan-300 uppercase tracking-wide mb-1">USDT recibido</p>
-                                        <p className="text-xl font-bold text-cyan-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
+                                    <div className="mt-4 pt-3 border-t border-gray-600">
+                                        <p className="text-xs text-teal-300 uppercase tracking-wide mb-1">USDT recibido</p>
+                                        <p className="text-xl font-bold text-teal-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
                                     </div>
                                 )}
                                 {hasAnyRefund && (
-                                    <p className="text-xs text-slate-400 mt-2">
+                                    <p className="text-xs text-gray-400 mt-2">
                                         Incluye descuento por devoluciones: {Object.entries(refundMap).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ')}
                                     </p>
                                 )}

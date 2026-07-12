@@ -21,8 +21,8 @@ const CATEGORY_CONFIG = {
   USD: {
     label: 'USD',
     sublabel: 'Se paga en Bolívares',
-    tabActive: 'bg-blue-600 text-white',
-    tabInactive: 'text-blue-700 hover:bg-blue-50',
+    tabActive: 'bg-primary-600 text-white',
+    tabInactive: 'text-primary-700 hover:bg-primary-50',
     fmtAmount: (v) =>
       `$ ${(parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
   },
@@ -580,7 +580,7 @@ const SupplierStatementPage = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowFilters((f) => !f)}
-                  className={(showFilters || startDate || endDate) ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' : ''}
+                  className={(showFilters || startDate || endDate) ? 'bg-primary-100 text-primary-700 hover:bg-primary-100' : ''}
                 >
                   <CalendarBlank className="h-4 w-4" />
                   Período
@@ -599,7 +599,7 @@ const SupplierStatementPage = () => {
 
             {/* Panel de filtros */}
             {showFilters && (
-              <div className="px-5 py-3 bg-blue-50/60 border-b border-blue-100 flex flex-wrap items-end gap-4">
+              <div className="px-5 py-3 bg-primary-50/60 border-b border-primary-100 flex flex-wrap items-end gap-4">
                 <DateRangeFilter
                   startDate={startDate}
                   endDate={endDate}

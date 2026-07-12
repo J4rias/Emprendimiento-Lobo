@@ -12,7 +12,6 @@ const LoginPage               = lazy(() => import('./pages/LoginPage'));
 const Dashboard               = lazy(() => import('./pages/Dashboard'));
 const InventoryPage           = lazy(() => import('./pages/InventoryPage'));
 const InventoryDetailPage     = lazy(() => import('./pages/InventoryDetailPage'));
-const InventoryAdjustPage     = lazy(() => import('./pages/InventoryAdjustPage'));
 const TransfersPage           = lazy(() => import('./pages/TransfersPage'));
 const InventoryMovementsPage  = lazy(() => import('./pages/InventoryMovementsPage'));
 const ProductsPage            = lazy(() => import('./pages/ProductsPage'));
@@ -143,16 +142,6 @@ function AppRoutes() {
           <PrivateRoute>
             <AppLayout>
               <InventoryDetailPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/inventario/:id/adjust"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <InventoryAdjustPage />
             </AppLayout>
           </PrivateRoute>
         }

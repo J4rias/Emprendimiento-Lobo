@@ -106,7 +106,7 @@ export function PaymentEditModal({ payment, open, onClose, onSubmit, isPending }
               {payment.allocations.map((alloc) => (
                 <div
                   key={alloc.id}
-                  className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-sm"
+                  className="flex items-center justify-between bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 text-sm"
                 >
                   <div>
                     <span className="font-medium text-primary-600">

@@ -50,7 +50,7 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
             <div className="flex flex-wrap gap-4 text-xs text-gray-600">
                 <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : 'Crédito'}</span>
                 <span><span className="font-medium">Estado:</span> {detail.status === 'completed' ? 'Completada' : detail.status === 'pending' ? 'Pendiente' : 'Cancelada'}</span>
-                <span><span className="font-medium">Tasa:</span> {rate.toLocaleString('es-CO')} COP/USD</span>
+                <span><span className="font-medium">Tasa:</span> {rate.toLocaleString('es-VE')} COP/USD</span>
             </div>
             {detail.details?.length > 0 && (
                 <table className="w-full text-xs border-collapse">
@@ -93,23 +93,23 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
                 </table>
             )}
             {appliedCNs.length > 0 && (
-                <div className="mt-2 border border-blue-200 rounded-lg overflow-hidden">
-                    <div className="bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Devoluciones Aplicadas</div>
+                <div className="mt-2 border border-primary-200 rounded-lg overflow-hidden">
+                    <div className="bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800">Devoluciones Aplicadas</div>
                     <table className="w-full text-xs">
                         <tbody>
                             {appliedCNs.map((cn) => (
-                                <tr key={cn.id} className="border-t border-blue-100">
-                                    <td className="px-3 py-1.5 text-blue-700 font-medium">{cn.number}</td>
+                                <tr key={cn.id} className="border-t border-primary-100">
+                                    <td className="px-3 py-1.5 text-primary-700 font-medium">{cn.number}</td>
                                     <td className="px-3 py-1.5 text-gray-500">{new Date(cn.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: '2-digit' })}</td>
-                                    <td className="px-3 py-1.5 text-right font-bold text-blue-700">
+                                    <td className="px-3 py-1.5 text-right font-bold text-primary-700">
                                         -{formatCurrency(currency === 'COP' ? cn.total_cop : cn.total_usd, currency)}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                         <tfoot>
-                            <tr className="border-t-2 border-blue-200 bg-blue-50">
-                                <td colSpan="2" className="px-3 py-1.5 text-right font-semibold text-blue-800">Neto a pagar</td>
+                            <tr className="border-t-2 border-primary-200 bg-primary-50">
+                                <td colSpan="2" className="px-3 py-1.5 text-right font-semibold text-primary-800">Neto a pagar</td>
                                 <td className="px-3 py-1.5 text-right font-bold text-orange-700">
                                     {formatCurrency(
                                         (currency === 'COP'
@@ -154,13 +154,13 @@ const CreditNoteDetailExpanded = ({ transaction }) => {
             </div>
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Monto devuelto</span>
-                <span className="text-blue-700 font-semibold">
+                <span className="text-primary-700 font-semibold">
                     {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(totalCOP)}
                 </span>
             </div>
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
-                <span className="text-gray-800">{exchangeRate.toLocaleString('es-CO')} COP/USD</span>
+                <span className="text-gray-800">{exchangeRate.toLocaleString('es-VE')} COP/USD</span>
             </div>
         </div>
     );
@@ -228,7 +228,7 @@ const PaymentDetailExpanded = ({ transaction, currency }) => {
                 {storedCurrency !== 'COP' && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
-                        <span className="text-gray-800">{effectiveRate.toLocaleString('es-CO')} COP/USD</span>
+                        <span className="text-gray-800">{effectiveRate.toLocaleString('es-VE')} COP/USD</span>
                     </div>
                 )}
                 {pay.reference && (
@@ -495,8 +495,8 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                 'Total Facturado (Crédito)',
                                                 statementData.summary[selectedCurrency].total_invoiced,
                                                 selectedCurrency,
-                                                'bg-blue-50',
-                                                'text-blue-800',
+                                                'bg-primary-50',
+                                                'text-primary-800',
                                                 Receipt
                                             )}
                                             {renderSummaryCard(
@@ -595,7 +595,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                                             <div className="flex flex-col">
                                                                                 <span className={`text-sm font-semibold ${t.type === 'charge' ? 'text-orange-600' :
-                                                                                    t.type === 'credit' ? 'text-blue-600' :
+                                                                                    t.type === 'credit' ? 'text-primary-600' :
                                                                                         t.isInternal ? 'text-purple-600' : 'text-green-600'
                                                                                     }`}>
                                                                                     {t.type === 'charge'
@@ -621,7 +621,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                                     <div className="flex flex-col items-end">
                                                                                         <span className="text-orange-300 line-through text-xs">{formatCurrency(t.amount, t.currency)}</span>
                                                                                         <span className="text-orange-600 font-bold">{formatCurrency(netAmt, t.currency)}</span>
-                                                                                        <span className="text-blue-500 text-[10px]">NC: -{formatCurrency(cnAmt, t.currency)}</span>
+                                                                                        <span className="text-primary-500 text-[10px]">NC: -{formatCurrency(cnAmt, t.currency)}</span>
                                                                                     </div>
                                                                                 ) : (
                                                                                     <span className="text-orange-600">{formatCurrency(t.amount, t.currency)}</span>
@@ -632,7 +632,7 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
                                                                             {t.type !== 'charge' ? (
-                                                                                <span className={t.isInternal ? "text-purple-600" : (t.type === 'credit' ? 'text-blue-600' : "text-green-600")}>
+                                                                                <span className={t.isInternal ? "text-purple-600" : (t.type === 'credit' ? 'text-primary-600' : "text-green-600")}>
                                                                                     {formatCurrency(t.amount, t.currency)}
                                                                                 </span>
                                                                             ) : (
@@ -721,14 +721,14 @@ const CustomerStatementModal = ({ customer, onClose }) => {
                                 </div>
 
                                 {statementData?.summary?.[selectedCurrency]?.available_credit > 0 && (
-                                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center justify-between gap-2">
+                                    <div className="bg-primary-50 p-3 rounded-lg border border-primary-200 flex items-center justify-between gap-2">
                                         <div>
-                                            <p className="text-xs text-blue-800 font-semibold">Saldo a Favor del Cliente</p>
-                                            <p className="text-base font-bold text-blue-700">
+                                            <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
+                                            <p className="text-base font-bold text-primary-700">
                                                 {formatCurrency(Math.min(statementData.summary[selectedCurrency].available_credit, getPendingInCurrency(selectedTransaction)), selectedCurrency)}
                                             </p>
                                         </div>
-                                        <p className="text-xs text-blue-600 font-medium text-right">Descontado del<br/>monto a pagar</p>
+                                        <p className="text-xs text-primary-600 font-medium text-right">Descontado del<br/>monto a pagar</p>
                                     </div>
                                 )}
 

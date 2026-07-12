@@ -380,7 +380,7 @@ export function AllocationSection({
 
       {/* ── Resumen de asignación ─────────────────────────────────────────── */}
       {allocations.length > 0 && formAmount && (
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm">
+        <div className="bg-primary-50 p-3 rounded-lg border border-primary-100 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Total del pago:</span>
             <span className="font-bold">
@@ -411,15 +411,15 @@ export function AllocationSection({
           )}
 
           {unallocated > 0.01 && (
-            <div className="mt-1 pt-1 border-t border-blue-300">
+            <div className="mt-1 pt-1 border-t border-primary-300">
               <div className="flex justify-between">
-                <span className="text-blue-700 font-medium">✨ Saldo a Favor generado:</span>
-                <span className="font-bold text-blue-700">
+                <span className="text-primary-700 font-medium">✨ Saldo a Favor generado:</span>
+                <span className="font-bold text-primary-700">
                   {formCurrency}{' '}
                   {unallocated.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="text-xs text-primary-600 mt-1">
                 La diferencia quedará como anticipo o saldo a favor del proveedor.
               </p>
             </div>

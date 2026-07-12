@@ -204,13 +204,13 @@ const SupplierPaymentsPage = () => {
       {/* ── Stats (solo con proveedor seleccionado) ───────────────────────────── */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card variant="compact" className="bg-blue-50 border-blue-100">
+          <Card variant="compact" className="bg-primary-50 border-primary-100">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-700">Total Pagos</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.total_payments}</p>
+                <p className="text-sm text-primary-700">Total Pagos</p>
+                <p className="text-2xl font-bold text-primary-900">{stats.total_payments}</p>
               </div>
-              <CurrencyDollar className="w-10 h-10 text-blue-600 opacity-40" />
+              <CurrencyDollar className="w-10 h-10 text-primary-600 opacity-40" />
             </div>
           </Card>
 

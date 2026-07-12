@@ -107,7 +107,7 @@ const ProductViewSheet = ({ open, onClose, product, onEdit, hasPermission }) => 
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-900">{pres.name || 'Sin nombre'}</span>
                     {pres.is_default && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
                         <Star className="h-3 w-3 fill-current" />
                         Predeterminada
                       </span>

@@ -50,7 +50,7 @@ const CreditNotesPage = () => {
       case 'draft':
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><Clock className="w-4 h-4 mr-1" /> Borrador</span>;
       case 'approved':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800"><CheckCircle className="w-4 h-4 mr-1" /> Aprobado</span>;
+        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 text-primary-800"><CheckCircle className="w-4 h-4 mr-1" /> Aprobado</span>;
       case 'applied':
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><CheckCircle className="w-4 h-4 mr-1" /> Aplicado</span>;
       case 'cancelled':
@@ -179,7 +179,7 @@ const CreditNotesPage = () => {
                 creditNotes.map((note) => (
                   <tr key={note.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-blue-600">{note.credit_note_number}</div>
+                      <div className="font-medium text-primary-600">{note.credit_note_number}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(note.credit_note_date).toLocaleDateString()}

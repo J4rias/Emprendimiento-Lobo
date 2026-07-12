@@ -182,7 +182,7 @@ const SalesPage = () => {
               <div className="text-[10px] text-gray-400">de {copFormat(saleTotal, row.exchange_rate)}</div>
             )}
             {cnCount > 0 && (
-              <div className="text-[10px] text-blue-500">
+              <div className="text-[10px] text-primary-500">
                 Dev: -COP {Math.ceil(cnTotalCOP).toLocaleString('es-VE')}
               </div>
             )}
@@ -194,7 +194,7 @@ const SalesPage = () => {
       <div>
         <span className="text-sm font-bold text-gray-900">{copFormat(saleTotal, row.exchange_rate)}</span>
         {cnCount > 0 && (
-          <div className="text-[10px] text-blue-500">
+          <div className="text-[10px] text-primary-500">
             Neto: COP {netCOP.toLocaleString('es-VE')} ({cnCount} dev.)
           </div>
         )}
@@ -408,8 +408,8 @@ const SalesPage = () => {
                 <p className="text-sm text-gray-600 mb-1">Total Ventas</p>
                 <p className="text-2xl font-bold text-gray-800">{stats.totalSales || 0}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                <ShoppingBag className="w-6 h-6 text-primary-600" />
               </div>
             </div>
           </Card>
@@ -544,14 +544,14 @@ const SalesPage = () => {
             </div>
 
             {customerCreditBalance.cop > 0 && (
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex justify-between items-center">
+              <div className="bg-primary-50 p-3 rounded-lg border border-primary-200 flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-blue-800 font-semibold">Saldo a Favor del Cliente</p>
-                  <p className="text-lg font-bold text-blue-900">
+                  <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
+                  <p className="text-lg font-bold text-primary-900">
                     COP {Math.ceil(customerCreditBalance.cop).toLocaleString('es-VE')}
                   </p>
                 </div>
-                <div className="text-right text-xs text-blue-700">
+                <div className="text-right text-xs text-primary-700">
                   <p>Descontado del</p>
                   <p>monto a pagar</p>
                 </div>

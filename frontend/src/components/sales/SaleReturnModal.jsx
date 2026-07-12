@@ -214,7 +214,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Vendidos</th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-blue-600 uppercase bg-blue-50/50">CANT. A DEVOLVER</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-primary-600 uppercase bg-primary-50/50">CANT. A DEVOLVER</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal (COP)</th>
                                 </tr>
                             </thead>
@@ -231,7 +231,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                                 <div className="text-xs text-orange-500">({item.alreadyReturned} devueltos)</div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 bg-blue-50/20 text-center">
+                                        <td className="px-4 py-3 bg-primary-50/20 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <input
                                                     type="number"
@@ -241,7 +241,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                                     value={item.returnQuantity === 0 ? '' : item.returnQuantity}
                                                     onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                                                     placeholder="0"
-                                                    className="w-20 px-2 py-1 text-center border border-blue-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
+                                                    className="w-20 px-2 py-1 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
                                                 />
                                                 <button
                                                     type="button"
@@ -307,7 +307,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                                 required
                                 value={refundMethod}
                                 onChange={(e) => setRefundMethod(e.target.value)}
-                                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-primary-200 focus:border-primary-500 font-medium text-blue-900 bg-blue-50"
+                                className="w-full px-3 py-2 border border-primary-300 rounded-md focus:ring-primary-200 focus:border-primary-500 font-medium text-primary-900 bg-primary-50"
                             >
                                 <option value="credit_balance" disabled={!sale?.customer_id}>💰 Monedero (Saldo a Favor del Cliente){!sale?.customer_id ? ' — N/A Consumidor Final' : ''}</option>
                                 <option value="cash">💵 Entregar Efectivo Físico</option>

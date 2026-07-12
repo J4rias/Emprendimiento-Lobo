@@ -128,7 +128,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 {loading ? (
                   <div className="p-8 text-center text-gray-500">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
                     <p>Buscando clientes...</p>
                   </div>
                 ) : customers.length === 0 ? (
@@ -142,12 +142,12 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                       <button
                         key={customer.id}
                         onClick={() => handleSelectCustomer(customer)}
-                        className="w-full text-left p-4 hover:bg-blue-50 transition-colors group"
+                        className="w-full text-left p-4 hover:bg-primary-50 transition-colors group"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
+                              <h4 className="font-medium text-gray-900 group-hover:text-primary-700 transition-colors">
                                 {getCustomerDisplayName(customer)}
                               </h4>
                               {customer.type === 'juridical' && (
@@ -167,14 +167,14 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
                                   Crédito: COP {Math.round(parseFloat(customer.creditLimit || 0)).toLocaleString('de-DE')}
                                 </span>
                                 {customer.discountPercentage > 0 && (
-                                  <span className="text-xs text-blue-600">
+                                  <span className="text-xs text-primary-600">
                                     Desc: {customer.discountPercentage}%
                                   </span>
                                 )}
                               </div>
                             )}
                           </div>
-                          <CaretRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                          <CaretRight className="w-5 h-5 text-gray-300 group-hover:text-primary-500 transition-colors" />
                         </div>
                       </button>
                     ))}
@@ -200,7 +200,7 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
               <button
                 type="submit"
                 form="customer-quick-add-form"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-sm transition-all"
+                className="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 shadow-sm transition-all"
               >
                 Crear y Seleccionar
               </button>

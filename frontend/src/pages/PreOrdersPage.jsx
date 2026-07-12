@@ -85,7 +85,7 @@ const PreOrdersPage = () => {
   const getStatusBadge = (status) => {
     const badges = {
       pending: { cls: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pendiente' },
-      approved: { cls: 'bg-blue-100 text-blue-800', icon: CheckCircle, label: 'Aprobado' },
+      approved: { cls: 'bg-primary-100 text-primary-800', icon: CheckCircle, label: 'Aprobado' },
       rejected: { cls: 'bg-red-100 text-red-800', icon: XCircle, label: 'Rechazado' },
       converted: { cls: 'bg-green-100 text-green-800', icon: ShoppingCart, label: 'Convertido' },
       expired: { cls: 'bg-gray-100 text-gray-800', icon: Clock, label: 'Expirado' },
@@ -102,7 +102,7 @@ const PreOrdersPage = () => {
 
   const getChannelIcon = (channel) => {
     switch (channel) {
-      case 'messenger': return <ChatCircle className="w-4 h-4 text-blue-500" title="Messenger" />;
+      case 'messenger': return <ChatCircle className="w-4 h-4 text-primary-500" title="Messenger" />;
       case 'telegram': return <PaperPlaneTilt className="w-4 h-4 text-sky-500" title="Telegram" />;
       case 'web': return <Globe className="w-4 h-4 text-gray-500" title="Web" />;
       default: return null;
@@ -135,9 +135,9 @@ const PreOrdersPage = () => {
           <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
           <div className="text-sm text-yellow-600">Pendientes</div>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="text-2xl font-bold text-blue-700">{stats.approved}</div>
-          <div className="text-sm text-blue-600">Aprobados</div>
+        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+          <div className="text-2xl font-bold text-primary-700">{stats.approved}</div>
+          <div className="text-sm text-primary-600">Aprobados</div>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-gray-700">{stats.today}</div>
@@ -286,9 +286,9 @@ const PreOrdersPage = () => {
 
               {/* Notes */}
               {selectedOrder.notes && (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-blue-700 mb-1">Notas del bot</h3>
-                  <p className="text-sm text-blue-600 whitespace-pre-wrap">{selectedOrder.notes}</p>
+                <div className="bg-primary-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-primary-700 mb-1">Notas del bot</h3>
+                  <p className="text-sm text-primary-600 whitespace-pre-wrap">{selectedOrder.notes}</p>
                 </div>
               )}
 
@@ -338,7 +338,7 @@ const PreOrdersPage = () => {
                     <button
                       onClick={() => approveMutation.mutate(selectedOrder.id)}
                       disabled={approveMutation.isPending}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+                      className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
                     >
                       Aprobar
                     </button>

@@ -1,28 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Barcode, Package, Plus, Minus, Check, X, ArrowLeft, Warehouse, WarningCircle, Camera, Keyboard } from '@phosphor-icons/react';
 import { productService } from '../services/api/productService';
 import { inventoryService } from '../services/api/inventoryService';
+import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
 
+// Página táctil (escáner móvil): el diseño touch-first es deliberado,
+// igual que el POS — no migrar a los componentes de escritorio del UI kit.
 const StockReplenishmentPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const inputRef = useRef(null);
-  
+
   const [barcode, setBarcode] = useState('');
   const [product, setProduct] = useState(null);
-  const [warehouseId, setWarehouseId] = useState(1);
+  const [warehouseId, setWarehouseId] = useState(null);
   const [presentations, setPresentations] = useState([]);
   const [selectedPresentation, setSelectedPresentation] = useState(null);
   const [packageQuantity, setPackageQuantity] = useState(0);
   const [looseUnits, setLooseUnits] = useState(0);
-  const [warehouses, setWarehouses] = useState([
-    { id: 1, name: 'Depósito Principal' },
-    { id: 2, name: 'Sucursal 1' },
-    { id: 3, name: 'Sucursal 2' }
-  ]);
+
+  // Almacenes desde la DB (nunca hardcodear IDs)
+  const { data: warehousesData } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => warehouseService.getAll(),
+    staleTime: Infinity,
+  });
+  const warehouses = (warehousesData?.data || []).filter(w => w.is_active);
+  useEffect(() => {
+    if (warehouseId === null && warehouses.length > 0) setWarehouseId(warehouses[0].id);
+  }, [warehouses, warehouseId]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -181,11 +192,11 @@ const StockReplenishmentPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header - Fixed */}
-      <div className="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-lg">
+      <div className="bg-primary-600 text-white p-4 sticky top-0 z-10 shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => navigate('/inventario')}
-            className="p-2 hover:bg-blue-700 rounded-lg"
+            className="p-2 hover:bg-primary-700 rounded-lg"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -194,7 +205,7 @@ const StockReplenishmentPage = () => {
         </div>
         
         {/* Warehouse Selector */}
-        <div className="bg-blue-700 rounded-lg p-3">
+        <div className="bg-primary-700 rounded-lg p-3">
           <label className="text-sm font-medium mb-2 flex items-center gap-2">
             <Warehouse className="w-4 h-4" />
             Depósito
@@ -226,7 +237,7 @@ const StockReplenishmentPage = () => {
                   onClick={() => setUseCameraScanner(true)}
                   className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
                     useCameraScanner
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -237,7 +248,7 @@ const StockReplenishmentPage = () => {
                   onClick={() => setUseCameraScanner(false)}
                   className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors ${
                     !useCameraScanner
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -250,12 +261,12 @@ const StockReplenishmentPage = () => {
             {/* Camera Scanner */}
             {useCameraScanner ? (
               <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 text-center">
+                <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Camera className="w-6 h-6" />
                     <h2 className="text-lg font-bold">Escaneo con Cámara</h2>
                   </div>
-                  <p className="text-sm text-blue-100">
+                  <p className="text-sm text-primary-100">
                     Apunta la cámara al código de barras
                   </p>
                 </div>
@@ -272,7 +283,7 @@ const StockReplenishmentPage = () => {
                             setCameraError(null);
                             setUseCameraScanner(false);
                           }}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                          className="px-4 py-2 bg-primary-600 text-white rounded-lg"
                         >
                           Usar entrada manual
                         </button>
@@ -295,8 +306,8 @@ const StockReplenishmentPage = () => {
               /* Manual Input */
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <div className="text-center mb-6">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
-                    <Barcode className="w-10 h-10 text-blue-600" />
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-100 rounded-full mb-4">
+                    <Barcode className="w-10 h-10 text-primary-600" />
                   </div>
                   <h2 className="text-xl font-bold text-gray-900 mb-2">
                     Ingresa el Código de Barras
@@ -321,7 +332,7 @@ const StockReplenishmentPage = () => {
                   <button
                     onClick={() => searchProduct(barcode)}
                     disabled={loading}
-                    className="w-full mt-4 px-6 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 disabled:bg-gray-400"
+                    className="w-full mt-4 px-6 py-4 bg-primary-600 text-white rounded-lg font-semibold text-lg hover:bg-primary-700 disabled:bg-gray-400"
                   >
                     {loading ? 'Buscando...' : 'Buscar Producto'}
                   </button>

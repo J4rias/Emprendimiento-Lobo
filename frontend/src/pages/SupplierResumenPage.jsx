@@ -38,7 +38,7 @@ const SupplierRow = ({ supplier, bcvRate, onView }) => {
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-6 py-3 text-sm font-medium text-gray-900">{supplier.name}</td>
-      <td className="px-6 py-3 text-right text-sm font-medium text-blue-700">
+      <td className="px-6 py-3 text-right text-sm font-medium text-primary-700">
         {fmtUSD(balances.USD)}
       </td>
       <td className="px-6 py-3 text-right text-sm font-medium text-emerald-700">
@@ -127,13 +127,13 @@ const SupplierResumenPage = () => {
 
       {/* ── Tarjetas resumen ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-primary-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Total USD</span>
-            <CurrencyDollar className="h-5 w-5 text-blue-500" />
+            <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">Total USD</span>
+            <CurrencyDollar className="h-5 w-5 text-primary-500" />
           </div>
-          <p className="text-xl font-bold text-blue-900">{fmtUSD(totals?.USD)}</p>
-          <p className="text-xs text-blue-500 mt-1">{usdSuppliers.length} proveedor{usdSuppliers.length !== 1 ? 'es' : ''}</p>
+          <p className="text-xl font-bold text-primary-900">{fmtUSD(totals?.USD)}</p>
+          <p className="text-xs text-primary-500 mt-1">{usdSuppliers.length} proveedor{usdSuppliers.length !== 1 ? 'es' : ''}</p>
         </div>
 
         <div className="bg-white rounded-xl border border-emerald-200 p-4 shadow-sm">
@@ -194,7 +194,7 @@ const SupplierResumenPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Proveedor
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold text-primary-600 uppercase tracking-wider">
                   USD
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wider">

@@ -186,25 +186,25 @@ const PurchaseOrderReceivePage = () => {
       {/* Mutation Error (shown below header via toast; this also catches redirect-type errors) */}
 
       {/* Order Info */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="bg-primary-50 border-primary-200">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <p className="text-sm text-blue-700">Fecha de Orden</p>
-            <p className="font-medium text-blue-900">
+            <p className="text-sm text-primary-700">Fecha de Orden</p>
+            <p className="font-medium text-primary-900">
               {new Date(order.order_date).toLocaleDateString('es-VE')}
             </p>
           </div>
           <div>
-            <p className="text-sm text-blue-700">Almacén Destino</p>
-            <p className="font-medium text-blue-900">{order.warehouse.name}</p>
+            <p className="text-sm text-primary-700">Almacén Destino</p>
+            <p className="font-medium text-primary-900">{order.warehouse.name}</p>
           </div>
           <div>
-            <p className="text-sm text-blue-700">Total Orden</p>
-            <p className="font-medium text-blue-900">{formatMoney(order.total, order.currency)}</p>
+            <p className="text-sm text-primary-700">Total Orden</p>
+            <p className="font-medium text-primary-900">{formatMoney(order.total, order.currency)}</p>
           </div>
           <div>
-            <p className="text-sm text-blue-700">Estado</p>
-            <p className="font-medium text-blue-900">{ORDER_STATUS_LABEL[order.status] || order.status}</p>
+            <p className="text-sm text-primary-700">Estado</p>
+            <p className="font-medium text-primary-900">{ORDER_STATUS_LABEL[order.status] || order.status}</p>
           </div>
         </div>
       </Card>
@@ -259,7 +259,7 @@ const PurchaseOrderReceivePage = () => {
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ordenado</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ya Recibido</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Pendiente</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-primary-50">
                   Recibir Ahora
                 </th>
               </tr>
@@ -290,7 +290,7 @@ const PurchaseOrderReceivePage = () => {
                       {item.pending_packages - item.receiving_packages}p + {item.pending_units - item.receiving_units}u
                     </span>
                   </td>
-                  <td className="px-4 py-3 bg-blue-50">
+                  <td className="px-4 py-3 bg-primary-50">
                     <div className="flex items-center justify-center gap-2">
                       <div className="flex items-center gap-1">
                         <input

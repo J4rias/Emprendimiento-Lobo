@@ -439,8 +439,8 @@ const PriceListsPage = () => {
                         {editingList && (
                             <div className="flex items-center gap-1.5 text-sm min-w-[110px]">
                                 {autoSaveStatus === 'saving' && (
-                                    <span className="text-blue-500 flex items-center gap-1">
-                                        <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-primary-500 flex items-center gap-1">
+                                        <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
                                         Guardando...
                                     </span>
                                 )}
@@ -474,7 +474,7 @@ const PriceListsPage = () => {
                     <div className="p-4 border-b border-gray-200">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                <Package className="w-5 h-5 text-blue-600" /> Productos ({details.length})
+                                <Package className="w-5 h-5 text-primary-600" /> Productos ({details.length})
                             </h2>
                             <div className="relative w-64">
                                 <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -551,7 +551,7 @@ const PriceListsPage = () => {
                                                                     <div className="flex items-center gap-1">
                                                                         <button
                                                                             onClick={() => toggleFreeze(realIdx)}
-                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
                                                                             {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
@@ -567,7 +567,7 @@ const PriceListsPage = () => {
                                                                                 : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
                                                                             }
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                     <div className="text-gray-500 font-medium text-[11px]">
@@ -576,7 +576,7 @@ const PriceListsPage = () => {
                                                                             ? `$ ${(d.frozen_price / (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                                                             : `$ ${(d.package_price || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                                                         }
-                                                                        {d.is_frozen && d.frozen_currency === 'COP' && <span className="ml-1 text-[9px] text-blue-400 opacity-70">(est.)</span>}
+                                                                        {d.is_frozen && d.frozen_currency === 'COP' && <span className="ml-1 text-[9px] text-primary-400 opacity-70">(est.)</span>}
                                                                     </div>
                                                                 </>
                                                             ) : (
@@ -584,7 +584,7 @@ const PriceListsPage = () => {
                                                                     <div className="flex items-center gap-1">
                                                                         <button
                                                                             onClick={() => toggleFreeze(realIdx)}
-                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
                                                                             title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
                                                                         >
                                                                             {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
@@ -596,7 +596,7 @@ const PriceListsPage = () => {
                                                                             min="0"
                                                                             value={d.package_price || ''}
                                                                             onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-blue-50 border-blue-200' : 'border-gray-300'}`}
+                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
                                                                 </>
@@ -660,7 +660,7 @@ const PriceListsPage = () => {
     return (
         <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2" />
                 <p className="text-gray-500">Cargando lista de precios...</p>
             </div>
         </div>

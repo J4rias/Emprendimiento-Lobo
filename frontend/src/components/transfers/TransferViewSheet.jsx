@@ -74,7 +74,7 @@ const TransferViewSheet = ({ open, onClose, transfer, hasPermission, onReceive, 
                       </p>
                     )}
                   </div>
-                  <span className="text-sm font-semibold text-blue-600 shrink-0 ml-3">
+                  <span className="text-sm font-semibold text-primary-600 shrink-0 ml-3">
                     {d.quantity_requested} uds
                   </span>
                 </div>
