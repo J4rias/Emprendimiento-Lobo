@@ -828,25 +828,49 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     });
 
     // === CASH REFUNDS FROM CREDIT NOTES (devoluciones en efectivo) ===
+    // Group by the sale's currency_mode so we only deduct from the correct currency
     const cashRefundResult = await sequelize.query(
       `SELECT
+         s.currency_mode,
          COALESCE(SUM(cn.total * cn.exchange_rate), 0) AS refund_cop,
          COALESCE(SUM(cn.total), 0) AS refund_usd,
          COUNT(*) AS refund_count
        FROM credit_notes cn
+       JOIN sales s ON s.id = cn.sale_id
        WHERE cn.status = 'applied'
          AND cn.refund_method = 'cash'
          AND cn.approved_at BETWEEN :startOfDay AND :endOfDay
-         ${user_id ? 'AND cn.created_by = :user_id' : ''}`,
+         ${user_id ? 'AND cn.created_by = :user_id' : ''}
+       GROUP BY s.currency_mode`,
       {
         replacements: { startOfDay, endOfDay, ...(user_id ? { user_id } : {}) },
         type: sequelize.QueryTypes.SELECT
       }
     );
+    // Build per-currency refund map
+    const refundByCurrency: Record<string, number> = {};
+    let totalRefundCOP = 0;
+    let totalRefundUSD = 0;
+    let totalRefundCount = 0;
+    for (const row of cashRefundResult as any[]) {
+      const mode = row.currency_mode || 'USD';
+      const count = parseInt(row.refund_count || 0);
+      totalRefundCount += count;
+      if (mode === 'COP') {
+        const amount = Math.round(parseFloat(row.refund_cop || 0));
+        refundByCurrency['COP'] = (refundByCurrency['COP'] || 0) + amount;
+        totalRefundCOP += amount;
+      } else {
+        const amount = parseFloat(row.refund_usd || 0);
+        refundByCurrency['USD'] = (refundByCurrency['USD'] || 0) + amount;
+        totalRefundUSD += amount;
+      }
+    }
     const cashRefunds = {
-      refund_cop: Math.round(parseFloat(cashRefundResult[0]?.refund_cop || 0)),
-      refund_usd: parseFloat(cashRefundResult[0]?.refund_usd || 0),
-      refund_count: parseInt(cashRefundResult[0]?.refund_count || 0)
+      refund_cop: totalRefundCOP,
+      refund_usd: totalRefundUSD,
+      refund_count: totalRefundCount,
+      refund_by_currency: refundByCurrency
     };
 
     res.json({

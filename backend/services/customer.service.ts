@@ -372,21 +372,47 @@ export async function getCustomerCreditBalance(customerId: string | number) {
 
   let totalInvoicedCOP = 0;
   let totalPaidCOP = 0;
+  let creditBalanceUsedCOP = 0;
+
   for (const s of sales) {
     const saleRate = parseFloat(s.exchange_rate || 1);
-    const realPayments = (s.payments || []).filter((p: any) => p.payment_method !== 'credit_balance');
-    const hasPaid = (s.payments || []).length > 0;
-    const paidCOP = realPayments.reduce((pSum: any, p: any) => {
-      if (p.currency === 'COP') return pSum + parseFloat(p.amount);
-      return pSum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);
-    }, 0);
-    if (hasPaid) {
+    const allPayments = s.payments || [];
+    const realPayments = allPayments.filter((p: any) => p.payment_method !== 'credit_balance');
+    const creditPayments = allPayments.filter((p: any) => p.payment_method === 'credit_balance');
+
+    if (allPayments.length > 0) {
       totalInvoicedCOP += parseFloat(s.total) * saleRate;
-      totalPaidCOP += paidCOP;
+      totalPaidCOP += realPayments.reduce((sum: number, p: any) => {
+        if (p.currency === 'COP') return sum + parseFloat(p.amount);
+        return sum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);
+      }, 0);
     }
+
+    creditBalanceUsedCOP += creditPayments.reduce((sum: number, p: any) => {
+      if (p.currency === 'COP') return sum + parseFloat(p.amount);
+      return sum + parseFloat(p.amount) * parseFloat(p.exchange_rate || saleRate);
+    }, 0);
   }
-  const creditBalanceCOP = Math.max(0, totalPaidCOP - totalInvoicedCOP);
-  return { credit_balance_cop: Math.round(creditBalanceCOP), credit_balance_usd: 0 };
+
+  const overpaymentCOP = Math.max(0, totalPaidCOP - totalInvoicedCOP);
+
+  // Credit from credit notes with refund_method='credit_balance'
+  const creditNotes = await CreditNote.findAll({
+    where: {
+      customer_id: customerId,
+      status: 'applied',
+      refund_method: 'credit_balance'
+    },
+    attributes: ['total', 'exchange_rate']
+  }) as any[];
+
+  let cnCreditCOP = 0;
+  for (const cn of creditNotes) {
+    cnCreditCOP += parseFloat(cn.total || 0) * parseFloat(cn.exchange_rate || 1);
+  }
+
+  const availableCreditCOP = Math.max(0, overpaymentCOP + cnCreditCOP - creditBalanceUsedCOP);
+  return { credit_balance_cop: Math.round(availableCreditCOP), credit_balance_usd: 0 };
 }
 
 // ─── getCustomerPurchases ─────────────────────────────────────────────────────

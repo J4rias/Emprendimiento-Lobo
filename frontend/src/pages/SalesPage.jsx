@@ -267,21 +267,27 @@ const SalesPage = () => {
       return toast.error('Debe ingresar un monto válido mayor a 0');
     }
     const rate = paymentSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+    const cashAmount = parseFloat(paymentData.amount_cop);
+    const remainingCOP = Math.ceil((parseFloat(paymentSale.total) - parseFloat(paymentSale.paid_amount || 0)) * rate);
+
     const payment_lines = [{
-      amount: parseFloat(paymentData.amount_cop),
+      amount: cashAmount,
       method: paymentData.method,
       currency: 'COP',
       exchange_rate: rate,
       reference: paymentData.reference,
     }];
     if (customerCreditBalance.cop > 0) {
-      payment_lines.push({
-        amount: customerCreditBalance.cop,
-        method: 'credit_balance',
-        currency: 'COP',
-        exchange_rate: rate,
-        reference: 'Saldo a Favor Aplicado',
-      });
+      const creditToApply = Math.min(customerCreditBalance.cop, Math.max(0, remainingCOP - cashAmount));
+      if (creditToApply > 0) {
+        payment_lines.push({
+          amount: creditToApply,
+          method: 'credit_balance',
+          currency: 'COP',
+          exchange_rate: rate,
+          reference: 'Saldo a Favor Aplicado',
+        });
+      }
     }
     paymentMutation.mutate({ saleId: paymentSale.id, payment_lines, notes: paymentData.notes });
   };

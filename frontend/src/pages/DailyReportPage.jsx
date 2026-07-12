@@ -125,23 +125,18 @@ const DailyReportPage = () => {
                         <td style="font-size:12px;">Cantidad</td>
                         <td style="text-align:right; font-size:12px; font-weight:bold;">${report.cashRefunds.refund_count}</td>
                     </tr>
+                    ${Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `
                     <tr>
-                        <td style="font-size:12px;">Total USD</td>
-                        <td style="text-align:right; font-size:12px; font-weight:bold;">$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}</td>
-                    </tr>
-                    <tr>
-                        <td style="font-size:12px;">Total COP</td>
-                        <td style="text-align:right; font-size:12px; font-weight:bold;">${fmtAmount(report.cashRefunds.refund_cop, 'COP')}</td>
-                    </tr>
+                        <td style="font-size:12px;">Total ${cur}</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)}</td>
+                    </tr>`).join('')}
                 </table>
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
                 ` : ''}
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">CUADRE FÍSICO (EFECTIVO)</div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
                     ${(() => {
-                        const refundUSD = report.cashRefunds?.refund_usd || 0;
-                        const refundCOP = report.cashRefunds?.refund_cop || 0;
-                        const refundMap = { USD: refundUSD, COP: refundCOP };
+                        const refundMap = report.cashRefunds?.refund_by_currency || {};
                         return Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
                                 const cash = methods.cash || 0;
@@ -336,7 +331,7 @@ const DailyReportPage = () => {
                                     <div>
                                         <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Devoluciones</p>
                                         <div className="text-2xl font-bold text-rose-600 mt-1">
-                                            $ {fmtAmount(report.cashRefunds.refund_usd, 'USD')}
+                                            {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}`}
                                         </div>
                                         <p className="text-sm text-gray-500 mt-1">
                                             {report.cashRefunds.refund_count} devoluci{report.cashRefunds.refund_count !== 1 ? 'ones' : 'on'} en efectivo
@@ -399,9 +394,7 @@ const DailyReportPage = () => {
 
                     {/* Cuadre Físico — solo efectivo por moneda, menos devoluciones */}
                     {(() => {
-                        const refundUSD = report.cashRefunds?.refund_usd || 0;
-                        const refundCOP = report.cashRefunds?.refund_cop || 0;
-                        const refundMap = { USD: refundUSD, COP: refundCOP };
+                        const refundMap = report.cashRefunds?.refund_by_currency || {};
                         const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
                                 const cash = methods.cash || 0;
@@ -412,7 +405,8 @@ const DailyReportPage = () => {
                         // USDT total across all currencies
                         const usdtTotal = Object.values(report.paymentsBreakdown || {})
                             .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
-                        if (cashByCurrency.length === 0 && !refundUSD && !usdtTotal) return null;
+                        const hasAnyRefund = Object.values(refundMap).some(v => v > 0);
+                        if (cashByCurrency.length === 0 && !hasAnyRefund && !usdtTotal) return null;
                         return (
                             <div className="bg-slate-800 text-white p-6 rounded-xl shadow-sm">
                                 <p className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-3">Cuadre Físico (Efectivo)</p>
@@ -432,9 +426,9 @@ const DailyReportPage = () => {
                                         <p className="text-xl font-bold text-cyan-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
                                     </div>
                                 )}
-                                {(refundUSD > 0 || refundCOP > 0) && (
+                                {hasAnyRefund && (
                                     <p className="text-xs text-slate-400 mt-2">
-                                        Incluye descuento por devoluciones: {refundUSD > 0 ? `$ ${fmtAmount(refundUSD, 'USD')} USD` : ''}{refundUSD > 0 && refundCOP > 0 ? ' / ' : ''}{refundCOP > 0 ? `${fmtAmount(refundCOP, 'COP')} COP` : ''}
+                                        Incluye descuento por devoluciones: {Object.entries(refundMap).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ')}
                                     </p>
                                 )}
                             </div>
