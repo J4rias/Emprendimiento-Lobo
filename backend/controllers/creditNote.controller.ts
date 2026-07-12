@@ -578,16 +578,15 @@ export const approveCreditNote = async (req: Request, res: Response) => {
           warehouse_id: creditNote.warehouse_id,
           presentation_id: detail.presentation_id,
           batch_id: detail.batch_id || null,
-          type: 'ingreso',
           movement_type: 'ingreso',
           package_quantity: detail.package_quantity_returned,
           loose_units: detail.loose_units_returned,
           quantity: totalUnits,
-          unit_cost: detail.unit_price,
-          reference_type: 'credit_note',
-          reference_id: creditNote.id,
-          reference_number: creditNote.credit_note_number,
-          notes: `Devolución de venta ${creditNote.sale.sale_number}`,
+          unit_cost: detail.presentation.cost || null,
+          package_cost: detail.presentation.package_cost || null,
+          currency: detail.presentation.purchase_currency || 'USD',
+          document_number: creditNote.credit_note_number,
+          reason: `Devolución de venta ${creditNote.sale.sale_number}`,
           user_id: (req as any).user.id
         } as any, { transaction }) as any;
 

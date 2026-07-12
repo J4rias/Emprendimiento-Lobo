@@ -4,7 +4,7 @@
  *
  * Pure logic tests — no database or HTTP server needed.
  *
- * Run:   cd backend && node tests/payment-conversion.test.js
+ * Run:   cd backend && node tests/payment-conversion.check.js
  */
 
 // ─── helpers ───────────────────────────────────────────────────────────────────

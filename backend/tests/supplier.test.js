@@ -53,19 +53,19 @@ describe('Suppliers API — smoke tests', () => {
     expect(res.body.data).toBeDefined();
   });
 
-  it('GET /api/suppliers/:id/statement con id=1 -> 200, body.data tiene ledger', async () => {
+  it('GET /api/suppliers/:id/statement -> 404 (endpoint legacy eliminado, usar /ledger)', async () => {
     const res = await request(app)
       .get('/api/suppliers/1/statement')
       .set('Authorization', `Bearer ${authToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body.data.ledger).toBeDefined();
+    expect(res.status).toBe(404);
   });
 
-  it('GET /api/suppliers/:id/ledger con id=1 -> 200, body.data tiene resumen por categoría', async () => {
+  it('GET /api/suppliers/:id/ledger con id=1 -> 200, body.data tiene categorías (USD/DIVISAS/COP)', async () => {
     const res = await request(app)
       .get('/api/suppliers/1/ledger')
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.data.summary).toBeDefined();
+    expect(res.body.data.categories).toBeDefined();
+    expect(res.body.data.supplier).toBeDefined();
   });
 });

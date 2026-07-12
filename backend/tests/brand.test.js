@@ -34,7 +34,7 @@ describe('Brands API — smoke tests', () => {
       .post('/api/brands')
       .set('Authorization', `Bearer ${authToken}`)
       .send({});
-    expect(res.status).toBe(400) || expect(res.status).toBe(422);
+    expect([400, 422]).toContain(res.status);
   });
 
   it('GET /api/brands/:id con id=99999999 -> 404', async () => {

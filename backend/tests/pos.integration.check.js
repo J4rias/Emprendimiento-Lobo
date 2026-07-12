@@ -5,7 +5,7 @@
  * Setup: Requires a running MySQL database (uses the app's config).
  *        Does NOT need the HTTP server running — hits models directly.
  *
- * Run:   cd backend && node tests/pos.integration.test.js
+ * Run:   cd backend && node tests/pos.integration.check.js
  */
 
 const { PosReservation, Inventory, Product, ProductPresentation, sequelize } = require('../models');

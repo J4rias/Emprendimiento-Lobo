@@ -810,11 +810,11 @@ class PurchaseOrderController {
             // Check if we need to convert currencies
             let newPackageCost = detail.package_cost;
             let newUnitCost = detail.unit_cost;
+            let costsValid = true;
 
             if (order.currency && presentation.purchase_currency && order.currency !== presentation.purchase_currency) {
               try {
-                // Determine transaction date for accurate historical rate, defaulting to right now
-                const rateDate = new Date();
+                const rateDate = order.order_date ? new Date(order.order_date) : new Date();
 
                 // Convert costs from the PO currency to the Presentation's base currency
                 newPackageCost = await (ExchangeRate as any).convert(
@@ -831,19 +831,26 @@ class PurchaseOrderController {
                   rateDate
                 );
               } catch (conversionError) {
-                logger.error(`Failed to convert cost for product ${detail.product_id} from ${order.currency} to ${presentation.purchase_currency}:`, conversionError);
-                // In case of failure, we will temporarily preserve the raw value to avoid transaction crash,
-                // but the system will log this. Ideally an alert should be triggered.
+                // Sin tasa no se puede convertir: conservar el costo anterior de la
+                // presentación en vez de escribir un monto en la moneda equivocada.
+                costsValid = false;
+                logger.warn(
+                  `Costo de presentación ${presentation.id} (producto ${detail.product_id}) no actualizado: ` +
+                  `falló conversión ${order.currency}→${presentation.purchase_currency}`,
+                  { error: (conversionError as Error).message }
+                );
               }
             }
 
-            await presentation.update(
-              {
-                package_cost: newPackageCost,
-                cost: newUnitCost
-              },
-              { transaction }
-            );
+            if (costsValid) {
+              await presentation.update(
+                {
+                  package_cost: newPackageCost,
+                  cost: newUnitCost
+                },
+                { transaction }
+              );
+            }
           }
         }
       }

@@ -19,6 +19,23 @@ const getUserName = (user) => {
   return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Sistema';
 };
 
+// Bultos/sueltas del movimiento: usa los valores persistidos si existen;
+// si no, los deriva de la cantidad total (quantity lleva signo en transferencias).
+const splitQty = (m) => {
+  const qty = Math.abs(parseFloat(m.quantity) || 0);
+  const pkg   = m.package_quantity != null ? Math.abs(parseFloat(m.package_quantity) || 0) : null;
+  const loose = m.loose_units      != null ? Math.abs(parseFloat(m.loose_units) || 0)      : null;
+  if (pkg !== null && (pkg > 0 || (loose || 0) > 0)) {
+    return { bultos: pkg, sueltas: loose || 0, qty };
+  }
+  const upu = parseFloat(m.presentation?.units_per_package) || 0;
+  return {
+    bultos:  upu > 0 ? Math.floor(qty / upu) : 0,
+    sueltas: upu > 0 ? qty % upu : qty,
+    qty,
+  };
+};
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 const InventoryMovementsPage = () => {
@@ -61,10 +78,7 @@ const InventoryMovementsPage = () => {
   const handleExport = () => {
     const headers = ['Fecha', 'Producto', 'SKU', 'Tipo', 'Presentación', 'Bultos', 'Sueltas', 'Total uds', 'Almacén', 'Referencia', 'Usuario'];
     const rows = movements.map(m => {
-      const upu    = parseInt(m.presentation?.units_per_package, 10) || 0;
-      const qty    = Math.floor(parseFloat(m.quantity) || 0);
-      const bultos  = upu > 0 ? Math.floor(qty / upu) : 0;
-      const sueltas = upu > 0 ? qty % upu : qty;
+      const { bultos, sueltas, qty } = splitQty(m);
       return [
         fmtDate(m.createdAt || m.created_at),
         m.product?.name || '',
@@ -130,9 +144,7 @@ const InventoryMovementsPage = () => {
       header: 'Bultos',
       className: 'text-right',
       render: (m) => {
-        const upu = parseInt(m.presentation?.units_per_package, 10) || 0;
-        const qty = Math.floor(parseFloat(m.quantity) || 0);
-        const bultos = upu > 0 ? Math.floor(qty / upu) : 0;
+        const { bultos } = splitQty(m);
         return bultos > 0
           ? <span className="text-sm font-medium text-right block">{bultos}</span>
           : <span className="text-xs text-gray-300 text-right block">—</span>;
@@ -142,9 +154,7 @@ const InventoryMovementsPage = () => {
       header: 'Sueltas',
       className: 'text-right',
       render: (m) => {
-        const upu = parseInt(m.presentation?.units_per_package, 10) || 0;
-        const qty = Math.floor(parseFloat(m.quantity) || 0);
-        const sueltas = upu > 0 ? qty % upu : qty;
+        const { sueltas } = splitQty(m);
         return sueltas > 0
           ? <span className="text-sm font-medium text-right block">{sueltas}</span>
           : <span className="text-xs text-gray-300 text-right block">—</span>;
@@ -160,23 +170,23 @@ const InventoryMovementsPage = () => {
       header: 'Referencia',
       render: (m) => {
         if (!m.document_number) return <span className="text-gray-300 text-xs">—</span>;
-        const isSale = ['egreso', 'egreso_venta', 'venta', 'devolucion_cliente'].includes(m.movement_type);
-        const dest = isSale
-          ? null  // manejado vía state con sale_id
-          : {
-              ingreso: '/purchase-orders', ingreso_compra: '/purchase-orders', compra: '/purchase-orders', devolucion_proveedor: '/purchase-orders',
-              transferencia: '/transferencias', transferencia_entrada: '/transferencias', transferencia_salida: '/transferencias',
-            }[m.movement_type] ?? null;
+        // Prioridad: venta vinculada (subquery backend) > NC por prefijo > destino por tipo
+        const isCreditNote = m.document_number.startsWith('NC-');
+        const dest = m.sale_id
+          ? null // manejado vía state con sale_id
+          : isCreditNote
+            ? '/credit-notes'
+            : { ingreso: '/purchase-orders', transferencia: '/transferencias' }[m.movement_type] ?? null;
 
         const handleClick = () => {
-          if (isSale && m.sale_id) {
+          if (m.sale_id) {
             navigate('/ventas', { state: { openSaleId: m.sale_id } });
           } else if (dest) {
             navigate(dest);
           }
         };
 
-        const isClickable = (isSale && !!m.sale_id) || !!dest;
+        const isClickable = !!m.sale_id || !!dest;
 
         return (
           <button

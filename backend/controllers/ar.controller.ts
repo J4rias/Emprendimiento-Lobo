@@ -1,28 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import User from '../models/User';
-import ExchangeRate from '../models/ExchangeRate';
 
 const { sequelize } = require('../config/database');
 const { buildCustomerStatement, getCustomerCreditBlock, computeDueDate, computeAgingBucket } = require('../services/statementService');
 const bcrypt = require('bcryptjs');
-const { getARSummary, getCustomerAging, reverseSalePayment, validateCreditPin } = require('../services/ar.service');
+const {
+  getARSummary, getCustomerAging, reverseSalePayment, validateCreditPin,
+  bucketLabel, getLatestCOPRate
+} = require('../services/ar.service');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function bucketLabel(bucket: string): string {
-  return ({ vigente: 'Vigente', '0_30': '0-30 días', '31_60': '31-60 días', '61_90': '61-90 días', '+90': '+90 días', sin_termino: 'Sin término' } as any)[bucket] || bucket;
-}
-
 function toCSVRow(row: any[]): string {
   return row.map((v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
-}
-
-async function getLatestCOPRate(): Promise<number> {
-  const rate = await ExchangeRate.findOne({
-    where: { from_currency: 'USD', to_currency: 'COP', is_active: true },
-    order: [['effective_date', 'DESC']]
-  }) as any;
-  return parseFloat(rate?.rate || 1);
 }
 
 // ─── Resumen general ─────────────────────────────────────────────────────────

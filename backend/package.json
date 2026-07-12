@@ -8,7 +8,7 @@
     "dev": "tsx watch server.ts",
     "tsc:check": "tsc --noEmit",
     "init-db": "node scripts/init-db.js",
-    "test": "jest --coverage",
+    "test": "jest --coverage --forceExit",
     "test:watch": "jest --watch",
     "test:integration": "jest --testPathPattern=tests/integration",
     "test:e2e": "jest --testPathPattern=tests/e2e",
@@ -49,6 +49,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
     "@types/bcryptjs": "^3.0.0",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",

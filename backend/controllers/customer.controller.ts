@@ -9,11 +9,11 @@ const { sequelize } = require('../config/database');
 const {
   getCustomerStats,
   getOverdueCustomers,
-  getCustomerStatement,
   getCustomerCreditBalance,
   getCustomerPurchases,
   getCustomerActivity
 } = require('../services/customer.service');
+const { buildCustomerStatement } = require('../services/statementService');
 
 class CustomerController {
   constructor() {
@@ -301,7 +301,7 @@ class CustomerController {
 
   async getStatement(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await getCustomerStatement(req.params.id);
+      const result = await buildCustomerStatement(req.params.id);
       if (!result) return res.status(404).json({ message: 'Cliente no encontrado' });
       res.json({ data: result });
     } catch (error) {

@@ -20,9 +20,6 @@ router.get('/resumen', authorize('suppliers.view'), supplierController.getResume
 // Get supplier by ID
 router.get('/:id', authorize('suppliers.view'), supplierController.getById);
 
-// Get supplier statement (legacy unified ledger)
-router.get('/:id/statement', authorize('suppliers.view'), supplierController.getStatement);
-
 // Get supplier ledger grouped by category (USD/DIVISAS/COP) - matches spreadsheet layout
 router.get('/:id/ledger', authorize('suppliers.view'), supplierController.getLedger);
 

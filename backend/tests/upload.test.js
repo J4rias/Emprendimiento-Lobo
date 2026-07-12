@@ -21,12 +21,11 @@ describe('Uploads API — smoke tests', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  it('GET /api/uploads con token -> 200, body.data es array o tiene data', async () => {
+  it('GET /api/uploads con token -> 404 (solo POST / y POST /multiple)', async () => {
     const res = await request(app)
       .get('/api/uploads')
       .set('Authorization', `Bearer ${authToken}`);
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.data) || res.body.data).toBe(true);
+    expect(res.status).toBe(404);
   });
 
   it('POST /api/uploads con body vacío {} CON token -> 400 o 422', async () => {
@@ -34,7 +33,7 @@ describe('Uploads API — smoke tests', () => {
       .post('/api/uploads')
       .set('Authorization', `Bearer ${authToken}`)
       .send({});
-    expect(res.status).toBe(400) || expect(res.status).toBe(422);
+    expect([400, 422]).toContain(res.status);
   });
 
   it('GET /api/uploads/:id con id=99999999 -> 404', async () => {

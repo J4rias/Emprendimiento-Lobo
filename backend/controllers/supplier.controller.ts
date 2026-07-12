@@ -5,7 +5,7 @@ import SupplierContact from '../models/SupplierContact';
 
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
-const { getSupplierStatement, getSupplierLedger, getSupplierResumen } = require('../services/supplier.service');
+const { getSupplierLedger, getSupplierResumen } = require('../services/supplier.service');
 
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -174,8 +174,9 @@ export const deleteSupplier = async (req: Request, res: Response, next: NextFunc
     const { id } = req.params;
     const supplier = await Supplier.findByPk(id) as any;
     if (!supplier) return res.status(404).json({ message: 'Proveedor no encontrado' });
-    await supplier.destroy();
-    res.json({ message: 'Proveedor eliminado exitosamente' });
+    // Soft-delete: el proveedor puede tener OCs y pagos históricos asociados
+    await supplier.update({ is_active: false, updated_by: (req as any).user.id });
+    res.json({ message: 'Proveedor desactivado exitosamente' });
   } catch (error) {
     next(error);
   }
@@ -193,16 +194,6 @@ export const getActive = async (req: Request, res: Response, next: NextFunction)
 };
 
 // ─── Analytics (delegated to supplier.service) ───────────────────────────────
-
-export const getStatement = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await getSupplierStatement(req.params.id);
-    if (!result) return res.status(404).json({ message: 'Proveedor no encontrado' });
-    res.json({ data: result });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const getLedger = async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -86,10 +86,13 @@ const InventoryDetailPage = () => {
 
     let balance = 0;
     const withBalance = sorted.map(m => {
-      const qty      = parseFloat(m.quantity) || 0;
-      const positive = isPositiveMovement(m.movement_type);
-      balance        = positive ? balance + qty : balance - qty;
-      return { ...m, qty, positive, balance };
+      const rawQty = parseFloat(m.quantity) || 0;
+      // 'transferencia' persiste el signo en quantity (salida negativa, entrada positiva)
+      const delta = m.movement_type === 'transferencia'
+        ? rawQty
+        : (isPositiveMovement(m.movement_type) ? rawQty : -rawQty);
+      balance += delta;
+      return { ...m, qty: Math.abs(rawQty), positive: delta >= 0, balance };
     });
 
     const all = withBalance.reverse();

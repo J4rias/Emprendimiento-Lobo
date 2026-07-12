@@ -6,7 +6,8 @@
  * Setup: Requiere BD MySQL corriendo (usa la config del app).
  *        NO necesita el servidor HTTP — accede a los modelos directamente.
  *
- * Run:   cd backend && node tests/customer.statement.test.js
+ * Run:   cd backend && node tests/customer.statement.check.js
+ *        (sufijo .check.js: script standalone, jest no lo ejecuta)
  */
 
 require('dotenv').config();

@@ -34,7 +34,7 @@ describe('Quotes API — smoke tests', () => {
       .post('/api/quotes')
       .set('Authorization', `Bearer ${authToken}`)
       .send({});
-    expect(res.status).toBe(400) || expect(res.status).toBe(422);
+    expect([400, 422]).toContain(res.status);
   });
 
   it('GET /api/quotes/:id con id=99999999 -> 404', async () => {

@@ -3,29 +3,20 @@ import { Badge } from '../ui';
 
 // ─── Configuración por tipo de movimiento ─────────────────────────────────────
 //
-// Verde  (success) = entrada de stock: compras, ingresos, devoluciones de clientes
-// Rojo   (error)   = salida de stock:  ventas, egresos, devoluciones a proveedor
+// Tipos persistidos por el backend (ENUM de inventory_movements):
+//   ingreso | egreso | ajuste_positivo | ajuste_negativo | transferencia
+//
+// Verde  (success) = entrada de stock: compras, devoluciones de clientes
+// Rojo   (error)   = salida de stock:  ventas
 // Ámbar  (warning) = ajuste manual:    puede ser + o −, pero es operación especial
-// Azul   (info)    = transferencia:    movimiento interno sin impacto en inventario total
+// Azul   (info)    = transferencia:    quantity lleva signo (salida −, entrada +)
 
 const TYPE_CONFIG = {
-  // ── Entradas ────────────────────────────────────────────────────────────────
-  compra:               { variant: 'success', label: 'Compra',             icon: TrendUp },
-  ingreso:              { variant: 'success', label: 'Ingreso',             icon: TrendUp },
-  ingreso_compra:       { variant: 'success', label: 'Ingreso Compra',      icon: TrendUp },
-  devolucion_cliente:   { variant: 'success', label: 'Dev. Cliente',        icon: TrendUp },
-  // ── Salidas ─────────────────────────────────────────────────────────────────
-  venta:                { variant: 'error',   label: 'Venta',               icon: TrendDown },
-  egreso:               { variant: 'error',   label: 'Egreso',              icon: TrendDown },
-  egreso_venta:         { variant: 'error',   label: 'Egreso Venta',        icon: TrendDown },
-  devolucion_proveedor: { variant: 'error',   label: 'Dev. Proveedor',      icon: TrendDown },
-  // ── Ajustes ─────────────────────────────────────────────────────────────────
-  ajuste_positivo:      { variant: 'warning', label: 'Ajuste +',            icon: SlidersHorizontal },
-  ajuste_negativo:      { variant: 'warning', label: 'Ajuste −',            icon: SlidersHorizontal },
-  // ── Transferencias ──────────────────────────────────────────────────────────
-  transferencia:        { variant: 'info',    label: 'Transferencia',       icon: ArrowsLeftRight },
-  transferencia_entrada:{ variant: 'info',    label: 'Transfer. Entrada',   icon: ArrowsLeftRight },
-  transferencia_salida: { variant: 'info',    label: 'Transfer. Salida',    icon: ArrowsLeftRight },
+  ingreso:         { variant: 'success', label: 'Ingreso',       icon: TrendUp },
+  egreso:          { variant: 'error',   label: 'Egreso',        icon: TrendDown },
+  ajuste_positivo: { variant: 'warning', label: 'Ajuste +',      icon: SlidersHorizontal },
+  ajuste_negativo: { variant: 'warning', label: 'Ajuste −',      icon: SlidersHorizontal },
+  transferencia:   { variant: 'info',    label: 'Transferencia', icon: ArrowsLeftRight },
 };
 
 /**
@@ -58,25 +49,18 @@ export function MovementTypeBadge({ type, showIcon = true }) {
 export function isPositiveMovement(type) {
   const cfg = TYPE_CONFIG[type];
   if (!cfg) return false;
-  return cfg.variant === 'success' || type === 'ajuste_positivo' || type === 'transferencia_entrada';
+  return cfg.variant === 'success' || type === 'ajuste_positivo';
 }
 
 /**
  * Opciones para Select de filtro de tipo de movimiento.
+ * Solo los tipos que la DB persiste — otros valores nunca devuelven resultados.
  */
 export const MOVEMENT_TYPE_OPTIONS = [
   { value: '', label: 'Todos los tipos' },
-  { value: 'compra',               label: 'Compra' },
-  { value: 'ingreso',              label: 'Ingreso' },
-  { value: 'ingreso_compra',       label: 'Ingreso Compra' },
-  { value: 'devolucion_cliente',   label: 'Dev. Cliente' },
-  { value: 'venta',                label: 'Venta' },
-  { value: 'egreso',               label: 'Egreso' },
-  { value: 'egreso_venta',         label: 'Egreso Venta' },
-  { value: 'devolucion_proveedor', label: 'Dev. Proveedor' },
-  { value: 'ajuste_positivo',      label: 'Ajuste +' },
-  { value: 'ajuste_negativo',      label: 'Ajuste −' },
-  { value: 'transferencia',        label: 'Transferencia' },
-  { value: 'transferencia_entrada',label: 'Transfer. Entrada' },
-  { value: 'transferencia_salida', label: 'Transfer. Salida' },
+  { value: 'ingreso',         label: 'Ingreso' },
+  { value: 'egreso',          label: 'Egreso' },
+  { value: 'ajuste_positivo', label: 'Ajuste +' },
+  { value: 'ajuste_negativo', label: 'Ajuste −' },
+  { value: 'transferencia',   label: 'Transferencia' },
 ];

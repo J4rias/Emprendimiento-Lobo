@@ -35,7 +35,7 @@ describe('Categories API', () => {
     const res = await request(app)
       .post('/api/categories')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ name: TEST_NAME });
+      .send({ name: TEST_NAME, code: 'TSTCAT' });
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBeDefined();
     expect(res.body.data.name).toBe(TEST_NAME);
@@ -46,7 +46,7 @@ describe('Categories API', () => {
     const res = await request(app)
       .post('/api/categories')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ name: TEST_NAME });
+      .send({ name: TEST_NAME, code: 'TSTCAT' });
     expect(res.status).toBe(409);
   });
 

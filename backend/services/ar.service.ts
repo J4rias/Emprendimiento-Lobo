@@ -336,9 +336,6 @@ export async function validateCreditPin(adminId: number, pin: string, t: any): P
       `UPDATE users SET credit_pin_attempts = ?, credit_pin_locked_until = ? WHERE id = ?`,
       { replacements: [attempts, lockedUntil, adminId], transaction: t }
     );
-    if (t && !lockedUntil) {
-      // commit the attempt counter update even on non-locking failures
-    }
     return { ok: false, locked: !!lockedUntil, lockedUntil: lockedUntil || undefined, attemptsLeft: 3 - attempts };
   }
 

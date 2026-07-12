@@ -186,6 +186,11 @@ const PurchaseOrderCreatePage = () => {
                 String(item.presentation_id) === String(pres.id)
       );
       if (dup) return prev;
+      // Los costos de la presentación están en su purchase_currency: solo se
+      // prellenan si coinciden con la moneda de la orden. Si no, quedan en 0 y
+      // el costo anterior se muestra etiquetado con su moneda real — prellenar
+      // 85.000 COP en una orden USD corrompe los costos al recibir (conversión).
+      const sameCurrency = (pres.purchase_currency || 'USD') === prev.currency;
       return {
         ...prev,
         items: [...prev.items, {
@@ -196,10 +201,11 @@ const PurchaseOrderCreatePage = () => {
           units_per_package: pres.units_per_package || 1,
           package_quantity: 0,
           loose_units: 0,
-          unit_cost: pres.cost || 0,
-          package_cost: pres.package_cost || 0,
+          unit_cost: sameCurrency ? (pres.cost || 0) : 0,
+          package_cost: sameCurrency ? (pres.package_cost || 0) : 0,
           suggested_unit_cost: pres.cost || 0,
           suggested_package_cost: pres.package_cost || 0,
+          suggested_cost_currency: pres.purchase_currency || 'USD',
           discount_percent: 0,
           tax_percent: 0,
         }],
@@ -415,8 +421,8 @@ const PurchaseOrderCreatePage = () => {
                             className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-primary-200 focus:outline-none"
                           />
                           {item.suggested_package_cost > 0 && (
-                            <div className="text-xs text-gray-400 mt-0.5" title="Último costo registrado">
-                              Ant: {formatMoney(item.suggested_package_cost, formData.currency)}
+                            <div className="text-xs text-gray-400 mt-0.5" title="Último costo registrado (en la moneda de compra del producto)">
+                              Ant: {formatMoney(item.suggested_package_cost, item.suggested_cost_currency || formData.currency)}
                             </div>
                           )}
                         </td>
@@ -555,7 +561,7 @@ const PurchaseOrderCreatePage = () => {
                 <div className="text-xs text-gray-500">SKU: {product.sku}</div>
                 {product.presentations?.length > 0 && (
                   <div className="text-xs text-gray-600 mt-0.5">
-                    {product.presentations[0].name} · Costo: {formatMoney(product.presentations[0].cost, formData.currency)}
+                    {product.presentations[0].name} · Costo: {formatMoney(product.presentations[0].cost, product.presentations[0].purchase_currency || 'USD')}
                   </div>
                 )}
               </button>

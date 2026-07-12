@@ -84,7 +84,7 @@ const SuppliersPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id) => supplierService.delete(id),
     onSuccess: () => {
-      toast.success('Proveedor eliminado exitosamente');
+      toast.success('Proveedor desactivado exitosamente');
       setDeleteTarget(null);
       invalidate();
     },
@@ -299,9 +299,9 @@ const SuppliersPage = () => {
         onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
         loading={deleteMutation.isPending}
         variant="danger"
-        title="¿Eliminar este proveedor?"
-        description={deleteTarget ? `"${deleteTarget.name}" será eliminado permanentemente.` : ''}
-        confirmLabel="Eliminar"
+        title="¿Desactivar este proveedor?"
+        description={deleteTarget ? `"${deleteTarget.name}" pasará a inactivo; su historial de compras y pagos se conserva.` : ''}
+        confirmLabel="Desactivar"
       />
     </div>
   );

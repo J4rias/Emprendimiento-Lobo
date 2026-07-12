@@ -15,10 +15,9 @@ beforeAll(async () => {
 afterAll(async () => { await sequelize.close(); });
 
 describe('Company API — smoke tests', () => {
-  it('GET /api/company sin auth -> 401 o 403', async () => {
+  it('GET /api/company sin auth -> 200 (público por diseño, lo consume el catálogo)', async () => {
     const res = await request(app).get('/api/company');
-    expect(res.status).toBeGreaterThanOrEqual(401);
-    expect(res.status).toBeLessThan(500);
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/company con token -> 200, body.data tiene configuración', async () => {

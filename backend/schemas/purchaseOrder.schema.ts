@@ -39,11 +39,12 @@ export const CancelPurchaseOrderSchema = z.object({
 }).passthrough();
 
 const ReceivedItemSchema = z.object({
-  purchase_order_detail_id: z.number().int().positive(),
-  package_quantity_received: z.number().nullable().optional(),
-  loose_units_received: z.number().nullable().optional(),
-  batch_number: z.string().optional(),
-  expiry_date: z.string().optional(),
+  detail_id: z.number().int().positive(),
+  package_quantity: z.number().min(0).nullable().optional(),
+  loose_units: z.number().min(0).nullable().optional(),
+  batch_number: z.string().nullable().optional(),
+  manufacture_date: z.string().nullable().optional(),
+  expiry_date: z.string().nullable().optional(),
 }).passthrough();
 
 export const ReceiveMerchandiseSchema = z.object({

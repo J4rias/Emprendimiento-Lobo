@@ -22,13 +22,12 @@ interface SupplierPaymentAttributes {
   created_by: number;
   createdAt?: Date;
   updatedAt?: Date;
-  deletedAt?: Date | null;
 }
 
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface SupplierPaymentCreationAttributes extends Optional<
   SupplierPaymentAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'payment_date' | 'payment_method' | 'amount' | 'currency' | 'status'
+  'id' | 'createdAt' | 'updatedAt' | 'payment_date' | 'payment_method' | 'amount' | 'currency' | 'status'
 > {}
 
 // 3. sequelize.define con los genéricos

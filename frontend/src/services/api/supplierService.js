@@ -39,12 +39,6 @@ export const supplierService = {
     return response.data;
   },
 
-  // Get supplier statement (legacy unified ledger)
-  getStatement: async (id) => {
-    const response = await api.get(`/suppliers/${id}/statement`);
-    return response.data;
-  },
-
   // Get supplier ledger grouped by category (USD/DIVISAS/COP)
   getLedger: async (id) => {
     const response = await api.get(`/suppliers/${id}/ledger`);
