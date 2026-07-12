@@ -135,7 +135,16 @@ const InventoryPage = () => {
     if (!amount || amount === 0) return 0;
     if (fromCurrency === 'COP') return amount;
     const rate = calculateEffectiveRate(fromCurrency, 'COP', exchangeRates);
-    return rate ? amount * rate : amount;
+    // Sin tasa disponible: null — el caller muestra el valor en su moneda real
+    // en vez de etiquetar un monto USD como COP
+    return rate ? amount * rate : null;
+  };
+
+  // Muestra en COP si hay tasa; si no, en la moneda original (sin mentir)
+  const formatValueCOP = (amount, fromCurrency = 'USD') => {
+    const cop = toCOP(amount, fromCurrency);
+    if (cop !== null) return formatCOP(cop);
+    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: fromCurrency, maximumFractionDigits: 0 }).format(amount || 0);
   };
 
   const getDefaultPresentation = (item) =>
@@ -335,8 +344,8 @@ const InventoryPage = () => {
         const qty        = parseFloat(item.quantity);
         const pkgCost    = parseFloat(pres.package_cost || 0);
         const upu        = parseFloat(pres.units_per_package) || 1;
-        const valueCOP   = toCOP(qty * (pkgCost / upu), pres.purchase_currency || 'USD');
-        return <span className="font-medium text-gray-700">{valueCOP > 0 ? formatCOP(valueCOP) : '—'}</span>;
+        const rawValue   = qty * (pkgCost / upu);
+        return <span className="font-medium text-gray-700">{rawValue > 0 ? formatValueCOP(rawValue, pres.purchase_currency || 'USD') : '—'}</span>;
       },
     },
     {
@@ -491,7 +500,7 @@ const InventoryPage = () => {
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Valor Total</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCOP(toCOP(valuationData?.data?.totalValue || 0, 'USD'))}
+                {formatValueCOP(valuationData?.data?.totalValue || 0, 'USD')}
               </p>
               {valuationData?.data?.totalsByCurrency &&
                 Object.entries(valuationData.data.totalsByCurrency).filter(([, v]) => v > 0).length > 1 && (
@@ -791,7 +800,7 @@ const InventoryPage = () => {
           <div>
             <p className="text-sm text-gray-600 mb-1">Total Convertido</p>
             <p className="text-3xl font-bold text-green-600">
-              {formatCOP(toCOP(valuationData?.data?.totalValue || 0, 'USD'))}
+              {formatValueCOP(valuationData?.data?.totalValue || 0, 'USD')}
             </p>
           </div>
 

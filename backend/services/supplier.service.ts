@@ -45,21 +45,39 @@ export async function getSupplierLedger(supplierId: string | number) {
   }) as any[];
 
   const poMap: any = {};
+  // Factor de conversión a la moneda de la categoría: las OCs facturadas en VES
+  // caen en la categoría USD y deben convertirse (sumarlas crudas infla el total).
+  const poCatFactor: Record<number, number> = {};
   const categories: any = {};
 
   for (const po of purchaseOrders) {
     const cat = getLedgerCategory(po.currency, po.settlement_currency);
     poMap[po.id] = cat;
 
+    let factor = 1;
+    if (po.currency === 'VES') {
+      try {
+        factor = await (ExchangeRate as any).getRate('VES', 'USD', po.order_date);
+      } catch (e) {
+        try {
+          const bcv = await (ExchangeRate as any).getRate('USD', 'VES');
+          factor = bcv ? 1 / bcv : 1;
+        } catch (_) { factor = 1; }
+      }
+    }
+    poCatFactor[po.id] = factor;
+
     if (!categories[cat]) {
       categories[cat] = { total_invoiced: 0, total_paid: 0, balance: 0, invoices: [], payments: [] };
     }
 
-    const poTotal = parseFloat(po.total || 0);
+    const poTotal = parseFloat(po.total || 0) * factor;
     categories[cat].total_invoiced += poTotal;
     categories[cat].invoices.push({
       id: po.id, date: po.order_date, description: po.order_number,
-      amount: poTotal, status: po.status, notes: po.notes
+      amount: poTotal,
+      amount_ves: po.currency === 'VES' ? parseFloat(po.total || 0) : null,
+      status: po.status, notes: po.notes
     });
   }
 
@@ -72,8 +90,9 @@ export async function getSupplierLedger(supplierId: string | number) {
       for (const alloc of payment.allocations) {
         const cat = poMap[alloc.purchase_order_id];
         if (!cat) continue;
+        const factor = poCatFactor[alloc.purchase_order_id] ?? 1;
         if (!allocByCategory[cat]) allocByCategory[cat] = { amountPoCurrency: 0, amountPayCurrency: 0 };
-        allocByCategory[cat].amountPoCurrency += parseFloat(alloc.allocated_amount_po_currency || 0);
+        allocByCategory[cat].amountPoCurrency += parseFloat(alloc.allocated_amount_po_currency || 0) * factor;
         allocByCategory[cat].amountPayCurrency += parseFloat(alloc.allocated_amount || 0);
       }
 
@@ -171,8 +190,12 @@ export async function getSupplierResumen() {
   for (const po of purchaseOrders) {
     const supplierId = po.supplier_id;
     const cat = getLedgerCategory(po.currency, po.settlement_currency);
-    const poTotal = parseFloat(po.total || 0);
-    const poPaid = paidMap[po.id] || 0;
+    // OCs en VES caen en la categoría USD: convertir (total y pagos congelados
+    // están en la moneda de la OC) — sumarlas crudas inflaba el total USD.
+    let factor = 1;
+    if (po.currency === 'VES' && bcvRate) factor = 1 / bcvRate;
+    const poTotal = parseFloat(po.total || 0) * factor;
+    const poPaid = (paidMap[po.id] || 0) * factor;
     const poBalance = poTotal - poPaid;
 
     if (!supplierMap[supplierId]) {

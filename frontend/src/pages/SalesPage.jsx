@@ -160,8 +160,9 @@ const SalesPage = () => {
   const getCustomerName = (customer) => {
     if (!customer) return 'Cliente General';
     const words2 = (s) => (s || '').trim().split(/\s+/).slice(0, 2).join(' ');
-    if (customer.type === 'juridical') return customer.businessName || customer.tradeName || 'Empresa Sin Nombre';
-    return `${words2(customer.firstName)} ${words2(customer.lastName)}`.trim() || 'Cliente Sin Nombre';
+    if (customer.type === 'juridical') return customer.business_name || customer.trade_name || 'Empresa Sin Nombre';
+    return `${words2(customer.first_name)} ${words2(customer.last_name)}`.trim()
+      || customer.business_name || 'Cliente Sin Nombre';
   };
 
   const renderTotal = (row) => {

@@ -79,40 +79,32 @@ class ExchangeRateController {
       const { date } = req.query as Record<string, string>;
       const effectiveDate = date || new Date().toISOString().split('T')[0];
 
-      // Obtener todas las tasas para la fecha especificada
+      // Última tasa vigente POR PAR (from→to) a la fecha. Antes devolvía solo
+      // las tasas con effective_date exacto: si hoy solo se cargó VES→COP, el
+      // USD→VES de ayer quedaba fuera y el frontend perdía toda conversión USD.
       const rates = await ExchangeRate.findAll({
         where: {
-          effective_date: effectiveDate,
-          is_active: true
+          is_active: true,
+          effective_date: { [Op.lte]: effectiveDate }
         },
         include: [
           { model: User, as: 'creator', attributes: ['id', 'username'] }
         ],
-        order: [['from_currency', 'ASC'], ['to_currency', 'ASC']]
+        order: [['effective_date', 'DESC'], ['created_at', 'DESC']],
+        limit: 100
       }) as any[];
 
-      // Si no hay tasas para esa fecha, buscar las más recientes
-      if (rates.length === 0) {
-        const latestRates = await ExchangeRate.findAll({
-          where: {
-            is_active: true,
-            effective_date: {
-              [Op.lte]: effectiveDate
-            }
-          },
-          order: [['effective_date', 'DESC'], ['created_at', 'DESC']],
-          limit: 20
-        }) as any[];
-
-        return res.json({
-          data: latestRates,
-          message: 'No hay tasas para la fecha especificada. Se muestran las más recientes.'
-        });
+      const seen = new Set<string>();
+      const latestPerPair: any[] = [];
+      for (const r of rates) {
+        const key = `${r.from_currency}->${r.to_currency}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          latestPerPair.push(r);
+        }
       }
 
-      res.json({
-        data: rates
-      });
+      res.json({ data: latestPerPair });
     } catch (error) {
       next(error);
     }

@@ -108,7 +108,12 @@ async function buildCustomerStatement(customerId: any) {
   }
 
   const ledger: any[] = [];
-  const summary: Record<string, any> = {};
+  // Inicializar siempre: un cliente sin ventas a crédito puede igual tener
+  // saldo a favor (NC con refund a monedero) y debe verse en el resumen.
+  const summary: Record<string, any> = {
+    USD: { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 },
+    COP: { total_invoiced: 0, total_paid: 0, balance: 0, available_credit: 0 },
+  };
   const creditDays = (customer as any).credit_days || 0;
 
   // Procesar cargos (ventas)

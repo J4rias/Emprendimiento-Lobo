@@ -309,6 +309,15 @@ export const createCreditNote = async (req: Request, res: Response) => {
       });
     }
 
+    // Una venta cancelada ya revirtió stock y crédito: una NC encima
+    // duplicaría el beneficio (stock y/o monedero)
+    if (sale.status === 'cancelled') {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: 'No se puede crear una nota de crédito sobre una venta cancelada'
+      });
+    }
+
     // Validate refund method vs customer type
     if (refund_method === 'credit_balance' && !sale.customer_id) {
       await transaction.rollback();

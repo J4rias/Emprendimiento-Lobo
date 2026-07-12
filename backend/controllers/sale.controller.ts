@@ -744,8 +744,14 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     const creditTotalUSD = parseFloat(creditResult?.creditTotal) || 0;
 
     // === PAYMENTS BREAKDOWN (only today's cash/mixed sales, not credit sales) ===
+    // Incluye ventas 'returned': su pago sí entró a caja y la devolución en
+    // efectivo ya se descuenta aparte en cashRefunds — excluirlas restaba doble.
     const todaySaleIds = (await Sale.findAll({
-      where: { ...salesWhere, sale_type: { [Op.in]: ['cash', 'mixed'] } },
+      where: {
+        ...salesWhere,
+        status: { [Op.in]: ['completed', 'pending', 'returned'] },
+        sale_type: { [Op.in]: ['cash', 'mixed'] }
+      },
       attributes: ['id']
     }) as any[]).map((s: any) => s.id);
 
@@ -829,6 +835,9 @@ export const getDailyClosure = async (req: Request, res: Response) => {
 
     // === CASH REFUNDS FROM CREDIT NOTES (devoluciones en efectivo) ===
     // Group by the sale's currency_mode so we only deduct from the correct currency
+    // Ventana en UTC explícito: en raw queries sequelize serializa Date en hora
+    // local (el ORM usa UTC) y las NC aprobadas de noche caían al día siguiente.
+    const toUtcSql = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
     const cashRefundResult = await sequelize.query(
       `SELECT
          s.currency_mode,
@@ -843,7 +852,7 @@ export const getDailyClosure = async (req: Request, res: Response) => {
          ${user_id ? 'AND cn.created_by = :user_id' : ''}
        GROUP BY s.currency_mode`,
       {
-        replacements: { startOfDay, endOfDay, ...(user_id ? { user_id } : {}) },
+        replacements: { startOfDay: toUtcSql(startOfDay), endOfDay: toUtcSql(endOfDay), ...(user_id ? { user_id } : {}) },
         type: sequelize.QueryTypes.SELECT
       }
     );
@@ -984,9 +993,20 @@ export const getSalesSummary = async (req: Request, res: Response) => {
     const dateFrom = date_from || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const dateTo = date_to || dateFrom;
 
-    const replacements = { dateFrom, dateTo };
+    // Ventana en medianoche local convertida a UTC (los DATETIME se guardan en
+    // UTC vía ORM) para que "el día" del resumen coincida con el del cierre;
+    // con strings crudos, las ventas/abonos nocturnos caían en el día siguiente.
+    // Nota: en raw queries sequelize serializa Date en hora local (a diferencia
+    // del ORM, que usa UTC), por eso se pasan strings UTC explícitos.
+    const [fy, fm, fd] = (dateFrom as string).split('-').map(Number);
+    const [ty, tm, td] = (dateTo as string).split('-').map(Number);
+    const toUtcSql = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
+    const startWin = toUtcSql(new Date(fy, fm - 1, fd, 0, 0, 0, 0));
+    const endWin = toUtcSql(new Date(ty, tm - 1, td, 23, 59, 59, 999));
+
+    const replacements: any = { dateFrom, dateTo, startWin, endWin };
     const statusFilter = "s.status IN ('completed','pending')";
-    const dateFilter = "s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)";
+    const dateFilter = "s.sale_date BETWEEN :startWin AND :endWin";
 
     // --- Summary + sales_by_type ---
     const [summaryRow] = await sequelize.query(`
@@ -1063,10 +1083,10 @@ export const getSalesSummary = async (req: Request, res: Response) => {
       FROM sale_payments sp
       JOIN sales s ON s.id = sp.sale_id
       WHERE s.status IN ('completed','pending')
-        AND DATE(sp.payment_date) >= :dateFrom AND DATE(sp.payment_date) <= :dateTo
+        AND sp.payment_date BETWEEN :startWin AND :endWin
         AND (
           s.sale_type = 'credit'
-          OR (s.sale_type = 'mixed' AND DATE(s.sale_date) < :dateFrom)
+          OR (s.sale_type = 'mixed' AND s.sale_date < :startWin)
         )
       GROUP BY sp.currency
     `, { replacements, type: sequelize.QueryTypes.SELECT });

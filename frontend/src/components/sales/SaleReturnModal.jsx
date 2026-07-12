@@ -186,7 +186,9 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                         <p className="text-xs font-semibold text-gray-500 uppercase">Cliente</p>
                         <p className="text-sm font-medium text-gray-900">
                             {sale.customer
-                                ? (sale.customer.businessName || `${sale.customer.firstName || ''} ${sale.customer.lastName || ''}`.trim() || 'Consumidor Final')
+                                ? (sale.customer.business_name || sale.customer.businessName
+                                    || `${sale.customer.first_name || sale.customer.firstName || ''} ${sale.customer.last_name || sale.customer.lastName || ''}`.trim()
+                                    || 'Consumidor Final')
                                 : 'Consumidor Final'}
                         </p>
                     </div>

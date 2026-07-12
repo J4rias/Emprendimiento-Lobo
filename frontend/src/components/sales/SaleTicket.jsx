@@ -42,9 +42,9 @@ const buildTicketHTML = (sale, companyInfo = {}, printOptions = {}) => {
 
         ${sale.customer ? `
           <div style="margin-top: 4px; border-top: 1px solid #000; pt: 2px;">
-            <div><strong>Cliente:</strong> ${sale.customer.fullName || (sale.customer.firstName ? `${sale.customer.firstName} ${sale.customer.lastName}` : (sale.customer.businessName || 'GENERAL'))}</div>
+            <div><strong>Cliente:</strong> ${sale.customer.business_name || sale.customer.businessName || `${sale.customer.first_name || sale.customer.firstName || ''} ${sale.customer.last_name || sale.customer.lastName || ''}`.trim() || 'GENERAL'}</div>
             ${sale.customer.address ? `<div style="font-size: 11px;"><strong>Dir:</strong> ${sale.customer.address}</div>` : ''}
-            ${sale.customer.documentNumber ? `<div><strong>Doc:</strong> ${sale.customer.documentType ? sale.customer.documentType + '-' : ''}${sale.customer.documentNumber}</div>` : ''}
+            ${(sale.customer.document_number || sale.customer.documentNumber) ? `<div><strong>Doc:</strong> ${(sale.customer.document_type || sale.customer.documentType) ? (sale.customer.document_type || sale.customer.documentType) + '-' : ''}${sale.customer.document_number || sale.customer.documentNumber}</div>` : ''}
           </div>
         ` : '<div><strong>Cliente:</strong> CONSUMIDOR FINAL</div>'}
 
