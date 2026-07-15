@@ -11,7 +11,7 @@ RUN corepack enable pnpm && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY backend/package.json backend/pnpm-lock.yaml ./
+COPY backend/package.json backend/pnpm-lock.yaml backend/.npmrc ./
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build TypeScript
@@ -31,7 +31,7 @@ RUN corepack enable pnpm && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY backend/package.json backend/pnpm-lock.yaml ./
+COPY backend/package.json backend/pnpm-lock.yaml backend/.npmrc ./
 RUN pnpm install --frozen-lockfile --prod
 
 # Stage 4: Runtime
