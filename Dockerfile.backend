@@ -47,7 +47,6 @@ WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY backend/migrations ./migrations
-COPY backend/seeders ./seeders
 COPY backend/.sequelizerc ./.sequelizerc
 COPY --from=build /app/dist/config ./config
 COPY backend/public ./public
