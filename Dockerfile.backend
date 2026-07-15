@@ -1,5 +1,5 @@
 # Stage 1: Install ALL dependencies (including dev for tsc)
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 # Install pnpm and build dependencies for sharp
 RUN corepack enable pnpm && \
@@ -20,7 +20,7 @@ COPY backend/ ./
 RUN pnpm tsc
 
 # Stage 3: Production dependencies only
-FROM node:20-slim AS prod-deps
+FROM node:22-slim AS prod-deps
 
 RUN corepack enable pnpm && \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -35,7 +35,7 @@ COPY backend/package.json backend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 # Stage 4: Runtime
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 # Install libvips runtime dependency
 RUN apt-get update && apt-get install -y --no-install-recommends \
