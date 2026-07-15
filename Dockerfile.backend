@@ -1,8 +1,9 @@
-# Stage 1: Install production dependencies
+# Stage 1: Install ALL dependencies (including dev for tsc)
 FROM node:20-slim AS deps
 
-# Install build dependencies for sharp and system tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install pnpm and build dependencies for sharp
+RUN corepack enable pnpm && \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3 \
     libvips-dev \
@@ -10,10 +11,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY backend/package*.json ./
-RUN npm ci --omit=dev
+COPY backend/package.json backend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-# Stage 2: Runtime
+# Stage 2: Build TypeScript
+FROM deps AS build
+COPY backend/ ./
+RUN pnpm tsc
+
+# Stage 3: Production dependencies only
+FROM node:20-slim AS prod-deps
+
+RUN corepack enable pnpm && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    libvips-dev \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/package.json backend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+# Stage 4: Runtime
 FROM node:20-slim AS runtime
 
 # Install libvips runtime dependency
@@ -23,12 +44,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY backend/ ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY backend/migrations ./migrations
+COPY backend/seeders ./seeders
+COPY backend/.sequelizerc ./.sequelizerc
+COPY --from=build /app/dist/config ./config
+COPY backend/public ./public
 
 # Create upload directories (overridden by volume mount in production)
 RUN mkdir -p public/uploads/brands public/uploads/products public/uploads/temp
 
 EXPOSE 5000
 
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]
