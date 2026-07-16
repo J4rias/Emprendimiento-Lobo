@@ -612,7 +612,7 @@ export async function addPayment(
     }, 0);
 
     const remainingBalance = parseFloat(sale.total) - parseFloat(sale.paid_amount);
-    if (totalNewlyPaidUSD > remainingBalance + 0.01) {
+    if (totalNewlyPaidUSD > remainingBalance + 1) {
       await transaction.rollback();
       throw new ServiceError(400, 'El pago excede el saldo pendiente de la venta');
     }

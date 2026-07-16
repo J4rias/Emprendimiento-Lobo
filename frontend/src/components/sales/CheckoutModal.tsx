@@ -78,7 +78,7 @@ export default function CheckoutModal({
 
   return (
     <>
-    <Modal open={show} onClose={onClose} title={modalTitle}>
+    <Modal open={show} onClose={onClose} title={modalTitle} size="lg">
       <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
 
         {/* Resumen */}

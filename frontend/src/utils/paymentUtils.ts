@@ -74,7 +74,9 @@ export function convertPaymentLinesToBackend(
       base.exchange_rate = copPerUSD / (parseFloat(String(line.cop_rate)) || 1);
       return base;
     }
-    // COP: monto tal cual con tasa del sistema
+    // COP: use cop_rate to derive exchange_rate (handles custom rates in USD mode)
+    const copRate = parseFloat(String(line.cop_rate)) || 1;
+    base.exchange_rate = copPerUSD / copRate;
     return base;
   });
 }

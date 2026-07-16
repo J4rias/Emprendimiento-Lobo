@@ -13,6 +13,13 @@ const copFormat = (amount, rate) => {
   return `COP ${Math.ceil(val).toLocaleString('es-VE')}`;
 };
 
+const fmtByCurrency = (usdAmount, sale) => {
+  const val = parseFloat(usdAmount || 0);
+  if (sale.currency_mode === 'USD') return `$ ${val.toFixed(2)}`;
+  const rate = parseFloat(sale.exchange_rate || 1);
+  return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
+};
+
 const fmtDate = (d) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }); }
@@ -83,8 +90,8 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
                       <p className="text-xs text-gray-400">{d.presentation?.name}</p>
                     </td>
                     <td className="px-3 py-2 text-center text-gray-600">{parseFloat(d.quantity)}</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{copFormat(d.unit_price, sale.exchange_rate)}</td>
-                    <td className="px-3 py-2 text-right font-bold text-gray-900">{copFormat(d.total, sale.exchange_rate)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{fmtByCurrency(d.unit_price, sale)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-gray-900">{fmtByCurrency(d.total, sale)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -113,7 +120,9 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
                         {PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}
                       </span>
                       <span className="font-bold text-emerald-600">
-                        COP {Math.ceil(amountCOP).toLocaleString('es-VE')}
+                        {sale.currency_mode === 'USD'
+                          ? `$ ${(parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1)).toFixed(2)}`
+                          : `COP ${Math.ceil(amountCOP).toLocaleString('es-VE')}`}
                       </span>
                     </div>
                     {showRate && (
@@ -134,12 +143,12 @@ const SaleViewSheet = ({ open, onClose, sale, onPrint, onPrintPortable, exchange
             <div className="flex justify-between font-bold text-base text-gray-900">
               <span>Total</span>
               <span className="text-primary-600">
-                {copFormat(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount || 0), sale.exchange_rate)}
+                {fmtByCurrency(parseFloat(sale.subtotal) - parseFloat(sale.discount_amount || 0), sale)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-gray-500">
               <span>Monto Pagado</span>
-              <span className="font-semibold text-emerald-600">{copFormat(sale.paid_amount || 0, sale.exchange_rate)}</span>
+              <span className="font-semibold text-emerald-600">{fmtByCurrency(sale.paid_amount || 0, sale)}</span>
             </div>
           </div>
         </section>

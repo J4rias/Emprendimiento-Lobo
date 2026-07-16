@@ -238,8 +238,7 @@ const SettingsPage = () => {
     }));
   };
 
-  const handleRoleSubmit = (e) => {
-    e.preventDefault();
+  const handleRoleSubmit = () => {
     roleSaveMutation.mutate({ id: editingRole?.id, payload: formData });
   };
 
@@ -575,9 +574,19 @@ const SettingsPage = () => {
         open={showModal}
         onClose={() => { setShowModal(false); resetForm(); }}
         title={editingRole ? 'Editar Rol' : 'Nuevo Rol'}
-        size="xl"
+        size="full"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowModal(false); resetForm(); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleRoleSubmit} loading={roleSaveMutation.isPending}>
+              {editingRole ? 'Actualizar' : 'Crear'} Rol
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={handleRoleSubmit} className="space-y-6">
+        <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1">
               <Input
@@ -616,7 +625,7 @@ const SettingsPage = () => {
               <span className="text-xs text-gray-400">Pulsa el cuadro junto al título para marcar todo el bloque</span>
             </div>
 
-            <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
                 {Object.entries(permissionsByModule).map(([module, perms]) => {
                   const allSelected = perms.every(p => formData.permissions.includes(p.id));
@@ -667,15 +676,7 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="secondary" onClick={() => { setShowModal(false); resetForm(); }}>
-              Cancelar
-            </Button>
-            <Button type="submit" loading={roleSaveMutation.isPending}>
-              {editingRole ? 'Actualizar' : 'Crear'} Rol
-            </Button>
-          </div>
-        </form>
+        </div>
       </Modal>
 
       {/* ── User modal ────────────────────────────────────────────────────────── */}

@@ -30,7 +30,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const METHODS_BY_CURRENCY = {
-  COP: ['cash', 'transfer', 'usdt'],
+  COP: ['cash', 'transfer'],
   VES: ['cash', 'card', 'transfer'],
   USD: ['cash', 'transfer', 'usdt'],
 };

@@ -11,7 +11,7 @@ const sizeClasses = {
   full: 'max-w-5xl',
 }
 
-export function Modal({ open, onClose, title, children, footer, size = 'md', className }) {
+export function Modal({ open, onClose, title, children, footer, size = 'lg', className }) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
@@ -26,7 +26,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
           className={cn(
             'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
             'bg-white rounded-xl shadow-modal',
-            'max-h-[90vh] overflow-y-auto',
+            'max-h-[90vh] overflow-hidden flex flex-col',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -56,7 +56,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
           </div>
 
           {/* Body */}
-          <div className="px-6 py-4">{children}</div>
+          <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
 
           {/* Footer */}
           {footer && (
