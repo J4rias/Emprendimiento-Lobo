@@ -17,8 +17,8 @@ export function usePOSSocket({ sessionId, tabId, token, isEnabled = true }) {
     }
 
     // Extract origin only — Socket.io interprets paths as namespaces
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const backendUrl = new URL(apiUrl).origin; // strips /api path
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const backendUrl = apiUrl ? new URL(apiUrl).origin : window.location.origin;
 
     // Connect to Socket.io
     const socket = io(backendUrl, {

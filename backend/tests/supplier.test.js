@@ -69,3 +69,60 @@ describe('Suppliers API — smoke tests', () => {
     expect(res.body.data.supplier).toBeDefined();
   });
 });
+
+describe('Suppliers API — query params & filters', () => {
+  it('GET /api/suppliers?search= (empty string) -> 200', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ search: '' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/suppliers?search=xyz_inexistente -> 200', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ search: 'xyz_inexistente_999' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/suppliers?is_active=true -> 200', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ is_active: 'true' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/suppliers?page=1&limit=5 -> 200, max 5', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ page: 1, limit: 5 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /api/suppliers?sort_by=name&sort_dir=DESC -> 200', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ sort_by: 'name', sort_dir: 'DESC' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/suppliers?search=&page=1&limit=20 -> 200 (combo frontend)', async () => {
+    const res = await request(app)
+      .get('/api/suppliers')
+      .query({ search: '', page: 1, limit: 20 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});

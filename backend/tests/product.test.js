@@ -66,3 +66,93 @@ describe('Products API — smoke tests', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Products API — query params & filters', () => {
+  it('GET /api/products?search= (empty string) -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ search: '' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?search=xyz_inexistente -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ search: 'xyz_inexistente_999' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?category_id=1 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ category_id: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?is_active=true -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ is_active: 'true' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?is_active=false -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ is_active: 'false' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?is_perishable=true -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ is_perishable: 'true' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?barcode=xyz_no_existe -> 200 o 404', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ barcode: 'xyz_no_existe' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it('GET /api/products?price_list_id=1 -> 200 (modo POS)', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ price_list_id: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?sort_by=name&sort_dir=ASC -> 200', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ sort_by: 'name', sort_dir: 'ASC' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?search=&category_id=1&is_active=true&page=1&limit=10 -> 200 (combo)', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ search: '', category_id: 1, is_active: 'true', page: 1, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/products?page=9999 -> 200, sin resultados', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .query({ page: 9999, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+  });
+});

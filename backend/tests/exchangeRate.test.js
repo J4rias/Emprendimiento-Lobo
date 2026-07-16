@@ -60,3 +60,78 @@ describe('Exchange Rates API', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('Exchange Rates API — query params & filters', () => {
+  it('GET /api/exchange-rates?from_currency=USD -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ from_currency: 'USD' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?to_currency=COP -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ to_currency: 'COP' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?from_currency=USD&to_currency=COP -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ from_currency: 'USD', to_currency: 'COP' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?date_from=2026-01-01&date_to=2026-12-31 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ date_from: '2026-01-01', date_to: '2026-12-31' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?is_active=true -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ is_active: 'true' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?is_active=all -> 200', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ is_active: 'all' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/exchange-rates?page=1&limit=5 -> 200, max 5', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ page: 1, limit: 5 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /api/exchange-rates?from_currency=USD&to_currency=COP&is_active=true&page=1&limit=10 -> 200 (combo)', async () => {
+    const res = await request(app)
+      .get('/api/exchange-rates')
+      .query({ from_currency: 'USD', to_currency: 'COP', is_active: 'true', page: 1, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});

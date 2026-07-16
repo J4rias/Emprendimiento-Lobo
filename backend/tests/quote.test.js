@@ -44,3 +44,78 @@ describe('Quotes API — smoke tests', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Quotes API — query params & filters', () => {
+  it('GET /api/quotes?search= (empty string) -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ search: '' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?search=xyz_inexistente -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ search: 'xyz_inexistente_999' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?status=draft -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ status: 'draft' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?customer_id=1 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ customer_id: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?date_from=2026-01-01&date_to=2026-12-31 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ date_from: '2026-01-01', date_to: '2026-12-31' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?page=1&limit=5 -> 200, max 5', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ page: 1, limit: 5 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /api/quotes?sort_by=created_at&sort_dir=ASC -> 200', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ sort_by: 'created_at', sort_dir: 'ASC' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/quotes?search=&status=draft&page=1&limit=10 -> 200 (combo)', async () => {
+    const res = await request(app)
+      .get('/api/quotes')
+      .query({ search: '', status: 'draft', page: 1, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});

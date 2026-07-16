@@ -9,33 +9,33 @@ const PurchaseOrderItemSchema = z.object({
   unit_cost: z.number().nullable().optional(),
   discount_percent: z.number().min(0).max(100).optional(),
   tax_percent: z.number().min(0).optional(),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
 }).passthrough();
 
 export const CreatePurchaseOrderSchema = z.object({
   supplier_id: z.number().int().positive(),
   warehouse_id: z.number().int().positive(),
-  order_date: z.string().optional(),
-  expected_delivery_date: z.string().optional(),
+  order_date: z.string().nullable().optional(),
+  expected_delivery_date: z.string().nullable().optional(),
   currency: z.string().optional(),
-  settlement_currency: z.string().optional(),
-  notes: z.string().optional(),
+  settlement_currency: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   items: z.array(PurchaseOrderItemSchema).min(1),
 }).passthrough();
 
 export const UpdatePurchaseOrderSchema = z.object({
   supplier_id: z.number().int().positive().optional(),
   warehouse_id: z.number().int().positive().optional(),
-  order_date: z.string().optional(),
-  expected_delivery_date: z.string().optional(),
+  order_date: z.string().nullable().optional(),
+  expected_delivery_date: z.string().nullable().optional(),
   currency: z.string().optional(),
-  settlement_currency: z.string().optional(),
-  notes: z.string().optional(),
+  settlement_currency: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   items: z.array(PurchaseOrderItemSchema).min(1).optional(),
 }).passthrough();
 
 export const CancelPurchaseOrderSchema = z.object({
-  cancellation_reason: z.string().optional(),
+  cancellation_reason: z.string().nullable().optional(),
 }).passthrough();
 
 const ReceivedItemSchema = z.object({
@@ -49,6 +49,6 @@ const ReceivedItemSchema = z.object({
 
 export const ReceiveMerchandiseSchema = z.object({
   received_items: z.array(ReceivedItemSchema).min(1),
-  invoice_number: z.string().optional(),
-  notes: z.string().optional(),
+  invoice_number: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 }).passthrough();

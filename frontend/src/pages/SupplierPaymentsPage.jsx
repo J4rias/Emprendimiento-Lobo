@@ -79,8 +79,8 @@ const SupplierPaymentsPage = () => {
       });
       return {
         payments: res.data || [],
-        totalPages: res.totalPages || 1,
-        total: res.total || 0,
+        totalPages: res.pagination?.totalPages || 1,
+        total: res.pagination?.total || 0,
       };
     },
   });

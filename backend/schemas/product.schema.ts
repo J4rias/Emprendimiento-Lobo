@@ -3,19 +3,19 @@ import { z } from 'zod';
 export const CreateProductSchema = z.object({
   name: z.string().min(1),
   category_id: z.coerce.number().int().positive(),
-  brand_id: z.coerce.number().int().positive().optional(),
-  min_stock: z.coerce.number().optional(),
-  max_stock: z.coerce.number().optional(),
-  reorder_point: z.coerce.number().optional(),
+  brand_id: z.coerce.number().int().positive().nullable().optional(),
+  min_stock: z.coerce.number().nullable().optional(),
+  max_stock: z.coerce.number().nullable().optional(),
+  reorder_point: z.coerce.number().nullable().optional(),
 }).passthrough();
 
 export const UpdateProductSchema = z.object({
   name: z.string().min(1).optional(),
   category_id: z.coerce.number().int().positive().optional(),
-  brand_id: z.coerce.number().int().positive().optional(),
-  min_stock: z.coerce.number().optional(),
-  max_stock: z.coerce.number().optional(),
-  reorder_point: z.coerce.number().optional(),
+  brand_id: z.coerce.number().int().positive().nullable().optional(),
+  min_stock: z.coerce.number().nullable().optional(),
+  max_stock: z.coerce.number().nullable().optional(),
+  reorder_point: z.coerce.number().nullable().optional(),
 }).passthrough();
 
 export const CreatePresentationSchema = z.object({

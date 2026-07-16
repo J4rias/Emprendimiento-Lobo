@@ -618,7 +618,7 @@ function TabletCheckoutModal({
   const [banks, setBanks] = useState([]);
 
   useEffect(() => {
-    bankService.getAll().then(setBanks).catch(() => {});
+    bankService.getAll().then(res => setBanks(Array.isArray(res) ? res : res?.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {

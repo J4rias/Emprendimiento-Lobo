@@ -802,7 +802,7 @@ export function usePOS() {
         notes,
       });
 
-      setSaleResult({ ...result.sale, totals: { subtotal, discount, tax, total }, changeAmount });
+      setSaleResult({ ...result.data, totals: { subtotal, discount, tax, total }, changeAmount });
       setShowCheckoutModal(false);
       setShowResultModal(true);
 

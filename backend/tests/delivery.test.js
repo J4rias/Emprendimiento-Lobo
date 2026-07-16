@@ -45,3 +45,69 @@ describe('Deliveries API — smoke tests', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Deliveries API — query params & filters', () => {
+  it('GET /api/deliveries?search= (empty string) -> 200', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ search: '' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/deliveries?search=xyz_inexistente -> 200', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ search: 'xyz_inexistente_999' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/deliveries?status=pending -> 200', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ status: 'pending' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/deliveries?customer_id=1 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ customer_id: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/deliveries?date_from=2026-01-01&date_to=2026-12-31 -> 200', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ date_from: '2026-01-01', date_to: '2026-12-31' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/deliveries?page=1&limit=5 -> 200, max 5', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ page: 1, limit: 5 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /api/deliveries?search=&status=pending&page=1&limit=10 -> 200 (combo)', async () => {
+    const res = await request(app)
+      .get('/api/deliveries')
+      .query({ search: '', status: 'pending', page: 1, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});

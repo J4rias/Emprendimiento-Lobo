@@ -45,3 +45,51 @@ describe('Pre-Orders API — smoke tests', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Pre-Orders API — query params & filters', () => {
+  it('GET /api/pre-orders?status=pending -> 200', async () => {
+    const res = await request(app)
+      .get('/api/pre-orders')
+      .query({ status: 'pending' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/pre-orders?channel=whatsapp -> 200', async () => {
+    const res = await request(app)
+      .get('/api/pre-orders')
+      .query({ channel: 'whatsapp' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/pre-orders?page=1&limit=5 -> 200, max 5', async () => {
+    const res = await request(app)
+      .get('/api/pre-orders')
+      .query({ page: 1, limit: 5 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /api/pre-orders?sort_by=created_at&sort_dir=ASC -> 200', async () => {
+    const res = await request(app)
+      .get('/api/pre-orders')
+      .query({ sort_by: 'created_at', sort_dir: 'ASC' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/pre-orders?status=pending&channel=whatsapp&page=1&limit=10 -> 200 (combo)', async () => {
+    const res = await request(app)
+      .get('/api/pre-orders')
+      .query({ status: 'pending', channel: 'whatsapp', page: 1, limit: 10 })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});

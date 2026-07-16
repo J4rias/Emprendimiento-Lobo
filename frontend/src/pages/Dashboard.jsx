@@ -59,9 +59,9 @@ const Dashboard = () => {
   });
 
   const today = data.today || {};
-  const byMode = today.salesByMode || {};
-  const modeCOP = byMode.COP || { count: 0, total_cop: 0 };
-  const modeUSD = byMode.USD || { count: 0, total_usd: 0 };
+  const byCurr = today.salesByCurrency || {};
+  const paidCOP = byCurr.COP || { count: 0, total: 0 };
+  const paidUSD = byCurr.USD || { count: 0, total: 0 };
   const topProducts = (today.topProducts || []).slice(0, 5);
   const categoriesStats = data.categoriesStats || [];
   const monthName = new Date().toLocaleDateString('es-VE', { month: 'long' });
@@ -115,17 +115,17 @@ const Dashboard = () => {
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Ventas de hoy</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Ventas en COP"
-            value={formatCOP(modeCOP.total_cop)}
-            detail={`${modeCOP.count} venta${modeCOP.count !== 1 ? 's' : ''} en modo COP`}
+            label="Recibido en COP"
+            value={formatCOP(paidCOP.total)}
+            detail={`${paidCOP.count} venta${paidCOP.count !== 1 ? 's' : ''}`}
             icon={CurrencyCircleDollar}
             tone="primary"
             onClick={() => navigate('/ventas')}
           />
           <StatCard
-            label="Ventas en USD"
-            value={formatUSD(modeUSD.total_usd)}
-            detail={`${modeUSD.count} venta${modeUSD.count !== 1 ? 's' : ''} en modo USD`}
+            label="Recibido en USD"
+            value={formatUSD(paidUSD.total)}
+            detail={`${paidUSD.count} venta${paidUSD.count !== 1 ? 's' : ''}`}
             icon={CurrencyDollar}
             tone="success"
             onClick={() => navigate('/ventas')}
