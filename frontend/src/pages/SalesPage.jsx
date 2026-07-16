@@ -11,10 +11,14 @@ import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
+import { COP_TOLERANCE } from '../hooks/usePOS';
+import CheckoutModal from '../components/sales/CheckoutModal';
 import { formatDate } from '../utils/formatUtils';
 import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { downloadCSV } from '../utils/csvUtils';
 import { useCompany } from '../context/CompanyContext';
+import { useAuth } from '../context/AuthContext';
 import SaleReturnModal from '../components/sales/SaleReturnModal';
 import SaleViewSheet from '../components/sales/SaleViewSheet';
 import {
@@ -59,6 +63,7 @@ const PAYMENT_METHOD_LABEL = {
 
 const SalesPage = () => {
   const { companySettings } = useCompany();
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
   const [limit, setLimit] = useTableLimit();
@@ -80,6 +85,11 @@ const SalesPage = () => {
   const [cancelSaleId, setCancelSaleId]   = useState(null);
   const [cancelReason, setCancelReason]   = useState('');
   const [refundLines, setRefundLines]     = useState(null); // set after cancel if refund needed
+
+  // Checkout state for pos_pending collection
+  const [checkoutPaymentLines, setCheckoutPaymentLines] = useState([]);
+  const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [collectSaving, setCollectSaving] = useState(false);
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: salesSortBy, sortDir: salesSortDir, onSort: _salesOnSort } = useTableSort([], { serverSide: true, defaultField: 'sale_date', defaultDir: 'desc' });
@@ -125,6 +135,7 @@ const SalesPage = () => {
     staleTime: 5 * 60_000,
   });
   const exchangeRates = ratesData?.data || [];
+  const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
 
   // ─── Mutations ────────────────────────────────────────────────────────────────
   const invalidateSales = () => {
@@ -168,6 +179,13 @@ const SalesPage = () => {
     return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
   };
 
+  const fmtSaleAmount = (usdAmount, row) => {
+    const val = parseFloat(usdAmount || 0);
+    if (row.currency_mode === 'USD') return `$ ${val.toFixed(2)}`;
+    const rate = parseFloat(row.exchange_rate || 1);
+    return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
+  };
+
   const getCustomerName = (customer) => {
     if (!customer) return 'Cliente General';
     const words2 = (s) => (s || '').trim().split(/\s+/).slice(0, 2).join(' ');
@@ -183,14 +201,24 @@ const SalesPage = () => {
     const rate       = parseFloat(row.exchange_rate || 1);
     const netCOP     = Math.ceil(saleTotal * rate) - Math.ceil(cnTotalCOP);
 
+    // pos_pending: show full total as pending
+    if (row.sale_type === 'pos_pending' && row.status === 'pending') {
+      return (
+        <div>
+          <span className="text-sm font-bold text-orange-600">{fmtSaleAmount(saleTotal, row)}</span>
+          <div className="text-[10px] text-gray-400">por cobrar</div>
+        </div>
+      );
+    }
+
     if ((row.sale_type === 'credit' || row.sale_type === 'mixed') && row.status !== 'cancelled') {
       const pending = saleTotal - parseFloat(row.paid_amount || 0);
       if (pending > 0.01) {
         return (
           <div>
-            <span className="text-sm font-bold text-red-600">{copFormat(pending, row.exchange_rate)}</span>
+            <span className="text-sm font-bold text-red-600">{fmtSaleAmount(pending, row)}</span>
             {parseFloat(row.paid_amount || 0) > 0 && (
-              <div className="text-[10px] text-gray-400">de {copFormat(saleTotal, row.exchange_rate)}</div>
+              <div className="text-[10px] text-gray-400">de {fmtSaleAmount(saleTotal, row)}</div>
             )}
             {cnCount > 0 && (
               <div className="text-[10px] text-primary-500">
@@ -203,7 +231,7 @@ const SalesPage = () => {
     }
     return (
       <div>
-        <span className="text-sm font-bold text-gray-900">{copFormat(saleTotal, row.exchange_rate)}</span>
+        <span className="text-sm font-bold text-gray-900">{fmtSaleAmount(saleTotal, row)}</span>
         {cnCount > 0 && (
           <div className="text-[10px] text-primary-500">
             Neto: COP {netCOP.toLocaleString('es-VE')} ({cnCount} dev.)
@@ -296,6 +324,14 @@ const SalesPage = () => {
   };
 
   const handleOpenPaymentModal = async (sale) => {
+    if (sale.sale_type === 'pos_pending') {
+      // Open full CheckoutModal for initial collection
+      setCheckoutPaymentLines([]);
+      setCheckoutNotes('');
+      setPaymentSale(sale);
+      return;
+    }
+    // credit/mixed abonos — simple modal
     setPaymentSale(sale);
     setCustomerCreditBalance({ usd: 0, cop: 0 });
     const pendingUSD = parseFloat(sale.total) - parseFloat(sale.paid_amount || 0);
@@ -311,6 +347,47 @@ const SalesPage = () => {
       } catch (_) {}
     }
     setPaymentData({ amount_cop: pendingCOP > 0 ? String(pendingCOP) : '', method: 'cash', reference: '', notes: '' });
+  };
+
+  const handleCollectPayment = async () => {
+    if (checkoutPaymentLines.length === 0) {
+      return toast.error('Agrega al menos una forma de pago');
+    }
+    const sale = paymentSale;
+    const rate = parseFloat(sale.exchange_rate) || copPerUSD;
+    const saleTotalCOP = parseFloat(sale.total) * rate;
+
+    setCollectSaving(true);
+    try {
+      const { adjustedLines } = adjustPaymentLinesForChange(
+        checkoutPaymentLines, saleTotalCOP, copPerUSD, sale.currency_mode || 'COP', COP_TOLERANCE
+      );
+      const backendLines = convertPaymentLinesToBackend(adjustedLines, exchangeRates);
+
+      await saleService.addPayment(sale.id, {
+        payment_lines: backendLines,
+        notes: checkoutNotes || undefined,
+      });
+
+      toast.success('Cobro registrado exitosamente');
+      setPaymentSale(null);
+      invalidateSales();
+      queryClient.invalidateQueries({ queryKey: ['pending-pos-count'] });
+
+      // Print ticket
+      try {
+        const saleDetail = await saleService.getSaleById(sale.id);
+        setSelectedSale(saleDetail.data);
+        printSaleTicket(saleDetail.data, companySettings, {
+          displayCurrency: sale.currency_mode || 'COP',
+          exchangeRate: rate,
+        });
+      } catch (_) {}
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al registrar el cobro');
+    } finally {
+      setCollectSaving(false);
+    }
   };
 
   const handleOpenReturnModal = async (saleId) => {
@@ -440,10 +517,10 @@ const SalesPage = () => {
           {(row.sale_type === 'credit' || row.sale_type === 'mixed' || row.sale_type === 'pos_pending') && row.status === 'pending' && (
             <PaymentAction onClick={() => handleOpenPaymentModal(row)} title={row.sale_type === 'pos_pending' ? 'Cobrar' : 'Abonar Pago'} />
           )}
-          {row.status === 'completed' && (
+          {row.status === 'completed' && hasPermission('credit_notes.create') && (
             <ReturnAction onClick={() => handleOpenReturnModal(row.id)} />
           )}
-          {row.status !== 'cancelled' && row.status !== 'returned' && (
+          {row.status !== 'cancelled' && row.status !== 'returned' && hasPermission('sales.delete') && (
             <CancelAction onClick={() => handleCancelSale(row.id)} title="Cancelar venta" />
           )}
         </div>
@@ -597,9 +674,46 @@ const SalesPage = () => {
         calculateEffectiveRate={calculateEffectiveRate}
       />
 
-      {/* ── Payment modal ─────────────────────────────────────────────────────── */}
+      {/* ── CheckoutModal for pos_pending collection ──────────────────────── */}
+      {paymentSale?.sale_type === 'pos_pending' && (
+        <CheckoutModal
+          show={!!paymentSale}
+          onClose={() => !collectSaving && setPaymentSale(null)}
+          subtotal={parseFloat(paymentSale.subtotal || paymentSale.total)}
+          discount={parseFloat(paymentSale.discount_amount || 0)}
+          tax={parseFloat(paymentSale.tax_amount || 0)}
+          total={parseFloat(paymentSale.total)}
+          totalCOP={parseFloat(paymentSale.total) * (parseFloat(paymentSale.exchange_rate) || copPerUSD)}
+          copPerUSD={copPerUSD}
+          paymentLines={checkoutPaymentLines}
+          setPaymentLines={setCheckoutPaymentLines}
+          customer={paymentSale.customer ? {
+            id: paymentSale.customer.id,
+            type: paymentSale.customer.type,
+            firstName: paymentSale.customer.first_name,
+            lastName: paymentSale.customer.last_name,
+            businessName: paymentSale.customer.business_name,
+            tradeName: paymentSale.customer.trade_name,
+          } : null}
+          onCustomerSelect={null}
+          saleType="cash"
+          notes={checkoutNotes}
+          setNotes={setCheckoutNotes}
+          exchangeRates={exchangeRates}
+          displayCurrency={paymentSale.currency_mode || 'COP'}
+          onComplete={handleCollectPayment}
+          saving={collectSaving}
+          isAdmin={false}
+          mode="collect"
+          allowCredit={false}
+          title={`Cobrar Venta — ${paymentSale.sale_number}`}
+          confirmLabel="Cobrar"
+        />
+      )}
+
+      {/* ── Payment modal (abonos for credit/mixed) ───────────────────────── */}
       <Modal
-        open={!!paymentSale}
+        open={!!paymentSale && paymentSale.sale_type !== 'pos_pending'}
         onClose={() => !paymentMutation.isPending && setPaymentSale(null)}
         title={`Registrar Abono — ${paymentSale?.sale_number || ''}`}
         size="md"

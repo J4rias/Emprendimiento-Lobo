@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { usePOS, CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, getSavedRate, saveRate, COP_TOLERANCE } from '../hooks/usePOS';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { usePOS, CURRENCIES, PAYMENT_METHODS, COP_TOLERANCE, saveRate } from '../hooks/usePOS';
+import { useCheckoutPayments } from '../hooks/useCheckoutPayments';
+import { getCustomerDisplayName } from '../utils/paymentUtils';
+import type { PaymentLine, ExchangeRate, Customer } from '../utils/paymentUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { saleService } from '../services/api/saleService';
-import { bankService } from '../services/api/bankService';
 import { printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
@@ -16,7 +18,7 @@ import {
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
-const PAYMENT_ICONS = { cash: Money, card: CreditCard, transfer: DeviceMobile, usdt: Hash };
+const PAYMENT_ICONS: Record<string, React.ComponentType<any>> = { cash: Money, card: CreditCard, transfer: DeviceMobile, usdt: Hash };
 
 // ============= TABLET POS =============
 const POSPageTablet = () => {
@@ -129,10 +131,11 @@ const POSPageTablet = () => {
                 <div className="grid grid-cols-3 gap-3">
                   {pos.products
                     .filter(product => {
-                      if (pos.displayCurrency !== 'USD' || pos.isAdmin) return true;
+                      if (pos.isAdmin) return true;
+                      const priceField = pos.displayCurrency === 'USD' ? 'package_price_usd' : 'package_price_cop';
                       return (product.presentations || []).some(p => {
                         const detail = pos.priceListDetails[`${product.id}-${p.id}`];
-                        return detail && parseFloat(detail.package_price_usd) > 0;
+                        return detail && parseFloat(detail[priceField]) > 0;
                       });
                     })
                     .map((product) => (
@@ -331,9 +334,6 @@ const POSPageTablet = () => {
         saving={pos.saving}
         exchangeRates={pos.exchangeRates}
         displayCurrency={pos.displayCurrency}
-        toDisplay={pos.toDisplay}
-        displaySymbol={pos.displaySymbol}
-        fmt={pos.fmt}
         isAdmin={pos.isAdmin}
       />}
 
@@ -616,131 +616,50 @@ function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onTog
   );
 }
 
+interface TabletCheckoutModalProps {
+  show: boolean;
+  onClose: () => void;
+  customer: any;
+  onCustomerSelect: (c: any) => void;
+  saleType: string;
+  paymentLines: PaymentLine[];
+  setPaymentLines: (lines: PaymentLine[]) => void;
+  notes: string;
+  setNotes: (v: string) => void;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  totalCOP: number;
+  copPerUSD: number;
+  onComplete: () => void;
+  saving: boolean;
+  exchangeRates: ExchangeRate[];
+  displayCurrency: string;
+  isAdmin: boolean;
+}
+
 function TabletCheckoutModal({
   show, onClose, customer, onCustomerSelect, saleType, paymentLines, setPaymentLines,
   notes, setNotes,
   subtotal, discount, tax, total, totalCOP, copPerUSD,
   onComplete, saving,
-  exchangeRates, displayCurrency, toDisplay, displaySymbol, fmt, isAdmin,
-}) {
-  const getCOPRate = (code) => {
-    if (displayCurrency === 'USD' && code === 'USD') return copPerUSD;
-    if (code === displayCurrency) return code === 'COP' ? 1 : (getSavedRate(code, displayCurrency) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1);
-    return getSavedRate(code, displayCurrency) || calculateEffectiveRate(code, 'COP', exchangeRates) || 1;
-  };
-
-  const isUSD = displayCurrency === 'USD';
-  const sSym = isUSD ? '$' : 'COP$';
-  const fmtTotal = (usdVal) => isUSD ? usdVal.toFixed(2) : Math.ceil(usdVal * copPerUSD).toLocaleString('es-VE');
-  const fmtCOP = (copVal) => isUSD ? (copVal / copPerUSD).toFixed(2) : Math.ceil(copVal).toLocaleString('es-VE');
-
-  const [newPayCurrency, setNewPayCurrency] = useState(isUSD ? 'USD' : 'COP');
-  const [newPayMethod, setNewPayMethod] = useState('cash');
-  const [newPayAmount, setNewPayAmount] = useState('');
-  const [newPayRate, setNewPayRate] = useState(() => getCOPRate(isUSD ? 'USD' : 'COP'));
-  const [newPayBank, setNewPayBank] = useState('');
-  const [changeRate, setChangeRate] = useState(() => getSavedRate('changeRate', 'COP') || Math.round(copPerUSD));
-  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
-  const [banks, setBanks] = useState([]);
-
-  useEffect(() => {
-    bankService.getAll().then(res => setBanks(Array.isArray(res) ? res : res?.data || [])).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const def = isUSD ? 'USD' : 'COP';
-    setNewPayCurrency(def);
-    setNewPayMethod('cash');
-    setNewPayAmount('');
-    setNewPayRate(getCOPRate(def));
-    setNewPayBank('');
-  }, [displayCurrency]);
+  exchangeRates, displayCurrency, isAdmin,
+}: TabletCheckoutModalProps) {
+  const {
+    isUSD, sSym, fmtTotal, fmtCOP, fmtLine,
+    newPayCurrency, newPayMethod, newPayAmount, newPayRate, newPayBank,
+    changeRate, showCustomerSearch, banks,
+    setNewPayAmount, setNewPayRate, setNewPayBank, setChangeRate, setShowCustomerSearch,
+    handleCurrencyChange, handleMethodChange, addPaymentLine,
+    cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP,
+    availableMethods, hasCreditLine, filteredBanks, effectiveCurrency,
+  } = useCheckoutPayments({
+    paymentLines, setPaymentLines,
+    totalCOP, copPerUSD, displayCurrency, exchangeRates,
+  });
 
   if (!show) return null;
-
-  const getCustomerDisplayName = (c) => {
-    if (!c) return null;
-    if (c.type === 'natural') return `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Sin nombre';
-    return c.businessName || c.tradeName || 'Sin nombre';
-  };
-
-  const hasCreditLine = paymentLines.some(l => l.method === 'credit');
-  const effectiveCurrency = newPayCurrency;
-
-  const handleCurrencyChange = (code) => {
-    setNewPayCurrency(code);
-    if (isUSD && code !== 'USD') {
-      setNewPayRate(getSavedRate(code, 'USD') || calculateEffectiveRate('USD', code, exchangeRates) || 1);
-    } else {
-      setNewPayRate(getCOPRate(code));
-    }
-    const allowed = METHODS_BY_CURRENCY[code] || ['cash'];
-    if (!allowed.includes(newPayMethod)) setNewPayMethod(allowed[0]);
-  };
-
-  const handleMethodChange = (method) => {
-    setNewPayMethod(method);
-    setNewPayBank('');
-    if (method === 'usdt') {
-      setNewPayRate(getSavedRate('usdt', 'COP') || copPerUSD);
-    } else if (newPayMethod === 'usdt' && method !== 'usdt') {
-      handleCurrencyChange(newPayCurrency);
-    }
-  };
-
-  // Banks filtered by the selected currency
-  const filteredBanks = banks.filter(b => b.currency === effectiveCurrency);
-
-  const addPaymentLine = () => {
-    const amount = parseFloat(newPayAmount);
-    if (!amount || amount <= 0) { toast.error('Ingresa un monto válido'); return; }
-    let copRate;
-    const isUSDT = newPayMethod === 'usdt';
-    if (isUSDT) {
-      // USDT: rate input is always COP/USDT, amount is in USDT (≈USD)
-      copRate = parseFloat(newPayRate) || copPerUSD;
-      saveRate('usdt', copRate, 'COP');
-    } else if (isUSD && effectiveCurrency === 'USD') {
-      copRate = copPerUSD;
-    } else if (isUSD && effectiveCurrency !== 'USD') {
-      copRate = copPerUSD / (parseFloat(newPayRate) || 1);
-      saveRate(effectiveCurrency, parseFloat(newPayRate), 'USD');
-    } else if (effectiveCurrency === 'COP') {
-      copRate = 1;
-    } else {
-      copRate = parseFloat(newPayRate) || 1;
-      if (effectiveCurrency !== displayCurrency) saveRate(effectiveCurrency, copRate, 'COP');
-    }
-    const backendCurrency = isUSDT ? 'USD' : effectiveCurrency;
-    const displayRate = (isUSD && effectiveCurrency !== 'USD') ? (parseFloat(newPayRate) || 1) : null;
-    const existingIdx = (displayRate || isUSDT)
-      ? -1
-      : paymentLines.findIndex(l => l.currency === backendCurrency && l.method === newPayMethod);
-    const bankId = (newPayMethod === 'transfer' && newPayBank) ? parseInt(newPayBank) : undefined;
-    if (existingIdx >= 0) {
-      const updated = [...paymentLines];
-      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
-      setPaymentLines(updated);
-    } else {
-      setPaymentLines([...paymentLines, { currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }), ...(bankId && { bank_id: bankId }) }]);
-    }
-    setNewPayAmount('');
-  };
-
-  const cashLines = paymentLines.filter(l => l.method !== 'credit');
-  const creditCOP = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
-  const paidCOP = cashLines.reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
-  const effectiveTotalCOP = totalCOP - creditCOP;
-  const rawChangeCOP = paidCOP - effectiveTotalCOP;
-  const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : rawChangeCOP;
-
-  const availableMethods = PAYMENT_METHODS.filter(m => (METHODS_BY_CURRENCY[effectiveCurrency] || ['cash']).includes(m.id));
-
-  const fmtLine = (amount, currency) => {
-    const n = parseFloat(amount) || 0;
-    if (currency === 'COP') return Math.ceil(n).toLocaleString('es-VE');
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   const saleTypeLabel = saleType === 'mixed' ? 'Mixta' : saleType === 'credit' ? 'Crédito' : 'Contado';
 
@@ -808,7 +727,7 @@ function TabletCheckoutModal({
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-2">Notas (opcional)</label>
             <Textarea
-              value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+              value={notes} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)} rows={2}
               placeholder="Observaciones..."
             />
           </div>
@@ -840,7 +759,7 @@ function TabletCheckoutModal({
                               ? `${Math.ceil(line.cop_rate).toLocaleString('es-VE')} COP/USDT`
                               : line.display_rate
                               ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString('es-VE') : line.display_rate.toFixed(2)} ${line.currency}/USD`
-                              : `${parseFloat(line.cop_rate).toFixed(2)} COP/${line.currency}`}
+                              : `${parseFloat(String(line.cop_rate)).toFixed(2)} COP/${line.currency}`}
                           </span>
                         )}
                       </div>
@@ -865,7 +784,7 @@ function TabletCheckoutModal({
                 {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
                   <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                     <option value="">Banco</option>
-                    {filteredBanks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {filteredBanks.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                   </select>
                 )}
                 {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
@@ -886,17 +805,17 @@ function TabletCheckoutModal({
               {(() => {
                 const remainingCOP = effectiveTotalCOP - paidCOP;
                 if (remainingCOP <= COP_TOLERANCE) return null;
-                let remainingInCurrency, formatted;
+                let remainingInCurrency: number;
                 if (isUSD && effectiveCurrency === 'USD') {
                   remainingInCurrency = remainingCOP / copPerUSD;
                 } else if (isUSD && effectiveCurrency !== 'USD') {
-                  const customRate = parseFloat(newPayRate) || 1;
+                  const customRate = parseFloat(String(newPayRate)) || 1;
                   remainingInCurrency = (remainingCOP / copPerUSD) * customRate;
                 } else {
-                  const copRate = parseFloat(newPayRate) || 1;
+                  const copRate = parseFloat(String(newPayRate)) || 1;
                   remainingInCurrency = remainingCOP / copRate;
                 }
-                formatted = effectiveCurrency === 'USD'
+                const formatted = effectiveCurrency === 'USD'
                   ? remainingInCurrency.toFixed(2)
                   : Math.ceil(remainingInCurrency).toLocaleString('es-VE');
                 return (
@@ -925,7 +844,7 @@ function TabletCheckoutModal({
                     <button
                       onClick={() => {
                         if (!customer) { toast.error('Selecciona un cliente para crédito'); return; }
-                        const creditLine = isUSD
+                        const creditLine: PaymentLine = isUSD
                           ? { currency: 'USD', method: 'credit', amount: parseFloat((remainingForCredit / copPerUSD).toFixed(2)), cop_rate: copPerUSD }
                           : { currency: 'COP', method: 'credit', amount: Math.round(remainingForCredit), cop_rate: 1 };
                         setPaymentLines([...paymentLines, creditLine]);
@@ -998,7 +917,7 @@ function TabletCheckoutModal({
     <CustomerSearch
       isOpen={showCustomerSearch}
       onClose={() => setShowCustomerSearch(false)}
-      onSelect={(c) => {
+      onSelect={(c: any) => {
         onCustomerSelect(c);
         setShowCustomerSearch(false);
       }}
@@ -1010,7 +929,7 @@ function TabletCheckoutModal({
   );
 }
 
-function TabletSaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }) {
+function TabletSaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }: any) {
   if (!show || !sale) return null;
 
   const isSentToCashier = sale.sentToCashier;
@@ -1067,12 +986,12 @@ function TabletSaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, 
   );
 }
 
-function TabletCreditPinModal({ onClose, onValidated }) {
+function TabletCreditPinModal({ onClose, onValidated }: { onClose: () => void; onValidated: (adminId: number) => void }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [shaking, setShaking] = useState(false);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
     if (pin.length < 4) return;
@@ -1081,7 +1000,7 @@ function TabletCreditPinModal({ onClose, onValidated }) {
     try {
       const res = await saleService.validateCreditPin(pin);
       onValidated(res.admin_id);
-    } catch (err) {
+    } catch (err: any) {
       const msg = err.response?.data?.message || 'Error al validar PIN';
       setError(msg);
       setShaking(true);

@@ -12,6 +12,8 @@ import { posReservationService } from '../services/api/posReservationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { toast } from 'sonner';
+import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
+import type { PaymentLine } from '../utils/paymentUtils';
 
 // ============= CONSTANTS =============
 export const CURRENCIES = [
@@ -37,17 +39,17 @@ export const METHODS_BY_CURRENCY = {
 export const COP_TOLERANCE = 40;
 
 const POS_RATES_PREFIX = 'pos_custom_rates_';
-export const getSavedRate = (currency, mode = 'COP') => {
+export const getSavedRate = (currency: string, mode = 'COP'): number | null => {
   try {
-    return JSON.parse(localStorage.getItem(POS_RATES_PREFIX + mode))?.[currency]
-      || JSON.parse(localStorage.getItem('pos_custom_rates'))?.[currency]
+    return JSON.parse(localStorage.getItem(POS_RATES_PREFIX + mode) || 'null')?.[currency]
+      || JSON.parse(localStorage.getItem('pos_custom_rates') || 'null')?.[currency]
       || null;
   } catch { return null; }
 };
-export const saveRate = (currency, rate, mode = 'COP') => {
+export const saveRate = (currency: string, rate: number, mode = 'COP') => {
   try {
     const key = POS_RATES_PREFIX + mode;
-    const saved = JSON.parse(localStorage.getItem(key)) || {};
+    const saved = JSON.parse(localStorage.getItem(key) || '{}');
     saved[currency] = rate;
     localStorage.setItem(key, JSON.stringify(saved));
   } catch { /* ignore */ }
@@ -80,19 +82,19 @@ export function usePOS() {
   const customer = activeTab?.customer || null;
 
   // ============= LOCAL STATE =============
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [productPage, setProductPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [priceLists, setPriceLists] = useState([]);
-  const [selectedPriceList, setSelectedPriceList] = useState(null);
+  const [priceLists, setPriceLists] = useState<any[]>([]);
+  const [selectedPriceList, setSelectedPriceList] = useState<number | null>(null);
   const [selectedPriceListCurrency, setSelectedPriceListCurrency] = useState('USD');
-  const [priceListDetails, setPriceListDetails] = useState({});
-  const [exchangeRates, setExchangeRates] = useState([]);
+  const [priceListDetails, setPriceListDetails] = useState<Record<string, any>>({});
+  const [exchangeRates, setExchangeRates] = useState<any[]>([]);
   const [displayCurrency, _setDisplayCurrency] = useState(() => localStorage.getItem('pos_display_currency') || 'COP');
-  const setDisplayCurrency = useCallback((c) => { localStorage.setItem('pos_display_currency', c); _setDisplayCurrency(c); }, []);
+  const setDisplayCurrency = useCallback((c: string) => { localStorage.setItem('pos_display_currency', c); _setDisplayCurrency(c); }, []);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   // ============= MODAL STATES =============
@@ -104,13 +106,13 @@ export function usePOS() {
   const [showCreditPinModal, setShowCreditPinModal] = useState(false);
 
   const isAdmin = hasPermission('settings.manage');
-  const [conflictData, setConflictData] = useState(null);
+  const [conflictData, setConflictData] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
   // ============= CHECKOUT STATE =============
-  const [paymentLines, setPaymentLines] = useState([]);
+  const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([]);
   const [notes, setNotes] = useState('');
-  const [saleResult, setSaleResult] = useState(null);
+  const [saleResult, setSaleResult] = useState<any>(null);
 
   // Derive saleType from payment lines
   const hasCreditLine = paymentLines.some(l => l.method === 'credit');
@@ -121,13 +123,13 @@ export function usePOS() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // ============= REFS =============
-  const searchInputRef = useRef();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // ============= CURRENCY HELPERS =============
   const displaySymbol = CURRENCIES.find((c) => c.code === displayCurrency)?.symbol || '$';
 
   const toDisplay = useCallback(
-    (amountUSD) => {
+    (amountUSD: number | string) => {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
       return parseFloat(amountUSD || 0) * (rate || 1);
     },
@@ -135,7 +137,7 @@ export function usePOS() {
   );
 
   const fromDisplay = useCallback(
-    (amountDisplay) => {
+    (amountDisplay: number | string) => {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
       return parseFloat(amountDisplay || 0) / (rate || 1);
     },
@@ -143,7 +145,7 @@ export function usePOS() {
   );
 
   const fmt = useCallback(
-    (amount) => {
+    (amount: number | string) => {
       const n = parseFloat(amount) || 0;
       if (displayCurrency === 'COP') {
         return Math.round(n).toLocaleString('es-CO');
@@ -189,7 +191,7 @@ export function usePOS() {
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
       if (e.key === 'F8') {
         e.preventDefault();
@@ -291,7 +293,7 @@ export function usePOS() {
     }
   };
 
-  const selectPriceList = async (listId) => {
+  const selectPriceList = async (listId: number | null) => {
     if (!listId) {
       setSelectedPriceList(null);
       setPriceListDetails({});
@@ -316,13 +318,13 @@ export function usePOS() {
   };
 
   // ============= PRICE HELPERS =============
-  const getProductStock = useCallback((product) => {
+  const getProductStock = useCallback((product: any) => {
     if (!product.inventories) return 0;
     return product.inventories.reduce((sum, inv) => sum + parseFloat(inv.quantity || 0), 0);
   }, []);
 
   const getPrice = useCallback(
-    (product, presentation) => {
+    (product: any, presentation: any) => {
       if (!presentation) return { pkgPrice: 0, unitPrice: 0 };
 
       const key = `${product.id}-${presentation.id}`;
@@ -370,7 +372,7 @@ export function usePOS() {
   );
 
   const getEffectivePriceUSD = useCallback(
-    (presentation, priceListItem) => {
+    (presentation: any, priceListItem: any) => {
       // Modo USD directo: usar package_price_usd sin conversión
       if (displayCurrency === 'USD' && priceListItem) {
         return parseFloat(priceListItem.package_price_usd) || 0;
@@ -430,7 +432,7 @@ export function usePOS() {
   }, [displayCurrency]);  
 
   // ============= STOCK HELPERS =============
-  const getProductStockDetails = useCallback((product, presentation) => {
+  const getProductStockDetails = useCallback((product: any, presentation: any) => {
     const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity || 0), 0);
     const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
     return {
@@ -442,7 +444,7 @@ export function usePOS() {
   }, []);
 
   // ============= CART HANDLERS =============
-  const handleAddProduct = async (product, presentation, qty = 1, forceSellByUnit = null) => {
+  const handleAddProduct = async (product: any, presentation: any, qty = 1, forceSellByUnit: boolean | null = null) => {
     if (!presentation) { toast.error('Selecciona una presentación'); return; }
     if (!activeTabId) { toast.error('Abre una pestaña de venta primero'); return; }
 
@@ -500,7 +502,7 @@ export function usePOS() {
         frozen_price: priceInfo.frozen_price || null,
         frozen_currency: priceInfo.frozen_currency || null,
       });
-    } catch (err) {
+    } catch (err: any) {
       if (err.response?.status === 409) {
         setConflictData({
           productName: product.name,
@@ -515,7 +517,7 @@ export function usePOS() {
     }
   };
 
-  const handleRemoveItem = async (productId, presentationId, sellByUnit) => {
+  const handleRemoveItem = async (productId: number, presentationId: number, sellByUnit: boolean) => {
     const item = cart.find((i) =>
       i.product_id === productId &&
       i.presentation_id === presentationId &&
@@ -548,7 +550,7 @@ export function usePOS() {
           units_to_release: unitsToRelease,
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       if (err.response?.status !== 404) {
         console.error('Error removing item:', err);
         toast.error('Error al remover producto');
@@ -558,7 +560,7 @@ export function usePOS() {
     removeFromCart(activeTabId, productId, presentationId, sellByUnit);
   };
 
-  const handleQuantityChange = async (productId, presentationId, sellByUnit, newQty) => {
+  const handleQuantityChange = async (productId: number, presentationId: number, sellByUnit: boolean, newQty: number) => {
     if (newQty < 1) return;
 
     const item = cart.find((i) =>
@@ -587,7 +589,7 @@ export function usePOS() {
         units_requested: totalUnitsRequested,
       });
       updateQuantity(activeTabId, productId, presentationId, sellByUnit, newQty);
-    } catch (err) {
+    } catch (err: any) {
       if (err.response?.status === 409) {
         setConflictData({
           productName: item.product_name,
@@ -602,7 +604,7 @@ export function usePOS() {
     }
   };
 
-  const handleToggleSellMode = async (productId, presentationId, currentSellByUnit) => {
+  const handleToggleSellMode = async (productId: number, presentationId: number, currentSellByUnit: boolean) => {
     const item = cart.find(i =>
       i.product_id === productId &&
       i.presentation_id === presentationId &&
@@ -619,7 +621,7 @@ export function usePOS() {
     toggleSellMode(activeTabId, productId, presentationId, currentSellByUnit);
   };
 
-  const handlePriceChange = (productId, presentationId, sellByUnit, newPriceDisplay) => {
+  const handlePriceChange = (productId: number, presentationId: number, sellByUnit: boolean, newPriceDisplay: number | string) => {
     const rawVal = parseFloat(newPriceDisplay) || 0;
 
     const item = cart.find(i =>
@@ -642,11 +644,11 @@ export function usePOS() {
     }
   };
 
-  const handleDiscountChange = (productId, presentationId, sellByUnit, val) => {
+  const handleDiscountChange = (productId: number, presentationId: number, sellByUnit: boolean, val: number) => {
     updateCartItemDiscount(activeTabId, productId, presentationId, sellByUnit, val);
   };
 
-  const handleSetCustomer = (c) => {
+  const handleSetCustomer = (c: any) => {
     setTabCustomer(activeTabId, c);
     if (c && c.discountPercentage > 0) {
       applyDiscountToAll(activeTabId, c.discountPercentage);
@@ -659,7 +661,7 @@ export function usePOS() {
   };
 
   // ============= SURCHARGE & EFFECTIVE PRICE =============
-  const applyUnitSurcharge = useCallback((usdUnitPrice, item) => {
+  const applyUnitSurcharge = useCallback((usdUnitPrice: number, item: any) => {
     if (!item.sellByUnit || item.quantity >= (item.units_per_package || 1) / 2) return usdUnitPrice;
     const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
     if (!copRate || copRate <= 0) return usdUnitPrice * 1.07;
@@ -667,7 +669,7 @@ export function usePOS() {
     return copRounded / copRate;
   }, [exchangeRates]);
 
-  const getEffectiveUSDPrice = useCallback((item) => {
+  const getEffectiveUSDPrice = useCallback((item: any) => {
     if (item.is_frozen && item.frozen_price) {
       const rate = calculateEffectiveRate(item.frozen_currency || 'USD', 'USD', exchangeRates);
       const baseFrozen = item.sellByUnit
@@ -707,79 +709,14 @@ export function usePOS() {
   const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
   const totalCOP = total * copPerUSD;
 
-  const convertPaymentLinesToBackend = useCallback((lines) => {
-    const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-    return lines.map(line => {
-      const base = { currency: line.currency, method: line.method, amount: line.amount, ...(line.bank_id && { bank_id: line.bank_id }) };
-      if (line.currency === 'USD') {
-        const usdRate = copPerUSD / (parseFloat(line.cop_rate) || copPerUSD);
-        return { ...base, exchange_rate: usdRate };
-      }
-      if (line.currency === 'VES') {
-        // VES se envía como VES con monto original; exchange_rate = copPerUSD / cop_rate
-        const vesRate = copPerUSD / (parseFloat(line.cop_rate) || 1);
-        return { ...base, exchange_rate: vesRate };
-      }
-      // COP: monto tal cual con tasa del sistema
-      return { ...base, exchange_rate: copPerUSD };
-    });
-  }, [exchangeRates]);
-
   // ============= CHECKOUT =============
-  const performSale = async (authorizedBy) => {
+  const performSale = async (authorizedBy: number | null) => {
     setSaving(true);
     try {
-      // Calculate change BEFORE sending to backend so we store net amounts
-      const paidCOP = paymentLines
-        .filter(l => l.method !== 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
-      const creditCOP = paymentLines
-        .filter(l => l.method === 'credit')
-        .reduce((s, l) => s + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
-      const rawChangeCOP = saleType === 'cash' ? paidCOP - (totalCOP - creditCOP) : 0;
-      const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : Math.max(0, rawChangeCOP);
-      const changeAmount = (changeCOP / copPerUSD).toFixed(2);
-
-      // Subtract change from payment lines
-      let adjustedLines = paymentLines;
-      if (changeCOP > 0) {
-        adjustedLines = [...paymentLines];
-        let remainingChange = changeCOP;
-
-        // 1. Deduct from COP cash lines first (change given in COP)
-        for (let i = adjustedLines.length - 1; i >= 0 && remainingChange > COP_TOLERANCE; i--) {
-          const line = adjustedLines[i];
-          if (line.method !== 'credit' && line.currency === 'COP') {
-            const deductible = Math.min(remainingChange, line.amount);
-            adjustedLines[i] = { ...line, amount: line.amount - deductible };
-            remainingChange -= deductible;
-          }
-        }
-
-        // 2. In USD mode with no COP to absorb, deduct from USD lines (change given in USD)
-        if (remainingChange > COP_TOLERANCE && displayCurrency === 'USD') {
-          let remainingUSD = remainingChange / copPerUSD;
-          for (let i = adjustedLines.length - 1; i >= 0 && remainingUSD > 0.005; i--) {
-            const line = adjustedLines[i];
-            if (line.method !== 'credit' && line.currency === 'USD') {
-              const deductible = Math.min(remainingUSD, line.amount);
-              adjustedLines[i] = { ...line, amount: parseFloat((line.amount - deductible).toFixed(2)) };
-              remainingUSD -= deductible;
-            }
-          }
-          remainingChange = remainingUSD * copPerUSD;
-        }
-
-        // 3. Fallback: negative COP line (COP change given from register for foreign overpayment)
-        if (remainingChange > COP_TOLERANCE) {
-          adjustedLines.push({
-            currency: 'COP',
-            method: 'cash',
-            amount: -Math.round(remainingChange),
-            cop_rate: 1,
-          });
-        }
-      }
+      // Adjust payment lines for change (vuelto) using shared utility
+      const { adjustedLines, changeAmount } = saleType === 'cash'
+        ? adjustPaymentLinesForChange(paymentLines, totalCOP, copPerUSD, displayCurrency, COP_TOLERANCE)
+        : { adjustedLines: paymentLines, changeCOP: 0, changeAmount: '0.00' };
 
       const result = await saleService.createSale({
         customer_id: customer?.id || null,
@@ -789,7 +726,7 @@ export function usePOS() {
         session_id: sessionId,
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
-        payment_lines: convertPaymentLinesToBackend(adjustedLines),
+        payment_lines: convertPaymentLinesToBackend(adjustedLines, exchangeRates),
         authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
         items: cart.map((item) => ({
           product_id: item.product_id,
@@ -815,7 +752,7 @@ export function usePOS() {
 
       toast.dismiss();
       toast.success('¡Venta completada!');
-    } catch (err) {
+    } catch (err: any) {
       if (err.response?.status === 409) {
         toast.error(`Stock insuficiente: ${err.response.data.product_name}. Disponible: ${err.response.data.available}`);
       } else {
@@ -881,7 +818,7 @@ export function usePOS() {
     await performSale(isAdmin ? user.id : null);
   };
 
-  const handleCreditPinValidated = async (adminId) => {
+  const handleCreditPinValidated = async (adminId: number) => {
     setShowCreditPinModal(false);
     await performSale(adminId);
   };
@@ -924,7 +861,7 @@ export function usePOS() {
       setNotes('');
       toast.dismiss();
       toast.success('Venta enviada a caja');
-    } catch (err) {
+    } catch (err: any) {
       if (err.response?.status === 409) {
         toast.error(`Stock insuficiente: ${err.response.data.product_name}. Disponible: ${err.response.data.available}`);
       } else {
@@ -935,10 +872,10 @@ export function usePOS() {
     }
   };
 
-  const handleTabClose = async (tabId) => {
+  const handleTabClose = async (tabId: string) => {
     try {
       await posReservationService.releaseTab({ session_id: sessionId, tab_id: tabId });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error releasing tab reservations:', err);
     }
   };
