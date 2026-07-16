@@ -308,7 +308,7 @@ export async function createSale(
       throw new ServiceError(400, `Pago insuficiente. Total: $${total.toFixed(2)}, Pagado: $${paid_amount.toFixed(2)}`);
     }
 
-    if (sale_type === 'credit') {
+    if (sale_type === 'credit' || sale_type === 'pos_pending') {
       credit_amount = total;
     }
 
@@ -584,9 +584,9 @@ export async function addPayment(
       throw new ServiceError(404, 'Venta no encontrada');
     }
 
-    if (!['credit', 'mixed'].includes(sale.sale_type)) {
+    if (!['credit', 'mixed', 'pos_pending'].includes(sale.sale_type)) {
       await transaction.rollback();
-      throw new ServiceError(400, 'Solo se pueden agregar pagos a ventas a crédito o mixtas');
+      throw new ServiceError(400, 'Solo se pueden agregar pagos a ventas a crédito, mixtas o pendientes de cobro');
     }
 
     if (sale.status === 'cancelled') {
@@ -597,6 +597,14 @@ export async function addPayment(
     if (!payment_lines || payment_lines.length === 0) {
       await transaction.rollback();
       throw new ServiceError(400, 'No se enviaron líneas de pago');
+    }
+
+    // Validate all amounts are positive
+    for (const payLine of payment_lines) {
+      if ((parseFloat(payLine.amount) || 0) <= 0) {
+        await transaction.rollback();
+        throw new ServiceError(400, 'El monto de cada línea de pago debe ser positivo');
+      }
     }
 
     const totalNewlyPaidUSD = payment_lines.reduce((sum: number, payLine: any) => {
@@ -641,15 +649,20 @@ export async function addPayment(
     const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
     const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 
-    await sale.update({
+    const saleUpdateData: any = {
       paid_amount: newPaidAmount,
       credit_amount: newCreditAmount,
       status: newStatus,
       updated_by: userId
-    }, { transaction });
+    };
+    // pos_pending → cash when fully paid
+    if (sale.sale_type === 'pos_pending' && newStatus === 'completed') {
+      saleUpdateData.sale_type = 'cash';
+    }
+    await sale.update(saleUpdateData, { transaction });
 
-    // Update customer's credit_used and creditBalance in a single fetch
-    if (sale.customer_id) {
+    // Update customer's credit_used and creditBalance (skip for pos_pending — no credit involved)
+    if (sale.customer_id && sale.sale_type !== 'pos_pending') {
       const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
       if (customer) {
         const updates: any = {

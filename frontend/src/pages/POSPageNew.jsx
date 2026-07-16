@@ -6,11 +6,11 @@ import { bankService } from '../services/api/bankService';
 import POSTabs from '../components/pos/POSTabs';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
-import { Modal, Button, Textarea } from '../components/ui';
+import { Modal, Button, Textarea, ConfirmDialog } from '../components/ui';
 import {
   Plus, MagnifyingGlass, X, WarningCircle, CheckCircle, User,
   Package, Lock, Money, CreditCard, DeviceMobile,
-  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch
+  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
@@ -20,6 +20,7 @@ const PAYMENT_ICONS = { cash: Money, card: CreditCard, transfer: DeviceMobile, u
 // ============= MAIN COMPONENT =============
 const POSPage = () => {
   const pos = usePOS();
+  const [showSendToCashier, setShowSendToCashier] = useState(false);
 
   if (!pos.hasPermission('sales.create')) {
     return (
@@ -69,7 +70,7 @@ const POSPage = () => {
             {/* Shortcuts hint */}
             <div className="hidden lg:flex items-center gap-1.5 text-xs text-gray-400">
               <kbd className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 text-[10px]">F2</kbd><span>Buscar</span>
-              <kbd className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 text-[10px] ml-2">F8</kbd><span>Cobrar</span>
+              <kbd className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 text-[10px] ml-2">F8</kbd><span>{pos.canCollectPayment ? 'Cobrar' : 'Enviar a Caja'}</span>
             </div>
           </div>
         </div>
@@ -287,20 +288,31 @@ const POSPage = () => {
                 </div>
               )}
 
-              <button
-                onClick={() => pos.setShowCheckoutModal(true)}
-                className="w-full mt-2 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-5 h-5" />
-                Cobrar (F8)
-              </button>
+              {pos.canCollectPayment ? (
+                <button
+                  onClick={() => pos.setShowCheckoutModal(true)}
+                  className="w-full mt-2 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Cobrar (F8)
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowSendToCashier(true)}
+                  disabled={pos.cart.length === 0 || pos.saving}
+                  className="w-full mt-2 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                  Enviar a Caja (F8)
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* MODALS */}
-      <CheckoutModal
+      {pos.canCollectPayment && <CheckoutModal
         show={pos.showCheckoutModal}
         onClose={() => pos.setShowCheckoutModal(false)}
         customer={pos.customer}
@@ -324,6 +336,20 @@ const POSPage = () => {
         displaySymbol={pos.displaySymbol}
         fmt={pos.fmt}
         isAdmin={pos.isAdmin}
+      />}
+
+      <ConfirmDialog
+        open={showSendToCashier}
+        onClose={() => setShowSendToCashier(false)}
+        onConfirm={async () => {
+          setShowSendToCashier(false);
+          await pos.sendToCashier();
+        }}
+        loading={pos.saving}
+        variant="info"
+        title="¿Enviar venta a caja?"
+        description="Los artículos quedarán reservados. El cajero realizará el cobro e imprimirá el ticket."
+        confirmLabel="Enviar a Caja"
       />
 
       <StockConflictAlert
@@ -963,24 +989,30 @@ function CheckoutModal({
 function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }) {
   if (!show || !sale) return null;
 
+  const isSentToCashier = sale.sentToCashier;
+
   return (
-    <Modal open={show} onClose={onClose} title="Venta Completada">
+    <Modal open={show} onClose={onClose} title={isSentToCashier ? 'Enviado a Caja' : 'Venta Completada'}>
       <div className="space-y-4">
         <div className="flex items-center justify-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isSentToCashier ? 'bg-blue-100' : 'bg-green-100'}`}>
+            {isSentToCashier
+              ? <ArrowRight className="w-8 h-8 text-blue-600" />
+              : <CheckCircle className="w-8 h-8 text-green-600" />}
           </div>
         </div>
         <div className="text-center">
           <p className="text-lg font-bold text-gray-800">{sale.sale_number}</p>
-          <p className="text-sm text-gray-500">Venta registrada exitosamente</p>
+          <p className="text-sm text-gray-500">
+            {isSentToCashier ? 'Venta enviada a caja — pendiente de cobro' : 'Venta registrada exitosamente'}
+          </p>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Total:</span>
             <span className="font-bold">{displaySymbol} {fmt(toDisplay(parseFloat(sale.total || 0)))}</span>
           </div>
-          {sale.changeAmount && parseFloat(sale.changeAmount) > 0 && (
+          {!isSentToCashier && sale.changeAmount && parseFloat(sale.changeAmount) > 0 && (
             <div className="flex justify-between text-green-700">
               <span>Cambio:</span>
               <span className="font-bold">{displaySymbol} {fmt(toDisplay(parseFloat(sale.changeAmount)))}</span>
@@ -988,10 +1020,12 @@ function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, o
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={onPrint}>
-            <Printer className="w-4 h-4" />
-            Imprimir
-          </Button>
+          {!isSentToCashier && (
+            <Button variant="secondary" className="flex-1" onClick={onPrint}>
+              <Printer className="w-4 h-4" />
+              Imprimir
+            </Button>
+          )}
           <Button className="flex-1" onClick={onClose}>Nueva Venta</Button>
         </div>
       </div>

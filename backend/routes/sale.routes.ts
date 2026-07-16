@@ -79,7 +79,7 @@ router.post('/:id/cancel',
 
 router.post('/:id/payments',
   auth,
-  authorize('sales.create'),
+  authorize('sales.collect'),
   validateZod(AddPaymentSchema),
   saleController.addPayment
 );

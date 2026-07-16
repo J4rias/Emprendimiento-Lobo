@@ -5,7 +5,7 @@ import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
 import {
   Calendar, CurrencyDollar, TrendUp, ShoppingBag,
-  XCircle, Printer, DeviceMobile, CreditCard,
+  XCircle, Printer, DeviceMobile, CreditCard, FileCsv,
 } from '@phosphor-icons/react';
 import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';
@@ -13,6 +13,7 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { formatDate } from '../utils/formatUtils';
 import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
+import { downloadCSV } from '../utils/csvUtils';
 import { useCompany } from '../context/CompanyContext';
 import SaleReturnModal from '../components/sales/SaleReturnModal';
 import SaleViewSheet from '../components/sales/SaleViewSheet';
@@ -23,8 +24,8 @@ import {
 } from '../components/ui';
 
 // ── Status / type config ──────────────────────────────────────────────────────
-const SALE_TYPE_VARIANT = { cash: 'info',    credit: 'purple', mixed: 'warning' };
-const SALE_TYPE_LABEL   = { cash: 'Contado', credit: 'Crédito', mixed: 'Mixta'  };
+const SALE_TYPE_VARIANT = { cash: 'info',    credit: 'purple', mixed: 'warning', pos_pending: 'neutral' };
+const SALE_TYPE_LABEL   = { cash: 'Contado', credit: 'Crédito', mixed: 'Mixta',  pos_pending: 'Pendiente de Cobro' };
 
 const STATUS_VARIANT = {
   pending: 'warning', completed: 'success', cancelled: 'error', returned: 'neutral',
@@ -106,7 +107,17 @@ const SalesPage = () => {
     queryFn: () => saleService.getSalesStats({ status: statusFilter || undefined, sale_type: saleTypeFilter || undefined }),
     staleTime: 30_000,
   });
-  const stats = statsData?.stats || null;
+  const stats = statsData?.data || null;
+
+  // Pending POS sales count (for badge)
+  const { data: pendingPosCount = 0 } = useQuery({
+    queryKey: ['pending-pos-count'],
+    queryFn: async () => {
+      const res = await saleService.getSales({ sale_type: 'pos_pending', status: 'pending', limit: 1 });
+      return res?.pagination?.total || 0;
+    },
+    refetchInterval: 30_000,
+  });
 
   const { data: ratesData } = useQuery({
     queryKey: ['exchange-rates'],
@@ -208,6 +219,56 @@ const SalesPage = () => {
   const handleTypeChange   = (e) => { setSaleTypeFilter(e.target.value); setCurrentPage(1); };
   const handleClear = () => {
     setSearch(''); setStatusFilter(''); setSaleTypeFilter(''); setCurrentPage(1);
+  };
+
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const handleExportCSV = async () => {
+    setExportingCSV(true);
+    try {
+      const allSales = [];
+      let page = 1, hasMore = true;
+      const params = {
+        search: search || undefined,
+        status: statusFilter || undefined,
+        sale_type: saleTypeFilter || undefined,
+        sort_by: salesSortBy, sort_dir: salesSortDir,
+      };
+      while (hasMore) {
+        const res = await saleService.getSales({ ...params, page, limit: 200 });
+        allSales.push(...(res.data || []));
+        const pag = res.pagination || {};
+        hasMore = pag.page < pag.totalPages;
+        page++;
+      }
+      const getCustomerLabel = (c) => {
+        if (!c) return 'Cliente General';
+        if (c.type === 'juridical') return c.business_name || c.trade_name || '';
+        return `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente General';
+      };
+      downloadCSV(
+        `ventas_${new Date().toISOString().split('T')[0]}`,
+        ['Número', 'Fecha', 'Cliente', 'Tipo', 'Estado', 'Total USD', 'Tasa', 'Total COP'],
+        allSales.map(s => {
+          const t = parseFloat(s.total) || 0;
+          const r = parseFloat(s.exchange_rate) || 1;
+          return [
+            s.sale_number,
+            s.sale_date ? new Date(s.sale_date).toLocaleDateString('es-VE') : '',
+            getCustomerLabel(s.customer),
+            SALE_TYPE_LABEL[s.sale_type] || s.sale_type,
+            STATUS_LABEL[s.status] || s.status,
+            t.toFixed(2),
+            r,
+            Math.ceil(t * r),
+          ];
+        })
+      );
+      toast.success(`${allSales.length} ventas exportadas`);
+    } catch {
+      toast.error('Error al exportar ventas');
+    } finally {
+      setExportingCSV(false);
+    }
   };
 
   const handleViewDetail = async (saleId) => {
@@ -376,8 +437,8 @@ const SalesPage = () => {
       render: (_, row) => (
         <div className="flex items-center gap-1">
           <ViewAction onClick={() => handleViewDetail(row.id)} />
-          {(row.sale_type === 'credit' || row.sale_type === 'mixed') && row.status === 'pending' && (
-            <PaymentAction onClick={() => handleOpenPaymentModal(row)} title="Abonar Pago" />
+          {(row.sale_type === 'credit' || row.sale_type === 'mixed' || row.sale_type === 'pos_pending') && row.status === 'pending' && (
+            <PaymentAction onClick={() => handleOpenPaymentModal(row)} title={row.sale_type === 'pos_pending' ? 'Cobrar' : 'Abonar Pago'} />
           )}
           {row.status === 'completed' && (
             <ReturnAction onClick={() => handleOpenReturnModal(row.id)} />
@@ -394,9 +455,20 @@ const SalesPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Gestión de Ventas</h1>
-        <p className="text-gray-500 mt-1">Administra y consulta todas las ventas realizadas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Gestión de Ventas</h1>
+          <p className="text-gray-500 mt-1">Administra y consulta todas las ventas realizadas</p>
+        </div>
+        {pendingPosCount > 0 && (
+          <Button
+            variant="secondary"
+            onClick={() => { setSaleTypeFilter('pos_pending'); setStatusFilter('pending'); setCurrentPage(1); }}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            {pendingPosCount} pendiente{pendingPosCount !== 1 ? 's' : ''} de cobro
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -481,9 +553,15 @@ const SalesPage = () => {
               <option value="cash">Contado</option>
               <option value="credit">Crédito</option>
               <option value="mixed">Mixta</option>
+              <option value="pos_pending">Pendiente de Cobro</option>
             </Select>
           </div>
           <Button variant="secondary" onClick={handleClear}>Limpiar</Button>
+          {sales.length > 0 && (
+            <Button variant="secondary" size="icon" loading={exportingCSV} onClick={handleExportCSV} title="Exportar CSV">
+              <FileCsv className="w-4 h-4 text-emerald-600" />
+            </Button>
+          )}
         </div>
       </Card>
 

@@ -70,6 +70,7 @@ const CustomersPage = () => {
   const [statementCustomer, setStatementCustomer] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
+  const [formErrors, setFormErrors] = useState({});
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: custSortBy, sortDir: custSortDir, onSort: _custOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
@@ -183,6 +184,7 @@ const CustomersPage = () => {
     setShowModal(false);
     setEditingCustomer(null);
     setFormData(emptyForm());
+    setFormErrors({});
   };
 
   const handleChange = (e) => {
@@ -197,10 +199,30 @@ const CustomersPage = () => {
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.documentNumber?.trim()) errors.documentNumber = 'Requerido';
+    if (formData.type === 'natural') {
+      if (!formData.firstName?.trim()) errors.firstName = 'Requerido';
+      if (!formData.lastName?.trim()) errors.lastName = 'Requerido';
+    } else {
+      if (!formData.businessName?.trim()) errors.businessName = 'Requerido';
+    }
+    return errors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error('Completa los campos obligatorios');
+      return;
+    }
+    setFormErrors({});
     if (editingCustomer) {
       updateMutation.mutate({ id: editingCustomer.id, data: formData });
     } else {
@@ -389,19 +411,22 @@ const CustomersPage = () => {
                   onChange={handleChange}
                   required
                   placeholder={formData.documentType === 'J' ? 'Ej: 12345678-9' : 'Ej: 12345678'}
-                  className="flex-1 h-9 px-3 text-sm rounded-r-md border border-gray-300 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-primary-500 focus:ring-primary-200"
+                  className={`flex-1 h-9 px-3 text-sm rounded-r-md border bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0 ${formErrors.documentNumber ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-200' : 'border-gray-300 focus:border-primary-500 focus:ring-primary-200'}`}
                 />
               </div>
+              {formErrors.documentNumber && (
+                <p className="mt-1 text-xs text-red-600">{formErrors.documentNumber}</p>
+              )}
             </div>
 
             {formData.type === 'natural' ? (
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Nombre *" name="firstName" value={formData.firstName} onChange={handleChange} required placeholder="Ej: Juan" />
-                <Input label="Apellido *" name="lastName" value={formData.lastName} onChange={handleChange} required placeholder="Ej: Pérez" />
+                <Input label="Nombre *" name="firstName" value={formData.firstName} onChange={handleChange} required placeholder="Ej: Juan" error={formErrors.firstName} />
+                <Input label="Apellido *" name="lastName" value={formData.lastName} onChange={handleChange} required placeholder="Ej: Pérez" error={formErrors.lastName} />
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Razón Social *" name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="Ej: Mi Empresa C.A." />
+                <Input label="Razón Social *" name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="Ej: Mi Empresa C.A." error={formErrors.businessName} />
                 <Input label="Nombre Comercial" name="tradeName" value={formData.tradeName} onChange={handleChange} placeholder="Opcional" />
               </div>
             )}

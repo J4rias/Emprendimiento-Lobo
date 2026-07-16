@@ -612,7 +612,10 @@ export const approveCreditNote = async (req: Request, res: Response) => {
     }
 
     // Update customer credit balance if refund method is credit_balance
-    if (creditNote.refund_method === 'credit_balance' && creditNote.refund_amount > 0) {
+    // Only decrement credit_used for credit/mixed sales (pos_pending/cash never incremented it)
+    const saleSaleType = creditNote.sale?.sale_type;
+    if (creditNote.refund_method === 'credit_balance' && creditNote.refund_amount > 0
+        && (saleSaleType === 'credit' || saleSaleType === 'mixed')) {
       const customer = await Customer.findByPk(creditNote.customer_id, { transaction }) as any;
       if (customer) {
         // Add to customer's available credit

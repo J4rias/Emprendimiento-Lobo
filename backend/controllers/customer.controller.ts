@@ -4,6 +4,7 @@ import Customer from '../models/Customer';
 import PriceList from '../models/PriceList';
 import Sale from '../models/Sale';
 import SalePayment from '../models/SalePayment';
+import { normalizeCustomerKeys } from '../schemas/customer.schema';
 
 const { sequelize } = require('../config/database');
 const {
@@ -102,6 +103,7 @@ class CustomerController {
   // Create customer
   async createCustomer(req: Request, res: Response, next: NextFunction) {
     try {
+      req.body = normalizeCustomerKeys(req.body);
       const {
         type, document_type, document_number, business_name, trade_name, first_name, last_name,
         email, phone, mobile, address, city, state, country, postal_code,
@@ -144,7 +146,7 @@ class CustomerController {
   async updateCustomer(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const updateData = { ...req.body };
+      const updateData = { ...normalizeCustomerKeys(req.body) };
       delete updateData.code;
 
       const customer = await Customer.findOne({ where: { id } }) as any;

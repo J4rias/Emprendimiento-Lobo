@@ -86,10 +86,10 @@ const Sale = sequelize.define<Model<SaleAttributes, SaleCreationAttributes>>(
       comment: 'Fecha y hora de la venta'
     },
     sale_type: {
-      type: DataTypes.ENUM('cash', 'credit', 'mixed'),
+      type: DataTypes.ENUM('cash', 'credit', 'mixed', 'pos_pending'),
       allowNull: false,
       defaultValue: 'cash',
-      comment: 'Tipo de venta: contado, crédito o mixta'
+      comment: 'Tipo de venta: contado, crédito, mixta o pendiente de cobro (vendedor)'
     },
     payment_method: {
       type: DataTypes.ENUM('cash', 'card', 'transfer', 'mixed', 'usdt'),

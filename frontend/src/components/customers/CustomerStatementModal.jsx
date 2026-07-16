@@ -23,7 +23,7 @@ const SaleDetailExpanded = ({ transaction, currency }) => {
         const fetchDetail = async () => {
             try {
                 const data = await saleService.getSaleById(transaction.original_data.id);
-                setDetail(data.sale || data);
+                setDetail(data.data || data);
             } catch (e) {
                 console.error('Error fetching sale detail:', e);
             } finally {

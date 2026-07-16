@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const QuoteDetailSchema = z.object({
-  product_id: z.number().int().positive(),
-  product_presentation_id: z.number().int().positive(),
+  product_id: z.coerce.number().int().positive(),
+  product_presentation_id: z.coerce.number().int().positive(),
   description: z.string().nullable().optional(),
   quantity: z.coerce.number(),
   unit_price: z.coerce.number().min(0),
@@ -16,8 +16,8 @@ const QuoteDetailSchema = z.object({
 }).passthrough();
 
 export const CreateQuoteSchema = z.object({
-  customer_id: z.number().int().positive(),
-  price_list_id: z.number().int().positive().nullable().optional(),
+  customer_id: z.coerce.number().int().positive(),
+  price_list_id: z.coerce.number().int().positive().nullable().optional(),
   currency: z.string().optional(),
   details: z.array(QuoteDetailSchema),
   notes: z.string().nullable().optional(),
@@ -28,8 +28,8 @@ export const CreateQuoteSchema = z.object({
 }).passthrough();
 
 export const UpdateQuoteSchema = z.object({
-  customer_id: z.number().int().positive().optional(),
-  price_list_id: z.number().int().positive().nullable().optional(),
+  customer_id: z.coerce.number().int().positive().optional(),
+  price_list_id: z.coerce.number().int().positive().nullable().optional(),
   currency: z.string().optional(),
   details: z.array(QuoteDetailSchema).optional(),
   notes: z.string().nullable().optional(),

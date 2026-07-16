@@ -7,7 +7,7 @@ export const CreateUserSchema = z.object({
   first_name: z.string().min(1),
   last_name: z.string().min(1),
   phone: z.string().optional(),
-  role_id: z.number().int().positive(),
+  role_id: z.coerce.number().int().positive(),
   is_active: z.boolean().optional(),
 }).passthrough();
 
@@ -17,6 +17,6 @@ export const UpdateUserSchema = z.object({
   first_name: z.string().optional(),
   last_name: z.string().optional(),
   phone: z.string().optional(),
-  role_id: z.number().int().positive().optional(),
+  role_id: z.coerce.number().int().positive().optional(),
   is_active: z.boolean().optional(),
 }).passthrough();

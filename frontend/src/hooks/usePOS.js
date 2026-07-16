@@ -193,8 +193,9 @@ export function usePOS() {
       if (e.key === 'F2') { e.preventDefault(); searchInputRef.current?.focus(); }
       if (e.key === 'F8') {
         e.preventDefault();
-        if (cart.length > 0) setShowCheckoutModal(true);
-        else toast.error('Agrega productos antes de cobrar');
+        if (cart.length === 0) { toast.error('Agrega productos antes de continuar'); return; }
+        if (canCollectPayment) setShowCheckoutModal(true);
+        // Vendedor: F8 is handled by the page component (confirm dialog)
       }
       if (e.key === 'Escape') {
         setShowCheckoutModal(false);
@@ -885,6 +886,55 @@ export function usePOS() {
     await performSale(adminId);
   };
 
+  const canCollectPayment = hasPermission('sales.collect');
+
+  const sendToCashier = async () => {
+    if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
+    if (cart.length === 0) { toast.error('Agrega al menos un producto'); return; }
+
+    setSaving(true);
+    try {
+      const result = await saleService.createSale({
+        customer_id: customer?.id || null,
+        warehouse_id: 1,
+        sale_type: 'pos_pending',
+        currency_mode: displayCurrency === 'USD' ? 'USD' : 'COP',
+        session_id: sessionId,
+        tab_id: activeTabId,
+        exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
+        payment_lines: [],
+        items: cart.map((item) => ({
+          product_id: item.product_id,
+          presentation_id: item.presentation_id,
+          quantity: item.quantity,
+          is_unit: item.sellByUnit || false,
+          unit_price: getEffectiveUSDPrice(item),
+          discount_percent: item.discount_percent,
+          tax_percent: item.tax_percent,
+        })),
+        notes,
+      });
+
+      setSaleResult({ ...result.data, totals: { subtotal, discount, tax, total }, sentToCashier: true });
+      setShowResultModal(true);
+
+      closeTab(activeTabId);
+      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
+
+      setNotes('');
+      toast.dismiss();
+      toast.success('Venta enviada a caja');
+    } catch (err) {
+      if (err.response?.status === 409) {
+        toast.error(`Stock insuficiente: ${err.response.data.product_name}. Disponible: ${err.response.data.available}`);
+      } else {
+        toast.error(err.response?.data?.message || 'Error al enviar a caja');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleTabClose = async (tabId) => {
     try {
       await posReservationService.releaseTab({ session_id: sessionId, tab_id: tabId });
@@ -973,6 +1023,8 @@ export function usePOS() {
     totalCOP,
     copPerUSD,
     handleCompleteSale,
+    sendToCashier,
+    canCollectPayment,
     saving,
 
     // Sale result

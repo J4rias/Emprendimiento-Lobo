@@ -10,7 +10,7 @@ export const userService = {
     // Get active users (mapped for dropdowns)
     getActive: async () => {
         const response = await api.get('/users');
-        const users = response.data?.data?.users || [];
+        const users = response.data?.data || [];
         // Mapear firstname + lastname a "name" para la UI
         return {
             data: users

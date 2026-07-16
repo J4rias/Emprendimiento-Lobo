@@ -628,6 +628,7 @@ export const getDailySeries = async (req: Request, res: Response) => {
           ROUND(SUM(s.total * s.exchange_rate)) AS total_cop
         FROM sales s
         WHERE s.status IN ('completed', 'pending')
+          AND s.sale_type != 'pos_pending'
           AND s.deleted_at IS NULL
           AND s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)
         GROUP BY DATE(s.sale_date)
@@ -643,6 +644,7 @@ export const getDailySeries = async (req: Request, res: Response) => {
         FROM sale_details sd
         INNER JOIN sales s ON s.id = sd.sale_id
           AND s.status IN ('completed', 'pending')
+          AND s.sale_type != 'pos_pending'
           AND s.deleted_at IS NULL
           AND s.sale_date >= :dateFrom AND s.sale_date < DATE_ADD(:dateTo, INTERVAL 1 DAY)
         GROUP BY DATE(s.sale_date)
@@ -746,7 +748,8 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     // === SALES STATS (by sale_date) ===
     const salesWhere: any = {
       sale_date: { [Op.between]: [startOfDay, endOfDay] },
-      status: { [Op.in]: ['completed', 'pending'] }
+      status: { [Op.in]: ['completed', 'pending'] },
+      sale_type: { [Op.ne]: 'pos_pending' }
     };
     if (user_id) salesWhere.user_id = user_id;
 
@@ -906,6 +909,16 @@ export const getDailyClosure = async (req: Request, res: Response) => {
       refund_by_currency: refundByCurrency
     };
 
+    // Pending POS sales (vendedor-created, awaiting cashier collection)
+    const posPendingWhere: any = {
+      sale_date: { [Op.between]: [startOfDay, endOfDay] },
+      sale_type: 'pos_pending',
+      status: 'pending'
+    };
+    if (user_id) posPendingWhere.user_id = user_id;
+    const posPendingCount = await Sale.count({ where: posPendingWhere });
+    const posPendingTotal = await Sale.sum('total', { where: posPendingWhere }) || 0;
+
     res.json({
       data: {
         date: startOfDay.toISOString().split('T')[0],
@@ -915,7 +928,11 @@ export const getDailyClosure = async (req: Request, res: Response) => {
         creditTotalUSD,
         paymentsBreakdown,
         creditCollectedByCurrency,
-        cashRefunds
+        cashRefunds,
+        posPending: {
+          count: posPendingCount,
+          totalUSD: posPendingTotal
+        }
       }
     });
 
@@ -1045,7 +1062,9 @@ export const getSalesSummary = async (req: Request, res: Response) => {
         COALESCE(SUM(CASE WHEN s.sale_type='credit' THEN 1 ELSE 0 END), 0) as credit_count,
         COALESCE(SUM(CASE WHEN s.sale_type='credit' THEN s.total ELSE 0 END), 0) as credit_total,
         COALESCE(SUM(CASE WHEN s.sale_type='mixed' THEN 1 ELSE 0 END), 0) as mixed_count,
-        COALESCE(SUM(CASE WHEN s.sale_type='mixed' THEN s.total ELSE 0 END), 0) as mixed_total
+        COALESCE(SUM(CASE WHEN s.sale_type='mixed' THEN s.total ELSE 0 END), 0) as mixed_total,
+        COALESCE(SUM(CASE WHEN s.sale_type='pos_pending' THEN 1 ELSE 0 END), 0) as pos_pending_count,
+        COALESCE(SUM(CASE WHEN s.sale_type='pos_pending' THEN s.total ELSE 0 END), 0) as pos_pending_total
       FROM sales s
       WHERE ${statusFilter} AND ${dateFilter}
     `, { replacements, type: sequelize.QueryTypes.SELECT });
@@ -1147,7 +1166,8 @@ export const getSalesSummary = async (req: Request, res: Response) => {
           sales_by_type: {
             cash: { count: parseInt(sr.cash_count) || 0, total_usd: parseFloat(sr.cash_total) || 0 },
             credit: { count: parseInt(sr.credit_count) || 0, total_usd: parseFloat(sr.credit_total) || 0 },
-            mixed: { count: parseInt(sr.mixed_count) || 0, total_usd: parseFloat(sr.mixed_total) || 0 }
+            mixed: { count: parseInt(sr.mixed_count) || 0, total_usd: parseFloat(sr.mixed_total) || 0 },
+            pos_pending: { count: parseInt(sr.pos_pending_count) || 0, total_usd: parseFloat(sr.pos_pending_total) || 0 }
           }
         },
         payments_by_currency,

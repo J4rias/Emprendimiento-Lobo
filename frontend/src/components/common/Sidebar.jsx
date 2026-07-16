@@ -42,17 +42,17 @@ const MENU = [
   {
     section: 'Inventario',
     items: [
-      { name: 'Inventario',       icon: Package,               path: '/inventario',            permission: 'inventory.view',     end: true },
-      { name: 'Movimientos',      icon: ClockCounterClockwise, path: '/inventario/movimientos', permission: 'inventory.view'     },
+      { name: 'Inventario',       icon: Package,               path: '/inventario',            permission: 'inventory.adjust',   end: true },
+      { name: 'Movimientos',      icon: ClockCounterClockwise, path: '/inventario/movimientos', permission: 'inventory.adjust'   },
       { name: 'Reponer Stock',    icon: Scan,                  path: '/reponer-stock',          permission: 'inventory.adjust'   },
       { name: 'Transferencias',   icon: ArrowsLeftRight,       path: '/transferencias',         permission: 'inventory.transfer' },
       {
-        name: 'Productos', icon: Warehouse, permission: 'products.view', isAccordion: true,
+        name: 'Productos', icon: Warehouse, permission: 'products.create', isAccordion: true,
         items: [
-          { name: 'Lista de Productos', path: '/productos',  permission: 'products.view'  },
-          { name: 'Categorías',         path: '/categorias', permission: 'products.view'  },
-          { name: 'Proveedores',        path: '/proveedores',permission: 'suppliers.view' },
-          { name: 'Marcas',             path: '/marcas',     permission: 'products.view'  },
+          { name: 'Lista de Productos', path: '/productos',  permission: 'products.create' },
+          { name: 'Categorías',         path: '/categorias', permission: 'products.create' },
+          { name: 'Proveedores',        path: '/proveedores',permission: 'suppliers.view'  },
+          { name: 'Marcas',             path: '/marcas',     permission: 'products.create' },
         ],
       },
     ],
@@ -95,7 +95,7 @@ const MENU = [
         ],
       },
       { name: 'Reportes',      icon: ChartBar,   path: '/reportes',    permission: 'reports.view' },
-      { name: 'Cierre de Caja', icon: Calculator, path: '/cierre-caja', permission: 'sales.view'  },
+      { name: 'Cierre de Caja', icon: Calculator, path: '/cierre-caja', permission: 'sales.collect' },
     ],
   },
   {

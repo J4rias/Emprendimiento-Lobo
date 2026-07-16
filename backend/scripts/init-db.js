@@ -36,6 +36,11 @@ const initializeDatabase = async () => {
       name: 'Contador',
       description: 'Reportes financieros y facturación'
     });
+
+    const vendedorRole = await Role.create({
+      name: 'Vendedor',
+      description: 'Carga artículos en POS, no cobra ni imprime'
+    });
     console.log('✅ Roles created\n');
 
     // Create Permissions
@@ -77,6 +82,7 @@ const initializeDatabase = async () => {
       { name: 'sales.update', description: 'Actualizar ventas', module: 'sales', action: 'update' },
       { name: 'sales.cancel', description: 'Cancelar ventas', module: 'sales', action: 'cancel' },
       { name: 'sales.return', description: 'Procesar devoluciones', module: 'sales', action: 'return' },
+      { name: 'sales.collect', description: 'Cobrar ventas (POS)', module: 'sales', action: 'collect' },
 
       // Purchases
       { name: 'purchases.view', description: 'Ver compras', module: 'purchases', action: 'view' },
@@ -153,7 +159,7 @@ const initializeDatabase = async () => {
     // Assign permissions to Cajero
     const cajeroPerms = createdPermissions.filter(p =>
       ['products.view', 'inventory.view', 'sales.quotes.view', 'sales.quotes.create',
-       'sales.view', 'sales.create', 'sales.cancel', 'sales.return', 'reports.view',
+       'sales.view', 'sales.create', 'sales.collect', 'sales.cancel', 'sales.return', 'reports.view',
        'customers.view', 'customers.create', 'customers.update',
        'credit_notes.view', 'credit_notes.create',
        'deliveries.view'].includes(p.name)
@@ -177,6 +183,18 @@ const initializeDatabase = async () => {
     for (const permission of contadorPerms) {
       await RolePermission.create({
         role_id: contadorRole.id,
+        permission_id: permission.id
+      });
+    }
+
+    // Assign permissions to Vendedor
+    const vendedorPerms = createdPermissions.filter(p =>
+      ['products.view', 'sales.view', 'sales.create',
+       'customers.view', 'customers.create'].includes(p.name)
+    );
+    for (const permission of vendedorPerms) {
+      await RolePermission.create({
+        role_id: vendedorRole.id,
         permission_id: permission.id
       });
     }

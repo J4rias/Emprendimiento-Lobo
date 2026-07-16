@@ -8,11 +8,11 @@ import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
-import { Textarea } from '../components/ui';
+import { Textarea, ConfirmDialog } from '../components/ui';
 import {
   MagnifyingGlass, X, WarningCircle, CheckCircle, User,
   Package, Lock, Money, CreditCard, DeviceMobile,
-  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch
+  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 
@@ -22,6 +22,7 @@ const PAYMENT_ICONS = { cash: Money, card: CreditCard, transfer: DeviceMobile, u
 const POSPageTablet = () => {
   const pos = usePOS();
   const { companySettings } = useCompany();
+  const [showSendToCashier, setShowSendToCashier] = useState(false);
 
   const handlePortablePrint = useCallback(() => {
     if (pos.saleResult) {
@@ -286,20 +287,31 @@ const POSPageTablet = () => {
                 </div>
               )}
 
-              <button
-                onClick={() => pos.setShowCheckoutModal(true)}
-                className="w-full mt-1 bg-green-600 text-white py-4 rounded-xl text-lg font-bold active:bg-green-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-6 h-6" />
-                Cobrar
-              </button>
+              {pos.canCollectPayment ? (
+                <button
+                  onClick={() => pos.setShowCheckoutModal(true)}
+                  className="w-full mt-1 bg-green-600 text-white py-4 rounded-xl text-lg font-bold active:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-6 h-6" />
+                  Cobrar
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowSendToCashier(true)}
+                  disabled={pos.cart.length === 0 || pos.saving}
+                  className="w-full mt-1 bg-blue-600 text-white py-4 rounded-xl text-lg font-bold active:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-6 h-6" />
+                  Enviar a Caja
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* ===== MODALS ===== */}
-      <TabletCheckoutModal
+      {pos.canCollectPayment && <TabletCheckoutModal
         show={pos.showCheckoutModal}
         onClose={() => pos.setShowCheckoutModal(false)}
         customer={pos.customer}
@@ -323,6 +335,20 @@ const POSPageTablet = () => {
         displaySymbol={pos.displaySymbol}
         fmt={pos.fmt}
         isAdmin={pos.isAdmin}
+      />}
+
+      <ConfirmDialog
+        open={showSendToCashier}
+        onClose={() => setShowSendToCashier(false)}
+        onConfirm={async () => {
+          setShowSendToCashier(false);
+          await pos.sendToCashier();
+        }}
+        loading={pos.saving}
+        variant="info"
+        title="¿Enviar venta a caja?"
+        description="Los artículos quedarán reservados. El cajero realizará el cobro e imprimirá el ticket."
+        confirmLabel="Enviar a Caja"
       />
 
       <StockConflictAlert
@@ -987,25 +1013,31 @@ function TabletCheckoutModal({
 function TabletSaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }) {
   if (!show || !sale) return null;
 
+  const isSentToCashier = sale.sentToCashier;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-6 p-8">
         <div className="space-y-6">
           <div className="flex items-center justify-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-10 h-10 text-green-600" />
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center ${isSentToCashier ? 'bg-blue-100' : 'bg-green-100'}`}>
+              {isSentToCashier
+                ? <ArrowRight className="w-10 h-10 text-blue-600" />
+                : <CheckCircle className="w-10 h-10 text-green-600" />}
             </div>
           </div>
           <div className="text-center">
             <p className="text-xl font-bold text-gray-800">{sale.sale_number}</p>
-            <p className="text-base text-gray-500 mt-1">Venta registrada exitosamente</p>
+            <p className="text-base text-gray-500 mt-1">
+              {isSentToCashier ? 'Venta enviada a caja — pendiente de cobro' : 'Venta registrada exitosamente'}
+            </p>
           </div>
           <div className="bg-gray-50 p-5 rounded-xl space-y-3 text-base">
             <div className="flex justify-between">
               <span className="text-gray-500">Total:</span>
               <span className="font-bold text-lg">{displaySymbol} {fmt(toDisplay(parseFloat(sale.total || 0)))}</span>
             </div>
-            {sale.changeAmount && parseFloat(sale.changeAmount) > 0 && (
+            {!isSentToCashier && sale.changeAmount && parseFloat(sale.changeAmount) > 0 && (
               <div className="flex justify-between text-green-700">
                 <span>Cambio:</span>
                 <span className="font-bold text-lg">{displaySymbol} {fmt(toDisplay(parseFloat(sale.changeAmount)))}</span>
@@ -1013,13 +1045,15 @@ function TabletSaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, 
             )}
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={onPrint}
-              className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-gray-300 rounded-xl text-base text-gray-700 active:bg-gray-50"
-            >
-              <Printer className="w-5 h-5" />
-              Imprimir
-            </button>
+            {!isSentToCashier && (
+              <button
+                onClick={onPrint}
+                className="flex-1 flex items-center justify-center gap-2 py-4 border-2 border-gray-300 rounded-xl text-base text-gray-700 active:bg-gray-50"
+              >
+                <Printer className="w-5 h-5" />
+                Imprimir
+              </button>
+            )}
             <button
               onClick={onClose}
               className="flex-1 py-4 bg-blue-600 text-white rounded-xl text-base font-bold active:bg-blue-700"

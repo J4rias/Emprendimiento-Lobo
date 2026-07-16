@@ -13,20 +13,20 @@ import {
   CaretDown
 } from '@phosphor-icons/react';
 import { creditNoteService } from '../services/api/creditNoteService';
-import { ViewAction } from '../components/ui';
+import { ViewAction, Pagination, useTableLimit } from '../components/ui';
 
 const CreditNotesPage = () => {
+  const [limit, setLimit] = useTableLimit();
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     type: '',
     page: 1,
-    limit: 10
   });
 
   const { data: notesData, isLoading: loading, refetch } = useQuery({
-    queryKey: ['credit-notes', filters],
-    queryFn: () => creditNoteService.getAll(filters),
+    queryKey: ['credit-notes', filters, limit],
+    queryFn: () => creditNoteService.getAll({ ...filters, limit }),
     keepPreviousData: true,
     staleTime: 30_000,
   });
@@ -217,27 +217,16 @@ const CreditNotesPage = () => {
         </div>
 
         {/* Pagination */}
-        {!loading && pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Mostrando página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handlePageChange(filters.page - 1)}
-                disabled={filters.page === 1}
-                className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => handlePageChange(filters.page + 1)}
-                disabled={filters.page === pagination.totalPages}
-                className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
+        {!loading && pagination.totalPages > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200">
+            <Pagination
+              page={filters.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={limit}
+              onPageChange={handlePageChange}
+              onLimitChange={(newLimit) => { setLimit(newLimit); setFilters(prev => ({ ...prev, page: 1 })); }}
+            />
           </div>
         )}
       </div>

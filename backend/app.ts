@@ -160,6 +160,7 @@ app.use('/api/accounts-receivable', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
 app.use('/api/banks', require('./routes/bank.routes'));
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/client-errors', require('./routes/clientError.routes'));
 app.use('/api/docs', require('./routes/docs.routes'));
 
 // 404 handler

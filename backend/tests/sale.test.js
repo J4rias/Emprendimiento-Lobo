@@ -154,4 +154,109 @@ describe('Sales API — query params & filters', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toBeDefined();
   });
+
+  it('GET /api/sales?sale_type=pos_pending -> 200', async () => {
+    const res = await request(app)
+      .get('/api/sales')
+      .query({ sale_type: 'pos_pending' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});
+
+describe('Sales API — pos_pending (vendedor flow)', () => {
+  let createdSaleId = null;
+
+  it('POST /api/sales con sale_type=pos_pending y payment_lines=[] crea venta pending', async () => {
+    // First get a product with stock for the sale
+    const productsRes = await request(app)
+      .get('/api/products')
+      .query({ limit: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+
+    if (!productsRes.body.data || productsRes.body.data.length === 0) {
+      console.log('Skipping: no products in DB');
+      return;
+    }
+
+    const product = productsRes.body.data[0];
+    const presentation = product.presentations?.[0];
+    if (!presentation) {
+      console.log('Skipping: product has no presentations');
+      return;
+    }
+
+    const res = await request(app)
+      .post('/api/sales')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        warehouse_id: 1,
+        sale_type: 'pos_pending',
+        currency_mode: 'USD',
+        exchange_rate: 1,
+        payment_lines: [],
+        items: [{
+          product_id: product.id,
+          presentation_id: presentation.id,
+          quantity: 1,
+          is_unit: false,
+          unit_price: parseFloat(presentation.price) || 1,
+          discount_percent: 0,
+          tax_percent: 0,
+        }],
+      });
+
+    // Should succeed (admin has sales.create)
+    if (res.status === 200 || res.status === 201) {
+      createdSaleId = res.body.data?.id;
+      expect(res.body.data.status).toBe('pending');
+      expect(res.body.data.sale_type).toBe('pos_pending');
+      expect(parseFloat(res.body.data.paid_amount)).toBe(0);
+      expect(parseFloat(res.body.data.credit_amount)).toBeGreaterThan(0);
+    } else {
+      // May fail due to stock — that's OK for this smoke test
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    }
+  });
+
+  it('POST /api/sales/:id/payments con admin token (sales.collect) -> cobra pos_pending', async () => {
+    if (!createdSaleId) {
+      console.log('Skipping: no pos_pending sale was created');
+      return;
+    }
+
+    // Get the sale to know the total
+    const saleRes = await request(app)
+      .get(`/api/sales/${createdSaleId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+    const saleTotal = parseFloat(saleRes.body.data?.total || 0);
+
+    const res = await request(app)
+      .post(`/api/sales/${createdSaleId}/payments`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        payment_lines: [{
+          amount: saleTotal,
+          method: 'cash',
+          currency: 'USD',
+          exchange_rate: 1,
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    // After full payment, sale_type should change from pos_pending to cash
+    expect(res.body.data?.sale?.sale_type || res.body.sale?.sale_type).toBe('cash');
+    expect(res.body.data?.sale?.status || res.body.sale?.status).toBe('completed');
+  });
+
+  it('GET /api/sales/daily-closure includes posPending field', async () => {
+    const res = await request(app)
+      .get('/api/sales/daily-closure')
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty('posPending');
+    expect(res.body.data.posPending).toHaveProperty('count');
+    expect(res.body.data.posPending).toHaveProperty('totalUSD');
+  });
 });

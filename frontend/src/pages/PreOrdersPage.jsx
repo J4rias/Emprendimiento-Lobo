@@ -11,29 +11,28 @@ import {
   PaperPlaneTilt,
   Globe,
   ArrowRight,
-  CaretLeft,
-  CaretRight,
   ArrowClockwise,
   Warning,
 } from '@phosphor-icons/react';
 import { preOrderService } from '../services/api/preOrderService';
+import { Pagination, useTableLimit } from '../components/ui';
 import { toast } from 'sonner';
 
 const PreOrdersPage = () => {
   const queryClient = useQueryClient();
+  const [limit, setLimit] = useTableLimit();
   const [filters, setFilters] = useState({
     status: '',
     channel: '',
     page: 1,
-    limit: 20,
   });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
 
   const { data: ordersData, isLoading } = useQuery({
-    queryKey: ['pre-orders', filters],
-    queryFn: () => preOrderService.getAll(filters),
+    queryKey: ['pre-orders', filters, limit],
+    queryFn: () => preOrderService.getAll({ ...filters, limit }),
     keepPreviousData: true,
     staleTime: 15_000,
   });
@@ -229,28 +228,16 @@ const PreOrdersPage = () => {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-            <div className="text-sm text-gray-500">
-              {pagination.total} pre-pedidos
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={pagination.page <= 1}
-                onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-              >
-                <CaretLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm text-gray-600">{pagination.page} / {pagination.totalPages}</span>
-              <button
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-              >
-                <CaretRight className="w-5 h-5" />
-              </button>
-            </div>
+        {pagination.totalPages > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200">
+            <Pagination
+              page={filters.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={limit}
+              onPageChange={(p) => setFilters(f => ({ ...f, page: p }))}
+              onLimitChange={(newLimit) => { setLimit(newLimit); setFilters(f => ({ ...f, page: 1 })); }}
+            />
           </div>
         )}
       </div>

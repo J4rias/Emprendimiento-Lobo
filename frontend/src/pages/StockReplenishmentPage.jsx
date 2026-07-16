@@ -68,19 +68,20 @@ const StockReplenishmentPage = () => {
 
     try {
       const response = await productService.searchByBarcode(code);
+      const product = response.data?.[0];
 
-      if (response.data) {
-        setProduct(response.data);
+      if (product) {
+        setProduct(product);
 
         // Load presentations
-        if (response.data.presentations && response.data.presentations.length > 0) {
-          setPresentations(response.data.presentations);
+        if (product.presentations && product.presentations.length > 0) {
+          setPresentations(product.presentations);
           // Select default presentation
-          const defaultPres = response.data.presentations.find(p => p.is_default);
+          const defaultPres = product.presentations.find(p => p.is_default);
           if (defaultPres) {
             setSelectedPresentation(defaultPres.id);
           } else {
-            setSelectedPresentation(response.data.presentations[0].id);
+            setSelectedPresentation(product.presentations[0].id);
           }
         }
 

@@ -38,6 +38,7 @@ const getCustomerName = (customer) => {
 const getSaleTypeLabel = (type) => {
   if (type === 'mixed') return 'Mixta';
   if (type === 'credit') return 'Crédito';
+  if (type === 'pos_pending') return 'Pendiente de Cobro';
   return 'Contado';
 };
 
@@ -108,14 +109,14 @@ const ReportsPage = () => {
         saleService.getSalesStats({ ...adjusted, summary_only: 'true' }),
         saleService.getSales({ ...adjusted, page: 1, limit: SALES_PAGE_SIZE })
       ]);
-      const total = statsRes.stats?.totalSales || 0;
-      const cop   = statsRes.stats?.totalRevenueCOP || 0;
+      const total = statsRes.data?.totalSales || 0;
+      const cop   = statsRes.data?.totalRevenueCOP || 0;
       setSalesStats({
         total_sales:       total,
         total_amount_cop:  cop,
         average_ticket_cop: total > 0 ? cop / total : 0,
       });
-      const rows       = salesRes.sales || [];
+      const rows       = salesRes.data || [];
       const pagination = salesRes.pagination || {};
       setSalesRows(rows);
       setSalesPage(1);
@@ -191,7 +192,7 @@ const ReportsPage = () => {
         }
         case 'top_products': {
           const statsData   = await saleService.getSalesStats({ ...adj, top_limit: 50 });
-          const topProducts = (statsData.stats?.topProducts || []).map(tp => ({
+          const topProducts = (statsData.data?.topProducts || []).map(tp => ({
             product:        tp.product,
             total_quantity: parseFloat(tp.dataValues?.total_quantity || tp.total_quantity || 0),
             total_amount:   parseFloat(tp.dataValues?.total_amount   || tp.total_amount   || 0),
@@ -245,7 +246,7 @@ const ReportsPage = () => {
       setLoadingMoreSales(true);
       const nextPage   = salesPage + 1;
       const res        = await saleService.getSales({ ...salesAdjustedRange.current, page: nextPage, limit: SALES_PAGE_SIZE });
-      const rows       = res.sales || [];
+      const rows       = res.data || [];
       const pagination = res.pagination || {};
       setSalesRows(prev => [...prev, ...rows]);
       setSalesPage(nextPage);
@@ -315,7 +316,7 @@ const ReportsPage = () => {
     while (hasMore) {
       const res        = await saleService.getSales({ ...salesAdjustedRange.current, page, limit: 200 });
       const pagination = res.pagination || {};
-      allSales.push(...(res.sales || []));
+      allSales.push(...(res.data || []));
       hasMore = pagination.page < pagination.totalPages;
       page++;
     }
