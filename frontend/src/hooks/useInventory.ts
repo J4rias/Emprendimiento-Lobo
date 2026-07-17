@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../services/api/inventoryService';
+import type { InventoryListParams, AdjustData } from '../services/api/inventoryService';
 
 export const useInventoryByWarehouse = (warehouseId: number, params?: InventoryListParams) => {
   return useQuery({ queryKey: ['inventory', 'warehouse', warehouseId, params], queryFn: () => inventoryService.getByWarehouse(warehouseId, params) });

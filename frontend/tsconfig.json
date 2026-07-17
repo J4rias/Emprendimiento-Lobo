@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    /* Type checking */
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    /* Module resolution */
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* JSX */
+    "jsx": "react-jsx",
+
+    /* Coexistence with JS during migration */
+    "allowJs": true,
+    "checkJs": false,
+
+    /* Path aliases */
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}

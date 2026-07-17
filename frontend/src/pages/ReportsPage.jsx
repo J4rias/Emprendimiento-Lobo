@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 import { Button, Card, DateRangeFilter, Select, Spinner } from '../components/ui';
 import { downloadCSV } from '../utils/csvUtils';
+import { localToday, localMonthStart } from '../utils/dateUtils';
 
 const SALES_PAGE_SIZE = 50;
 const INVENTORY_PAGE_SIZE = 50;
@@ -61,7 +62,7 @@ const ReportsPage = () => {
   const paramStart = searchParams.get('start');
   const paramEnd   = searchParams.get('end');
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   const firstOfMonth = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;

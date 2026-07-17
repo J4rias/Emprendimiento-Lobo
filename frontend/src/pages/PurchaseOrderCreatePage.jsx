@@ -18,6 +18,7 @@ import {
   Select,
   Textarea,
 } from '../components/ui';
+import { localToday } from '../utils/dateUtils';
 
 const PurchaseOrderCreatePage = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ const PurchaseOrderCreatePage = () => {
   const [formData, setFormData] = useState({
     supplier_id: '',
     warehouse_id: '',
-    order_date: new Date().toISOString().split('T')[0],
+    order_date: localToday(),
     expected_delivery_date: '',
     currency: 'USD',
     notes: '',

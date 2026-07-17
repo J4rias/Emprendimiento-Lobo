@@ -6,6 +6,7 @@ import { printHTML, formatDate as printFormatDate } from '../utils/printUtils';
 import { Printer, CurrencyDollar, Wallet, WarningCircle, CreditCard, ShoppingCart, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { Button, Card, Input, Select, Spinner, StatCard } from '../components/ui';
+import { localToday } from '../utils/dateUtils';
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();
@@ -14,10 +15,7 @@ const DailyReportPage = () => {
     const [report, setReport] = useState(null);
     const [users, setUsers] = useState([]);
 
-    const [filters, setFilters] = useState({
-        date: new Date().toISOString().split('T')[0],
-        user_id: user?.role?.name === 'Administrador' ? '' : (user?.id || '')
-    });
+    const [filters, setFilters] = useState({ date: localToday(), user_id: '' });
 
     useEffect(() => {
         if (hasPermission('users.view')) {

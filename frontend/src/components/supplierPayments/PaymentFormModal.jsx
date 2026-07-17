@@ -5,11 +5,12 @@ import { AllocationSection, fmtNum, parseNum } from './AllocationSection';
 import { supplierPaymentService } from '../../services/api/supplierPaymentService';
 import { exchangeRateService } from '../../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../../utils/exchangeRateUtils';
+import { localToday } from '../../utils/dateUtils';
 
 const DEFAULT_FORM = {
   supplier_id: '',
   invoice_number: '',
-  payment_date: new Date().toISOString().split('T')[0],
+  payment_date: localToday(),
   payment_method: 'transfer',
   amount: '',
   currency: 'USD',
@@ -88,7 +89,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
       supplier_id: order.supplier_id,
       purchase_order_id: order.id,
       invoice_number: order.last_invoice_number || '',
-      payment_date: new Date().toISOString().split('T')[0],
+      payment_date: localToday(),
       payment_method: 'transfer',
       amount: order.total,
       currency: 'USD',

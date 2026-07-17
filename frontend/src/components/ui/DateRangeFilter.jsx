@@ -1,6 +1,7 @@
 import { ArrowCounterClockwise } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import { Button } from './Button'
+import { localToday, toLocalDateStr } from '../../utils/dateUtils'
 
 /**
  * Calcula el rango de fechas por defecto.
@@ -11,12 +12,12 @@ import { Button } from './Button'
  */
 export function getDefaultDateRange(defaultDays) {
   const today = new Date()
-  const end_date = today.toISOString().split('T')[0]
+  const end_date = localToday()
 
   if (defaultDays) {
     const start = new Date(today)
     start.setDate(start.getDate() - defaultDays + 1)
-    return { start_date: start.toISOString().split('T')[0], end_date }
+    return { start_date: toLocalDateStr(start), end_date }
   }
 
   // Mes en curso: primer día del mes hasta hoy
@@ -30,8 +31,8 @@ function getPrevMonthRange() {
   const lastOfPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0)
   const firstOfPrevMonth = new Date(lastOfPrevMonth.getFullYear(), lastOfPrevMonth.getMonth(), 1)
   return {
-    start_date: firstOfPrevMonth.toISOString().split('T')[0],
-    end_date: lastOfPrevMonth.toISOString().split('T')[0],
+    start_date: toLocalDateStr(firstOfPrevMonth),
+    end_date: toLocalDateStr(lastOfPrevMonth),
   }
 }
 

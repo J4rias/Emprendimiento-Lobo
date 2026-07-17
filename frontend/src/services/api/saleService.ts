@@ -1,4 +1,17 @@
 import api from './axios';
+import type { Sale, SalePayment } from '../../types';
+
+export interface SaleListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  sale_type?: string;
+  customer_id?: number;
+  warehouse_id?: number;
+  date_from?: string;
+  date_to?: string;
+}
 
 export const saleService = {
   createSale: async (saleData: Sale) => {
@@ -56,25 +69,3 @@ export const saleService = {
     return response.data;
   }
 };
-
-interface Pagination { total: number; page: number; limit: number; totalPages: number; }
-interface SalePayment { id: number; method: string; amount: number; currency: string; }
-interface SaleDetail { id: number; product_id: number; quantity: number; unit_price: number; total: number; }
-interface Sale {
-  id: number;
-  sale_number: string;
-  sale_type: 'cash' | 'credit' | 'mixed';
-  status: 'completed' | 'pending' | 'cancelled';
-  total: number;
-  exchange_rate: number;
-  notes?: string;
-  sale_date: string;
-  customer_id?: number;
-  warehouse_id: number;
-  payments?: SalePayment[];
-  details?: SaleDetail[];
-}
-interface SaleListParams { page?: number; limit?: number; search?: string; status?: string; sale_type?: string; customer_id?: number; warehouse_id?: number; date_from?: string; date_to?: string; }
-interface SaleListResponse { data: Sale[]; pagination: Pagination; }
-interface SaleResponse { message: string; data: Sale; }
-interface SaleStatsResponse { data: { totalSales: number; totalRevenue: number; totalRevenueCOP: number; totalCost: number; grossProfit: number; grossMarginPct: number; [key: string]: unknown; }; }

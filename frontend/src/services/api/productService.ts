@@ -1,55 +1,19 @@
 import api from './axios';
+import type { Pagination, Product } from '../../types';
 
-interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-interface Category {
-  id: number;
-  name: string;
-}
-
-interface Brand {
-  id: number;
-  name: string;
-}
-
-interface ProductPresentation {
-  id: number;
-  name: string;
-  units_per_package: number;
-  price: number;
-  is_default: boolean;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  sku: string;
-  description?: string;
-  category_id: number;
-  brand_id: number;
-  is_active: boolean;
-  created_at: string;
-  category?: Category;
-  brand?: Brand;
-  presentations?: ProductPresentation[];
-}
-
-interface ProductListParams {
+export interface ProductListParams {
   page?: number;
   limit?: number;
   search?: string;
   category_id?: number;
   brand_id?: number;
   is_active?: boolean;
+  price_list_id?: number;
 }
 
-interface ProductListResponse {
+export interface ProductListResponse {
   data: Product[];
+  products?: Product[];
   pagination: Pagination;
 }
 

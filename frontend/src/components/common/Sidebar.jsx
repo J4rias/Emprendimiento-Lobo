@@ -36,7 +36,7 @@ const MENU = [
   {
     section: null,
     items: [
-      { name: 'Dashboard', icon: SquaresFour, path: '/dashboard' },
+      { name: 'Dashboard', icon: SquaresFour, path: '/dashboard', permission: 'dashboard.view' },
     ],
   },
   {

@@ -15,6 +15,7 @@ import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../ut
 import { COP_TOLERANCE } from '../hooks/usePOS';
 import CheckoutModal from '../components/sales/CheckoutModal';
 import { formatDate } from '../utils/formatUtils';
+import { localToday, localMonthStart } from '../utils/dateUtils';
 import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { downloadCSV } from '../utils/csvUtils';
 import { useCompany } from '../context/CompanyContext';
@@ -95,9 +96,22 @@ const SalesPage = () => {
   const { sortBy: salesSortBy, sortDir: salesSortDir, onSort: _salesOnSort } = useTableSort([], { serverSide: true, defaultField: 'sale_date', defaultDir: 'desc' });
   const salesOnSort = (f, d) => { _salesOnSort(f, d); setCurrentPage(1); };
 
+  // Stats period: dashboard.view → date picker (default: current month), otherwise → today only
+  const canSeeDashboard = hasPermission('dashboard.view');
+  const today = localToday();
+  const monthStart = localMonthStart();
+  const [statsFrom, setStatsFrom] = useState(canSeeDashboard ? monthStart : today);
+  const [statsTo, setStatsTo]     = useState(today);
+  const dateRange = canSeeDashboard
+    ? { date_from: statsFrom, date_to: statsTo }
+    : { date_from: today, date_to: today };
+  const statsPeriodLabel = canSeeDashboard
+    ? (statsFrom === monthStart && statsTo === today ? 'del Mes' : 'del Período')
+    : 'de Hoy';
+
   // ─── Queries ──────────────────────────────────────────────────────────────────
   const { data: salesData, isLoading } = useQuery({
-    queryKey: ['sales', currentPage, limit, search, statusFilter, saleTypeFilter, salesSortBy, salesSortDir],
+    queryKey: ['sales', currentPage, limit, search, statusFilter, saleTypeFilter, salesSortBy, salesSortDir, dateRange.date_from, dateRange.date_to],
     queryFn: () => saleService.getSales({
       page: currentPage, limit,
       search,
@@ -105,6 +119,7 @@ const SalesPage = () => {
       sale_type: saleTypeFilter || undefined,
       sort_by: salesSortBy,
       sort_dir: salesSortDir,
+      ...dateRange,
     }),
     staleTime: 30_000,
   });
@@ -113,8 +128,12 @@ const SalesPage = () => {
   const total      = salesData?.pagination?.total || 0;
 
   const { data: statsData } = useQuery({
-    queryKey: ['sales-stats', statusFilter, saleTypeFilter],
-    queryFn: () => saleService.getSalesStats({ status: statusFilter || undefined, sale_type: saleTypeFilter || undefined }),
+    queryKey: ['sales-stats', statusFilter, saleTypeFilter, dateRange.date_from, dateRange.date_to],
+    queryFn: () => saleService.getSalesStats({
+      status: statusFilter || undefined,
+      sale_type: saleTypeFilter || undefined,
+      ...dateRange,
+    }),
     staleTime: 30_000,
   });
   const stats = statsData?.data || null;
@@ -260,6 +279,7 @@ const SalesPage = () => {
         status: statusFilter || undefined,
         sale_type: saleTypeFilter || undefined,
         sort_by: salesSortBy, sort_dir: salesSortDir,
+        ...dateRange,
       };
       while (hasMore) {
         const res = await saleService.getSales({ ...params, page, limit: 200 });
@@ -548,13 +568,32 @@ const SalesPage = () => {
         )}
       </div>
 
+      {/* Stats date range picker */}
+      {canSeeDashboard && (
+        <div className="flex items-center gap-3">
+          <Input
+            type="date"
+            value={statsFrom}
+            onChange={(e) => { setStatsFrom(e.target.value); setCurrentPage(1); }}
+            className="w-auto"
+          />
+          <span className="text-sm text-gray-500">a</span>
+          <Input
+            type="date"
+            value={statsTo}
+            onChange={(e) => { setStatsTo(e.target.value); setCurrentPage(1); }}
+            className="w-auto"
+          />
+        </div>
+      )}
+
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card variant="compact">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Ventas</p>
+                <p className="text-sm text-gray-600 mb-1">Ventas {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">{stats.totalSales || 0}</p>
               </div>
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -565,7 +604,7 @@ const SalesPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Ingresos Totales</p>
+                <p className="text-sm text-gray-600 mb-1">Ingresos {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
                   {stats.totalRevenueCOP != null
                     ? `COP ${Math.ceil(stats.totalRevenueCOP).toLocaleString('es-VE')}`
@@ -580,7 +619,7 @@ const SalesPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Ventas Contado</p>
+                <p className="text-sm text-gray-600 mb-1">Contado {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
                   {stats.salesByType?.find(s => s.sale_type === 'cash')?.count || 0}
                 </p>
@@ -593,7 +632,7 @@ const SalesPage = () => {
           <Card variant="compact">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Ventas Crédito</p>
+                <p className="text-sm text-gray-600 mb-1">Crédito {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
                   {stats.salesByType?.find(s => s.sale_type === 'credit')?.count || 0}
                 </p>

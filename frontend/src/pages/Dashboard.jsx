@@ -10,6 +10,7 @@ import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
 import { formatCOP, formatUSD } from '../utils/formatUtils';
 import { Alert, Button, Card, Skeleton, StatCard } from '../components/ui';
+import { localToday, localMonthStart } from '../utils/dateUtils';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,19 +22,17 @@ const Dashboard = () => {
     const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
 
     // Hoy (medianoche local — misma semántica que el cierre de caja)
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const todayStr = localToday();
     const todayStats = await saleService.getSalesStats({
-      date_from: `${localDate}T00:00:00`,
-      date_to: `${localDate}T23:59:59`,
+      date_from: todayStr,
+      date_to: todayStr,
       top_limit: 5,
     }).catch(() => ({ data: {} }));
 
     // Mes en curso (solo resumen)
-    const monthDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
     const monthStatsData = await saleService.getSalesStats({
-      date_from: `${monthDate}T00:00:00`,
+      date_from: localMonthStart(),
+      date_to: todayStr,
       summary_only: 'true',
     }).catch(() => ({ data: {} }));
 
@@ -144,7 +143,7 @@ const Dashboard = () => {
             detail={monthName.charAt(0).toUpperCase() + monthName.slice(1)}
             icon={TrendUp}
             tone="primary"
-            onClick={() => navigate(`/reportes?type=sales&start=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end=${new Date().toISOString().split('T')[0]}`)}
+            onClick={() => navigate(`/reportes?type=sales&start=${localMonthStart()}&end=${localToday()}`)}
           />
         </div>
       </div>

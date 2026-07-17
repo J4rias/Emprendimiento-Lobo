@@ -15,6 +15,7 @@ import {
   Table,
 } from '../components/ui';
 
+import { localToday } from '../utils/dateUtils';
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const ExchangeRatesPage = () => {
@@ -27,14 +28,14 @@ const ExchangeRatesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingRate, setEditingRate] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(localToday());
   const [rateSortBy, setRateSortBy] = useState('effective_date');
   const [rateSortDir, setRateSortDir] = useState('desc');
   const [formData, setFormData] = useState({
     from_currency: 'USD',
     to_currency: 'VES',
     rate: '',
-    effective_date: new Date().toISOString().split('T')[0],
+    effective_date: localToday(),
     source: 'Manual',
     notes: ''
   });
@@ -157,7 +158,7 @@ const ExchangeRatesPage = () => {
       from_currency: 'USD',
       to_currency: 'VES',
       rate: '',
-      effective_date: new Date().toISOString().split('T')[0],
+      effective_date: localToday(),
       source: 'Manual',
       notes: ''
     });

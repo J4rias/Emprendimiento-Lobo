@@ -274,7 +274,11 @@ export function usePOS() {
         price_list_id: selectedPriceList || undefined,
       });
       const results = res.products || res.data || [];
-      setProducts((prev) => [...prev, ...results]);
+      setProducts((prev) => {
+        const existingIds = new Set(prev.map((p: any) => p.id));
+        const newOnly = results.filter((p: any) => !existingIds.has(p.id));
+        return [...prev, ...newOnly];
+      });
       setProductPage(nextPage);
       setHasMoreProducts(res.pagination ? res.pagination.page < res.pagination.totalPages : false);
     } catch (e) {

@@ -132,7 +132,7 @@ const POSPageTablet = () => {
                   {pos.products
                     .filter(product => {
                       if (pos.isAdmin) return true;
-                      const priceField = pos.displayCurrency === 'USD' ? 'package_price_usd' : 'package_price_cop';
+                      const priceField = pos.displayCurrency === 'USD' ? 'package_price_usd' : 'package_price';
                       return (product.presentations || []).some(p => {
                         const detail = pos.priceListDetails[`${product.id}-${p.id}`];
                         return detail && parseFloat(detail[priceField]) > 0;

@@ -5,6 +5,7 @@ import PriceList from '../models/PriceList';
 import Sale from '../models/Sale';
 import SalePayment from '../models/SalePayment';
 import { normalizeCustomerKeys } from '../schemas/customer.schema';
+import { parseLocalDate, parseLocalDateEnd } from '../utils/dateUtils';
 
 const { sequelize } = require('../config/database');
 const {
@@ -329,8 +330,8 @@ class CustomerController {
       if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
       const now = new Date();
-      const dateFrom = date_from ? new Date(date_from) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const dateTo = date_to ? new Date(date_to) : now;
+      const dateFrom = date_from ? parseLocalDate(date_from) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+      const dateTo = date_to ? parseLocalDateEnd(date_to) : now;
 
       const data = await getCustomerPurchases(id, dateFrom, dateTo);
       res.json({ data });

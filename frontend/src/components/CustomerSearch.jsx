@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlass, X, User, WarningCircle, CreditCard, CaretRight, UserPlus } from '@phosphor-icons/react';
 import { customerService } from '../services/api/customerService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
-import Modal from './common/Modal';
+import { Modal } from './ui';
 import CustomerQuickAdd from './CustomerQuickAdd';
 
 const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, saleAmount = 0, exchangeRates = [] }) => {
@@ -76,10 +76,10 @@ const CustomerSearch = ({ isOpen, onClose, onSelect, validateCredit = false, sal
 
   return (
     <Modal
-      isOpen={isOpen}
+      open={isOpen}
       onClose={onClose}
       title={isAdding ? "Nuevo Cliente" : "Seleccionar Cliente"}
-      size="lg"
+      size="2xl"
     >
       {/* Shared fixed-height shell: content area + footer */}
       <div className="flex flex-col" style={{ height: '520px' }}>

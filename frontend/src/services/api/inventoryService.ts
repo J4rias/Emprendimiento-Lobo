@@ -1,23 +1,7 @@
 import api from './axios';
+import type { Pagination } from '../../types';
 
-interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-interface InventoryItem {
-  id: number;
-  product_id: number;
-  warehouse_id: number;
-  quantity: number;
-  min_stock?: number;
-  product?: { id: number; name: string; sku: string; presentations?: unknown[] };
-  warehouse?: { id: number; name: string };
-}
-
-interface InventoryListParams {
+export interface InventoryListParams {
   page?: number;
   limit?: number;
   search?: string;
@@ -28,11 +12,11 @@ interface InventoryListParams {
 }
 
 interface InventoryListResponse {
-  data: InventoryItem[];
+  data: unknown[];
   pagination: Pagination;
 }
 
-interface AdjustData {
+export interface AdjustData {
   product_id: number;
   warehouse_id: number;
   quantity: number;
@@ -51,7 +35,7 @@ export const inventoryService = {
     return response.data;
   },
 
-  getById: async (id: number): Promise<InventoryItem> => {
+  getById: async (id: number) => {
     const response = await api.get(`/inventory/${id}`);
     return response.data;
   },
@@ -61,27 +45,27 @@ export const inventoryService = {
     return response.data;
   },
 
-  getLowStock: async (params?: Record<string, unknown>): Promise<any> => {
+  getLowStock: async (params?: Record<string, unknown>) => {
     const response = await api.get('/inventory/alerts/low-stock', { params });
     return response.data;
   },
 
-  getExpiringProducts: async (params?: Record<string, unknown>): Promise<any> => {
+  getExpiringProducts: async (params?: Record<string, unknown>) => {
     const response = await api.get('/inventory/alerts/expiring', { params });
     return response.data;
   },
 
-  getValuation: async (params?: Record<string, unknown>): Promise<any> => {
+  getValuation: async (params?: Record<string, unknown>) => {
     const response = await api.get('/inventory/valuation', { params });
     return response.data;
   },
 
-  adjustInventory: async (data: AdjustData): Promise<any> => {
+  adjustInventory: async (data: AdjustData) => {
     const response = await api.post('/inventory/adjust', data);
     return response.data;
   },
 
-  getMovements: async (params?: Record<string, unknown>): Promise<any> => {
+  getMovements: async (params?: Record<string, unknown>) => {
     const response = await api.get('/inventory/movements', { params });
     return response.data;
   },

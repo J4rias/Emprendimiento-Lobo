@@ -1,18 +1,7 @@
-import axios from 'axios';
+import api from './axios';
+import type { Pagination, Brand } from '../../types';
 
-interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-interface Brand {
-  id: number;
-  name: string;
-  is_active: boolean;
-  product_count?: number;
-}
+export type { Brand };
 
 interface BrandListResponse {
   data: Brand[];
@@ -24,33 +13,33 @@ interface BrandResponse {
   data: Brand;
 }
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+export const brandService = {
+  getAll: async (params?: Record<string, unknown>): Promise<BrandListResponse> => {
+    const response = await api.get('/brands', { params });
+    return response.data;
+  },
 
-export const getAllBrands = async (params?: Record<string, unknown>): Promise<BrandListResponse> => {
-  const response = await axios.get(`${API_URL}/brands`, { params });
-  return response.data;
-};
+  getActive: async (): Promise<BrandListResponse> => {
+    const response = await api.get('/brands', { params: { is_active: true } });
+    return response.data;
+  },
 
-export const getActiveBrands = async (): Promise<BrandListResponse> => {
-  const response = await axios.get(`${API_URL}/brands?is_active=true`);
-  return response.data;
-};
+  getById: async (id: number): Promise<BrandResponse> => {
+    const response = await api.get(`/brands/${id}`);
+    return response.data;
+  },
 
-export const getBrandById = async (id: number): Promise<BrandResponse> => {
-  const response = await axios.get(`${API_URL}/brands/${id}`);
-  return response.data;
-};
+  create: async (data: Omit<Brand, 'id'>): Promise<BrandResponse> => {
+    const response = await api.post('/brands', data);
+    return response.data;
+  },
 
-export const createBrand = async (data: Omit<Brand, 'id'>): Promise<BrandResponse> => {
-  const response = await axios.post(`${API_URL}/brands`, data);
-  return response.data;
-};
+  update: async (id: number, data: Partial<Omit<Brand, 'id'>>): Promise<BrandResponse> => {
+    const response = await api.put(`/brands/${id}`, data);
+    return response.data;
+  },
 
-export const updateBrand = async (id: number, data: Partial<Omit<Brand, 'id'>>): Promise<BrandResponse> => {
-  const response = await axios.put(`${API_URL}/brands/${id}`, data);
-  return response.data;
-};
-
-export const deleteBrand = async (id: number): Promise<void> => {
-  await axios.delete(`${API_URL}/brands/${id}`);
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/brands/${id}`);
+  },
 };

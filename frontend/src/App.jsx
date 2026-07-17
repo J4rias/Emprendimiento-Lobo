@@ -52,8 +52,45 @@ const LoadingFallback = () => (
   </div>
 );
 
-const PrivateRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+// Route → permission mapping (must match Sidebar MENU permissions)
+const ROUTE_PERMISSIONS = {
+  '/dashboard':                'dashboard.view',
+  '/inventario':               'inventory.adjust',
+  '/inventario/movimientos':   'inventory.adjust',
+  '/reponer-stock':            'inventory.adjust',
+  '/transferencias':           'inventory.transfer',
+  '/productos':                'products.create',
+  '/categorias':               'products.create',
+  '/proveedores':              'suppliers.view',
+  '/marcas':                   'products.create',
+  '/clientes':                 'customers.view',
+  '/listas-precios':           'price_lists.view',
+  '/pos/new':                  'sales.create',
+  '/pos/tablet':               'sales.create',
+  '/ventas':                   'sales.view',
+  '/cotizaciones':             'sales.quotes.view',
+  '/pre-pedidos':              'pre_orders.view',
+  '/purchase-orders':          'purchases.view',
+  '/purchase-orders/create':   'purchases.view',
+  '/deliveries':               'deliveries.view',
+  '/credit-notes':             'credit_notes.view',
+  '/supplier-payments':        'supplier_payments.view',
+  '/cuentas-por-pagar':        'suppliers.view',
+  '/cuentas-por-cobrar':       'ar.view',
+  '/reportes':                 'reports.view',
+  '/cierre-caja':              'sales.collect',
+  '/configuracion':            'settings.manage',
+  '/tasas-cambio':             'settings.manage',
+};
+
+// Ordered list of routes to try as default landing page
+const DEFAULT_ROUTES = [
+  '/dashboard', '/ventas', '/pos/new', '/clientes', '/inventario',
+  '/productos', '/reportes', '/configuracion',
+];
+
+const PrivateRoute = ({ children, permission }) => {
+  const { user, loading, hasPermission } = useAuth();
 
   if (loading) {
     return (
@@ -66,7 +103,27 @@ const PrivateRoute = ({ children }) => {
     );
   }
 
-  return user ? children : <Navigate to="/login" />;
+  if (!user) return <Navigate to="/login" />;
+
+  if (permission && !hasPermission(permission)) {
+    const fallback = DEFAULT_ROUTES.find(r => {
+      const perm = ROUTE_PERMISSIONS[r];
+      return !perm || hasPermission(perm);
+    }) || '/login';
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
+};
+
+const DefaultRedirect = () => {
+  const { user, hasPermission } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  const target = DEFAULT_ROUTES.find(r => {
+    const perm = ROUTE_PERMISSIONS[r];
+    return !perm || hasPermission(perm);
+  }) || '/login';
+  return <Navigate to={target} replace />;
 };
 
 const COLLAPSED_KEY = 'atlas-sidebar-collapsed';
@@ -114,344 +171,53 @@ function AppRoutes() {
       <Route path="/catalogo" element={<CatalogPage />} />
       <Route
         path="/login"
-        element={user ? <Navigate to="/dashboard" /> : <LoginPage />}
+        element={user ? <DefaultRedirect /> : <LoginPage />}
       />
       <Route
         path="/dashboard"
         element={
-          <PrivateRoute>
+          <PrivateRoute permission="dashboard.view">
             <AppLayout>
               <Dashboard />
             </AppLayout>
           </PrivateRoute>
         }
       />
-      <Route
-        path="/inventario"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <InventoryPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/inventario/:id"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <InventoryDetailPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/transferencias"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <TransfersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/inventario/movimientos"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <InventoryMovementsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/productos"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <ProductsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cotizaciones"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <QuotesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/pos/new"
-        element={
-          <PrivateRoute>
-            <ErrorBoundary><POSPageNew /></ErrorBoundary>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/pos/tablet"
-        element={
-          <PrivateRoute>
-            <ErrorBoundary><POSPageTablet /></ErrorBoundary>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/ventas"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SalesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/reponer-stock"
-        element={
-          <PrivateRoute>
-            <ErrorBoundary><StockReplenishmentPage /></ErrorBoundary>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/categorias"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <CategoriesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/proveedores"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SuppliersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/proveedores/:id/estado-cuenta"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SupplierStatementPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/marcas"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <BrandsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/clientes"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <CustomersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/usuarios"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <UsersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/configuracion"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SettingsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/tasas-cambio"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <ExchangeRatesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/purchase-orders"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PurchaseOrdersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/purchase-orders/create"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PurchaseOrderCreatePage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/purchase-orders/edit/:id"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PurchaseOrderCreatePage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/purchase-orders/receive/:id"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PurchaseOrderReceivePage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/credit-notes"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <CreditNotesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/deliveries"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <DeliveriesPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/listas-precios"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PriceListsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/supplier-payments"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SupplierPaymentsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cuentas-por-pagar"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <SupplierResumenPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/pre-pedidos"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <PreOrdersPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/reportes"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <ReportsPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cuentas-por-cobrar"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <AccountsReceivablePage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cuentas-por-cobrar/clientes"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <AccountsReceivablePage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cuentas-por-cobrar/cliente/:id"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <ARCustomerDetailPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/cierre-caja"
-        element={
-          <PrivateRoute>
-            <AppLayout>
-              <DailyReportPage />
-            </AppLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/dashboard" />} />
-      <Route path="*" element={<Navigate to="/dashboard" />} />
+      <Route path="/inventario" element={<PrivateRoute permission="inventory.adjust"><AppLayout><InventoryPage /></AppLayout></PrivateRoute>} />
+      <Route path="/inventario/:id" element={<PrivateRoute permission="inventory.adjust"><AppLayout><InventoryDetailPage /></AppLayout></PrivateRoute>} />
+      <Route path="/transferencias" element={<PrivateRoute permission="inventory.transfer"><AppLayout><TransfersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/inventario/movimientos" element={<PrivateRoute permission="inventory.adjust"><AppLayout><InventoryMovementsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/productos" element={<PrivateRoute permission="products.create"><AppLayout><ProductsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/cotizaciones" element={<PrivateRoute permission="sales.quotes.view"><AppLayout><QuotesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/pos/new" element={<PrivateRoute permission="sales.create"><ErrorBoundary><POSPageNew /></ErrorBoundary></PrivateRoute>} />
+      <Route path="/pos/tablet" element={<PrivateRoute permission="sales.create"><ErrorBoundary><POSPageTablet /></ErrorBoundary></PrivateRoute>} />
+      <Route path="/ventas" element={<PrivateRoute permission="sales.view"><AppLayout><SalesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/reponer-stock" element={<PrivateRoute permission="inventory.adjust"><ErrorBoundary><StockReplenishmentPage /></ErrorBoundary></PrivateRoute>} />
+      <Route path="/categorias" element={<PrivateRoute permission="products.create"><AppLayout><CategoriesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/proveedores" element={<PrivateRoute permission="suppliers.view"><AppLayout><SuppliersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/proveedores/:id/estado-cuenta" element={<PrivateRoute permission="suppliers.view"><AppLayout><SupplierStatementPage /></AppLayout></PrivateRoute>} />
+      <Route path="/marcas" element={<PrivateRoute permission="products.create"><AppLayout><BrandsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/clientes" element={<PrivateRoute permission="customers.view"><AppLayout><CustomersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/usuarios" element={<PrivateRoute permission="settings.manage"><AppLayout><UsersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/configuracion" element={<PrivateRoute permission="settings.manage"><AppLayout><SettingsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/tasas-cambio" element={<PrivateRoute permission="settings.manage"><AppLayout><ExchangeRatesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/purchase-orders" element={<PrivateRoute permission="purchases.view"><AppLayout><PurchaseOrdersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/purchase-orders/create" element={<PrivateRoute permission="purchases.view"><AppLayout><PurchaseOrderCreatePage /></AppLayout></PrivateRoute>} />
+      <Route path="/purchase-orders/edit/:id" element={<PrivateRoute permission="purchases.view"><AppLayout><PurchaseOrderCreatePage /></AppLayout></PrivateRoute>} />
+      <Route path="/purchase-orders/receive/:id" element={<PrivateRoute permission="purchases.view"><AppLayout><PurchaseOrderReceivePage /></AppLayout></PrivateRoute>} />
+      <Route path="/credit-notes" element={<PrivateRoute permission="credit_notes.view"><AppLayout><CreditNotesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/deliveries" element={<PrivateRoute permission="deliveries.view"><AppLayout><DeliveriesPage /></AppLayout></PrivateRoute>} />
+      <Route path="/listas-precios" element={<PrivateRoute permission="price_lists.view"><AppLayout><PriceListsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/supplier-payments" element={<PrivateRoute permission="supplier_payments.view"><AppLayout><SupplierPaymentsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/cuentas-por-pagar" element={<PrivateRoute permission="suppliers.view"><AppLayout><SupplierResumenPage /></AppLayout></PrivateRoute>} />
+      <Route path="/pre-pedidos" element={<PrivateRoute permission="pre_orders.view"><AppLayout><PreOrdersPage /></AppLayout></PrivateRoute>} />
+      <Route path="/reportes" element={<PrivateRoute permission="reports.view"><AppLayout><ReportsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/cuentas-por-cobrar" element={<PrivateRoute permission="ar.view"><AppLayout><AccountsReceivablePage /></AppLayout></PrivateRoute>} />
+      <Route path="/cuentas-por-cobrar/clientes" element={<PrivateRoute permission="ar.view"><AppLayout><AccountsReceivablePage /></AppLayout></PrivateRoute>} />
+      <Route path="/cuentas-por-cobrar/cliente/:id" element={<PrivateRoute permission="ar.view"><AppLayout><ARCustomerDetailPage /></AppLayout></PrivateRoute>} />
+      <Route path="/cierre-caja" element={<PrivateRoute permission="sales.collect"><AppLayout><DailyReportPage /></AppLayout></PrivateRoute>} />
+      <Route path="/" element={<DefaultRedirect />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
     </Suspense>
   );

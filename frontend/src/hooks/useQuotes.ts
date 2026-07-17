@@ -1,41 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { quoteService } from '../services/api/quoteService';
-
-interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-interface QuoteItem {
-  product_id: number;
-  presentation_id: number;
-  quantity: number;
-  unit_price: number;
-  total: number;
-}
-
-interface Quote {
-  id: number;
-  quote_number: string;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-  customer_id?: number;
-  total: number;
-  notes?: string;
-  valid_until?: string;
-  created_at: string;
-  items?: QuoteItem[];
-}
-
-interface QuoteListParams {
-  page?: number;
-  limit?: number;
-  status?: string;
-  customer_id?: number;
-  date_from?: string;
-  date_to?: string;
-}
+import type { Quote } from '../types';
+import type { QuoteListParams } from '../services/api/quoteService';
 
 export const useQuotes = (params?: QuoteListParams) => {
   return useQuery({ queryKey: ['quotes', params], queryFn: () => quoteService.getAll(params) });
@@ -48,7 +14,7 @@ export const useQuote = (id: number) => {
 export const useCreateQuote = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({ mutationFn: (data: Quote) => quoteService.create(data), onSuccess: () => {
+  return useMutation({ mutationFn: (data: Partial<Quote>) => quoteService.create(data), onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     }, });
 };
@@ -56,7 +22,7 @@ export const useCreateQuote = () => {
 export const useUpdateQuote = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({ mutationFn: (args: { id: number; data: Quote }) => quoteService.update(args.id, args.data), onSuccess: (data, variables) => {
+  return useMutation({ mutationFn: (args: { id: number; data: Partial<Quote> }) => quoteService.update(args.id, args.data), onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         queryClient.invalidateQueries({ queryKey: ['quotes', variables.id] });
       }, });
@@ -73,7 +39,7 @@ export const useDeleteQuote = () => {
 export const useConvertQuoteToSale = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({ mutationFn: (args: { id: number; data: any }) =>
+  return useMutation({ mutationFn: (args: { id: number; data: unknown }) =>
       quoteService.convertToSale(args.id, args.data), onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         queryClient.invalidateQueries({ queryKey: ['sales'] });

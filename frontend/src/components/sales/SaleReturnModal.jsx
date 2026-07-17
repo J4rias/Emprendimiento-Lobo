@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShoppingBag, ArrowCounterClockwise, FileX } from '@phosphor-icons/react';
 import { creditNoteService } from '../../services/api/creditNoteService';
-import Modal from '../common/Modal';
+import { Modal } from '../ui';
 import { toast } from 'sonner';
 
 const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
@@ -168,7 +168,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
 
     return (
         <Modal
-            isOpen={isOpen}
+            open={isOpen}
             onClose={() => !submitting && onClose()}
             title={
                 <div className="flex items-center gap-2 text-rose-600">
@@ -176,7 +176,7 @@ const SaleReturnModal = ({ isOpen, onClose, sale, onReturnSuccess }) => {
                     <span>Generar Devolución - Venta {sale.sale_number}</span>
                 </div>
             }
-            size="lg"
+            size="2xl"
         >
             <form onSubmit={handleSubmit} className="space-y-6">
 

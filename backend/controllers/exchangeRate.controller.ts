@@ -6,6 +6,7 @@ import { Op } from 'sequelize';
 
 // Model imports (esModuleInterop — require with export = in the .ts files)
 import ExchangeRate from '../models/ExchangeRate';
+import { localToday } from '../utils/dateUtils';
 import User from '../models/User';
 
 // Other requires that are not models/sequelize/express → leave as require()
@@ -77,7 +78,7 @@ class ExchangeRateController {
   async getLatest(req: Request, res: Response, next: NextFunction) {
     try {
       const { date } = req.query as Record<string, string>;
-      const effectiveDate = date || new Date().toISOString().split('T')[0];
+      const effectiveDate = date || localToday();
 
       // Última tasa vigente POR PAR (from→to) a la fecha. Antes devolvía solo
       // las tasas con effective_date exacto: si hoy solo se cargó VES→COP, el
@@ -320,7 +321,7 @@ class ExchangeRateController {
           to_currency,
           rate,
           converted_amount: convertedAmount,
-          date: date || new Date().toISOString().split('T')[0]
+          date: date || localToday()
         }
       });
     } catch (error) {

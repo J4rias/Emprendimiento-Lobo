@@ -8,6 +8,7 @@ import { Op } from 'sequelize';
 import Quote from '../models/Quote';
 import QuoteDetail from '../models/QuoteDetail';
 import Customer from '../models/Customer';
+import { parseLocalDate, parseLocalDateEnd } from '../utils/dateUtils';
 import Product from '../models/Product';
 import ProductPresentation from '../models/ProductPresentation';
 import User from '../models/User';
@@ -60,14 +61,14 @@ export const getAllQuotes = async (req: Request, res: Response, next: NextFuncti
     if (date_from) {
       where.quote_date = {
         ...where.quote_date,
-        [Op.gte]: new Date(date_from)
+        [Op.gte]: parseLocalDate(date_from)
       };
     }
 
     if (date_to) {
       where.quote_date = {
         ...where.quote_date,
-        [Op.lte]: new Date(date_to)
+        [Op.lte]: parseLocalDateEnd(date_to)
       };
     }
 
@@ -637,14 +638,14 @@ export const getQuoteStats = async (req: Request, res: Response, next: NextFunct
     if (date_from) {
       where.quote_date = {
         ...where.quote_date,
-        [Op.gte]: new Date(date_from as string)
+        [Op.gte]: parseLocalDate(date_from as string)
       };
     }
 
     if (date_to) {
       where.quote_date = {
         ...where.quote_date,
-        [Op.lte]: new Date(date_to as string)
+        [Op.lte]: parseLocalDateEnd(date_to as string)
       };
     }
 

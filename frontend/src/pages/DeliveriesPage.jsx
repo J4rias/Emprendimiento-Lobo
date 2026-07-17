@@ -14,6 +14,7 @@ import {
   ViewAction, TransitAction, DeliverAction, CancelAction,
 } from '../components/ui';
 import DeliveryViewSheet from '../components/deliveries/DeliveryViewSheet';
+import { localToday } from '../utils/dateUtils';
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -31,7 +32,7 @@ const DELIVERY_METHODS = {
 
 const BLANK_FORM = {
   sale_number: '',
-  scheduled_date: new Date().toISOString().split('T')[0],
+  scheduled_date: localToday(),
   delivery_address: '',
   delivery_city: '',
   delivery_state: '',
@@ -144,7 +145,7 @@ const DeliveriesPage = () => {
 
   const confirmMutation = useMutation({
     mutationFn: (id) => deliveryService.confirm(id, {
-      delivery_date: new Date().toISOString().split('T')[0],
+      delivery_date: localToday(),
     }),
     onSuccess: () => {
       toast.success('Entrega confirmada exitosamente');

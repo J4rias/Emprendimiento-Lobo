@@ -13,6 +13,7 @@ import Category from '../models/Category';
 import ProductPresentation from '../models/ProductPresentation';
 import ExchangeRate from '../models/ExchangeRate';
 import InventoryMovement from '../models/InventoryMovement';
+import { parseLocalDate, parseLocalDateEnd } from '../utils/dateUtils';
 import User from '../models/User';
 import Barcode from '../models/Barcode';
 
@@ -479,8 +480,8 @@ class InventoryController {
 
       if (date_from || date_to) {
         where.created_at = {};
-        if (date_from) where.created_at[Op.gte] = `${date_from}T00:00:00`;
-        if (date_to)   where.created_at[Op.lte] = `${date_to}T23:59:59`;
+        if (date_from) where.created_at[Op.gte] = parseLocalDate(date_from as string);
+        if (date_to)   where.created_at[Op.lte] = parseLocalDateEnd(date_to as string);
       }
 
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);

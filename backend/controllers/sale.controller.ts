@@ -22,6 +22,8 @@ const bcrypt = require('bcryptjs');
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
 
+import { parseLocalDate, parseLocalDateEnd, localToday } from '../utils/dateUtils';
+
 // generateSaleNumber moved to sale.service.ts
 
 export const createSale = async (req: Request, res: Response) => {
@@ -132,17 +134,11 @@ export const getSales = async (req: Request, res: Response) => {
     }
 
     if (date_from && date_to) {
-      where.sale_date = {
-        [Op.between]: [new Date(date_from as string), new Date(date_to as string)]
-      };
+      where.sale_date = { [Op.between]: [parseLocalDate(date_from as string), parseLocalDateEnd(date_to as string)] };
     } else if (date_from) {
-      where.sale_date = {
-        [Op.gte]: new Date(date_from as string)
-      };
+      where.sale_date = { [Op.gte]: parseLocalDate(date_from as string) };
     } else if (date_to) {
-      where.sale_date = {
-        [Op.lte]: new Date(date_to as string)
-      };
+      where.sale_date = { [Op.lte]: parseLocalDateEnd(date_to as string) };
     }
 
     const { count, rows } = await Sale.findAndCountAll({
@@ -413,13 +409,9 @@ export const getSalesStats = async (req: Request, res: Response) => {
     const where: any = {};
 
     if (date_from && date_to) {
-      where.sale_date = {
-        [Op.between]: [new Date(date_from as string), new Date(date_to as string)]
-      };
+      where.sale_date = { [Op.between]: [parseLocalDate(date_from as string), parseLocalDateEnd(date_to as string)] };
     } else if (date_from) {
-      where.sale_date = {
-        [Op.gte]: new Date(date_from as string)
-      };
+      where.sale_date = { [Op.gte]: parseLocalDate(date_from as string) };
     }
 
     if (warehouse_id) {
@@ -452,7 +444,7 @@ export const getSalesStats = async (req: Request, res: Response) => {
       INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
       WHERE s.status IN ('completed', 'pending')
         AND sd.cost_price IS NOT NULL
-        ${date_from && date_to ? 'AND s.sale_date BETWEEN :date_from AND :date_to' : date_from ? 'AND s.sale_date >= :date_from' : ''}
+        ${date_from && date_to ? "AND s.sale_date BETWEEN :date_from AND CONCAT(:date_to, ' 23:59:59')" : date_from ? 'AND s.sale_date >= :date_from' : ''}
         ${warehouse_id ? 'AND s.warehouse_id = :warehouse_id' : ''}
     `, {
       replacements: { date_from, date_to, warehouse_id },
@@ -609,8 +601,8 @@ export const getSalesStats = async (req: Request, res: Response) => {
 export const getDailySeries = async (req: Request, res: Response) => {
   try {
     const { date_from, date_to } = req.query;
-    const dateTo = date_to || new Date().toISOString().slice(0, 10);
-    const dateFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const dateTo = (date_to as string) || localToday();
+    const dateFrom = (date_from as string) || (() => { const d = new Date(); d.setDate(d.getDate() - 30); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
 
     const rows = await sequelize.query(`
       SELECT
@@ -682,9 +674,9 @@ export const getProductSales = async (req: Request, res: Response) => {
     };
 
     if (date_from && date_to) {
-      where.sale_date = { [Op.between]: [new Date(date_from as string), new Date(date_to as string)] };
+      where.sale_date = { [Op.between]: [parseLocalDate(date_from as string), parseLocalDateEnd(date_to as string)] };
     } else if (date_from) {
-      where.sale_date = { [Op.gte]: new Date(date_from as string) };
+      where.sale_date = { [Op.gte]: parseLocalDate(date_from as string) };
     }
 
     const productSales = await SaleDetail.findAll({
@@ -921,7 +913,7 @@ export const getDailyClosure = async (req: Request, res: Response) => {
 
     res.json({
       data: {
-        date: startOfDay.toISOString().split('T')[0],
+        date: `${startOfDay.getFullYear()}-${String(startOfDay.getMonth()+1).padStart(2,'0')}-${String(startOfDay.getDate()).padStart(2,'0')}`,
         totalSalesUSD,
         totalSalesCOP: Math.round(totalSalesCOP),
         salesCount,

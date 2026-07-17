@@ -1,21 +1,5 @@
 import api from './axios';
-
-export interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-export interface PreOrder {
-  id: number;
-  code: string;
-  status: 'pending' | 'approved' | 'rejected' | 'converted';
-  customer_id?: number;
-  notes?: string;
-  created_at: string;
-  items?: unknown[];
-}
+import type { Pagination, PreOrder } from '../../types';
 
 export interface PreOrderListParams {
   page?: number;
