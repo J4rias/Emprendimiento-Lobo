@@ -202,7 +202,7 @@ export function useCheckoutPayments({
   const fmtLine = useCallback((amount: number | string, currency: string) => {
     const n = parseFloat(String(amount)) || 0;
     if (currency === 'COP') return Math.ceil(n).toLocaleString('es-VE');
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }, []);
 
   return {

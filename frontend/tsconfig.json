@@ -16,9 +16,8 @@
     /* JSX */
     "jsx": "react-jsx",
 
-    /* Coexistence with JS during migration */
-    "allowJs": true,
-    "checkJs": false,
+    /* All source is TypeScript now */
+    "allowJs": false,
 
     /* Path aliases */
     "paths": {

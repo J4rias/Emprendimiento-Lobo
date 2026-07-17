@@ -148,9 +148,9 @@ export function usePOS() {
     (amount: number | string) => {
       const n = parseFloat(amount) || 0;
       if (displayCurrency === 'COP') {
-        return Math.round(n).toLocaleString('es-CO');
+        return Math.round(n).toLocaleString('es-VE');
       }
-      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
     [displayCurrency]
   );
@@ -782,7 +782,7 @@ export function usePOS() {
       if (creditCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
           ? `$ ${((totalCOP - creditCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(totalCOP - creditCOP).toLocaleString('es-CO')}`;
+          : `COP$ ${Math.round(totalCOP - creditCOP).toLocaleString('es-VE')}`;
         toast.error(`Monto a crédito insuficiente. Faltan: ${faltante}`);
         return;
       }
@@ -799,14 +799,14 @@ export function usePOS() {
       if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
           ? `$ ${((totalCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-CO')}`;
+          : `COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-VE')}`;
         toast.error(`Monto insuficiente. Faltan: ${faltante}`);
         return;
       }
       if (saleType === 'mixed' && cashPaidCOP < expectedCashCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
           ? `$ ${((expectedCashCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-CO')}`;
+          : `COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-VE')}`;
         toast.error(`Monto en efectivo insuficiente. Faltan: ${faltante}`);
         return;
       }

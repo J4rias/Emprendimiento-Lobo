@@ -1,8 +1,9 @@
 import type { Customer } from './models';
+export type { Customer };
 
 export interface CartItem {
   product_id: number;
-  presentation_id: number;
+  presentation_id: number | null;
   product_name: string;
   product_sku: string;
   presentation_name: string;
