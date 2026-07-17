@@ -83,6 +83,7 @@ const initializeDatabase = async () => {
       { name: 'sales.cancel', description: 'Cancelar ventas', module: 'sales', action: 'cancel' },
       { name: 'sales.return', description: 'Procesar devoluciones', module: 'sales', action: 'return' },
       { name: 'sales.collect', description: 'Cobrar ventas (POS)', module: 'sales', action: 'collect' },
+      { name: 'sales.credit', description: 'Vender a crédito (POS)', module: 'sales', action: 'credit' },
 
       // Purchases
       { name: 'purchases.view', description: 'Ver compras', module: 'purchases', action: 'view' },
