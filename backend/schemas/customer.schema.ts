@@ -38,7 +38,7 @@ const customerFields = {
 };
 
 /** Normalize camelCase → snake_case so the controller always sees snake_case */
-export function normalizeCustomerKeys(data: Record<string, any>) {
+export function normalizeCustomerKeys(data: Record<string, any>): Record<string, any> {
   return {
     ...data,
     document_type:       data.document_type ?? data.documentType,
