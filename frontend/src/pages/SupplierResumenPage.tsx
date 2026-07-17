@@ -10,24 +10,25 @@ import {
 } from '@phosphor-icons/react';
 import { supplierService } from '../services/api/supplierService';
 import { Alert, Button, Card, SearchInput, Spinner, ViewAction } from '../components/ui';
+import { formatUSD, formatCOP, formatVES, LOCALE } from '../utils/formatUtils';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmtUSD = (v) => {
   const val = parseFloat(v) || 0;
   if (Math.abs(val) < 0.01) return '-';
-  return `$ ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatUSD(val);
 };
 
 const fmtCOP = (v) => {
   const val = parseFloat(v) || 0;
   if (Math.abs(val) < 1) return '-';
-  return `$ ${Math.ceil(val).toLocaleString('es-VE')}`;
+  return formatCOP(val);
 };
 
 const fmtVES = (v) => {
   const val = parseFloat(v) || 0;
   if (Math.abs(val) < 1) return '-';
-  return `Bs ${Math.ceil(val).toLocaleString('es-VE')}`;
+  return formatVES(val);
 };
 
 // ── Row ───────────────────────────────────────────────────────────────────────
@@ -161,7 +162,7 @@ const SupplierResumenPage = () => {
           </div>
           <p className="text-xl font-bold text-gray-900">
             {bcv_rate
-              ? parseFloat(bcv_rate).toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+              ? parseFloat(bcv_rate).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
               : 'N/A'}
           </p>
           <p className="text-xs text-gray-500 mt-1">Bs / USD</p>

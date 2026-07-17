@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { supplierService } from '../services/api/supplierService';
-import { formatMoney } from '../utils/formatUtils';
+import { formatMoney, formatCOP, formatDateShort } from '../utils/formatUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { toast } from 'sonner';
 import {
@@ -161,9 +161,9 @@ const PurchaseOrdersPage = () => {
   // ─── Helpers ──────────────────────────────────────────────────────────────────
   const copFormat = (amount, currency) => {
     const val = parseFloat(amount || 0);
-    if (currency === 'COP') return `COP ${Math.ceil(val).toLocaleString('es-VE')}`;
+    if (currency === 'COP') return formatCOP(val);
     const rate = calculateEffectiveRate(currency, 'COP', exchangeRates) || 1;
-    return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
+    return formatCOP(val * rate);
   };
 
   const totalValueInCOP = () => {
@@ -214,7 +214,7 @@ const PurchaseOrdersPage = () => {
       sortable: true,
       sortKey: 'order_date',
       render: (v) => (
-        <div className="text-sm text-gray-600">{new Date(v).toLocaleDateString('es-VE')}</div>
+        <div className="text-sm text-gray-600">{formatDateShort(v)}</div>
       ),
     },
     {

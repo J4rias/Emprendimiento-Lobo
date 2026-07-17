@@ -8,13 +8,16 @@ import {
   Button, Alert, Card, Modal, ConfirmDialog, ExportCsvAction,
   SearchInput, Select, useTableLimit,
 } from '../components/ui';
+import { productService } from '../services/api/productService';
+import { categoryService } from '../services/api/categoryService';
+import { brandService } from '../services/api/brandService';
+import { packagingTypeService } from '../services/api/packagingTypeService';
+import { presentationTypeService } from '../services/api/presentationTypeService';
 import { presentationService } from '../services/api/presentationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import ProductTable from '../components/products/ProductTable';
 import ProductForm from '../components/products/ProductForm';
 import ProductViewSheet from '../components/products/ProductViewSheet';
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const EMPTY_FORM = {
   name: '',
@@ -33,7 +36,7 @@ const EMPTY_FORM = {
 };
 
 const ProductsPage = () => {
-  const { token, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -68,12 +71,12 @@ const ProductsPage = () => {
   const { data: productsData = {}, isLoading: loading } = useQuery({
     queryKey: ['products', currentPage, debouncedSearch, categoryFilter, limit],
     queryFn: async () => {
-      const response = await fetch(
-        `${API_URL}/products?page=${currentPage}&search=${debouncedSearch}&category_id=${categoryFilter}&limit=${limit}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!response.ok) throw new Error('Error al cargar productos');
-      const data = await response.json();
+      const data = await productService.getAll({
+        page: currentPage,
+        search: debouncedSearch,
+        category_id: categoryFilter,
+        limit,
+      });
       return {
         products: data.data || [],
         totalPages: data.pagination?.totalPages || 1,
@@ -89,11 +92,7 @@ const ProductsPage = () => {
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar categorías');
-      const data = await res.json();
+      const data = await categoryService.getAll();
       return data.data || [];
     },
     staleTime: Infinity,
@@ -102,11 +101,7 @@ const ProductsPage = () => {
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/brands?is_active=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar marcas');
-      const data = await res.json();
+      const data = await brandService.getActive();
       return data.data || [];
     },
     staleTime: Infinity,
@@ -115,11 +110,7 @@ const ProductsPage = () => {
   const { data: packagingTypes = [] } = useQuery({
     queryKey: ['packaging-types'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/packaging-types/active`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar tipos de empaque');
-      const data = await res.json();
+      const data = await packagingTypeService.getActive();
       return data.data || [];
     },
     staleTime: Infinity,
@@ -128,11 +119,7 @@ const ProductsPage = () => {
   const { data: presentationTypes = [] } = useQuery({
     queryKey: ['presentation-types'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/presentation-types/active`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar tipos de presentación');
-      const data = await res.json();
+      const data = await presentationTypeService.getActive();
       return data.data || [];
     },
     staleTime: Infinity,
@@ -221,17 +208,12 @@ const ProductsPage = () => {
   const handleBarcodeDetected = async (barcode) => {
     if (!barcode) return;
     try {
-      const res = await fetch(`${API_URL}/products?barcode=${encodeURIComponent(barcode)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data && data.data.id !== editingProduct?.id) {
-          setBarcodeError(`El código de barras ya existe en el producto: ${data.data.name}`);
-          setShowBarcodeScanner(false);
-          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          return;
-        }
+      const data = await productService.searchByBarcode(barcode);
+      if (data.data && data.data.id !== editingProduct?.id) {
+        setBarcodeError(`El código de barras ya existe en el producto: ${data.data.name}`);
+        setShowBarcodeScanner(false);
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        return;
       }
       setFormData((prev) => ({ ...prev, barcode }));
       setShowBarcodeScanner(false);
@@ -302,23 +284,17 @@ const ProductsPage = () => {
 
       // Validate barcode uniqueness
       if (formData.barcode) {
-        const checkRes = await fetch(
-          `${API_URL}/products?barcode=${encodeURIComponent(formData.barcode)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (checkRes.ok) {
-          const checkData = await checkRes.json();
+        try {
+          const checkData = await productService.searchByBarcode(formData.barcode);
           if (checkData.data && checkData.data.id !== editingProduct?.id) {
             setBarcodeError(`El código de barras ya existe en el producto: ${checkData.data.name}`);
             setSubmitting(false);
             return;
           }
+        } catch {
+          // No existing product with this barcode — continue
         }
       }
-
-      const url = editingProduct
-        ? `${API_URL}/products/${editingProduct.id}`
-        : `${API_URL}/products`;
 
       const submitData = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -333,15 +309,10 @@ const ProductsPage = () => {
         submitData.append('image_url', imagePreview);
       }
 
-      const res = await fetch(url, {
-        method: editingProduct ? 'PUT' : 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Error al guardar producto');
+      if (editingProduct) {
+        await productService.update(editingProduct.id, submitData);
+      } else {
+        await productService.create(submitData);
       }
 
       if (editingProduct) {
@@ -429,19 +400,12 @@ const ProductsPage = () => {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (id) =>
-      fetch(`${API_URL}/products/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((r) => {
-        if (!r.ok) return r.json().then((d) => { throw new Error(d.message || 'Error al eliminar producto'); });
-        return r.json();
-      }),
+    mutationFn: (id: number) => productService.delete(id),
     onSuccess: () => {
       toast.success('Producto eliminado');
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
-    onError: (err) => toast.error(err.message || 'Error al eliminar producto'),
+    onError: (err: any) => toast.error(err.response?.data?.message || err.message || 'Error al eliminar producto'),
   });
 
   const handleDelete = (id) => setDeleteTarget(id);
@@ -453,11 +417,7 @@ const ProductsPage = () => {
 
   const handleDownloadCSV = async () => {
     try {
-      const res = await fetch(`${API_URL}/products?format=csv`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al exportar productos');
-      const blob = await res.blob();
+      const blob = await productService.exportCsv();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -467,8 +427,8 @@ const ProductsPage = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success('Lista de productos exportada');
-    } catch (err) {
-      toast.error(err.message || 'No se pudo descargar la lista de productos');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'No se pudo descargar la lista de productos');
     }
   };
 

@@ -10,7 +10,7 @@ import {
   CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { formatMoney } from '../utils/formatUtils';
+import { formatMoney, formatDateShort } from '../utils/formatUtils';
 import { downloadCSV } from '../utils/csvUtils';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
@@ -296,7 +296,7 @@ const InventoryPage = () => {
       accessor: 'updated_at',
       render: (_, item) => (
         <span className="text-sm text-gray-500">
-          {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-VE') : '—'}
+          {formatDateShort(item.updated_at)}
         </span>
       ),
     },

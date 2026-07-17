@@ -1,6 +1,6 @@
 import React from 'react';
 import { Camera, X, WarningCircle } from '@phosphor-icons/react';
-import { Alert } from '../ui';
+import { Alert, Input, Select } from '../ui';
 import ImageUpload from '../common/ImageUpload';
 import PresentationManager from './PresentationManager';
 import { BarcodeScannerComponent } from '../BarcodeScanner';
@@ -171,17 +171,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Información Básica</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre del Producto *
-                </label>
-                <input
+                <Input
+                  label="Nombre del Producto *"
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={onChange}
                   required
                   minLength={2}
-                  className="input"
                   placeholder="Ej: Aceite de Soya 1L"
                 />
               </div>
@@ -199,12 +196,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                <select
+                <Select
+                  label="Categoría"
                   name="category_id"
                   value={formData.category_id}
                   onChange={onChange}
-                  className="input"
                 >
                   <option value="">Sin categoría</option>
                   {categories.map((cat) => (
@@ -212,7 +208,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                       {cat.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -245,12 +241,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-                <select
+                <Select
+                  label="Marca"
                   name="brand_id"
                   value={formData.brand_id}
                   onChange={onChange}
-                  className="input"
                 >
                   <option value="">Sin marca</option>
                   {brands.map((brand) => (
@@ -258,7 +253,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                       {brand.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -319,31 +314,25 @@ const ProductForm: React.FC<ProductFormProps> = ({
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Configuración de Stock</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stock Mínimo
-                </label>
-                <input
+                <Input
+                  label="Stock Mínimo"
                   type="number"
                   name="min_stock"
                   value={formData.min_stock}
                   onChange={onChange}
                   min="0"
                   step="1"
-                  className="input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stock Máximo
-                </label>
-                <input
+                <Input
+                  label="Stock Máximo"
                   type="number"
                   name="max_stock"
                   value={formData.max_stock}
                   onChange={onChange}
                   min="0"
                   step="1"
-                  className="input"
                 />
                 {Number(formData.max_stock) > 0 &&
                   Number(formData.min_stock) > 0 &&
@@ -354,17 +343,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
                   )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Punto de Reorden
-                </label>
-                <input
+                <Input
+                  label="Punto de Reorden"
                   type="number"
                   name="reorder_point"
                   value={formData.reorder_point}
                   onChange={onChange}
                   min="0"
                   step="1"
-                  className="input"
                 />
               </div>
             </div>

@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { X } from '@phosphor-icons/react';
 import { Button } from '../ui';
+import { formatMoney } from '../../utils/formatUtils';
 
 export interface Allocation {
   purchase_order_id: number;
@@ -195,11 +196,9 @@ export function AllocationSection({
               .map((po) => (
                 <option key={po.id} value={po.id}>
                   {po.order_number} — Total: {po.currency}{' '}
-                  {parseFloat(po.total).toLocaleString('es-VE', { minimumFractionDigits: 2 })} |
+                  {formatMoney(po.total, '', 2).trim()} |
                   Saldo: {po.currency}{' '}
-                  {parseFloat(po.balance ?? po.total).toLocaleString('es-VE', {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatMoney(po.balance ?? po.total, '', 2).trim()}
                   {po.last_invoice_number ? ` (Fact: ${po.last_invoice_number})` : ''}
                 </option>
               ))}
@@ -293,8 +292,8 @@ export function AllocationSection({
                   const rate = parseFloat(exchangeRate);
                   const amount = parseFloat(formAmount);
                   if (exchangeRateFrom === otherCur)
-                    return `${otherCur} ${(amount / rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
-                  return `${otherCur} ${(amount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+                    return formatMoney(amount / rate, otherCur, 2);
+                  return formatMoney(amount * rate, otherCur, 2);
                 })()}
               </strong>
             </p>
@@ -322,10 +321,9 @@ export function AllocationSection({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-800">{alloc.order_number}</div>
                     <div className="text-xs text-gray-500">
-                      Saldo: {alloc.po_currency}{' '}
-                      {alloc.po_total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                      Saldo: {formatMoney(alloc.po_total, alloc.po_currency, 2)}
                       {alloc.po_original_total && alloc.po_total !== alloc.po_original_total
-                        ? ` (de ${alloc.po_original_total.toLocaleString('es-VE', { minimumFractionDigits: 2 })})`
+                        ? ` (de ${formatMoney(alloc.po_original_total, '', 2).trim()})`
                         : ''}
                       {crossCurrency && (
                         <span className="ml-1 text-amber-500">
@@ -407,10 +405,8 @@ export function AllocationSection({
 
                 {crossCurrency && equivalentInPO !== null && (
                   <div className="mt-1 text-xs text-amber-600 pl-1">
-                    ≈ {alloc.po_currency}{' '}
-                    {equivalentInPO.toLocaleString('es-VE', { minimumFractionDigits: 2 })} de{' '}
-                    {alloc.po_currency}{' '}
-                    {alloc.po_total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                    ≈ {formatMoney(equivalentInPO, alloc.po_currency, 2)} de{' '}
+                    {formatMoney(alloc.po_total, alloc.po_currency, 2)}
                   </div>
                 )}
               </div>
@@ -425,14 +421,13 @@ export function AllocationSection({
           <div className="flex justify-between">
             <span className="text-gray-600">Total del pago:</span>
             <span className="font-bold">
-              {formCurrency}{' '}
-              {parseFloat(formAmount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+              {formatMoney(formAmount, formCurrency, 2)}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Distribuido:</span>
             <span className="font-bold text-green-600">
-              {formCurrency} {totalAllocated.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+              {formatMoney(totalAllocated, formCurrency, 2)}
             </span>
           </div>
 
@@ -441,8 +436,7 @@ export function AllocationSection({
               <div className="flex justify-between">
                 <span className="text-red-700 font-medium">⚠️ Error de distribución:</span>
                 <span className="font-bold text-red-700">
-                  {formCurrency}{' '}
-                  {Math.abs(unallocated).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  {formatMoney(Math.abs(unallocated), formCurrency, 2)}
                 </span>
               </div>
               <p className="text-xs text-red-600 mt-1">
@@ -456,8 +450,7 @@ export function AllocationSection({
               <div className="flex justify-between">
                 <span className="text-primary-700 font-medium">✨ Saldo a Favor generado:</span>
                 <span className="font-bold text-primary-700">
-                  {formCurrency}{' '}
-                  {unallocated.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  {formatMoney(unallocated, formCurrency, 2)}
                 </span>
               </div>
               <p className="text-xs text-primary-600 mt-1">

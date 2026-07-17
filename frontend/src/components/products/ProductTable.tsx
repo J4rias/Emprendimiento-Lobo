@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image as ImageIcon, Package } from '@phosphor-icons/react';
 import { Badge, Card, Table, Pagination, ViewAction, EditAction, DeleteAction } from '../ui';
-import { formatMoney } from '../../utils/formatUtils';
+import { formatMoney, LOCALE } from '../../utils/formatUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -146,13 +146,13 @@ const ProductTable: React.FC<ProductTableProps> = ({
         product.updated_at ? (
           <div className="flex flex-col">
             <span className="text-[11px] font-medium text-gray-700 capitalize">
-              {new Date(product.updated_at).toLocaleDateString('es-VE', {
+              {new Date(product.updated_at).toLocaleDateString(LOCALE, {
                 day: '2-digit',
                 month: 'short',
               })}
             </span>
             <span className="text-[10px] text-gray-400">
-              {new Date(product.updated_at).toLocaleTimeString('es-VE', {
+              {new Date(product.updated_at).toLocaleTimeString(LOCALE, {
                 hour: '2-digit',
                 minute: '2-digit',
               })}

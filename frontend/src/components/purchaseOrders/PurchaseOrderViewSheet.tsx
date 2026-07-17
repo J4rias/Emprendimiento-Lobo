@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatMoney as fmtMoney, formatDateShort, LOCALE } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = { draft:'neutral', sent:'info', confirmed:'warning', partial:'info', received:'success', cancelled:'error' };
 const STATUS_LABEL: Record<string, string>   = { draft:'Borrador', sent:'Enviada', confirmed:'Confirmada', partial:'Parcial', received:'Recibida', cancelled:'Cancelada' };
@@ -14,10 +15,8 @@ const PAYMENT_METHOD_COLOR: Record<string, string> = {
   other:    'bg-gray-100    text-gray-800',
 };
 
-const formatMoney = (amount: string | number, currency = 'USD'): string => {
-  const val = parseFloat(amount || 0);
-  return `${currency} ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const formatMoney = (amount: string | number, currency = 'USD'): string =>
+  fmtMoney(amount, currency, 2);
 
 interface PurchaseOrderViewSheetProps {
   open: boolean;
@@ -34,7 +33,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
           <h2 className="text-lg font-bold text-gray-900">{order.supplier?.name}</h2>
-          <p className="text-xs text-gray-500">{order.warehouse?.name} · {new Date(order.order_date).toLocaleDateString('es-VE')}</p>
+          <p className="text-xs text-gray-500">{order.warehouse?.name} · {formatDateShort(order.order_date)}</p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <Badge variant={STATUS_VARIANT[order.status] || 'neutral'}>
@@ -131,10 +130,10 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                   {order.reception_history.map((rec) => (
                     <tr key={rec.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-900">
-                        {new Date(rec.date).toLocaleDateString('es-VE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                        {new Date(rec.date).toLocaleDateString(LOCALE, { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
                       </td>
                       <td className="px-3 py-2 text-sm font-bold text-primary-600">{rec.document_number || order.order_number}</td>
-                      <td className="px-3 py-2 text-sm text-center font-bold text-green-600">+{parseFloat(rec.quantity).toLocaleString('es-VE')}</td>
+                      <td className="px-3 py-2 text-sm text-center font-bold text-green-600">+{parseFloat(rec.quantity).toLocaleString(LOCALE)}</td>
                       <td className="px-3 py-2 text-sm text-gray-600 italic">{rec.user}</td>
                     </tr>
                   ))}
@@ -164,7 +163,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                   {order.payment_history.map((pay, i) => (
                     <tr key={pay.id || i} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">
-                        {new Date(pay.payment_date).toLocaleDateString('es-VE')}
+                        {formatDateShort(pay.payment_date)}
                       </td>
                       <td className="px-3 py-2 text-sm font-bold text-primary-600">{pay.payment_number}</td>
                       <td className="px-3 py-2 text-sm">
@@ -173,7 +172,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                         </span>
                       </td>
                       <td className="px-3 py-2 text-sm text-right font-bold text-gray-900">
-                        {order.currency} {parseFloat(pay.allocated_amount_po_currency).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        {formatMoney(pay.allocated_amount_po_currency, order.currency)}
                       </td>
                     </tr>
                   ))}

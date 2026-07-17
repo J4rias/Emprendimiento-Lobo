@@ -9,6 +9,7 @@ import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, SearchInput, Select, Table,
   EditAction, ToggleLockAction,
 } from '../components/ui';
+import { formatDateShort } from '../utils/formatUtils';
 
 const emptyForm = () => ({
   username: '',
@@ -144,7 +145,7 @@ const UsersPage = () => {
       sortKey: 'last_login',
       render: (_, r) =>
         r.last_login
-          ? new Date(r.last_login).toLocaleDateString('es-VE')
+          ? formatDateShort(r.last_login)
           : 'Nunca',
     },
     {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlass, X, User, WarningCircle, CreditCard, CaretRight, UserPlus } from '@phosphor-icons/react';
 import { customerService } from '../services/api/customerService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { formatCOP } from '../utils/formatUtils';
 import { Modal } from './ui';
 import CustomerQuickAdd from './CustomerQuickAdd';
 
@@ -192,7 +193,7 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({ isOpen, onClose, onSele
                               <div className="flex items-center gap-3 mt-1">
                                 <span className="text-xs text-green-600 flex items-center gap-1">
                                   <CreditCard className="w-3 h-3" />
-                                  Crédito: COP {Math.round(parseFloat(String(customer.creditLimit || 0))).toLocaleString('es-VE')}
+                                  Crédito: {formatCOP(customer.creditLimit || 0)}
                                 </span>
                                 {customer.discountPercentage > 0 && (
                                   <span className="text-xs text-primary-600">

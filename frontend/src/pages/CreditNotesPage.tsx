@@ -14,6 +14,7 @@ import {
 } from '@phosphor-icons/react';
 import { creditNoteService } from '../services/api/creditNoteService';
 import { ViewAction, Pagination, useTableLimit } from '../components/ui';
+import { formatByCurrency } from '../utils/formatUtils';
 
 const CreditNotesPage = () => {
   const [limit, setLimit] = useTableLimit();
@@ -88,7 +89,7 @@ const CreditNotesPage = () => {
             <div className="text-sm font-medium text-gray-500 truncate">Monto Total Devuelto</div>
             <div className="mt-1 text-2xl font-bold text-red-600 text-base break-words">
               {stats.totalsByCurrency ? Object.entries(stats.totalsByCurrency).map(([curr, amount]) => (
-                <div key={curr}>{curr} {parseFloat(amount).toFixed(2)}</div>
+                <div key={curr}>{formatByCurrency(amount, curr)}</div>
               )) : '$ 0.00'}
             </div>
           </div>
@@ -200,7 +201,7 @@ const CreditNotesPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
                       {/* Ideally currency should come from the Sale original, assume DB handles it or it's mapped */}
                       <span className="text-red-600">
-                        {note.sale?.currency || 'USD'} {parseFloat(note.total).toFixed(2)}
+                        {formatByCurrency(note.total, note.sale?.currency || 'USD')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">

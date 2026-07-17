@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Modal, Button, Badge, Textarea, Spinner, Alert, ConfirmDialog, Card, ViewAction, ReceiveTransferAction, CancelAction } from '../components/ui';
 import TransferFormModal from '../components/transfers/TransferFormModal';
 import TransferViewSheet from '../components/transfers/TransferViewSheet';
+import { formatDateShort } from '../utils/formatUtils';
 
 const STATUS_CONFIG = {
   pending:   { label: 'Pendiente',   variant: 'warning' },
@@ -166,7 +167,7 @@ const TransfersPage = () => {
                           {transfer.transfer_number}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(transfer.transfer_date).toLocaleDateString('es-VE')}
+                          {formatDateShort(transfer.transfer_date)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-800">
                           <div className="flex items-center gap-1.5">

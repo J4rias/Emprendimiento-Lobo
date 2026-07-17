@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Package, Star, Trash, CurrencyDollar } from '@phosphor-icons/react';
 import { formatMoney } from '../../utils/formatUtils';
+import { Button, Input, Select } from '../ui';
 
 export interface Presentation {
   id: number | null;
@@ -213,14 +214,10 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
             Presentaciones del Producto ({localPresentations.length})
           </h4>
           {!readonly && (
-            <button
-              type="button"
-              onClick={addPresentation}
-              className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <Plus className="h-3 w-3 mr-1" />
+            <Button type="button" variant="secondary" size="sm" onClick={addPresentation}>
+              <Plus className="h-3 w-3" />
               Agregar Presentación
-            </button>
+            </Button>
           )}
         </div>
 
@@ -276,55 +273,61 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                   {/* Tipo de Empaque */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Tipo de Empaque</label>
                     {readonly ? (
-                      <p className="text-gray-700">{getPackagingTypeName(presentation.packaging_type_id)}</p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Tipo de Empaque</label>
+                        <p className="text-gray-700">{getPackagingTypeName(presentation.packaging_type_id)}</p>
+                      </>
                     ) : (
-                      <select
+                      <Select
+                        label="Tipo de Empaque"
                         value={presentation.packaging_type_id || ''}
                         onChange={(e) => updatePresentation(index, 'packaging_type_id', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         <option value="">Sin empaque</option>
                         {packagingTypes.map((type) => (
                           <option key={type.id} value={type.id}>{type.name}</option>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   </div>
 
                   {/* Tipo de Presentación */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Tipo de Unidad</label>
                     {readonly ? (
-                      <p className="text-gray-700">{getPresentationTypeName(presentation.presentation_type_id)}</p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Tipo de Unidad</label>
+                        <p className="text-gray-700">{getPresentationTypeName(presentation.presentation_type_id)}</p>
+                      </>
                     ) : (
-                      <select
+                      <Select
+                        label="Tipo de Unidad"
                         value={presentation.presentation_type_id || ''}
                         onChange={(e) => updatePresentation(index, 'presentation_type_id', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         <option value="">Sin tipo</option>
                         {presentationTypes.map((type) => (
                           <option key={type.id} value={type.id}>{type.name}</option>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   </div>
 
                   {/* Unidades por Paquete */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Unidades por Paquete *</label>
                     {readonly ? (
-                      <p className="text-gray-700">{presentation.units_per_package}</p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Unidades por Paquete *</label>
+                        <p className="text-gray-700">{presentation.units_per_package}</p>
+                      </>
                     ) : (
-                      <input
+                      <Input
+                        label="Unidades por Paquete *"
                         type="number"
                         min="1"
                         step="1"
                         value={presentation.units_per_package}
                         onChange={(e) => updatePresentation(index, 'units_per_package', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                         required
                       />
                     )}
@@ -332,38 +335,42 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
 
                   {/* Precio por Paquete */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Precio/Paquete</label>
                     {readonly ? (
-                      <p className="text-gray-700">
-                        {formatMoney(presentation.package_price, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
-                      </p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Precio/Paquete</label>
+                        <p className="text-gray-700">
+                          {formatMoney(presentation.package_price, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
+                        </p>
+                      </>
                     ) : (
-                      <input
+                      <Input
+                        label="Precio/Paquete"
                         type="number"
                         step="0.01"
                         min="0"
                         value={presentation.package_price || ''}
                         onChange={(e) => updatePresentation(index, 'package_price', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       />
                     )}
                   </div>
 
                   {/* Costo por Paquete */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Costo/Paquete</label>
                     {readonly ? (
-                      <p className="text-gray-700">
-                        {formatMoney(presentation.package_cost, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
-                      </p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Costo/Paquete</label>
+                        <p className="text-gray-700">
+                          {formatMoney(presentation.package_cost, currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
+                        </p>
+                      </>
                     ) : (
-                      <input
+                      <Input
+                        label="Costo/Paquete"
                         type="number"
                         step="0.01"
                         min="0"
                         value={presentation.package_cost || ''}
                         onChange={(e) => updatePresentation(index, 'package_cost', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       />
                     )}
                     {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
@@ -375,21 +382,23 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
 
                   {/* Moneda */}
                   <div className="md:col-span-2 lg:col-span-1">
-                    <label className="block text-xs text-gray-500 mb-1">Moneda</label>
                     {readonly ? (
-                      <p className="text-gray-700">{presentation.purchase_currency}</p>
+                      <>
+                        <label className="block text-xs text-gray-500 mb-1">Moneda</label>
+                        <p className="text-gray-700">{presentation.purchase_currency}</p>
+                      </>
                     ) : (
-                      <select
+                      <Select
+                        label="Moneda"
                         value={presentation.purchase_currency}
                         onChange={(e) => updatePresentation(index, 'purchase_currency', e.target.value)}
-                        className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:border-primary-500 focus:outline-none"
                       >
                         {currencies.map((curr) => (
                           <option key={curr.code} value={curr.code}>
                             {curr.code} ({curr.symbol})
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   </div>
 

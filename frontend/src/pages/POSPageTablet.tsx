@@ -4,6 +4,7 @@ import { useCheckoutPayments } from '../hooks/useCheckoutPayments';
 import { getCustomerDisplayName } from '../utils/paymentUtils';
 import type { PaymentLine, ExchangeRate, Customer } from '../utils/paymentUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { formatCOP } from '../utils/formatUtils';
 import { saleService } from '../services/api/saleService';
 import { printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { useCompany } from '../context/CompanyContext';
@@ -281,7 +282,7 @@ const POSPageTablet = () => {
                         <span className="text-gray-500">{cur.code}</span>
                         <span className="font-medium text-gray-700">
                           {converted !== null
-                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.ceil(converted).toLocaleString('es-VE') : converted.toFixed(2)}`
+                            ? (cur.code === 'COP' ? formatCOP(converted) : `${cur.symbol} ${converted.toFixed(2)}`)
                             : 'Sin tasa'}
                         </span>
                       </div>
@@ -756,9 +757,9 @@ function TabletCheckoutModal({
                         {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                           <span className="text-xs text-gray-400">
                             @ {line.method === 'usdt'
-                              ? `${Math.ceil(line.cop_rate).toLocaleString('es-VE')} COP/USDT`
+                              ? `${formatCOP(line.cop_rate).replace('COP ', '')} COP/USDT`
                               : line.display_rate
-                              ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString('es-VE') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                              ? `${line.currency === 'COP' ? formatCOP(line.display_rate).replace('COP ', '') : line.display_rate.toFixed(2)} ${line.currency}/USD`
                               : `${parseFloat(String(line.cop_rate)).toFixed(2)} COP/${line.currency}`}
                           </span>
                         )}
@@ -817,7 +818,7 @@ function TabletCheckoutModal({
                 }
                 const formatted = effectiveCurrency === 'USD'
                   ? remainingInCurrency.toFixed(2)
-                  : Math.ceil(remainingInCurrency).toLocaleString('es-VE');
+                  : formatCOP(remainingInCurrency).replace('COP ', '');
                 return (
                   <p className="text-base font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
                 );
@@ -886,7 +887,7 @@ function TabletCheckoutModal({
                     </div>
                     <div className="flex justify-between text-base font-semibold text-green-700">
                       <span>Entregar:</span>
-                      <span>COP$ {vueltoCOP.toLocaleString('es-VE')}</span>
+                      <span>{formatCOP(vueltoCOP)}</span>
                     </div>
                   </div>
                 );

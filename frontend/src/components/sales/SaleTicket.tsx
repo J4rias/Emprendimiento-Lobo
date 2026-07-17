@@ -7,6 +7,7 @@ import {
   separator,
   twoColumn
 } from '../../utils/printUtils';
+import { LOCALE } from '../../utils/formatUtils';
 
 interface CompanyInfo {
   name?: string;
@@ -36,10 +37,10 @@ const buildTicketHTML = (sale: Record<string, unknown>, companyInfo: CompanyInfo
     const val = parseFloat(amount || 0) * exchangeRate;
     if (isCOP) {
       const rounded = Math.round(val);
-      return `${currencySymbol} ${rounded.toLocaleString('es-VE')}`;
+      return `${currencySymbol} ${rounded.toLocaleString(LOCALE)}`;
     }
     const roundedVal = Math.round(val * 100) / 100;
-    return `${currencySymbol} ${roundedVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${currencySymbol} ${roundedVal.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const subtotal = parseFloat(sale.subtotal || 0);

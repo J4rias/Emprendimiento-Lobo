@@ -7,6 +7,7 @@ import { inventoryService } from '../services/api/inventoryService';
 import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
+import { formatUSD } from '../utils/formatUtils';
 
 // Página táctil (escáner móvil): el diseño touch-first es deliberado,
 // igual que el POS — no migrar a los componentes de escritorio del UI kit.
@@ -375,7 +376,7 @@ const StockReplenishmentPage = () => {
                     {presentations.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.name} - {p.units_per_package} uds/paquete
-                        {parseFloat(p.package_price || 0) > 0 ? ` - $${parseFloat(p.package_price).toFixed(2)}` : ''}
+                        {parseFloat(p.package_price || 0) > 0 ? ` - ${formatUSD(p.package_price)}` : ''}
                         {p.is_default ? ' ⭐' : ''}
                       </option>
                     ))}

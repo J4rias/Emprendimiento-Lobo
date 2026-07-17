@@ -1,8 +1,8 @@
 import { FileText } from '@phosphor-icons/react';
 import { Card } from '../ui';
+import { formatMoney } from '../../utils/formatUtils';
 
-const fmt = (v: number | string): string =>
-  parseFloat(String(v)).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+const fmt = (v: number | string): string => formatMoney(v, '', 2).trim();
 
 interface CurrencyBalance {
   total_ocs: number | string;
@@ -42,7 +42,7 @@ export function SupplierBalanceSummary({ summary }: SupplierBalanceSummaryProps)
               <span
                 className={`font-bold ${parseFloat(data.balance) < 0 ? 'text-green-600' : 'text-primary-600'}`}
               >
-                {Math.abs(parseFloat(data.balance)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                {fmt(Math.abs(parseFloat(data.balance)))}
               </span>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Modal, Input, Select, Textarea, Button } from '../ui';
+import { formatMoney } from '../../utils/formatUtils';
 import { AllocationSection, fmtNum, parseNum } from './AllocationSection';
 import type { Allocation } from './AllocationSection';
 import { supplierPaymentService } from '../../services/api/supplierPaymentService';
@@ -435,9 +436,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
               {formData.payment_method === 'credit_balance' && creditBalances?.[formData.currency] && (
                 <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                   Máx: {formData.currency}{' '}
-                  {creditBalances[formData.currency].available_credit.toLocaleString('es-VE', {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatMoney(creditBalances[formData.currency].available_credit, '', 2).trim()}
                 </span>
               )}
             </label>

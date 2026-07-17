@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatDateShort } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = { pending:'warning', in_transit:'info', delivered:'success', cancelled:'error' };
 const STATUS_LABEL: Record<string, string>   = { pending:'Pendiente', in_transit:'En Tránsito', delivered:'Entregado', cancelled:'Cancelado' };
@@ -38,7 +39,7 @@ const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, de
           <h2 className="text-lg font-bold text-gray-900">{delivery.delivery_number}</h2>
           <p className="text-xs text-gray-500">
             Venta: {delivery.sale?.sale_number}
-            {delivery.sale?.sale_date && ` · ${new Date(delivery.sale.sale_date).toLocaleDateString('es-VE')}`}
+            {delivery.sale?.sale_date && ` · ${formatDateShort(delivery.sale.sale_date)}`}
           </p>
         </div>
         <Badge variant={STATUS_VARIANT[delivery.status] || 'neutral'} className="shrink-0">
@@ -51,11 +52,11 @@ const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, de
         <section className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Fecha Programada">
-              {new Date(delivery.scheduled_date).toLocaleDateString('es-VE')}
+              {formatDateShort(delivery.scheduled_date)}
             </Field>
             {delivery.delivery_date && (
               <Field label="Fecha de Entrega">
-                {new Date(delivery.delivery_date).toLocaleDateString('es-VE')}
+                {formatDateShort(delivery.delivery_date)}
               </Field>
             )}
           </div>

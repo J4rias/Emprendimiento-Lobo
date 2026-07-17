@@ -12,6 +12,7 @@ import {
 import { Button, Card, DateRangeFilter, Select, Spinner } from '../components/ui';
 import { downloadCSV } from '../utils/csvUtils';
 import { localToday, localMonthStart } from '../utils/dateUtils';
+import { formatCOP, formatUSD, formatByCurrency, formatDateShort } from '../utils/formatUtils';
 
 const SALES_PAGE_SIZE = 50;
 const INVENTORY_PAGE_SIZE = 50;
@@ -26,9 +27,6 @@ const REPORT_TYPES = [
 ];
 
 const NEEDS_DATES = ['sales', 'purchases', 'top_products', 'product_sales'];
-
-const fmtCOP = (n) => Math.ceil(n || 0).toLocaleString('es-VE');
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-VE') : '';
 
 const getCustomerName = (customer) => {
   if (!customer) return 'Cliente General';
@@ -353,7 +351,7 @@ const ReportsPage = () => {
             allSales.map(sale => {
               const rate     = parseFloat(sale.exchange_rate) || 1;
               const totalCOP = Math.ceil((parseFloat(sale.total) || 0) * rate);
-              return [sale.sale_number, fmtDate(sale.sale_date), getCustomerName(sale.customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
+              return [sale.sale_number, formatDateShort(sale.sale_date), getCustomerName(sale.customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
             })
           );
           toast.success(`${allSales.length} ventas exportadas`);
@@ -393,7 +391,7 @@ const ReportsPage = () => {
         downloadCSV(
           `reporte_compras_${dateRange.start_date}_${dateRange.end_date}`,
           ['Número', 'Fecha', 'Proveedor', 'Estado', 'Moneda', 'Total'],
-          reportData.map(po => [po.order_number, fmtDate(po.order_date), po.supplier?.name || '', po.status, po.currency, po.total])
+          reportData.map(po => [po.order_number, formatDateShort(po.order_date), po.supplier?.name || '', po.status, po.currency, po.total])
         );
         break;
       case 'top_products':
@@ -437,8 +435,8 @@ const ReportsPage = () => {
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Ventas" value={stats.total_sales} />
-            <StatCard label="Monto Total" value={`COP ${fmtCOP(stats.total_amount_cop)}`} />
-            <StatCard label="Ticket Promedio" value={`COP ${fmtCOP(stats.average_ticket_cop)}`} />
+            <StatCard label="Monto Total" value={`${formatCOP(stats.total_amount_cop)}`} />
+            <StatCard label="Ticket Promedio" value={`${formatCOP(stats.average_ticket_cop)}`} />
           </div>
         );
       case 'inventory':
@@ -451,8 +449,8 @@ const ReportsPage = () => {
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Órdenes" value={stats.total_orders} />
-            <StatCard label="Monto Total" value={`$ ${parseFloat(stats.total_amount || 0).toFixed(2)}`} />
-            <StatCard label="Promedio por Orden" value={`$ ${parseFloat(stats.average_order || 0).toFixed(2)}`} />
+            <StatCard label="Monto Total" value={formatUSD(stats.total_amount || 0)} />
+            <StatCard label="Promedio por Orden" value={formatUSD(stats.average_order || 0)} />
           </div>
         );
       case 'top_products':
@@ -460,7 +458,7 @@ const ReportsPage = () => {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Productos" value={stats.total_products} />
             <StatCard label="Unidades Vendidas" value={stats.total_units_sold} />
-            <StatCard label="Ingresos Totales" value={`$ ${parseFloat(stats.total_revenue || 0).toFixed(2)}`} />
+            <StatCard label="Ingresos Totales" value={formatUSD(stats.total_revenue || 0)} />
           </div>
         );
       case 'product_sales':
@@ -468,8 +466,8 @@ const ReportsPage = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Productos" value={stats.total_products} />
             <StatCard label="Total Unidades" value={stats.total_units} />
-            <StatCard label="Total USD" value={`$ ${parseFloat(stats.total_usd || 0).toFixed(2)}`} />
-            <StatCard label="Total COP" value={`COP ${fmtCOP(stats.total_cop)}`} />
+            <StatCard label="Total USD" value={formatUSD(stats.total_usd || 0)} />
+            <StatCard label="Total COP" value={`${formatCOP(stats.total_cop)}`} />
           </div>
         );
       case 'low_stock':
@@ -511,11 +509,11 @@ const ReportsPage = () => {
                 {salesRows.map((sale, i) => (
                   <tr key={i}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.sale_number}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fmtDate(sale.sale_date)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateShort(sale.sale_date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCustomerName(sale.customer)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getSaleTypeLabel(sale.sale_type)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                      COP {fmtCOP((parseFloat(sale.total) || 0) * (parseFloat(sale.exchange_rate) || 1))}
+                      {formatCOP((parseFloat(sale.total) || 0) * (parseFloat(sale.exchange_rate) || 1))}
                     </td>
                   </tr>
                 ))}
@@ -550,8 +548,8 @@ const ReportsPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.warehouse?.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.quantity}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">$ {parseFloat(item.product?.cost || 0).toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.value || 0).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">{formatUSD(item.product?.cost || 0)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{formatUSD(item.value || 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -578,10 +576,10 @@ const ReportsPage = () => {
               {reportData.map((po, i) => (
                 <tr key={i}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{po.order_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fmtDate(po.order_date)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateShort(po.order_date)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.supplier?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.status}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{po.currency} {parseFloat(po.total || 0).toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{formatByCurrency(po.total || 0, po.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -600,7 +598,7 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_amount || 0).toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{formatUSD(item.total_amount || 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -624,8 +622,8 @@ const ReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.total_quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{item.num_sales}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">$ {parseFloat(item.total_usd || 0).toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">COP {fmtCOP(item.total_cop)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{formatUSD(item.total_usd || 0)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">{formatCOP(item.total_cop)}</td>
                 </tr>
               ))}
             </tbody>

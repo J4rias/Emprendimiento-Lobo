@@ -8,7 +8,7 @@ import { inventoryService } from '../services/api/inventoryService';
 import { saleService } from '../services/api/saleService';
 import { categoryService } from '../services/api/categoryService';
 import { useAuth } from '../context/AuthContext';
-import { formatCOP, formatUSD } from '../utils/formatUtils';
+import { formatCOP, formatUSD, LOCALE } from '../utils/formatUtils';
 import { Alert, Button, Card, Skeleton, StatCard } from '../components/ui';
 import { localToday, localMonthStart } from '../utils/dateUtils';
 
@@ -63,7 +63,7 @@ const Dashboard = () => {
   const paidUSD = byCurr.USD || { count: 0, total: 0 };
   const topProducts = (today.topProducts || []).slice(0, 5);
   const categoriesStats = data.categoriesStats || [];
-  const monthName = new Date().toLocaleDateString('es-VE', { month: 'long' });
+  const monthName = new Date().toLocaleDateString(LOCALE, { month: 'long' });
 
   if (loading) {
     return (
@@ -86,7 +86,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Bienvenido, {user?.first_name || user?.name || user?.username || 'Usuario'} — {new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}
+            Bienvenido, {user?.first_name || user?.name || user?.username || 'Usuario'} — {new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
         <Button size="lg" onClick={() => navigate('/pos/new')}>

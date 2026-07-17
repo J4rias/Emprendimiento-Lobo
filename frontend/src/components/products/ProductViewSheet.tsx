@@ -1,6 +1,7 @@
 import React from 'react';
 import { PencilSimple, Image as ImageIcon, Package, CurrencyDollar, Star } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatUSD, formatDateShort } from '../../utils/formatUtils';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || window.location.origin;
 
@@ -48,18 +49,7 @@ interface ProductViewSheetProps {
   hasPermission: (permission: string) => boolean;
 }
 
-const formatDate = (date: string | null | undefined): string => {
-  if (!date) return '-';
-  try {
-    return new Date(date).toLocaleDateString('es-VE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-};
+const formatDate = (date: string | null | undefined): string => formatDateShort(date);
 
 const ProductViewSheet: React.FC<ProductViewSheetProps> = ({ open, onClose, product, onEdit, hasPermission }) => {
   if (!product) return null;
@@ -181,13 +171,13 @@ const ProductViewSheet: React.FC<ProductViewSheetProps> = ({ open, onClose, prod
                       <CurrencyDollar className="h-3 w-3 text-gray-400" />
                       <span className="text-gray-500">Precio: </span>
                       <span className="font-semibold text-gray-900">
-                        ${parseFloat(pres.package_price || 0).toFixed(2)}
+                        {formatUSD(pres.package_price || 0)}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-gray-500">Costo: </span>
                       <span className="text-gray-900">
-                        ${parseFloat(pres.package_cost || 0).toFixed(2)}
+                        {formatUSD(pres.package_cost || 0)}
                       </span>
                     </div>
                   </div>

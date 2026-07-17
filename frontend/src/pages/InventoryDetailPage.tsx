@@ -14,6 +14,7 @@ import {
 import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
 import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 import { downloadCSV } from '../utils/csvUtils';
+import { formatDate, formatUSD } from '../utils/formatUtils';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ const InventoryDetailPage = () => {
   const handleExportCSV = () => {
     const headers = ['Fecha', 'Tipo', 'Referencia', 'Entrada', 'Salida', 'Existencia', 'Motivo', 'Usuario'];
     const rows = filteredKardex.map(m => [
-      new Date(m.created_at).toLocaleString('es-VE'),
+      formatDate(m.created_at),
       m.movement_type,
       m.document_number || '',
       m.positive ? m.qty : '',
@@ -201,6 +202,7 @@ const InventoryDetailPage = () => {
     }
     if (conversionData.error) return 'Tasa no disponible';
     return `${sym} ${parseFloat(conversionData.converted_amount || 0).toFixed(2)} ${effectiveCurrency}`;
+    // Note: costValue is a composite string with currency suffix, not a pure price display — kept as-is.
   })();
 
   // ─── Columnas del kardex ──────────────────────────────────────────────────
@@ -211,10 +213,7 @@ const InventoryDetailPage = () => {
       accessor: 'created_at',
       render: (_, m) => (
         <span className="text-xs text-gray-500 whitespace-nowrap">
-          {new Date(m.created_at).toLocaleString('es-VE', {
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-          })}
+          {formatDate(m.created_at)}
         </span>
       ),
     },
@@ -377,7 +376,7 @@ const InventoryDetailPage = () => {
             <p className="text-xs text-gray-500 mb-0.5">Última actualización</p>
             <p className="font-medium text-gray-900 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-gray-400" />
-              {new Date(inventory.updated_at).toLocaleString('es-VE')}
+              {formatDate(inventory.updated_at)}
             </p>
           </div>
         </div>
@@ -407,13 +406,13 @@ const InventoryDetailPage = () => {
                     <span className="font-medium">Uds/paquete:</span> {pres.units_per_package}
                   </div>
                   <div>
-                    <span className="font-medium">Costo paquete:</span> ${parseFloat(pres.package_cost || 0).toFixed(2)} {pres.purchase_currency}
+                    <span className="font-medium">Costo paquete:</span> {formatUSD(pres.package_cost || 0)} {pres.purchase_currency}
                   </div>
                   <div>
-                    <span className="font-medium">Precio paquete:</span> ${parseFloat(pres.package_price || 0).toFixed(2)}
+                    <span className="font-medium">Precio paquete:</span> {formatUSD(pres.package_price || 0)}
                   </div>
                   <div>
-                    <span className="font-medium">Costo unitario:</span> ${parseFloat(pres.cost || 0).toFixed(2)}
+                    <span className="font-medium">Costo unitario:</span> {formatUSD(pres.cost || 0)}
                   </div>
                 </div>
                 {pres.barcode && (

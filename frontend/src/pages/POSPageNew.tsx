@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { usePOS, CURRENCIES } from '../hooks/usePOS';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
+import { formatCOP } from '../utils/formatUtils';
 import { saleService } from '../services/api/saleService';
 import POSTabs from '../components/pos/POSTabs';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
@@ -274,7 +275,7 @@ const POSPage = () => {
                         <span className="text-gray-500">{cur.name} ({cur.code})</span>
                         <span className="font-medium text-gray-700">
                           {converted !== null
-                            ? `${cur.symbol} ${cur.code === 'COP' ? Math.ceil(converted).toLocaleString('es-VE') : converted.toFixed(2)}`
+                            ? (cur.code === 'COP' ? formatCOP(converted) : `${cur.symbol} ${converted.toFixed(2)}`)
                             : 'Sin tasa'}
                         </span>
                       </div>

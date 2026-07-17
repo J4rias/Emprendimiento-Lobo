@@ -5,10 +5,12 @@ export interface ProductListParams {
   page?: number;
   limit?: number;
   search?: string;
-  category_id?: number;
+  category_id?: number | string;
   brand_id?: number;
   is_active?: boolean;
   price_list_id?: number;
+  barcode?: string;
+  format?: string;
 }
 
 export interface ProductListResponse {
@@ -37,17 +39,25 @@ export const productService = {
     return response.data;
   },
 
-  create: async (data: Partial<Product>): Promise<ProductResponse> => {
+  create: async (data: FormData | Partial<Product>): Promise<ProductResponse> => {
     const response = await api.post('/products', data);
     return response.data;
   },
 
-  update: async (id: number, data: Partial<Product>): Promise<ProductResponse> => {
+  update: async (id: number, data: FormData | Partial<Product>): Promise<ProductResponse> => {
     const response = await api.put(`/products/${id}`, data);
     return response.data;
   },
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+
+  exportCsv: async (): Promise<Blob> => {
+    const response = await api.get('/products', {
+      params: { format: 'csv' },
+      responseType: 'blob',
+    });
+    return response.data;
   },
 } as const;

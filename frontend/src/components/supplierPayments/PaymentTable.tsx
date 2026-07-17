@@ -1,4 +1,5 @@
 import { Badge, Table, ViewAction, EditAction, CancelAction } from '../ui';
+import { formatMoney, formatDateShort } from '../../utils/formatUtils';
 
 const STATUS_LABEL = { recorded: 'Registrado', confirmed: 'Confirmado', cancelled: 'Cancelado' };
 const STATUS_VARIANT = { recorded: 'warning', confirmed: 'success', cancelled: 'error' };
@@ -23,7 +24,7 @@ const METHOD_VARIANT = {
 };
 
 const fmtAmt = (v: number | string, currency?: string): string =>
-  `${currency || ''} ${(parseFloat(String(v)) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`.trim();
+  formatMoney(v, currency || '', 2);
 
 interface SupplierPayment {
   id: number;
@@ -67,7 +68,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
         <div>
           <div className="font-medium text-gray-900">{p.payment_number || 'N/A'}</div>
           <div className="text-xs text-gray-500">
-            {p.payment_date ? new Date(p.payment_date).toLocaleDateString('es-VE') : 'N/A'}
+            {p.payment_date ? formatDateShort(p.payment_date) : 'N/A'}
           </div>
         </div>
       ),

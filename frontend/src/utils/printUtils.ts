@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas';
+import { formatByCurrency } from './formatUtils';
 
 /**
  * Print utilities for tickets and invoices
@@ -111,10 +112,7 @@ export const formatCurrency = (amount: number | string, currency = '$'): string 
   const val = parseFloat(String(amount));
   if (isNaN(val)) return `${currency} 0,00`;
 
-  return `${currency} ${val.toLocaleString('es-VE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`;
+  return formatByCurrency(val, currency);
 };
 
 /**

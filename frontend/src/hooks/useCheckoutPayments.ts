@@ -11,6 +11,7 @@ import {
   getSavedRate,
   saveRate,
 } from './usePOS';
+import { formatCOP, formatUSD } from '../utils/formatUtils';
 
 // ============= TYPES =============
 
@@ -192,17 +193,17 @@ export function useCheckoutPayments({
   );
 
   const fmtTotal = useCallback((usdVal: number) =>
-    isUSD ? usdVal.toFixed(2) : Math.ceil(usdVal * copPerUSD).toLocaleString('es-VE'),
+    isUSD ? formatUSD(usdVal).replace('$ ', '') : formatCOP(usdVal * copPerUSD).replace('COP ', ''),
   [isUSD, copPerUSD]);
 
   const fmtCOP = useCallback((copVal: number) =>
-    isUSD ? (copVal / copPerUSD).toFixed(2) : Math.ceil(copVal).toLocaleString('es-VE'),
+    isUSD ? formatUSD(copVal / copPerUSD).replace('$ ', '') : formatCOP(copVal).replace('COP ', ''),
   [isUSD, copPerUSD]);
 
   const fmtLine = useCallback((amount: number | string, currency: string) => {
     const n = parseFloat(String(amount)) || 0;
-    if (currency === 'COP') return Math.ceil(n).toLocaleString('es-VE');
-    return n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (currency === 'COP') return formatCOP(n).replace('COP ', '');
+    return formatUSD(n).replace('$ ', '');
   }, []);
 
   return {

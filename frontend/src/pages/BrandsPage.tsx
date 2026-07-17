@@ -20,6 +20,7 @@ import {
   ViewAction, EditAction, DeleteAction,
 } from '../components/ui';
 import BrandViewSheet from '../components/brands/BrandViewSheet';
+import { formatDateShort } from '../utils/formatUtils';
 
 const BrandsPage = () => {
   const queryClient = useQueryClient();
@@ -122,14 +123,7 @@ const BrandsPage = () => {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const formatDate = (date) => {
-    if (!date) return '-';
-    try {
-      return new Date(date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch {
-      return '-';
-    }
-  };
+  const formatDate = (date) => formatDateShort(date);
 
   const columns = [
     {

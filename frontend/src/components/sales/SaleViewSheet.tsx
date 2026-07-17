@@ -1,6 +1,7 @@
 import React from 'react';
 import { Printer, DeviceMobile } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatCOP, formatUSD, formatDateShort, LOCALE } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = { pending: 'warning', completed: 'success', cancelled: 'error', returned: 'neutral' };
 const STATUS_LABEL: Record<string, string>   = { pending: 'Pendiente', completed: 'Completada', cancelled: 'Cancelada', returned: 'Devuelta' };
@@ -11,20 +12,14 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 
 const copFormat = (amount: string | number, rate: string | number): string => {
   const val = parseFloat(String(amount || 0)) * parseFloat(String(rate || 1));
-  return `COP ${Math.ceil(val).toLocaleString('es-VE')}`;
+  return formatCOP(val);
 };
 
 const fmtByCurrency = (usdAmount: string | number, sale: Record<string, unknown>): string => {
   const val = parseFloat(String(usdAmount || 0));
-  if (sale.currency_mode === 'USD') return `$ ${val.toFixed(2)}`;
+  if (sale.currency_mode === 'USD') return formatUSD(val);
   const rate = parseFloat(String(sale.exchange_rate || 1));
-  return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
-};
-
-const fmtDate = (d: string | Date | null | undefined): string => {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }); }
-  catch { return '—'; }
+  return formatCOP(val * rate);
 };
 
 const getCustomerName = (c: Record<string, unknown> | null | undefined): string => {
@@ -72,7 +67,7 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
         <section className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <div className="grid grid-cols-2 gap-3 text-sm">
             {[
-              { label: 'Fecha',    value: fmtDate(sale.sale_date) },
+              { label: 'Fecha',    value: formatDateShort(sale.sale_date) },
               { label: 'Cliente',  value: getCustomerName(sale.customer) },
               { label: 'Vendedor', value: sale.seller?.first_name || sale.seller?.username || 'N/A' },
               { label: 'Almacén',  value: sale.warehouse?.name },
@@ -131,20 +126,20 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
                 return (
                   <div key={i} className="bg-white p-2 rounded border border-gray-200 space-y-0.5">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500">{fmtDate(p.payment_date)}</span>
+                      <span className="text-gray-500">{formatDateShort(p.payment_date)}</span>
                       <span className="font-semibold text-slate-700 capitalize">
                         {PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}
                       </span>
                       <span className="font-bold text-emerald-600">
                         {sale.currency_mode === 'USD'
-                          ? `$ ${(parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1)).toFixed(2)}`
-                          : `COP ${Math.ceil(amountCOP).toLocaleString('es-VE')}`}
+                          ? formatUSD(parseFloat(p.amount || 0) / parseFloat(p.exchange_rate || 1))
+                          : formatCOP(amountCOP)}
                       </span>
                     </div>
                     {showRate && (
                       <p className="text-[10px] text-gray-400 pl-1">
-                        {p.currency} {parseFloat(p.amount).toLocaleString('es-VE', { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
-                        {' @ '}{parseFloat(p.exchange_rate).toFixed(2)} | Equiv: $ {equivUSD.toFixed(2)}
+                        {p.currency} {parseFloat(p.amount).toLocaleString(LOCALE, { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
+                        {' @ '}{parseFloat(p.exchange_rate).toFixed(2)} | Equiv: {formatUSD(equivUSD)}
                       </p>
                     )}
                   </div>

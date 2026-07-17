@@ -14,7 +14,7 @@ import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
 import { COP_TOLERANCE } from '../hooks/usePOS';
 import CheckoutModal from '../components/sales/CheckoutModal';
-import { formatDate } from '../utils/formatUtils';
+import { formatDate, formatCOP, formatUSD, formatDateShort, formatByCurrency } from '../utils/formatUtils';
 import { localToday, localMonthStart } from '../utils/dateUtils';
 import { printSaleTicket, printSaleTicketPortable } from '../components/sales/SaleTicket';
 import { downloadCSV } from '../utils/csvUtils';
@@ -195,14 +195,14 @@ const SalesPage = () => {
     const rate = saleRate
       ? parseFloat(saleRate)
       : (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
-    return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
+    return formatCOP(val * rate);
   };
 
   const fmtSaleAmount = (usdAmount, row) => {
     const val = parseFloat(usdAmount || 0);
-    if (row.currency_mode === 'USD') return `$ ${val.toFixed(2)}`;
+    if (row.currency_mode === 'USD') return formatUSD(val);
     const rate = parseFloat(row.exchange_rate || 1);
-    return `COP ${Math.ceil(val * rate).toLocaleString('es-VE')}`;
+    return formatCOP(val * rate);
   };
 
   const getCustomerName = (customer) => {
@@ -241,7 +241,7 @@ const SalesPage = () => {
             )}
             {cnCount > 0 && (
               <div className="text-[10px] text-primary-500">
-                Dev: -COP {Math.ceil(cnTotalCOP).toLocaleString('es-VE')}
+                Dev: -{formatCOP(cnTotalCOP)}
               </div>
             )}
           </div>
@@ -253,7 +253,7 @@ const SalesPage = () => {
         <span className="text-sm font-bold text-gray-900">{fmtSaleAmount(saleTotal, row)}</span>
         {cnCount > 0 && (
           <div className="text-[10px] text-primary-500">
-            Neto: COP {netCOP.toLocaleString('es-VE')} ({cnCount} dev.)
+            Neto: {formatCOP(netCOP)} ({cnCount} dev.)
           </div>
         )}
       </div>
@@ -301,7 +301,7 @@ const SalesPage = () => {
           const r = parseFloat(s.exchange_rate) || 1;
           return [
             s.sale_number,
-            s.sale_date ? new Date(s.sale_date).toLocaleDateString('es-VE') : '',
+            s.sale_date ? formatDateShort(s.sale_date) : '',
             getCustomerLabel(s.customer),
             SALE_TYPE_LABEL[s.sale_type] || s.sale_type,
             STATUS_LABEL[s.status] || s.status,
@@ -485,10 +485,7 @@ const SalesPage = () => {
       sortKey: 'sale_date',
       render: (v) => (
         <span className="text-sm text-gray-600">
-          {new Date(v).toLocaleDateString('es-VE', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-          })}
+          {formatDate(v)}
         </span>
       ),
     },
@@ -607,7 +604,7 @@ const SalesPage = () => {
                 <p className="text-sm text-gray-600 mb-1">Ingresos {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
                   {stats.totalRevenueCOP != null
-                    ? `COP ${Math.ceil(stats.totalRevenueCOP).toLocaleString('es-VE')}`
+                    ? formatCOP(stats.totalRevenueCOP)
                     : copFormat(stats.totalRevenue || 0)}
                 </p>
               </div>
@@ -779,7 +776,7 @@ const SalesPage = () => {
                 <div>
                   <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
                   <p className="text-lg font-bold text-primary-900">
-                    COP {Math.ceil(customerCreditBalance.cop).toLocaleString('es-VE')}
+                    {formatCOP(customerCreditBalance.cop)}
                   </p>
                 </div>
                 <div className="text-right text-xs text-primary-700">
@@ -901,10 +898,7 @@ const SalesPage = () => {
                    `Efectivo ${line.currency}`}
                 </span>
                 <span className="font-bold text-lg text-gray-900">
-                  {line.currency === 'USD'
-                    ? `$ ${parseFloat(line.amount).toFixed(2)}`
-                    : Math.ceil(line.amount).toLocaleString('es-VE')}
-                  {' '}{line.currency}
+                  {formatByCurrency(line.amount, line.currency)}
                 </span>
               </div>
             ))}

@@ -1,12 +1,9 @@
 import React from 'react';
 import { PencilSimple, Globe } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatDateShort } from '../../utils/formatUtils';
 
-const fmtDate = (d: string | null | undefined): string => {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }); }
-  catch { return '—'; }
-};
+const fmtDate = (d: string | null | undefined): string => formatDateShort(d);
 
 interface FieldProps {
   label: string;

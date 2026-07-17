@@ -7,6 +7,7 @@ import { Printer, CurrencyDollar, Wallet, WarningCircle, CreditCard, ShoppingCar
 import { toast } from 'sonner';
 import { Button, Card, Input, Select, Spinner, StatCard } from '../components/ui';
 import { localToday } from '../utils/dateUtils';
+import { formatByCurrency, LOCALE } from '../utils/formatUtils';
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();
@@ -61,8 +62,8 @@ const DailyReportPage = () => {
 
     const fmtAmount = (amount, currency = 'USD') => {
         const val = parseFloat(amount || 0);
-        if (currency === 'COP') return Math.round(val).toLocaleString('es-VE');
-        return val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (currency === 'COP') return Math.round(val).toLocaleString(LOCALE);
+        return val.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const handlePrint = () => {
@@ -339,7 +340,7 @@ const DailyReportPage = () => {
                                                         <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
                                                         <span className="font-semibold text-gray-900 tabular-nums">
                                                             {currency === 'USD' ? '$' : ''}
-                                                            {amount.toLocaleString('es-VE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                            {amount.toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -347,7 +348,7 @@ const DailyReportPage = () => {
                                             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
                                                 <span className="text-gray-600">Total {currency}:</span>
                                                 <span className="text-gray-900 tabular-nums">
-                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString('es-VE', { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>

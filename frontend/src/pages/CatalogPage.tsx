@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MagnifyingGlass, CaretUp, Fire, Sparkle, Package } from '@phosphor-icons/react';
 import { catalogService, type CatalogData, type CatalogProduct } from '../services/api/catalogService';
+import { formatUSD } from '../utils/formatUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -255,10 +256,10 @@ const ProductCard = ({ product }: { product: CatalogProduct }) => (
       {/* Prices */}
       <div className="mt-2 pt-1.5 border-t border-gray-50">
         <p className="text-base font-bold text-slate-900 leading-none">
-          $ {Number(product.package_price).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {formatUSD(product.package_price)}
         </p>
         <p className="text-[10px] text-gray-400 mt-0.5">
-          $ {Number(product.unit_price).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} c/u
+          {formatUSD(product.unit_price)} c/u
         </p>
       </div>
     </div>

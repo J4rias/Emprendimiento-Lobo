@@ -33,8 +33,9 @@ const BUCKET_COLORS = {
 const fmt = (n) =>
   new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
 
-const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+import { formatDateShort } from '../utils/formatUtils';
+
+const fmtDate = (d) => formatDateShort(d);
 
 // ─── Barra de Aging ──────────────────────────────────────────────────────────
 

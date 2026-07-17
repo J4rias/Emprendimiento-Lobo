@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { formatMoney } from '../utils/formatUtils';
+import { formatMoney, formatDateShort } from '../utils/formatUtils';
 import { purchaseOrderService } from '../services/api/purchaseOrderService';
 import {
   ArrowLeft,
@@ -191,7 +191,7 @@ const PurchaseOrderReceivePage = () => {
           <div>
             <p className="text-sm text-primary-700">Fecha de Orden</p>
             <p className="font-medium text-primary-900">
-              {new Date(order.order_date).toLocaleDateString('es-VE')}
+              {formatDateShort(order.order_date)}
             </p>
           </div>
           <div>

@@ -1,6 +1,7 @@
 import { PencilSimple } from '@phosphor-icons/react';
 import { Calendar, Clock, Tag, AddressBook, User, Envelope, Phone, NotePencil } from '@phosphor-icons/react';
 import { Sheet, Badge, Button, Card } from '../ui';
+import { formatDateShort } from '../../utils/formatUtils';
 
 interface SupplierContact {
   id: number;
@@ -34,11 +35,7 @@ interface SupplierViewSheetProps {
   hasPermission: (permission: string) => boolean;
 }
 
-const fmtDate = (d: string | null | undefined): string => {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }); }
-  catch { return '—'; }
-};
+const fmtDate = (d: string | null | undefined): string => formatDateShort(d);
 
 const SupplierViewSheet: React.FC<SupplierViewSheetProps> = ({ open, onClose, supplier, onEdit, hasPermission }) => {
   if (!supplier) return null;

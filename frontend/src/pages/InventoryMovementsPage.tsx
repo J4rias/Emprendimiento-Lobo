@@ -12,7 +12,9 @@ import { downloadCSV } from '../utils/csvUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmtDate = (d) => new Date(d).toLocaleDateString('es-VE');
+import { formatDateShort } from '../utils/formatUtils';
+
+const fmtDate = (d) => formatDateShort(d);
 
 const getUserName = (user) => {
   if (!user) return 'Sistema';

@@ -1,6 +1,7 @@
 import React from 'react';
 import { PaperPlaneRight, XCircle, CheckCircle, ArrowCircleRight } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatUSD, formatDateShort } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = {
   draft:'neutral', sent:'info', approved:'success',
@@ -11,13 +12,9 @@ const STATUS_LABEL: Record<string, string> = {
   rejected:'Rechazada', converted:'Convertida', expired:'Vencida',
 };
 
-const fmtDate = (d: string | Date | null | undefined): string => {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }); }
-  catch { return '—'; }
-};
+const fmtDate = (d: string | Date | null | undefined): string => formatDateShort(d);
 
-const fmtUSD = (v: string | number): string => `$${parseFloat(String(v || 0)).toFixed(2)}`;
+const fmtUSD = (v: string | number): string => formatUSD(v);
 
 const customerName = (c: Record<string, unknown> | null | undefined): string => {
   if (!c) return '—';

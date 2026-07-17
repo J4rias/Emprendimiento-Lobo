@@ -18,12 +18,9 @@ import {
 } from '../components/ui';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const fmtDate = (d) => {
-  if (!d) return '—';
-  try {
-    return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch { return '—'; }
-};
+import { formatDateShort } from '../utils/formatUtils';
+
+const fmtDate = (d) => formatDateShort(d);
 
 const emptyForm = () => ({
   name: '', tax_id: '', payment_terms: '', notes: '', is_active: true, contacts: [],

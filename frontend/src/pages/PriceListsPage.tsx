@@ -11,6 +11,7 @@ import {
     Package, Printer, Lock, LockOpen
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { LOCALE, formatCOP, formatUSD } from '../utils/formatUtils';
 import { Button } from '../components/ui';
 
 const PriceListsPage = () => {
@@ -380,38 +381,31 @@ const PriceListsPage = () => {
     const renderCostDisplay = (usdAmount, baseCurrency, isBold = false) => {
         if (baseCurrency !== 'USD') {
             const isCOP = baseCurrency === 'COP';
-            const formatted = usdAmount.toLocaleString('es-VE', {
-                minimumFractionDigits: isCOP ? 0 : 2,
-                maximumFractionDigits: isCOP ? 0 : 2
-            });
             return (
                 <div className="flex flex-col items-end leading-tight">
                     <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>
-                        {isCOP ? `COP ${formatted}` : `${baseCurrency} ${formatted}`}
+                        {isCOP ? formatCOP(usdAmount) : `${baseCurrency} ${usdAmount.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </div>
                 </div>
             );
         }
 
         const rate = calculateEffectiveRate('USD', 'COP', exchangeRates);
-        const usdFormatted = usdAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         if (!rate) {
             return (
                 <div className="flex flex-col items-end leading-tight">
-                    <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>USD ${usdFormatted}</div>
+                    <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>USD {formatUSD(usdAmount)}</div>
                 </div>
             );
         }
 
         const copConverted = usdAmount * rate;
-        // Use 0 decimals for COP display
-        const copFormatted = copConverted.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
         return (
             <div className="flex flex-col items-end leading-tight gap-0.5">
-                <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>COP {copFormatted}</div>
-                <div className="text-gray-500 font-medium text-[11px]">USD ${usdFormatted}</div>
+                <div className={`text-gray-900 ${isBold ? 'font-bold' : 'font-medium'}`}>{formatCOP(copConverted)}</div>
+                <div className="text-gray-500 font-medium text-[11px]">USD {formatUSD(usdAmount)}</div>
             </div>
         );
     };
@@ -573,8 +567,8 @@ const PriceListsPage = () => {
                                                                     <div className="text-gray-500 font-medium text-[11px]">
                                                                         USD {
                                                                             d.is_frozen && d.frozen_currency === 'COP' && d.frozen_price
-                                                                            ? `$ ${(d.frozen_price / (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                                                            : `$ ${(d.package_price || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                                            ? formatUSD(d.frozen_price / (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1))
+                                                                            : formatUSD(d.package_price || 0)
                                                                         }
                                                                         {d.is_frozen && d.frozen_currency === 'COP' && <span className="ml-1 text-[9px] text-primary-400 opacity-70">(est.)</span>}
                                                                     </div>
@@ -628,7 +622,7 @@ const PriceListsPage = () => {
                                                                 marginCop = d.margin_percentage || 0;
                                                             }
                                                             const marginUsd = costUsd > 0 ? ((d.package_price_usd - costUsd) / costUsd * 100) : 0;
-                                                            const fmtMargin = (v) => v.toLocaleString('es-VE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                                                            const fmtMargin = (v) => v.toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                                                             const colorClass = (v) => v < 0 ? 'text-red-600' : v === 0 ? 'text-gray-400' : 'text-green-700';
                                                             return (
                                                                 <div className="flex flex-col items-end leading-tight gap-0.5">

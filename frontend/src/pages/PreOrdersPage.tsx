@@ -17,6 +17,7 @@ import {
 import { preOrderService } from '../services/api/preOrderService';
 import { Pagination, useTableLimit } from '../components/ui';
 import { toast } from 'sonner';
+import { formatUSD, formatDate } from '../utils/formatUtils';
 
 const PreOrdersPage = () => {
   const queryClient = useQueryClient();
@@ -212,11 +213,11 @@ const PreOrdersPage = () => {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{order.details?.length || 0}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium">
-                    ${parseFloat(order.total).toFixed(2)}
+                    {formatUSD(order.total)}
                   </td>
                   <td className="px-4 py-3 text-center">{getStatusBadge(order.status)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {new Date(order.createdAt).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {formatDate(order.createdAt)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <ViewAction onClick={() => openDetail(order)} />
@@ -291,12 +292,12 @@ const PreOrdersPage = () => {
                           {detail.presentation?.name} &middot; {parseFloat(detail.quantity)} {detail.isUnit ? 'uds' : 'paq'}
                         </div>
                       </div>
-                      <div className="text-sm font-medium">${parseFloat(detail.total).toFixed(2)}</div>
+                      <div className="text-sm font-medium">{formatUSD(detail.total)}</div>
                     </div>
                   ))}
                   <div className="p-3 flex justify-between items-center bg-gray-50 font-bold">
                     <div>Total</div>
-                    <div>${parseFloat(selectedOrder.total).toFixed(2)}</div>
+                    <div>{formatUSD(selectedOrder.total)}</div>
                   </div>
                 </div>
               </div>
@@ -306,7 +307,7 @@ const PreOrdersPage = () => {
                 <div className="bg-green-50 rounded-lg p-4">
                   <h3 className="text-sm font-medium text-green-700 mb-1">Venta generada</h3>
                   <p className="text-sm text-green-600">
-                    {selectedOrder.convertedSale.sale_number} — Total: ${parseFloat(selectedOrder.convertedSale.total).toFixed(2)}
+                    {selectedOrder.convertedSale.sale_number} — Total: {formatUSD(selectedOrder.convertedSale.total)}
                   </p>
                 </div>
               )}
@@ -354,7 +355,7 @@ const PreOrdersPage = () => {
               <h3 className="text-lg font-bold text-gray-800">Convertir a venta</h3>
             </div>
             <p className="text-sm text-gray-600">
-              Se creará una venta de contado por <strong>${parseFloat(selectedOrder.total).toFixed(2)}</strong> basada
+              Se creará una venta de contado por <strong>{formatUSD(selectedOrder.total)}</strong> basada
               en el pre-pedido <strong>{selectedOrder.code}</strong>. El inventario se descontará.
             </p>
             <p className="text-xs text-gray-400">

@@ -14,6 +14,7 @@ import {
   DateRangeFilter,
 } from '../components/ui';
 import { downloadCSV } from '../utils/csvUtils';
+import { formatUSD, formatCOP, formatVES, formatDateShort, LOCALE } from '../utils/formatUtils';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -23,23 +24,21 @@ const CATEGORY_CONFIG = {
     sublabel: 'Se paga en Bolívares',
     tabActive: 'bg-primary-600 text-white',
     tabInactive: 'text-primary-700 hover:bg-primary-50',
-    fmtAmount: (v) =>
-      `$ ${(parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    fmtAmount: (v) => formatUSD(v),
   },
   DIVISAS: {
     label: 'USD Digital',
     sublabel: 'Se paga en USD (Zelle, USDT)',
     tabActive: 'bg-emerald-600 text-white',
     tabInactive: 'text-emerald-700 hover:bg-emerald-50',
-    fmtAmount: (v) =>
-      `$ ${(parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    fmtAmount: (v) => formatUSD(v),
   },
   COP: {
     label: 'COP',
     sublabel: 'Se paga en Pesos',
     tabActive: 'bg-amber-600 text-white',
     tabInactive: 'text-amber-700 hover:bg-amber-50',
-    fmtAmount: (v) => `$ ${Math.ceil(parseFloat(v) || 0).toLocaleString('es-VE')}`,
+    fmtAmount: (v) => formatCOP(v),
   },
 };
 
@@ -73,19 +72,13 @@ const PAYMENT_METHODS = {
 
 const fmtDate = (d) => {
   if (!d) return '—';
-  return new Date(d + 'T12:00:00').toLocaleDateString('es-VE', {
+  return new Date(d + 'T12:00:00').toLocaleDateString(LOCALE, {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 };
 
-const fmtVES = (v) => {
-  const val = parseFloat(v) || 0;
-  if (Math.abs(val) < 0.01) return '—';
-  return `Bs ${Math.ceil(val).toLocaleString('es-VE')}`;
-};
-
 const fmtRate = (v) =>
-  (parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  (parseFloat(v) || 0).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -388,7 +381,7 @@ const SupplierStatementPage = () => {
                       {entry.amount_ves && (
                         <div>
                           <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Monto Bs</span>
-                          <span className="text-gray-700 font-semibold">{fmtVES(entry.amount_ves)}</span>
+                          <span className="text-gray-700 font-semibold">{formatVES(entry.amount_ves)}</span>
                         </div>
                       )}
                     </>
@@ -552,7 +545,7 @@ const SupplierStatementPage = () => {
                 {resolvedTab === 'USD' && bcvRate && activeCat.balance > 0.01 && (
                   <SummaryCard
                     title="Equivalente Bs"
-                    value={fmtVES(activeCat.balance * parseFloat(bcvRate))}
+                    value={formatVES(activeCat.balance * parseFloat(bcvRate))}
                     subtitle={`Tasa BCV: ${fmtRate(bcvRate)}`}
                     icon={Tag}
                     colorClass="bg-purple-50 border-purple-200 text-purple-800"

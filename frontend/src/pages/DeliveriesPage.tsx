@@ -15,6 +15,7 @@ import {
 } from '../components/ui';
 import DeliveryViewSheet from '../components/deliveries/DeliveryViewSheet';
 import { localToday } from '../utils/dateUtils';
+import { formatDateShort } from '../utils/formatUtils';
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -193,7 +194,7 @@ const DeliveriesPage = () => {
         <div>
           <div className="font-medium text-gray-900">{row.delivery_number}</div>
           <div className="text-xs text-gray-500">
-            {new Date(row.scheduled_date).toLocaleDateString('es-VE')}
+            {formatDateShort(row.scheduled_date)}
           </div>
         </div>
       ),
@@ -205,7 +206,7 @@ const DeliveriesPage = () => {
         <div>
           <div className="font-medium text-primary-600">{row.sale?.sale_number}</div>
           <div className="text-xs text-gray-500">
-            {new Date(row.sale?.sale_date).toLocaleDateString('es-VE')}
+            {formatDateShort(row.sale?.sale_date)}
           </div>
         </div>
       ),

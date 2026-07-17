@@ -13,6 +13,7 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { toast } from 'sonner';
 import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
+import { formatCOP, formatUSD } from '../utils/formatUtils';
 import type { PaymentLine } from '../utils/paymentUtils';
 
 // ============= CONSTANTS =============
@@ -148,9 +149,9 @@ export function usePOS() {
     (amount: number | string) => {
       const n = parseFloat(amount) || 0;
       if (displayCurrency === 'COP') {
-        return Math.round(n).toLocaleString('es-VE');
+        return formatCOP(n).replace('COP ', '');
       }
-      return n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return formatUSD(n).replace('$ ', '');
     },
     [displayCurrency]
   );
@@ -781,8 +782,8 @@ export function usePOS() {
         .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
       if (creditCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
-          ? `$ ${((totalCOP - creditCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(totalCOP - creditCOP).toLocaleString('es-VE')}`;
+          ? formatUSD((totalCOP - creditCOP) / copPerUSD)
+          : formatCOP(totalCOP - creditCOP);
         toast.error(`Monto a crédito insuficiente. Faltan: ${faltante}`);
         return;
       }
@@ -798,15 +799,15 @@ export function usePOS() {
       const expectedCashCOP = totalCOP - creditCOP;
       if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
-          ? `$ ${((totalCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(totalCOP - cashPaidCOP).toLocaleString('es-VE')}`;
+          ? formatUSD((totalCOP - cashPaidCOP) / copPerUSD)
+          : formatCOP(totalCOP - cashPaidCOP);
         toast.error(`Monto insuficiente. Faltan: ${faltante}`);
         return;
       }
       if (saleType === 'mixed' && cashPaidCOP < expectedCashCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
-          ? `$ ${((expectedCashCOP - cashPaidCOP) / copPerUSD).toFixed(2)}`
-          : `COP$ ${Math.round(expectedCashCOP - cashPaidCOP).toLocaleString('es-VE')}`;
+          ? formatUSD((expectedCashCOP - cashPaidCOP) / copPerUSD)
+          : formatCOP(expectedCashCOP - cashPaidCOP);
         toast.error(`Monto en efectivo insuficiente. Faltan: ${faltante}`);
         return;
       }

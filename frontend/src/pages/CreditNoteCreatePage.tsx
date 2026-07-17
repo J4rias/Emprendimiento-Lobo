@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle } from '@phosphor-icons/react';
 import { creditNoteService } from '../services/api/creditNoteService';
 import { saleService } from '../services/api/saleService';
 import { Alert, Button, Card, Input, Select, Textarea } from '../components/ui';
+import { formatUSD, formatDateShort } from '../utils/formatUtils';
 
 const CreditNoteCreatePage = () => {
   const navigate = useNavigate();
@@ -241,7 +242,7 @@ const CreditNoteCreatePage = () => {
               <div>
                 <p className="text-primary-700">Fecha</p>
                 <p className="font-medium text-primary-900">
-                  {new Date(sale.sale_date).toLocaleDateString('es-VE')}
+                  {formatDateShort(sale.sale_date)}
                 </p>
               </div>
               <div>
@@ -250,7 +251,7 @@ const CreditNoteCreatePage = () => {
               </div>
               <div>
                 <p className="text-primary-700">Total Venta</p>
-                <p className="font-medium text-primary-900">$ {parseFloat(sale.total).toFixed(2)}</p>
+                <p className="font-medium text-primary-900">{formatUSD(sale.total)}</p>
               </div>
             </div>
           </Card>
@@ -409,15 +410,15 @@ const CreditNoteCreatePage = () => {
                   <div className="space-y-0.5 text-right text-sm">
                     <div>
                       <span className="text-gray-600">Subtotal: </span>
-                      <span className="font-medium">$ {totals.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{formatUSD(totals.subtotal)}</span>
                     </div>
                     <div>
                       <span className="text-gray-600">Impuestos: </span>
-                      <span className="font-medium">$ {totals.tax_amount.toFixed(2)}</span>
+                      <span className="font-medium">{formatUSD(totals.tax_amount)}</span>
                     </div>
                     <div className="text-lg font-bold">
                       <span className="text-gray-900">Total: </span>
-                      <span className="text-primary-600">$ {totals.total.toFixed(2)}</span>
+                      <span className="text-primary-600">{formatUSD(totals.total)}</span>
                     </div>
                   </div>
                 </div>

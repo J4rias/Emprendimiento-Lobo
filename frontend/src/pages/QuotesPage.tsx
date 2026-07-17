@@ -10,6 +10,7 @@ import {
   ViewAction, ConvertAction, DeleteAction,
 } from '../components/ui';
 import QuoteViewSheet from '../components/quotes/QuoteViewSheet';
+import { formatUSD, formatDateShort } from '../utils/formatUtils';
 
 // ── Status config ────────────────────────────────────────────────────────────
 const STATUS_VARIANT = {
@@ -26,8 +27,8 @@ const customerName = (c) =>
   `${c?.firstName || c?.first_name || ''} ${c?.lastName || c?.last_name || ''}`.trim() ||
   'Cliente';
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-VE') : '—';
-const fmtUSD  = (n) => `$ ${parseFloat(n || 0).toFixed(2)}`;
+const fmtDate = (d) => formatDateShort(d);
+const fmtUSD  = (n) => formatUSD(n);
 
 const QuotesPage = () => {
   const { hasPermission } = useAuth();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Receipt, ArrowDownRight, ArrowUpRight, CircleNotch, Info, Repeat, CaretDown, CaretRight, CreditCard } from '@phosphor-icons/react';
 import { customerService } from '../../services/api/customerService';
 import { saleService } from '../../services/api/saleService';
+import { LOCALE, formatDateShort } from '../../utils/formatUtils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -70,7 +71,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
             <div className="flex flex-wrap gap-4 text-xs text-gray-600">
                 <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : 'Crédito'}</span>
                 <span><span className="font-medium">Estado:</span> {detail.status === 'completed' ? 'Completada' : detail.status === 'pending' ? 'Pendiente' : 'Cancelada'}</span>
-                <span><span className="font-medium">Tasa:</span> {rate.toLocaleString('es-VE')} COP/USD</span>
+                <span><span className="font-medium">Tasa:</span> {rate.toLocaleString(LOCALE)} COP/USD</span>
             </div>
             {detail.details?.length > 0 && (
                 <table className="w-full text-xs border-collapse">
@@ -120,7 +121,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
                             {appliedCNs.map((cn) => (
                                 <tr key={cn.id} className="border-t border-primary-100">
                                     <td className="px-3 py-1.5 text-primary-700 font-medium">{cn.number}</td>
-                                    <td className="px-3 py-1.5 text-gray-500">{new Date(cn.date).toLocaleDateString('es-VE', { year: 'numeric', month: 'short', day: '2-digit' })}</td>
+                                    <td className="px-3 py-1.5 text-gray-500">{formatDateShort(cn.date)}</td>
                                     <td className="px-3 py-1.5 text-right font-bold text-primary-700">
                                         -{formatCurrency(currency === 'COP' ? cn.total_cop : cn.total_usd, currency)}
                                     </td>
@@ -184,7 +185,7 @@ const CreditNoteDetailExpanded = ({ transaction }: CreditNoteDetailExpandedProps
             </div>
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
-                <span className="text-gray-800">{exchangeRate.toLocaleString('es-VE')} COP/USD</span>
+                <span className="text-gray-800">{exchangeRate.toLocaleString(LOCALE)} COP/USD</span>
             </div>
         </div>
     );
@@ -257,7 +258,7 @@ const PaymentDetailExpanded = ({ transaction, currency }: PaymentDetailExpandedP
                 {storedCurrency !== 'COP' && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Tasa aplicada</span>
-                        <span className="text-gray-800">{effectiveRate.toLocaleString('es-VE')} COP/USD</span>
+                        <span className="text-gray-800">{effectiveRate.toLocaleString(LOCALE)} COP/USD</span>
                     </div>
                 )}
                 {pay.reference && (
@@ -606,7 +607,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                 <React.Fragment key={t.id}>
                                                                     <tr className={`transition-colors ${isExpanded ? (isCharge ? 'bg-orange-50/30' : 'bg-green-50/30') : 'hover:bg-teal-50/50'}`}>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                                                            {new Date(t.date).toLocaleDateString('es-VE', { year: 'numeric', month: 'short', day: '2-digit' })}
+                                                                            {formatDateShort(t.date)}
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                                             <div className="flex items-center gap-2">

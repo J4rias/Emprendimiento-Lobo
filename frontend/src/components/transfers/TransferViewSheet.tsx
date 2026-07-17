@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Prohibit, ArrowRight } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatDate } from '../../utils/formatUtils';
 
 const STATUS_CONFIG: Record<string, { label: string; variant: string }> = {
   pending:   { label: 'Pendiente',  variant: 'warning' },
@@ -31,7 +32,7 @@ const TransferViewSheet: React.FC<TransferViewSheetProps> = ({ open, onClose, tr
             <span>{transfer.destinationWarehouse?.name}</span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            {new Date(transfer.transfer_date).toLocaleString('es-VE')}
+            {formatDate(transfer.transfer_date)}
           </p>
         </div>
         <Badge variant={STATUS_CONFIG[transfer.status]?.variant} className="shrink-0">

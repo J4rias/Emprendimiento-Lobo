@@ -16,6 +16,7 @@ import {
 } from '../components/ui';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { localToday } from '../utils/dateUtils';
+import { formatDateShort, formatDate } from '../utils/formatUtils';
 
 const ExchangeRatesPage = () => {
   const { hasPermission } = useAuth();
@@ -194,7 +195,7 @@ const ExchangeRatesPage = () => {
       render: (_, rate) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-400" />
-          {new Date(rate.effective_date + 'T00:00:00').toLocaleDateString('es-VE')}
+          {formatDateShort(rate.effective_date + 'T00:00:00')}
         </div>
       ),
     },
@@ -207,7 +208,7 @@ const ExchangeRatesPage = () => {
       render: (_, rate) => (
         <div>
           <div className="text-sm">{rate.creator?.first_name || rate.creator?.username || 'N/A'}</div>
-          <div className="text-xs text-gray-500">{new Date(rate.created_at).toLocaleString('es-VE')}</div>
+          <div className="text-xs text-gray-500">{formatDate(rate.created_at)}</div>
         </div>
       ),
     },

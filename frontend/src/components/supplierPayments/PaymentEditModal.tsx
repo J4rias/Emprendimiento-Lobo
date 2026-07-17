@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Modal, Input, Select, Textarea, Button } from '../ui';
+import { formatMoney } from '../../utils/formatUtils';
 
 interface PaymentAllocation {
   id: number;
@@ -77,7 +78,7 @@ export function PaymentEditModal({ payment, open, onClose, onSubmit, isPending }
   };
 
   const fmtAmt = (v: string | number, currency: string): string =>
-    `${currency || ''} ${(parseFloat(v) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`.trim();
+    formatMoney(v, currency || '', 2);
 
   return (
     <Modal open={open} onClose={onClose} title="Editar Pago" size="lg">
@@ -154,10 +155,7 @@ export function PaymentEditModal({ payment, open, onClose, onSubmit, isPending }
                     )}
                   </div>
                   <span className="font-semibold text-gray-800">
-                    {payment.currency}{' '}
-                    {parseFloat(alloc.allocated_amount).toLocaleString('es-VE', {
-                      minimumFractionDigits: 2,
-                    })}
+                    {formatMoney(alloc.allocated_amount, payment.currency, 2)}
                   </span>
                 </div>
               ))}

@@ -11,6 +11,7 @@ import { saleService } from '../services/api/saleService';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { Alert, Button, Pagination, Spinner, useTableLimit } from '../components/ui';
+import { LOCALE, formatDateShort } from '../utils/formatUtils';
 
 // ─── Utilidades ────────────────────────────────────────────────────────────────
 
@@ -20,10 +21,7 @@ const fmt = (amount) =>
     minimumFractionDigits: 0, maximumFractionDigits: 0
   }).format(parseFloat(amount) || 0);
 
-const fmtDate = (d) => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+const fmtDate = (d) => formatDateShort(d);
 
 const BUCKET_COLORS = {
   vigente:     'bg-green-100 text-green-800',
@@ -74,7 +72,7 @@ const SaleExpandedDetail = ({ transaction }) => {
       <div className="flex flex-wrap gap-4 text-xs text-gray-600">
         <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : 'Crédito'}</span>
         <span><span className="font-medium">Estado:</span> {detail.status === 'completed' ? 'Completada' : detail.status === 'pending' ? 'Pendiente' : 'Cancelada'}</span>
-        <span><span className="font-medium">Tasa:</span> {rate.toLocaleString('es-VE')} COP/USD</span>
+        <span><span className="font-medium">Tasa:</span> {rate.toLocaleString(LOCALE)} COP/USD</span>
         {transaction.original_data?.due_date && (
           <span><span className="font-medium">Vence:</span> {fmtDate(transaction.original_data.due_date)}</span>
         )}

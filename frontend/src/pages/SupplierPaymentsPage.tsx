@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { supplierPaymentService } from '../services/api/supplierPaymentService';
 import { supplierService } from '../services/api/supplierService';
 import { CurrencyDollar, TrendUp, CreditCard, Plus } from '@phosphor-icons/react';
+import { formatUSD } from '../utils/formatUtils';
 import {
   Alert,
   Button,
@@ -219,11 +220,9 @@ const SupplierPaymentsPage = () => {
               <div>
                 <p className="text-sm text-green-700">Total en USD</p>
                 <p className="text-2xl font-bold text-green-900">
-                  ${(
-                    parseFloat(
-                      stats.total_by_currency?.find((c) => c.currency === 'USD')?.total_amount || 0
-                    )
-                  ).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  {formatUSD(
+                    stats.total_by_currency?.find((c) => c.currency === 'USD')?.total_amount || 0
+                  )}
                 </p>
               </div>
               <TrendUp className="w-10 h-10 text-green-600 opacity-40" />

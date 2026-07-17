@@ -3,6 +3,7 @@ import { useCheckoutPayments } from '../../hooks/useCheckoutPayments';
 import { getCustomerDisplayName } from '../../utils/paymentUtils';
 import type { PaymentLine, ExchangeRate, Customer } from '../../utils/paymentUtils';
 import { CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, COP_TOLERANCE, saveRate } from '../../hooks/usePOS';
+import { LOCALE } from '../../utils/formatUtils';
 import CustomerSearch from '../CustomerSearch';
 import { Modal, Button, Textarea } from '../ui';
 import {
@@ -152,9 +153,9 @@ export default function CheckoutModal({
                       {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                         <span className="text-[10px] text-gray-400">
                           @ {line.method === 'usdt'
-                            ? `${Math.ceil(line.cop_rate).toLocaleString('es-VE')} COP/USDT`
+                            ? `${Math.ceil(line.cop_rate).toLocaleString(LOCALE)} COP/USDT`
                             : line.display_rate
-                            ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString('es-VE') : line.display_rate.toFixed(2)} ${line.currency}/USD`
+                            ? `${line.currency === 'COP' ? Math.ceil(line.display_rate).toLocaleString(LOCALE) : line.display_rate.toFixed(2)} ${line.currency}/USD`
                             : `${parseFloat(String(line.cop_rate)).toFixed(2)} COP/${line.currency}`}
                         </span>
                       )}
@@ -223,7 +224,7 @@ export default function CheckoutModal({
               }
               const formatted = effectiveCurrency === 'USD'
                 ? remainingInCurrency.toFixed(2)
-                : Math.ceil(remainingInCurrency).toLocaleString('es-VE');
+                : Math.ceil(remainingInCurrency).toLocaleString(LOCALE);
               return (
                 <p className="text-sm font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
               );
@@ -293,7 +294,7 @@ export default function CheckoutModal({
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-green-700">
                     <span>Entregar:</span>
-                    <span>COP$ {vueltoCOP.toLocaleString('es-VE')}</span>
+                    <span>COP$ {vueltoCOP.toLocaleString(LOCALE)}</span>
                   </div>
                 </div>
               );

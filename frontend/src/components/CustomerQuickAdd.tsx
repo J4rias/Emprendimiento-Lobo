@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { User, Phone, MapPin, CurrencyCircleDollar, WarningCircle, X } from '@phosphor-icons/react';
+import { User, Phone, MapPin, CurrencyCircleDollar } from '@phosphor-icons/react';
 import { customerService } from '../services/api/customerService';
+import { Input, Select, Alert, Button } from './ui';
 
 interface Customer {
   id: number;
@@ -118,14 +119,6 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
         }
     };
 
-    const getInputStyle = (fieldName: string): string => {
-        const baseStyle = "w-full text-sm border rounded-lg p-2 transition-all outline-none focus:ring-2";
-        if (validationErrors[fieldName]) {
-            return `${baseStyle} border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-200`;
-        }
-        return `${baseStyle} border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-primary-100`;
-    };
-
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
         if (!validateForm()) return;
@@ -152,17 +145,13 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
     return (
         <form id="customer-quick-add-form" onSubmit={handleSubmit} className="space-y-4 py-1">
             {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                    <WarningCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-red-800 flex-1">{error}</p>
-                    <button type="button" onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
-                        <X className="h-3.5 w-3.5" />
-                    </button>
-                </div>
+                <Alert key={error} variant="error" dismissible>
+                    {error}
+                </Alert>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Identificación */}
+                {/* Identificacion */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
                         <User className="h-4 w-4 text-gray-400" />
@@ -170,25 +159,19 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de Cliente</label>
-                            <select name="type" value={formData.type} onChange={handleChange} className={getInputStyle('type')}>
-                                <option value="natural">Natural</option>
-                                <option value="juridical">Jurídico</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Tipo Doc.</label>
-                            <select name="documentType" value={formData.documentType} onChange={handleChange} className={getInputStyle('documentType')}>
-                                {availableDocTypes.map(d => (
-                                    <option key={d.value} value={d.value}>{d.label.split(' - ')[0]}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select label="Tipo de Cliente" name="type" value={formData.type} onChange={handleChange}>
+                            <option value="natural">Natural</option>
+                            <option value="juridical">Jurídico</option>
+                        </Select>
+                        <Select label="Tipo Doc." name="documentType" value={formData.documentType} onChange={handleChange}>
+                            {availableDocTypes.map(d => (
+                                <option key={d.value} value={d.value}>{d.label.split(' - ')[0]}</option>
+                            ))}
+                        </Select>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Documento <span className="text-red-500">*</span></label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Documento <span className="text-red-500">*</span></label>
                         <div className="flex">
                             <span className={`inline-flex items-center px-2 border border-r-0 rounded-l-lg text-xs font-bold ${validationErrors.documentNumber ? 'bg-red-50 border-red-400 text-red-600' : 'bg-gray-100 border-gray-200 text-gray-700'}`}>
                                 {formData.documentType}-
@@ -202,30 +185,18 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
 
                     {formData.type === 'natural' ? (
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Nombre <span className="text-red-500">*</span></label>
-                                <input type="text" name="firstName" value={formData.firstName} onChange={handleChange}
-                                    className={getInputStyle('firstName')} placeholder="Ej: Juan" />
-                                {validationErrors.firstName && <p className="text-red-500 text-[10px] mt-1 font-medium">{validationErrors.firstName}</p>}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Apellido <span className="text-red-500">*</span></label>
-                                <input type="text" name="lastName" value={formData.lastName} onChange={handleChange}
-                                    className={getInputStyle('lastName')} placeholder="Ej: Pérez" />
-                                {validationErrors.lastName && <p className="text-red-500 text-[10px] mt-1 font-medium">{validationErrors.lastName}</p>}
-                            </div>
+                            <Input label="Nombre *" name="firstName" value={formData.firstName} onChange={handleChange}
+                                error={validationErrors.firstName || undefined} placeholder="Ej: Juan" />
+                            <Input label="Apellido *" name="lastName" value={formData.lastName} onChange={handleChange}
+                                error={validationErrors.lastName || undefined} placeholder="Ej: Pérez" />
                         </div>
                     ) : (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Razón Social <span className="text-red-500">*</span></label>
-                            <input type="text" name="businessName" value={formData.businessName} onChange={handleChange}
-                                className={getInputStyle('businessName')} placeholder="Ej: Mi Empresa C.A." />
-                            {validationErrors.businessName && <p className="text-red-500 text-[10px] mt-1 font-medium">{validationErrors.businessName}</p>}
-                        </div>
+                        <Input label="Razón Social *" name="businessName" value={formData.businessName} onChange={handleChange}
+                            error={validationErrors.businessName || undefined} placeholder="Ej: Mi Empresa C.A." />
                     )}
                 </div>
 
-                {/* Contacto y Crédito Section */}
+                {/* Contacto y Credito Section */}
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
                         <Phone className="h-4 w-4 text-gray-400" />
@@ -233,16 +204,10 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Celular</label>
-                            <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                                className={getInputStyle('mobile')} placeholder="04xx-xxx-xxxx" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" name="email" value={formData.email} onChange={handleChange}
-                                className={getInputStyle('email')} placeholder="opcional" />
-                        </div>
+                        <Input label="Celular" type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
+                            placeholder="04xx-xxx-xxxx" />
+                        <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange}
+                            placeholder="opcional" />
                     </div>
 
                     <div className="mt-auto">
@@ -252,21 +217,12 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Límite $</label>
-                                <input type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange}
-                                    className={getInputStyle('creditLimit')} min="0" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Días</label>
-                                <input type="number" name="creditDays" value={formData.creditDays} onChange={handleChange}
-                                    className={getInputStyle('creditDays')} min="0" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Desc. %</label>
-                                <input type="number" name="discountPercentage" value={formData.discountPercentage} onChange={handleChange}
-                                    className={getInputStyle('discountPercentage')} min="0" max="100" />
-                            </div>
+                            <Input label="Límite $" type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange}
+                                min="0" />
+                            <Input label="Días" type="number" name="creditDays" value={formData.creditDays} onChange={handleChange}
+                                min="0" />
+                            <Input label="Desc. %" type="number" name="discountPercentage" value={formData.discountPercentage} onChange={handleChange}
+                                min="0" max="100" />
                         </div>
                     </div>
                 </div>
@@ -276,18 +232,18 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
                 <MapPin className="h-4 w-4 text-gray-400" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase">Dirección</h3>
             </div>
-            <input type="text" name="address" value={formData.address} onChange={handleChange}
-                className={getInputStyle('address')} placeholder="Calle, Ciudad, Estado..." />
+            <Input name="address" value={formData.address} onChange={handleChange}
+                placeholder="Calle, Ciudad, Estado..." />
 
             {/* Only render own footer if used standalone (not embedded in CustomerSearch) */}
             {renderFooter && (
                 <div className="flex justify-end gap-3 pt-4 border-t">
-                    <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors" disabled={loading}>
+                    <Button variant="secondary" type="button" onClick={onCancel} disabled={loading}>
                         Volver a búsqueda
-                    </button>
-                    <button type="submit" className="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 shadow-sm transition-all" disabled={loading}>
-                        {loading ? 'Guardando...' : 'Crear y Seleccionar'}
-                    </button>
+                    </Button>
+                    <Button type="submit" disabled={loading} loading={loading}>
+                        Crear y Seleccionar
+                    </Button>
                 </div>
             )}
         </form>

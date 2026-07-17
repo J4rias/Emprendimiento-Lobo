@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sheet, Badge } from '../ui';
+import { formatMoney, formatDateShort, formatDate } from '../../utils/formatUtils';
 
 const STATUS_LABEL   = { recorded: 'Registrado', confirmed: 'Confirmado', cancelled: 'Cancelado' };
 const STATUS_VARIANT = { recorded: 'warning',     confirmed: 'success',    cancelled: 'error' };
@@ -12,10 +13,8 @@ const METHOD_VARIANT = {
   card: 'warning', other: 'neutral', credit_balance: 'purple', usdt: 'usdt',
 };
 
-const fmtDate     = (d: string | null | undefined): string => (d ? new Date(d).toLocaleDateString('es-VE') : 'N/A');
-const fmtDateTime = (d: string | null | undefined): string => (d ? new Date(d).toLocaleString('es-VE') : '');
-const fmtAmt      = (v: number | string, currency?: string): string =>
-  `${currency || ''} ${(parseFloat(String(v)) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`.trim();
+const fmtAmt = (v: number | string, currency?: string): string =>
+  formatMoney(v, currency || '', 2);
 
 // ── Field helper ──────────────────────────────────────────────────────────────
 interface FieldProps {
@@ -104,7 +103,7 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
 
         {/* ── Campos principales ───────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          <Field label="Fecha">{fmtDate(payment.payment_date)}</Field>
+          <Field label="Fecha">{formatDateShort(payment.payment_date)}</Field>
           <Field label="Proveedor">{payment.supplier?.name}</Field>
           {payment.invoice_number && (
             <Field label="N° Factura">{payment.invoice_number}</Field>
@@ -141,10 +140,7 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
                     {alloc.purchaseOrder?.currency &&
                       alloc.purchaseOrder.currency !== payment.currency && (
                         <p className="text-xs text-gray-400">
-                          ≈ {alloc.purchaseOrder.currency}{' '}
-                          {parseFloat(alloc.allocated_amount_po_currency).toLocaleString('es-VE', {
-                            minimumFractionDigits: 2,
-                          })}
+                          ≈ {formatMoney(alloc.allocated_amount_po_currency, alloc.purchaseOrder.currency, 2)}
                           {alloc.exchange_rate_used && alloc.exchange_rate_used !== 1 &&
                             ` (tasa: ${parseFloat(alloc.exchange_rate_used).toFixed(4)})`}
                         </p>
@@ -164,7 +160,7 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
           <p className="text-xs text-gray-500 mb-0.5">Registrado por</p>
           <p className="text-sm font-medium text-gray-900">{creatorName}</p>
           {payment.created_at && (
-            <p className="text-xs text-gray-400 mt-0.5">{fmtDateTime(payment.created_at)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatDate(payment.created_at)}</p>
           )}
         </div>
 

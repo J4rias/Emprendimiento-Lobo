@@ -1,6 +1,7 @@
 import React from 'react';
 import { PencilSimple } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
+import { formatCOP } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = { active: 'success', inactive: 'neutral', blocked: 'error' };
 const STATUS_LABEL: Record<string, string>   = { active: 'Activo',  inactive: 'Inactivo', blocked: 'Bloqueado' };
@@ -96,7 +97,7 @@ const CustomerViewSheet = ({ open, onClose, customer, onEdit, hasPermission }: C
           <h4 className="text-sm font-semibold text-gray-700 mb-3">Crédito</h4>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Límite de Crédito">
-              COP {Math.ceil(parseFloat(customer.creditLimit || 0)).toLocaleString('es-VE')}
+              {formatCOP(customer.creditLimit || 0)}
             </Field>
             <Field label="Días de Crédito">{customer.creditDays || 0} días</Field>
             <Field label="Descuento">{parseFloat(customer.discountPercentage || 0).toFixed(2)}%</Field>
