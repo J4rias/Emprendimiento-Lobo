@@ -122,6 +122,7 @@ const uploadMultiple = (fieldName: string, maxCount = 5) => [
 const cleanupTempImages = async () => {
   try {
     const tempDir = path.join(__dirname, '../public/uploads/temp');
+    try { await fs.access(tempDir); } catch { return; } // dir doesn't exist, skip silently
     const files = await fs.readdir(tempDir);
 
     // Eliminar archivos más antiguos de 1 hora

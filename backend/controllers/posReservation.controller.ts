@@ -105,27 +105,45 @@ export const reserve = async (req: Request, res: Response, next: NextFunction) =
       });
     }
 
-    // UPSERT: crear o actualizar reserva
-    const [reservation, created] = await PosReservation.findOrCreate({
-      where: { session_id, tab_id, presentation_id },
-      defaults: {
-        session_id,
-        tab_id,
-        user_id,
-        product_id,
-        presentation_id,
-        units_reserved: units_requested,
-        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 horas
-      },
-      transaction
-    }) as any;
-
-    if (!created) {
-      // Actualizar cantidad y TTL
-      await reservation.update({
-        units_reserved: units_requested,
-        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000)
-      }, { transaction });
+    // UPSERT: crear o actualizar reserva (con fallback para race conditions)
+    let reservation: any;
+    try {
+      const [found, created] = await PosReservation.findOrCreate({
+        where: { session_id, tab_id, presentation_id },
+        defaults: {
+          session_id,
+          tab_id,
+          user_id,
+          product_id,
+          presentation_id,
+          units_reserved: units_requested,
+          expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 horas
+        },
+        transaction
+      }) as any;
+      reservation = found;
+      if (!created) {
+        await reservation.update({
+          units_reserved: units_requested,
+          expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000)
+        }, { transaction });
+      }
+    } catch (err: any) {
+      // Race condition: another request created the row between SELECT and INSERT
+      if (err.name === 'SequelizeUniqueConstraintError') {
+        reservation = await PosReservation.findOne({
+          where: { session_id, tab_id, presentation_id },
+          transaction
+        });
+        if (reservation) {
+          await reservation.update({
+            units_reserved: units_requested,
+            expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000)
+          }, { transaction });
+        }
+      } else {
+        throw err;
+      }
     }
 
     await transaction.commit();
