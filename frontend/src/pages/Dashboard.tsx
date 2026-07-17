@@ -101,7 +101,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Bienvenido, {user?.first_name || user?.name || user?.username || 'Usuario'} — {new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
+            Bienvenido, {String(user?.first_name || user?.name || user?.username || 'Usuario')} — {new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
         <Button size="lg" onClick={() => navigate('/pos/new')}>

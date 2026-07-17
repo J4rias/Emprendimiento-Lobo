@@ -12,6 +12,7 @@ import {
   SearchInput, Select, Table, Textarea, useTableLimit,
   ViewAction, StatementAction, EditAction, DeleteAction,
 } from '../components/ui';
+import type { Column } from '../components/ui';
 
 // ── Venezuelan document types ────────────────────────────────────────────────
 const VE_DOC_TYPES = [
@@ -122,7 +123,7 @@ const CustomersPage = () => {
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: custSortBy, sortDir: custSortDir, onSort: _custOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
-  const custOnSort = (f: string, d: string) => { _custOnSort(f, d); setCurrentPage(1); };
+  const custOnSort = (f: string, d: 'asc' | 'desc') => { _custOnSort(f, d); setCurrentPage(1); };
 
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
@@ -283,8 +284,8 @@ const CustomersPage = () => {
   );
 
   // ─── Table columns ───────────────────────────────────────────────────────────
-  const columns = [
-    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: string) => v },
+  const columns: Column<CustomerRow>[] = [
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: unknown) => String(v ?? '') },
     {
       key: 'name',
       header: 'Nombre / Razón Social',
@@ -536,7 +537,7 @@ const CustomersPage = () => {
       <CustomerViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingCustomer(null); }}
-        customer={viewingCustomer}
+        customer={viewingCustomer as never}
         onEdit={() => { setShowViewModal(false); if (viewingCustomer) handleEdit(viewingCustomer); }}
         hasPermission={hasPermission}
       />

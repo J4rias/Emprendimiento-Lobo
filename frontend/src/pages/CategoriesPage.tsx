@@ -47,10 +47,13 @@ const CategoriesPage = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: categoriesData, isLoading, error: fetchError } = useQuery({
+  const { data: categoriesData, isLoading, error: fetchError } = useQuery<{
+    data: CategoryRow[];
+    pagination: { totalPages: number; total: number };
+  }>({
     queryKey: ['categories', currentPage, search, limit],
-    queryFn: () => categoryService.getAll({ page: currentPage, search: search.trim(), limit }) as Promise<{ data: CategoryRow[]; pagination: { totalPages: number; total: number } }>,
-    keepPreviousData: true,
+    queryFn: () => categoryService.getAll({ page: currentPage, search: search.trim(), limit }) as unknown as Promise<{ data: CategoryRow[]; pagination: { totalPages: number; total: number } }>,
+    placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
 

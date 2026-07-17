@@ -8,13 +8,51 @@ import { saleService } from '../services/api/saleService';
 import { Alert, Button, Card, Input, Select, Textarea } from '../components/ui';
 import { formatUSD, formatDateShort } from '../utils/formatUtils';
 
+interface ReturnItem {
+  sale_detail_id: number;
+  product_name: string;
+  presentation_name: string;
+  units_per_package: number;
+  sold_packages: number;
+  sold_units: number;
+  total_units_sold: number;
+  return_packages: number;
+  return_units: number;
+  return_to_stock: boolean;
+  unit_price: number;
+  discount_percent: number;
+  tax_percent: number;
+  selected: boolean;
+}
+
+interface SaleDetailData {
+  id: number;
+  product: { name: string };
+  presentation: { name: string; units_per_package: number };
+  package_quantity: number;
+  loose_units: number;
+  unit_price: number;
+  discount_percent: number;
+  tax_percent: number;
+}
+
+interface SaleData {
+  id: number;
+  sale_number: string;
+  sale_date: string;
+  status: string;
+  total: number;
+  customer?: { name: string } | null;
+  details: SaleDetailData[];
+}
+
 const CreditNoteCreatePage = () => {
   const navigate = useNavigate();
 
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [saleNumber, setSaleNumber] = useState('');
-  const [sale, setSale] = useState(null);
-  const [returnItems, setReturnItems] = useState([]);
+  const [sale, setSale] = useState<SaleData | null>(null);
+  const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
 
   const [formData, setFormData] = useState({
     reason: 'return',
@@ -28,8 +66,8 @@ const CreditNoteCreatePage = () => {
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
   const searchMutation = useMutation({
-    mutationFn: (num) => saleService.getBySaleNumber(num),
-    onSuccess: (response) => {
+    mutationFn: (num: string) => saleService.getBySaleNumber(num),
+    onSuccess: (response: { data?: SaleData }) => {
       const saleData = response.data;
       if (!saleData) {
         setError('Venta no encontrada');
@@ -52,7 +90,7 @@ const CreditNoteCreatePage = () => {
       setError(null);
       setSale(saleData);
       setReturnItems(
-        saleData.details.map((detail) => ({
+        saleData.details.map((detail: SaleDetailData) => ({
           sale_detail_id: detail.id,
           product_name: detail.product.name,
           presentation_name: detail.presentation.name,
@@ -71,21 +109,23 @@ const CreditNoteCreatePage = () => {
         }))
       );
     },
-    onError: (err) => {
-      setError(err.response?.data?.message || 'Error al buscar la venta');
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || 'Error al buscar la venta');
       setSale(null);
       setReturnItems([]);
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => creditNoteService.create(data),
+    mutationFn: (data: Record<string, unknown>) => creditNoteService.create(data),
     onSuccess: () => {
       toast.success('Nota de crédito creada exitosamente');
       navigate('/credit-notes');
     },
-    onError: (err) => {
-      setError(err.response?.data?.message || 'Error al crear la nota de crédito');
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || 'Error al crear la nota de crédito');
     },
   });
 
@@ -99,23 +139,23 @@ const CreditNoteCreatePage = () => {
     searchMutation.mutate(saleNumber);
   };
 
-  const set = (field) => (e) =>
+  const set = (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const updateReturnItem = (index, field, value) => {
+  const updateReturnItem = (index: number, field: keyof ReturnItem, value: string | number | boolean) => {
     setReturnItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
-        const updated = { ...item, [field]: value };
-        if ((field === 'return_packages' || field === 'return_units') && value > 0) {
+        const updated: ReturnItem = { ...item, [field]: value } as ReturnItem;
+        if ((field === 'return_packages' || field === 'return_units') && Number(value) > 0) {
           updated.selected = true;
         }
         if (field === 'return_packages') {
-          const qty = parseInt(value) || 0;
+          const qty = parseInt(String(value)) || 0;
           if (qty > item.sold_packages) updated.return_packages = item.sold_packages;
         }
         if (field === 'return_units') {
-          const qty = parseInt(value) || 0;
+          const qty = parseInt(String(value)) || 0;
           if (qty > item.sold_units) updated.return_units = item.sold_units;
         }
         return updated;
@@ -123,7 +163,7 @@ const CreditNoteCreatePage = () => {
     );
   };
 
-  const toggleItemSelection = (index) => {
+  const toggleItemSelection = (index: number) => {
     setReturnItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
@@ -152,7 +192,7 @@ const CreditNoteCreatePage = () => {
     return { subtotal, tax_amount, total: subtotal + tax_amount };
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const selectedItems = returnItems.filter(
       (item) => item.selected && (item.return_packages > 0 || item.return_units > 0)
@@ -169,6 +209,7 @@ const CreditNoteCreatePage = () => {
       }
     }
     setError(null);
+    if (!sale) return;
     createMutation.mutate({
       sale_id: sale.id,
       reason: formData.reason,

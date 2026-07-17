@@ -1,6 +1,7 @@
 import { Fragment, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import type { Icon as IconType } from '@phosphor-icons/react';
 import {
   ArrowLeft, Receipt, FileText, Money,
   Building, CreditCard, Tag,
@@ -16,33 +17,81 @@ import {
 import { downloadCSV } from '../utils/csvUtils';
 import { formatUSD, formatCOP, formatVES, formatDateShort, LOCALE } from '../utils/formatUtils';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface LedgerEntry {
+  id: string;
+  rawId: number;
+  type: 'charge' | 'payment';
+  date: string;
+  reference: string;
+  amount: number;
+  status?: string;
+  notes?: string;
+  payment_number?: string;
+  method?: string;
+  bcv_rate?: string | number;
+  amount_ves?: string | number;
+  runningBalance: number;
+}
+
+interface CategoryData {
+  balance: number;
+  total_invoiced: number;
+  total_paid: number;
+  invoices?: {
+    id: number;
+    date: string;
+    description: string;
+    amount: string | number;
+    status: string;
+    notes?: string;
+  }[];
+  payments?: {
+    id: number;
+    date: string;
+    description: string;
+    payment_number?: string;
+    payment_method: string;
+    amount: string | number;
+    bcv_rate?: string | number;
+    amount_ves?: string | number;
+  }[];
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const CATEGORY_CONFIG = {
+const CATEGORY_CONFIG: Record<string, {
+  label: string;
+  sublabel: string;
+  tabActive: string;
+  tabInactive: string;
+  fmtAmount: (v: number) => string;
+}> = {
   USD: {
     label: 'USD',
     sublabel: 'Se paga en Bolívares',
     tabActive: 'bg-primary-600 text-white',
     tabInactive: 'text-primary-700 hover:bg-primary-50',
-    fmtAmount: (v) => formatUSD(v),
+    fmtAmount: (v: number) => formatUSD(v),
   },
   DIVISAS: {
     label: 'USD Digital',
     sublabel: 'Se paga en USD (Zelle, USDT)',
     tabActive: 'bg-emerald-600 text-white',
     tabInactive: 'text-emerald-700 hover:bg-emerald-50',
-    fmtAmount: (v) => formatUSD(v),
+    fmtAmount: (v: number) => formatUSD(v),
   },
   COP: {
     label: 'COP',
     sublabel: 'Se paga en Pesos',
     tabActive: 'bg-amber-600 text-white',
     tabInactive: 'text-amber-700 hover:bg-amber-50',
-    fmtAmount: (v) => formatCOP(v),
+    fmtAmount: (v: number) => formatCOP(v),
   },
 };
 
-const PO_STATUS_LABELS = {
+const PO_STATUS_LABELS: Record<string, string> = {
   pending:   'Pendiente',
   partial:   'Recibido Parcial',
   received:  'Recibido',
@@ -50,7 +99,7 @@ const PO_STATUS_LABELS = {
   cancelled: 'Cancelada',
 };
 
-const PO_STATUS_VARIANTS = {
+const PO_STATUS_VARIANTS: Record<string, string> = {
   pending:   'warning',
   partial:   'info',
   received:  'success',
@@ -58,7 +107,7 @@ const PO_STATUS_VARIANTS = {
   cancelled: 'neutral',
 };
 
-const PAYMENT_METHODS = {
+const PAYMENT_METHODS: Record<string, string> = {
   cash:           'Efectivo',
   transfer:       'Transferencia',
   check:          'Cheque',
@@ -70,19 +119,27 @@ const PAYMENT_METHODS = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmtDate = (d) => {
+const fmtDate = (d: string) => {
   if (!d) return '—';
   return new Date(d + 'T12:00:00').toLocaleDateString(LOCALE, {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 };
 
-const fmtRate = (v) =>
-  (parseFloat(v) || 0).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+const fmtRate = (v: string | number) =>
+  (parseFloat(String(v)) || 0).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const SummaryCard = ({ title, value, subtitle, icon: Icon, colorClass }) => (
+interface SummaryCardProps {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: IconType;
+  colorClass: string;
+}
+
+const SummaryCard = ({ title, value, subtitle, icon: Icon, colorClass }: SummaryCardProps) => (
   <div className={`rounded-xl p-4 border ${colorClass}`}>
     <div className="flex items-center justify-between mb-1.5">
       <p className="text-xs font-medium opacity-75">{title}</p>
@@ -99,8 +156,8 @@ const SupplierStatementPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab]     = useState(null);
-  const [expandedId, setExpandedId]   = useState(null);
+  const [activeTab, setActiveTab]     = useState<string | null>(null);
+  const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit]             = useTableLimit();
   const [startDate, setStartDate]     = useState('');
@@ -128,35 +185,36 @@ const SupplierStatementPage = () => {
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const categories = ledgerData?.categories || {};
+  const categories: Record<string, CategoryData> = ledgerData?.categories || {};
   const catKeys    = Object.keys(categories);
 
   // Pick active tab (prefer USD → DIVISAS → COP; fall back to first available)
   const defaultTab  = ['USD', 'DIVISAS', 'COP'].find((c) => catKeys.includes(c)) || catKeys[0] || null;
   const resolvedTab = activeTab && catKeys.includes(activeTab) ? activeTab : defaultTab;
   const activeCat   = resolvedTab ? categories[resolvedTab] : null;
-  const config      = CATEGORY_CONFIG[resolvedTab] || CATEGORY_CONFIG.USD;
+  const config      = (resolvedTab && CATEGORY_CONFIG[resolvedTab]) || CATEGORY_CONFIG.USD;
 
   const supplier = ledgerData?.supplier || supplierInfo;
   const bcvRate  = ledgerData?.bcv_rate;
 
   // ── Merge facturas + pagos en ledger cronológico ───────────────────────────
 
-  const mergedLedger = useMemo(() => {
+  const mergedLedger = useMemo<LedgerEntry[]>(() => {
     if (!activeCat) return [];
 
-    const entries = [
-      ...(activeCat.invoices || []).map((inv) => ({
+    const entries: LedgerEntry[] = [
+      ...(activeCat.invoices || []).map<LedgerEntry>((inv) => ({
         id:        `inv_${inv.id}`,
         rawId:     inv.id,
         type:      'charge',
         date:      inv.date,
         reference: inv.description,  // OC order_number
-        amount:    parseFloat(inv.amount || 0),
+        amount:    parseFloat(String(inv.amount || 0)),
         status:    inv.status,
         notes:     inv.notes,
+        runningBalance: 0,
       })),
-      ...(activeCat.payments || []).map((pay) => ({
+      ...(activeCat.payments || []).map<LedgerEntry>((pay) => ({
         id:             `pay_${pay.id}`,
         rawId:          pay.id,
         type:           'payment',
@@ -164,9 +222,10 @@ const SupplierStatementPage = () => {
         reference:      pay.description,  // reference || payment_number
         payment_number: pay.payment_number,
         method:         pay.payment_method,
-        amount:         parseFloat(pay.amount || 0),
+        amount:         parseFloat(String(pay.amount || 0)),
         bcv_rate:       pay.bcv_rate,
         amount_ves:     pay.amount_ves,
+        runningBalance: 0,
       })),
     ];
 
@@ -241,7 +300,7 @@ const SupplierStatementPage = () => {
       fmtDate(e.date),
       e.reference || '—',
       e.type === 'charge' ? 'Orden de Compra' : 'Pago',
-      e.type === 'payment' ? (PAYMENT_METHODS[e.method] || e.method || '—') : '—',
+      e.type === 'payment' ? (PAYMENT_METHODS[e.method as string] || e.method || '—') : '—',
       e.type === 'charge'   ? e.amount.toFixed(2) : '',
       e.type === 'payment'  ? e.amount.toFixed(2) : '',
       e.runningBalance.toFixed(2),
@@ -252,7 +311,7 @@ const SupplierStatementPage = () => {
 
   // ── Cambio de pestaña ──────────────────────────────────────────────────────
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setExpandedId(null);
     setCurrentPage(1);
@@ -260,7 +319,7 @@ const SupplierStatementPage = () => {
 
   // ── Render fila ────────────────────────────────────────────────────────────
 
-  const renderRow = (entry) => {
+  const renderRow = (entry: LedgerEntry) => {
     const isCharge   = entry.type === 'charge';
     const isExpanded = expandedId === entry.id;
     const bal        = entry.runningBalance;
@@ -307,7 +366,7 @@ const SupplierStatementPage = () => {
           <td className="px-2 py-3 hidden md:table-cell">
             {!isCharge && entry.method && (
               <Badge variant="neutral">
-                {PAYMENT_METHODS[entry.method] || entry.method}
+                {PAYMENT_METHODS[entry.method as string] || entry.method}
               </Badge>
             )}
           </td>
@@ -342,7 +401,7 @@ const SupplierStatementPage = () => {
                   {entry.status && (
                     <div>
                       <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Estado OC</span>
-                      <Badge variant={PO_STATUS_VARIANTS[entry.status] || 'neutral'}>
+                      <Badge variant={(PO_STATUS_VARIANTS[entry.status] || 'neutral') as 'warning' | 'info' | 'success' | 'neutral'}>
                         {PO_STATUS_LABELS[entry.status] || entry.status}
                       </Badge>
                     </div>
@@ -366,7 +425,7 @@ const SupplierStatementPage = () => {
                   </div>
                   <div>
                     <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Método</span>
-                    <span className="text-gray-800">{PAYMENT_METHODS[entry.method] || entry.method || '—'}</span>
+                    <span className="text-gray-800">{(entry.method && PAYMENT_METHODS[entry.method]) || entry.method || '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Monto</span>
@@ -407,10 +466,11 @@ const SupplierStatementPage = () => {
   }
 
   if (isError || !ledgerData) {
+    const err = error as { response?: { data?: { message?: string } } };
     return (
       <div className="p-6 space-y-4">
         <Alert variant="error">
-          {error?.response?.data?.message || 'Error al cargar el estado de cuenta'}
+          {err?.response?.data?.message || 'Error al cargar el estado de cuenta'}
         </Alert>
         <Button variant="ghost" size="sm" onClick={() => navigate('/proveedores')}>
           <ArrowLeft className="h-4 w-4" />
@@ -545,7 +605,7 @@ const SupplierStatementPage = () => {
                 {resolvedTab === 'USD' && bcvRate && activeCat.balance > 0.01 && (
                   <SummaryCard
                     title="Equivalente Bs"
-                    value={formatVES(activeCat.balance * parseFloat(bcvRate))}
+                    value={formatVES(activeCat.balance * parseFloat(String(bcvRate)))}
                     subtitle={`Tasa BCV: ${fmtRate(bcvRate)}`}
                     icon={Tag}
                     colorClass="bg-purple-50 border-purple-200 text-purple-800"
@@ -709,7 +769,7 @@ const SupplierStatementPage = () => {
                   total={displayLedger.length}
                   limit={limit}
                   onPageChange={setCurrentPage}
-                  onLimitChange={(n) => { setLimit(n); setCurrentPage(1); }}
+                  onLimitChange={(n: number) => { setLimit(n); setCurrentPage(1); }}
                 />
               </>
             )}

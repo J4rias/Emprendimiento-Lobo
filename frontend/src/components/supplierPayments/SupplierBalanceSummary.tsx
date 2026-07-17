@@ -37,12 +37,12 @@ export function SupplierBalanceSummary({ summary }: SupplierBalanceSummaryProps)
             </div>
             <div className="flex justify-between text-sm mt-2 pt-1 border-t border-gray-300">
               <span className="font-bold text-gray-700">
-                {parseFloat(data.balance) < 0 ? 'Saldo a favor:' : 'Saldo pendiente:'}
+                {parseFloat(String(data.balance)) < 0 ? 'Saldo a favor:' : 'Saldo pendiente:'}
               </span>
               <span
-                className={`font-bold ${parseFloat(data.balance) < 0 ? 'text-green-600' : 'text-primary-600'}`}
+                className={`font-bold ${parseFloat(String(data.balance)) < 0 ? 'text-green-600' : 'text-primary-600'}`}
               >
-                {fmt(Math.abs(parseFloat(data.balance)))}
+                {fmt(Math.abs(parseFloat(String(data.balance))))}
               </span>
             </div>
           </div>

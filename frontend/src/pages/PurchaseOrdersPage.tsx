@@ -19,38 +19,81 @@ import {
   ViewAction, PaymentAction, EditAction, ApproveAction,
   ReceiveAction, PartialReceiveAction, CancelAction,
 } from '../components/ui';
+import type { BadgeVariant, Column } from '../components/ui';
 import PurchaseOrderViewSheet from '../components/purchaseOrders/PurchaseOrderViewSheet';
 
+// ── Local Interfaces ──────────────────────────────────────────────────────────
+interface PurchaseOrderRow {
+  id: number;
+  order_number: string;
+  status: string;
+  payment_status?: string;
+  total: number;
+  currency: string;
+  supplier?: { id: number; name: string; code?: string };
+  warehouse?: { id: number; name: string };
+  [key: string]: unknown;
+}
+
+interface PurchaseOrderView extends PurchaseOrderRow {
+  [key: string]: unknown;
+}
+
+interface SupplierOption {
+  id: number;
+  name: string;
+}
+
+interface StatsValueByCurrency {
+  currency: string;
+  total: number;
+}
+
+interface PurchaseOrderStats {
+  total_orders?: number;
+  pending_orders?: number;
+  value_by_currency?: StatsValueByCurrency[];
+  [key: string]: unknown;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 // ── Status / payment config ───────────────────────────────────────────────────
-const STATUS_VARIANT = {
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
   draft: 'neutral', sent: 'info', confirmed: 'purple',
   partially_received: 'warning', received: 'success', cancelled: 'error',
 };
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
   draft: 'Borrador', sent: 'Enviada', confirmed: 'Confirmada',
   partially_received: 'Parcialmente Recibida', received: 'Recibida', cancelled: 'Cancelada',
 };
-const PAYMENT_VARIANT = { paid: 'success', partial: 'info', pending: 'neutral' };
-const PAYMENT_LABEL  = { paid: 'Pagada',   partial: 'Abonada', pending: 'Pendiente Pago' };
+const PAYMENT_VARIANT: Record<string, BadgeVariant> = { paid: 'success', partial: 'info', pending: 'neutral' };
+const PAYMENT_LABEL: Record<string, string>  = { paid: 'Pagada',   partial: 'Abonada', pending: 'Pendiente Pago' };
 
-const PAYMENT_METHOD_LABEL = {
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque',
   card: 'Tarjeta', credit_balance: 'Saldo a Favor', usdt: 'USDT',
 };
-const PAYMENT_METHOD_COLOR = {
+const PAYMENT_METHOD_COLOR: Record<string, string> = {
   cash: 'bg-green-100 text-green-700', transfer: 'bg-primary-100 text-primary-700',
   check: 'bg-purple-100 text-purple-700', card: 'bg-yellow-100 text-yellow-700',
   credit_balance: 'bg-indigo-100 text-indigo-700', usdt: 'bg-cyan-100 text-cyan-700',
   other: 'bg-gray-100 text-gray-700',
 };
 
-const PERIOD_LABELS = {
+const PERIOD_LABELS: Record<string, string> = {
   this_week: 'Esta Semana', this_month: 'Este Mes', last_month: 'Mes Anterior',
   last_30_days: 'Últimos 30 días', this_year: 'Este Año', all: 'Total Histórico',
 };
 
 // ── Date range helper ─────────────────────────────────────────────────────────
-const getDateRange = (period) => {
+const getDateRange = (period: string): Record<string, string> => {
   const today = new Date(); today.setHours(23, 59, 59, 999);
   const start = new Date(); start.setHours(0, 0, 0, 0);
   if (period === 'all') return {};
@@ -84,14 +127,14 @@ const PurchaseOrdersPage = () => {
 
   // ─── UI state ─────────────────────────────────────────────────────────────────
   const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingOrder, setViewingOrder]   = useState(null);
-  const [approvingOrderId, setApprovingOrderId] = useState(null);
-  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [viewingOrder, setViewingOrder]   = useState<PurchaseOrderView | null>(null);
+  const [approvingOrderId, setApprovingOrderId] = useState<number | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: ordersSortBy, sortDir: ordersSortDir, onSort: _ordersOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
-  const ordersOnSort = (f, d) => { _ordersOnSort(f, d); setCurrentPage(1); };
+  const ordersOnSort = (f: string, d: 'asc' | 'desc') => { _ordersOnSort(f, d); setCurrentPage(1); };
 
   // ─── Queries ──────────────────────────────────────────────────────────────────
   const { data: ordersData, isLoading, isError: fetchError } = useQuery({
@@ -122,7 +165,7 @@ const PurchaseOrdersPage = () => {
     queryFn: () => supplierService.getActive(),
     staleTime: 5 * 60_000,
   });
-  const suppliers = suppliersData?.data || [];
+  const suppliers: SupplierOption[] = suppliersData?.data || [];
 
   const { data: ratesData } = useQuery({
     queryKey: ['exchange-rates'],
@@ -138,29 +181,35 @@ const PurchaseOrdersPage = () => {
   };
 
   const approveMutation = useMutation({
-    mutationFn: (id) => purchaseOrderService.approve(id),
+    mutationFn: (id: number) => purchaseOrderService.approve(id),
     onSuccess: () => {
       toast.success('Orden aprobada exitosamente');
       setApprovingOrderId(null);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al aprobar la orden'),
+    onError: (err: unknown) => {
+      const error = err as ApiErrorResponse;
+      toast.error(error?.response?.data?.message || 'Error al aprobar la orden');
+    },
   });
 
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }) => purchaseOrderService.cancel(id, reason),
+    mutationFn: (vars: { id: number | null; reason: string }) => purchaseOrderService.cancel(vars.id!, vars.reason),
     onSuccess: () => {
       toast.success('Orden cancelada exitosamente');
       setCancellingOrderId(null);
       setCancelReason('');
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al cancelar la orden'),
+    onError: (err: unknown) => {
+      const error = err as ApiErrorResponse;
+      toast.error(error?.response?.data?.message || 'Error al cancelar la orden');
+    },
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
-  const copFormat = (amount, currency) => {
-    const val = parseFloat(amount || 0);
+  const copFormat = (amount: number, currency: string) => {
+    const val = parseFloat(String(amount || 0));
     if (currency === 'COP') return formatCOP(val);
     const rate = calculateEffectiveRate(currency, 'COP', exchangeRates) || 1;
     return formatCOP(val * rate);
@@ -168,14 +217,14 @@ const PurchaseOrdersPage = () => {
 
   const totalValueInCOP = () => {
     if (!stats?.value_by_currency) return 0;
-    return stats.value_by_currency.reduce((sum, item) => {
-      if (item.currency === 'COP') return sum + parseFloat(item.total || 0);
+    return stats.value_by_currency.reduce((sum: number, item: StatsValueByCurrency) => {
+      if (item.currency === 'COP') return sum + parseFloat(String(item.total || 0));
       const rate = calculateEffectiveRate(item.currency, 'COP', exchangeRates) || 1;
-      return sum + parseFloat(item.total || 0) * rate;
+      return sum + parseFloat(String(item.total || 0)) * rate;
     }, 0);
   };
 
-  const handleView = async (order) => {
+  const handleView = async (order: PurchaseOrderRow) => {
     try {
       const res = await purchaseOrderService.getById(order.id);
       setViewingOrder(res.data);
@@ -185,23 +234,23 @@ const PurchaseOrdersPage = () => {
     }
   };
 
-  const handleSearchChange   = (v) => { setSearch(v);                    setCurrentPage(1); };
-  const handleStatusChange   = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
-  const handleSupplierChange = (e) => { setSupplierFilter(e.target.value); setCurrentPage(1); };
+  const handleSearchChange   = (v: string) => { setSearch(v);                    setCurrentPage(1); };
+  const handleStatusChange   = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleSupplierChange = (e: React.ChangeEvent<HTMLSelectElement>) => { setSupplierFilter(e.target.value); setCurrentPage(1); };
 
   // ─── Table columns ────────────────────────────────────────────────────────────
-  const columns = [
+  const columns: Column<PurchaseOrderRow>[] = [
     {
       key: 'order_number',
       header: 'Número',
       sortable: true,
       sortKey: 'order_number',
-      render: (v) => <div className="font-medium text-gray-900">{v}</div>,
+      render: (v: unknown) => <div className="font-medium text-gray-900">{String(v ?? '')}</div>,
     },
     {
       key: 'supplier',
       header: 'Proveedor',
-      render: (_, row) => (
+      render: (_: unknown, row: PurchaseOrderRow) => (
         <div>
           <div className="font-medium text-gray-900">{row.supplier?.name}</div>
           <div className="text-xs text-gray-500">{row.supplier?.code}</div>
@@ -213,21 +262,21 @@ const PurchaseOrdersPage = () => {
       header: 'Fecha',
       sortable: true,
       sortKey: 'order_date',
-      render: (v) => (
-        <div className="text-sm text-gray-600">{formatDateShort(v)}</div>
+      render: (v: unknown) => (
+        <div className="text-sm text-gray-600">{formatDateShort(v as string)}</div>
       ),
     },
     {
       key: 'warehouse',
       header: 'Almacén',
-      render: (_, row) => <div className="text-sm text-gray-600">{row.warehouse?.name}</div>,
+      render: (_: unknown, row: PurchaseOrderRow) => <div className="text-sm text-gray-600">{row.warehouse?.name}</div>,
     },
     {
       key: 'total',
       header: 'Total',
       sortable: true,
       sortKey: 'total',
-      render: (_, row) => (
+      render: (_: unknown, row: PurchaseOrderRow) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-900">{formatMoney(row.total, row.currency)}</span>
           {row.currency !== 'COP' && (
@@ -243,7 +292,7 @@ const PurchaseOrdersPage = () => {
       header: 'Estado',
       sortable: true,
       sortKey: 'status',
-      render: (_, row) => (
+      render: (_: unknown, row: PurchaseOrderRow) => (
         <div className="flex flex-col items-start gap-1">
           <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
             {STATUS_LABEL[row.status] || row.status}
@@ -260,7 +309,7 @@ const PurchaseOrdersPage = () => {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_: unknown, row: PurchaseOrderRow) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => handleView(row)} />
           {['partially_received', 'received'].includes(row.status) && hasPermission('supplier_payments.create') && (
@@ -370,7 +419,7 @@ const PurchaseOrdersPage = () => {
           <div className="w-52">
             <Select value={supplierFilter} onChange={handleSupplierChange}>
               <option value="">Todos los proveedores</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {suppliers.map((s: SupplierOption) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </div>
           <div className="w-52">
@@ -402,7 +451,7 @@ const PurchaseOrdersPage = () => {
           sortBy={ordersSortBy}
           sortDir={ordersSortDir}
           onSort={ordersOnSort}
-          rowClassName={(row) =>
+          rowClassName={(row: PurchaseOrderRow) =>
             row.status === 'partially_received'
               ? 'bg-amber-50/50 hover:bg-amber-100/50 transition-colors'
               : ''
@@ -414,7 +463,7 @@ const PurchaseOrdersPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -422,7 +471,7 @@ const PurchaseOrdersPage = () => {
       <PurchaseOrderViewSheet
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingOrder(null); }}
-        order={viewingOrder}
+        order={viewingOrder as any}
       />
 
       {/* ── Cancel modal ──────────────────────────────────────────────────────── */}
@@ -465,7 +514,11 @@ const PurchaseOrdersPage = () => {
       <ConfirmDialog
         open={!!approvingOrderId}
         onClose={() => setApprovingOrderId(null)}
-        onConfirm={() => approveMutation.mutate(approvingOrderId)}
+        onConfirm={() => {
+          if (approvingOrderId !== null) {
+            approveMutation.mutate(approvingOrderId);
+          }
+        }}
         loading={approveMutation.isPending}
         title="Aprobar Orden de Compra"
         description="La orden pasará a estado Enviada y podrá comenzar el proceso de recepción de mercancía."

@@ -6,6 +6,7 @@ import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { Modal, Button, Badge, Textarea, Spinner, Alert, ConfirmDialog, Card, ViewAction, ReceiveTransferAction, CancelAction } from '../components/ui';
+import type { BadgeVariant } from '../components/ui';
 import TransferFormModal from '../components/transfers/TransferFormModal';
 import TransferViewSheet from '../components/transfers/TransferViewSheet';
 import { formatDateShort } from '../utils/formatUtils';
@@ -21,7 +22,7 @@ interface TransferRow {
   [key: string]: unknown;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; variant: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; variant: BadgeVariant }> = {
   pending:   { label: 'Pendiente',   variant: 'warning' },
   completed: { label: 'Completada',  variant: 'success' },
   cancelled: { label: 'Cancelada',   variant: 'error' },
@@ -105,7 +106,7 @@ const TransfersPage = () => {
   const handleViewDetails = async (transfer: TransferRow) => {
     try {
       const response = await transferService.getById(transfer.id);
-      setViewTransfer(response.data);
+      setViewTransfer(response.data as TransferRow);
     } catch {
       toast.error('Error al cargar los detalles');
     }
@@ -218,10 +219,10 @@ const TransfersPage = () => {
       <TransferViewSheet
         open={!!viewTransfer}
         onClose={() => setViewTransfer(null)}
-        transfer={viewTransfer}
+        transfer={viewTransfer as any}
         hasPermission={hasPermission}
-        onReceive={(t: TransferRow) => setConfirmReceive(t)}
-        onCancel={(t: TransferRow) => openCancel(t)}
+        onReceive={(t: Record<string, unknown>) => setConfirmReceive(t as TransferRow)}
+        onCancel={(t: Record<string, unknown>) => openCancel(t as TransferRow)}
       />
 
       {/* ── Receive ConfirmDialog ── */}

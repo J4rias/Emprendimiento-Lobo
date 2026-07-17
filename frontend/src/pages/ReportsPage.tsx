@@ -13,6 +13,51 @@ import { Button, Card, DateRangeFilter, Select, Spinner } from '../components/ui
 import { downloadCSV } from '../utils/csvUtils';
 import { localToday, localMonthStart } from '../utils/dateUtils';
 import { formatCOP, formatUSD, formatByCurrency, formatDateShort } from '../utils/formatUtils';
+import type { Sale, InventoryItem, Customer } from '../types';
+
+// ─── Local Interfaces ────────────────────────────────────────────────────────
+
+interface DateRange { start_date: string; end_date: string; }
+interface AdjustedRange { date_from: string; date_to: string; status?: string; [key: string]: unknown; }
+
+interface SalesStats {
+  total_sales: number;
+  total_amount_cop: number;
+  average_ticket_cop: number;
+}
+interface InventoryStats { total_items: number; }
+interface PurchasesStats { total_orders: number; total_amount: number; average_order: number; }
+interface TopProductsStats { total_products: number; total_revenue: number; total_units_sold: number; }
+interface ProductSalesStats { total_products: number; total_units: number; total_usd: number; total_cop: number; }
+interface LowStockStats { critical_items: number; }
+type ReportStats = SalesStats | InventoryStats | PurchasesStats | TopProductsStats | ProductSalesStats | LowStockStats | Record<string, unknown>;
+
+interface ReportProduct {
+  sku: string;
+  name: string;
+  cost?: number;
+  minimum_stock?: number;
+  presentations?: { is_default: boolean; units_per_package: number }[];
+  [key: string]: unknown;
+}
+
+interface TopProduct { product: ReportProduct; total_quantity: number; total_amount: number; }
+interface ProductSale { product: ReportProduct; total_quantity: number; num_sales: number; total_usd: number; total_cop: number; }
+interface PurchaseOrder { order_number: string; order_date: string; supplier?: { name?: string }; status: string; currency: string; total: number; }
+
+interface InventoryRow extends Omit<InventoryItem, 'product'> {
+  quantity: number;
+  value: number;
+  product?: ReportProduct;
+  warehouse?: { id: number; name: string };
+}
+
+interface ReportResult {
+  stats: ReportStats | null;
+  data: unknown[];
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const SALES_PAGE_SIZE = 50;
 const INVENTORY_PAGE_SIZE = 50;
@@ -28,13 +73,13 @@ const REPORT_TYPES = [
 
 const NEEDS_DATES = ['sales', 'purchases', 'top_products', 'product_sales'];
 
-const getCustomerName = (customer) => {
+const getCustomerName = (customer?: Customer | null) => {
   if (!customer) return 'Cliente General';
   if (customer.type === 'natural') return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Sin nombre';
   return customer.businessName || customer.tradeName || 'Sin nombre';
 };
 
-const getSaleTypeLabel = (type) => {
+const getSaleTypeLabel = (type: string) => {
   if (type === 'mixed') return 'Mixta';
   if (type === 'credit') return 'Crédito';
   if (type === 'pos_pending') return 'Pendiente de Cobro';
@@ -43,7 +88,8 @@ const getSaleTypeLabel = (type) => {
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
-const StatCard = ({ label, value }) => (
+interface StatCardProps { label: string; value: string | number; }
+const StatCard = ({ label, value }: StatCardProps) => (
   <Card variant="compact">
     <p className="text-sm text-gray-600 mb-1">{label}</p>
     <p className="text-2xl font-bold text-gray-900">{value}</p>
@@ -66,46 +112,46 @@ const ReportsPage = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   })();
 
-  const [reportType, setReportType] = useState(paramType || 'sales');
-  const [dateRange, setDateRange] = useState({
+  const [reportType, setReportType] = useState<string>(paramType || 'sales');
+  const [dateRange, setDateRange] = useState<DateRange>({
     start_date: paramStart || firstOfMonth,
     end_date:   paramEnd   || today,
   });
 
   // Sales state
-  const [salesRows, setSalesRows] = useState([]);
+  const [salesRows, setSalesRows] = useState<Sale[]>([]);
   const [salesPage, setSalesPage] = useState(1);
   const [hasMoreSales, setHasMoreSales] = useState(false);
   const [loadingMoreSales, setLoadingMoreSales] = useState(false);
-  const [salesStats, setSalesStats] = useState(null);
+  const [salesStats, setSalesStats] = useState<SalesStats | null>(null);
   const [salesLoading, setSalesLoading] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
-  const salesAdjustedRange = useRef(null);
+  const salesAdjustedRange = useRef<AdjustedRange | null>(null);
 
   // Inventory state
-  const [inventoryRows, setInventoryRows] = useState([]);
+  const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [hasMoreInventory, setHasMoreInventory] = useState(false);
   const [loadingMoreInventory, setLoadingMoreInventory] = useState(false);
-  const [inventoryStats, setInventoryStats] = useState(null);
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [inventoryLoading, setInventoryLoading] = useState(false);
 
-  const getAdjustedRange = (range) => ({
+  const getAdjustedRange = (range: DateRange): AdjustedRange => ({
     date_from: range.start_date + 'T00:00:00',
     date_to:   range.end_date   + 'T23:59:59',
   });
 
   const SALES_STATUS_FILTER = 'completed,pending';
 
-  const generateSalesReport = useCallback(async (range) => {
-    const adjusted = { ...getAdjustedRange(range), status: SALES_STATUS_FILTER };
+  const generateSalesReport = useCallback(async (range: DateRange) => {
+    const adjusted: AdjustedRange = { ...getAdjustedRange(range), status: SALES_STATUS_FILTER };
     salesAdjustedRange.current = adjusted;
     setSalesStats(null);
     setSalesRows([]);
     setSalesLoading(true);
     try {
       const [statsRes, salesRes] = await Promise.all([
-        saleService.getSalesStats({ ...adjusted, summary_only: 'true' }),
+        saleService.getSalesStats({ ...adjusted, summary_only: 'true' } as Record<string, string>),
         saleService.getSales({ ...adjusted, page: 1, limit: SALES_PAGE_SIZE })
       ]);
       const total = statsRes.data?.totalSales || 0;
@@ -128,10 +174,10 @@ const ReportsPage = () => {
     }
   }, []);
 
-  const processInventoryItem = (item) => {
-    const qty  = parseFloat(item.quantity) || 0;
-    const cost = parseFloat(item.product?.cost) || 0;
-    return { ...item, quantity: qty, value: qty * cost };
+  const processInventoryItem = (item: InventoryItem): InventoryRow => {
+    const qty  = parseFloat(String(item.quantity)) || 0;
+    const cost = parseFloat(String((item.product as ReportProduct | undefined)?.cost || 0)) || 0;
+    return { ...item, quantity: qty, value: qty * cost } as InventoryRow;
   };
 
   const generateInventoryReport = useCallback(async () => {
@@ -140,7 +186,7 @@ const ReportsPage = () => {
     setInventoryLoading(true);
     try {
       const res        = await inventoryService.getAll({ page: 1, limit: INVENTORY_PAGE_SIZE });
-      const items      = (res.data || []).map(processInventoryItem);
+      const items      = ((res.data || []) as InventoryItem[]).map(processInventoryItem);
       const pagination = res.pagination || {};
       setInventoryRows(items);
       setInventoryPage(1);
@@ -160,7 +206,7 @@ const ReportsPage = () => {
       setLoadingMoreInventory(true);
       const nextPage   = inventoryPage + 1;
       const res        = await inventoryService.getAll({ page: nextPage, limit: INVENTORY_PAGE_SIZE });
-      const items      = (res.data || []).map(processInventoryItem);
+      const items      = ((res.data || []) as InventoryItem[]).map(processInventoryItem);
       const pagination = res.pagination || {};
       setInventoryRows(prev => [...prev, ...items]);
       setInventoryPage(nextPage);
@@ -172,14 +218,14 @@ const ReportsPage = () => {
     }
   }, [loadingMoreInventory, hasMoreInventory, inventoryPage]);
 
-  const generateReportMutation = useMutation({
-    mutationFn: async ({ type, range }) => {
+  const generateReportMutation = useMutation<ReportResult, Error, { type: string; range: DateRange }>({
+    mutationFn: async ({ type, range }): Promise<ReportResult> => {
       const adj = getAdjustedRange(range);
       switch (type) {
         case 'purchases': {
           const poRes  = await purchaseOrderService.getAll({ ...adj, limit: 1000 });
-          const poList = poRes.data || poRes.purchaseOrders || [];
-          const totalAmount = poList.reduce((sum, po) => sum + parseFloat(po.total || 0), 0);
+          const poList = (poRes.data || poRes.purchaseOrders || []) as PurchaseOrder[];
+          const totalAmount = poList.reduce((sum, po) => sum + parseFloat(String(po.total || 0)), 0);
           return {
             stats: {
               total_orders:  poList.length,
@@ -190,11 +236,11 @@ const ReportsPage = () => {
           };
         }
         case 'top_products': {
-          const statsData   = await saleService.getSalesStats({ ...adj, top_limit: 50 });
-          const topProducts = (statsData.data?.topProducts || []).map(tp => ({
-            product:        tp.product,
-            total_quantity: parseFloat(tp.dataValues?.total_quantity || tp.total_quantity || 0),
-            total_amount:   parseFloat(tp.dataValues?.total_amount   || tp.total_amount   || 0),
+          const statsData   = await saleService.getSalesStats({ ...adj, top_limit: '50' } as Record<string, string>);
+          const topProducts = ((statsData.data?.topProducts || []) as Record<string, unknown>[]).map((tp): TopProduct => ({
+            product:        tp.product as ReportProduct,
+            total_quantity: parseFloat(String((tp.dataValues as Record<string, unknown>)?.total_quantity || tp.total_quantity || 0)),
+            total_amount:   parseFloat(String((tp.dataValues as Record<string, unknown>)?.total_amount   || tp.total_amount   || 0)),
           }));
           return {
             stats: {
@@ -206,13 +252,13 @@ const ReportsPage = () => {
           };
         }
         case 'product_sales': {
-          const res   = await saleService.getProductSales(adj);
-          const items = (res.data || []).map(item => ({
-            product:        item.product,
-            total_quantity: parseFloat(item.dataValues?.total_quantity || item.total_quantity || 0),
-            num_sales:      parseInt(item.dataValues?.num_sales || item.num_sales || 0),
-            total_usd:      parseFloat(item.dataValues?.total_usd || item.total_usd || 0),
-            total_cop:      Math.ceil(parseFloat(item.dataValues?.total_cop || item.total_cop || 0)),
+          const res   = await saleService.getProductSales(adj as Record<string, string>);
+          const items = ((res.data || []) as Record<string, unknown>[]).map((item): ProductSale => ({
+            product:        item.product as ReportProduct,
+            total_quantity: parseFloat(String((item.dataValues as Record<string, unknown>)?.total_quantity || item.total_quantity || 0)),
+            num_sales:      parseInt(String((item.dataValues as Record<string, unknown>)?.num_sales || item.num_sales || 0)),
+            total_usd:      parseFloat(String((item.dataValues as Record<string, unknown>)?.total_usd || item.total_usd || 0)),
+            total_cop:      Math.ceil(parseFloat(String((item.dataValues as Record<string, unknown>)?.total_cop || item.total_cop || 0))),
           }));
           return {
             stats: {
@@ -226,7 +272,7 @@ const ReportsPage = () => {
         }
         case 'low_stock': {
           const res   = await inventoryService.getLowStock({ limit: 1000 });
-          const items = res.data || res.inventory || [];
+          const items = (res.data || res.inventory || []) as InventoryItem[];
           return { stats: { critical_items: items.length }, data: items };
         }
         default:
@@ -268,7 +314,7 @@ const ReportsPage = () => {
   }, []);
 
   // Infinite scroll — sales
-  const sentinelRef = useRef(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (reportType !== 'sales' || !hasMoreSales) return;
     const el = sentinelRef.current;
@@ -282,7 +328,7 @@ const ReportsPage = () => {
   }, [reportType, hasMoreSales, loadMoreSales]);
 
   // Infinite scroll — inventory
-  const inventorySentinelRef = useRef(null);
+  const inventorySentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (reportType !== 'inventory' || !hasMoreInventory) return;
     const el = inventorySentinelRef.current;
@@ -295,22 +341,22 @@ const ReportsPage = () => {
     return () => observer.disconnect();
   }, [reportType, hasMoreInventory, loadMoreInventory]);
 
-  const reportResult = generateReportMutation.data;
-  const stats      = reportType === 'sales'     ? salesStats
-                   : reportType === 'inventory' ? inventoryStats
-                   : (reportResult?.stats ?? null);
-  const reportData = reportType === 'sales'     ? salesRows
-                   : reportType === 'inventory' ? inventoryRows
-                   : (reportResult?.data ?? null);
+  const reportResult = generateReportMutation.data ?? null;
+  const stats: ReportStats | null = reportType === 'sales'     ? salesStats
+             : reportType === 'inventory' ? inventoryStats
+             : (reportResult?.stats ?? null);
+  const reportData: unknown[] | null = reportType === 'sales'     ? salesRows
+             : reportType === 'inventory' ? inventoryRows
+             : (reportResult?.data ?? null);
   const loading    = reportType === 'sales'     ? salesLoading
                    : reportType === 'inventory' ? inventoryLoading
                    : generateReportMutation.isPending;
 
   // ─── CSV export ────────────────────────────────────────────────────────────
 
-  const fetchAllSalesForExport = async () => {
+  const fetchAllSalesForExport = async (): Promise<Sale[]> => {
     if (!salesAdjustedRange.current) return [];
-    const allSales = [];
+    const allSales: Sale[] = [];
     let page = 1, hasMore = true;
     while (hasMore) {
       const res        = await saleService.getSales({ ...salesAdjustedRange.current, page, limit: 200 });
@@ -322,13 +368,13 @@ const ReportsPage = () => {
     return allSales;
   };
 
-  const fetchAllInventoryForExport = async () => {
-    const allItems = [];
+  const fetchAllInventoryForExport = async (): Promise<InventoryRow[]> => {
+    const allItems: InventoryRow[] = [];
     let page = 1, hasMore = true;
     while (hasMore) {
       const res        = await inventoryService.getAll({ page, limit: 200 });
       const pagination = res.pagination || {};
-      allItems.push(...(res.data || []).map(processInventoryItem));
+      allItems.push(...((res.data || []) as InventoryItem[]).map(processInventoryItem));
       hasMore = pagination.page < pagination.totalPages;
       page++;
     }
@@ -348,10 +394,10 @@ const ReportsPage = () => {
           downloadCSV(
             `reporte_ventas_${dateRange.start_date}_${dateRange.end_date}`,
             ['Número', 'Fecha', 'Cliente', 'Tipo', 'Estado', 'Total COP'],
-            allSales.map(sale => {
-              const rate     = parseFloat(sale.exchange_rate) || 1;
-              const totalCOP = Math.ceil((parseFloat(sale.total) || 0) * rate);
-              return [sale.sale_number, formatDateShort(sale.sale_date), getCustomerName(sale.customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
+            allSales.map((sale: Sale) => {
+              const rate     = parseFloat(String(sale.exchange_rate)) || 1;
+              const totalCOP = Math.ceil((parseFloat(String(sale.total)) || 0) * rate);
+              return [sale.sale_number, formatDateShort(sale.sale_date), getCustomerName((sale as unknown as { customer?: Customer | null }).customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
             })
           );
           toast.success(`${allSales.length} ventas exportadas`);
@@ -370,7 +416,7 @@ const ReportsPage = () => {
           downloadCSV(
             `inventario_valorizado_${today}`,
             ['SKU', 'Producto', 'Almacén', 'Cant. Total', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', 'Costo Unitario', 'Valor Total'],
-            allItems.map(item => {
+            allItems.map((item: InventoryRow) => {
               const presentations       = item.product?.presentations || [];
               const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
               const unitsPerPackage     = defaultPresentation?.units_per_package || 1;
@@ -391,28 +437,28 @@ const ReportsPage = () => {
         downloadCSV(
           `reporte_compras_${dateRange.start_date}_${dateRange.end_date}`,
           ['Número', 'Fecha', 'Proveedor', 'Estado', 'Moneda', 'Total'],
-          reportData.map(po => [po.order_number, formatDateShort(po.order_date), po.supplier?.name || '', po.status, po.currency, po.total])
+          (reportData as PurchaseOrder[]).map(po => [po.order_number, formatDateShort(po.order_date), po.supplier?.name || '', po.status, po.currency, po.total])
         );
         break;
       case 'top_products':
         downloadCSV(
           `productos_mas_vendidos_${dateRange.start_date}_${dateRange.end_date}`,
           ['SKU', 'Producto', 'Cantidad Vendida', 'Monto Total'],
-          reportData.map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.total_amount])
+          (reportData as TopProduct[]).map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.total_amount])
         );
         break;
       case 'product_sales':
         downloadCSV(
           `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}`,
           ['SKU', 'Producto', 'Cant. Vendida', '# Ventas', 'Total USD', 'Total COP'],
-          reportData.map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.num_sales, parseFloat(item.total_usd || 0).toFixed(2), Math.ceil(item.total_cop || 0)])
+          (reportData as ProductSale[]).map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.num_sales, parseFloat(String(item.total_usd || 0)).toFixed(2), Math.ceil(item.total_cop || 0)])
         );
         break;
       case 'low_stock':
         downloadCSV(
           `productos_bajo_stock_${today}`,
           ['SKU', 'Producto', 'Almacén', 'Cant. Total', 'Existencia (Paquetes)', 'Existencia (Unidades)', 'Uds/Paquete', 'Stock Mínimo', 'Estado'],
-          reportData.map(item => {
+          (reportData as InventoryRow[]).map(item => {
             const presentations       = item.product?.presentations || [];
             const defaultPresentation = presentations.find(p => p.is_default) || presentations[0];
             const unitsPerPackage     = defaultPresentation?.units_per_package || 1;
@@ -434,40 +480,40 @@ const ReportsPage = () => {
       case 'sales':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total Ventas" value={stats.total_sales} />
-            <StatCard label="Monto Total" value={`${formatCOP(stats.total_amount_cop)}`} />
-            <StatCard label="Ticket Promedio" value={`${formatCOP(stats.average_ticket_cop)}`} />
+            <StatCard label="Total Ventas" value={(stats as SalesStats).total_sales} />
+            <StatCard label="Monto Total" value={`${formatCOP((stats as SalesStats).total_amount_cop)}`} />
+            <StatCard label="Ticket Promedio" value={`${formatCOP((stats as SalesStats).average_ticket_cop)}`} />
           </div>
         );
       case 'inventory':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total Items" value={stats.total_items} />
+            <StatCard label="Total Items" value={(stats as InventoryStats).total_items} />
           </div>
         );
       case 'purchases':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total Órdenes" value={stats.total_orders} />
-            <StatCard label="Monto Total" value={formatUSD(stats.total_amount || 0)} />
-            <StatCard label="Promedio por Orden" value={formatUSD(stats.average_order || 0)} />
+            <StatCard label="Total Órdenes" value={(stats as PurchasesStats).total_orders} />
+            <StatCard label="Monto Total" value={formatUSD((stats as PurchasesStats).total_amount || 0)} />
+            <StatCard label="Promedio por Orden" value={formatUSD((stats as PurchasesStats).average_order || 0)} />
           </div>
         );
       case 'top_products':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total Productos" value={stats.total_products} />
-            <StatCard label="Unidades Vendidas" value={stats.total_units_sold} />
-            <StatCard label="Ingresos Totales" value={formatUSD(stats.total_revenue || 0)} />
+            <StatCard label="Total Productos" value={(stats as TopProductsStats).total_products} />
+            <StatCard label="Unidades Vendidas" value={(stats as TopProductsStats).total_units_sold} />
+            <StatCard label="Ingresos Totales" value={formatUSD((stats as TopProductsStats).total_revenue || 0)} />
           </div>
         );
       case 'product_sales':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Total Productos" value={stats.total_products} />
-            <StatCard label="Total Unidades" value={stats.total_units} />
-            <StatCard label="Total USD" value={formatUSD(stats.total_usd || 0)} />
-            <StatCard label="Total COP" value={`${formatCOP(stats.total_cop)}`} />
+            <StatCard label="Total Productos" value={(stats as ProductSalesStats).total_products} />
+            <StatCard label="Total Unidades" value={(stats as ProductSalesStats).total_units} />
+            <StatCard label="Total USD" value={formatUSD((stats as ProductSalesStats).total_usd || 0)} />
+            <StatCard label="Total COP" value={`${formatCOP((stats as ProductSalesStats).total_cop)}`} />
           </div>
         );
       case 'low_stock':
@@ -475,7 +521,7 @@ const ReportsPage = () => {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <Card variant="compact">
               <p className="text-sm text-gray-600 mb-1">Items Críticos</p>
-              <p className="text-2xl font-bold text-red-600">{stats.critical_items}</p>
+              <p className="text-2xl font-bold text-red-600">{(stats as LowStockStats).critical_items}</p>
             </Card>
           </div>
         );
@@ -486,14 +532,15 @@ const ReportsPage = () => {
 
   // ─── Report table ──────────────────────────────────────────────────────────
 
+  interface THProps { children: React.ReactNode; right?: boolean; }
+  const TH = ({ children, right = false }: THProps) => (
+    <th className={`px-6 py-3 text-${right ? 'right' : 'left'} text-xs font-medium text-gray-500 uppercase`}>{children}</th>
+  );
+
   const renderReportTable = () => {
     if (!reportData || reportData.length === 0) {
       return <div className="text-center py-12 text-gray-500">No hay datos para mostrar</div>;
     }
-
-    const TH = ({ children, right }) => (
-      <th className={`px-6 py-3 text-${right ? 'right' : 'left'} text-xs font-medium text-gray-500 uppercase`}>{children}</th>
-    );
 
     switch (reportType) {
       case 'sales':
@@ -506,14 +553,14 @@ const ReportsPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {salesRows.map((sale, i) => (
+                {salesRows.map((sale: Sale, i: number) => (
                   <tr key={i}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.sale_number}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateShort(sale.sale_date)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCustomerName(sale.customer)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCustomerName((sale as unknown as { customer?: Customer | null }).customer)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getSaleTypeLabel(sale.sale_type)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                      {formatCOP((parseFloat(sale.total) || 0) * (parseFloat(sale.exchange_rate) || 1))}
+                      {formatCOP((parseFloat(String(sale.total)) || 0) * (parseFloat(String(sale.exchange_rate)) || 1))}
                     </td>
                   </tr>
                 ))}
@@ -542,7 +589,7 @@ const ReportsPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {inventoryRows.map((item, i) => (
+                {inventoryRows.map((item: InventoryRow, i: number) => (
                   <tr key={i}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
@@ -573,7 +620,7 @@ const ReportsPage = () => {
               <tr><TH>Número</TH><TH>Fecha</TH><TH>Proveedor</TH><TH>Estado</TH><TH right>Total</TH></tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.map((po, i) => (
+              {(reportData as PurchaseOrder[]).map((po: PurchaseOrder, i: number) => (
                 <tr key={i}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{po.order_number}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateShort(po.order_date)}</td>
@@ -593,7 +640,7 @@ const ReportsPage = () => {
               <tr><TH>SKU</TH><TH>Producto</TH><TH right>Cant. Vendida</TH><TH right>Monto Total</TH></tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.map((item, i) => (
+              {(reportData as TopProduct[]).map((item: TopProduct, i: number) => (
                 <tr key={i}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
@@ -616,7 +663,7 @@ const ReportsPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.map((item, i) => (
+              {(reportData as ProductSale[]).map((item: ProductSale, i: number) => (
                 <tr key={i}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
@@ -640,7 +687,7 @@ const ReportsPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.map((item, i) => (
+              {(reportData as InventoryRow[]).map((item: InventoryRow, i: number) => (
                 <tr key={i}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.product?.sku}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.name}</td>
@@ -669,7 +716,7 @@ const ReportsPage = () => {
     else generateReportMutation.mutate({ type: reportType, range: dateRange });
   };
 
-  const handleReportTypeChange = (value) => {
+  const handleReportTypeChange = (value: string) => {
     setReportType(value);
     setSalesRows([]);
     setSalesStats(null);
@@ -698,7 +745,7 @@ const ReportsPage = () => {
             </label>
             <Select
               value={reportType}
-              onChange={(e) => handleReportTypeChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleReportTypeChange(e.target.value)}
               options={REPORT_TYPES}
             />
           </div>
@@ -708,7 +755,7 @@ const ReportsPage = () => {
             <DateRangeFilter
               startDate={dateRange.start_date}
               endDate={dateRange.end_date}
-              onChange={({ start_date, end_date }) => setDateRange({ start_date, end_date })}
+              onChange={({ start_date, end_date }: DateRange) => setDateRange({ start_date, end_date })}
               showPresets
             />
           )}

@@ -138,7 +138,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
     supplierPaymentService
       .getPayableBalance(order.supplier_id)
       .then((res) => {
-        const poData = res.data?.purchase_orders?.find((p) => p.id === order.id);
+        const poData = res.data?.purchase_orders?.find((p: { id: number; balance?: string | number }) => p.id === order.id);
         const trueBalance =
           poData && poData.balance !== undefined
             ? parseFloat(poData.balance)
@@ -201,7 +201,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
     }
 
     const suggested = Math.min(maxInPayCur, parseFloat(formData.amount)).toFixed(2);
-    if (a.allocated_amount !== suggested && parseFloat(a.allocated_amount || 0) !== parseFloat(suggested)) {
+    if (a.allocated_amount !== suggested && parseFloat(a.allocated_amount || '0') !== parseFloat(suggested)) {
       setAllocations([{
         ...a,
         allocated_amount: suggested,
@@ -219,11 +219,11 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
     }
     try {
       const [balanceRes, creditRes] = await Promise.all([
-        supplierPaymentService.getPayableBalance(supplierId),
-        supplierPaymentService.getCreditBalance(supplierId),
+        supplierPaymentService.getPayableBalance(Number(supplierId)),
+        supplierPaymentService.getCreditBalance(Number(supplierId)),
       ]);
       const receivable = (balanceRes.data?.purchase_orders || []).filter(
-        (o) => parseFloat(o.balance) > 0
+        (o: { balance: string | number }) => parseFloat(String(o.balance)) > 0
       );
       setPurchaseOrders(receivable);
       setCreditBalances(creditRes.data);
@@ -234,7 +234,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
   };
 
   const handleSupplierChange = (supplierId: string): void => {
-    setFormData((prev) => ({ ...prev, supplier_id: supplierId, purchase_order_id: '' }));
+    setFormData((prev) => ({ ...prev, supplier_id: supplierId, purchase_order_id: undefined }));
     setAllocations([]);
     fetchPurchaseOrdersBySupplier(supplierId);
   };
@@ -357,7 +357,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
   // Método de pago options — agrega "Saldo a Favor" solo si hay saldo disponible
   const methodOptions = [
     ...METHOD_OPTIONS,
-    ...(creditBalances?.[formData.currency]?.available_credit > 0
+    ...((creditBalances?.[formData.currency]?.available_credit ?? 0) > 0
       ? [{ value: 'credit_balance', label: 'Usar Saldo a Favor' }]
       : []),
   ];
@@ -393,7 +393,7 @@ export function PaymentFormModal({ open, onClose, onSuccess, suppliers, isPendin
             {prefillLocked ? (
               <div className="w-full h-9 px-3 flex items-center border border-gray-200 rounded-md bg-gray-50 text-gray-700 text-sm gap-2">
                 <span className="text-gray-400">🔒</span>
-                {suppliers.find((s) => s.id === parseInt(formData.supplier_id))?.name || 'Proveedor'}
+                {suppliers.find((s) => s.id === parseInt(String(formData.supplier_id)))?.name || 'Proveedor'}
               </div>
             ) : (
               <Select

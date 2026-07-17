@@ -12,35 +12,63 @@ import { supplierService } from '../services/api/supplierService';
 import { Alert, Button, Card, SearchInput, Spinner, ViewAction } from '../components/ui';
 import { formatUSD, formatCOP, formatVES, LOCALE } from '../utils/formatUtils';
 
+// ── Local Interfaces ──────────────────────────────────────────────────────────
+interface SupplierBalances {
+  USD?: number;
+  DIVISAS?: number;
+  COP?: number;
+  [key: string]: unknown;
+}
+
+interface SupplierResumen {
+  id: number;
+  name: string;
+  balances: SupplierBalances;
+}
+
+interface ResumenData {
+  bcv_rate?: string | number;
+  totals?: SupplierBalances;
+  ves_needed?: number;
+  suppliers?: SupplierResumen[];
+}
+
 // ── Formatters ────────────────────────────────────────────────────────────────
-const fmtUSD = (v) => {
-  const val = parseFloat(v) || 0;
+const fmtUSD = (v: unknown) => {
+  const val = parseFloat(String(v)) || 0;
   if (Math.abs(val) < 0.01) return '-';
   return formatUSD(val);
 };
 
-const fmtCOP = (v) => {
-  const val = parseFloat(v) || 0;
+const fmtCOP = (v: unknown) => {
+  const val = parseFloat(String(v)) || 0;
   if (Math.abs(val) < 1) return '-';
   return formatCOP(val);
 };
 
-const fmtVES = (v) => {
-  const val = parseFloat(v) || 0;
+const fmtVES = (v: unknown) => {
+  const val = parseFloat(String(v)) || 0;
   if (Math.abs(val) < 1) return '-';
   return formatVES(val);
 };
 
 // ── Row ───────────────────────────────────────────────────────────────────────
-const SupplierRow = ({ supplier, bcvRate, onView }) => {
+interface SupplierRowProps {
+  supplier: SupplierResumen;
+  bcvRate?: string | number | null;
+  onView: () => void;
+}
+
+const SupplierRow = ({ supplier, bcvRate, onView }: SupplierRowProps) => {
   const { balances } = supplier;
-  const vesEquiv = bcvRate ? (balances.USD || 0) * parseFloat(bcvRate) : 0;
+  const usdBalance = balances.USD || 0;
+  const vesEquiv = bcvRate ? usdBalance * parseFloat(String(bcvRate)) : 0;
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-6 py-3 text-sm font-medium text-gray-900">{supplier.name}</td>
       <td className="px-6 py-3 text-right text-sm font-medium text-primary-700">
-        {fmtUSD(balances.USD)}
+        {fmtUSD(usdBalance)}
       </td>
       <td className="px-6 py-3 text-right text-sm font-medium text-emerald-700">
         {fmtUSD(balances.DIVISAS)}
@@ -69,7 +97,7 @@ const SupplierResumenPage = () => {
     queryKey: ['supplier-resumen'],
     queryFn: async () => {
       const res = await supplierService.getResumen();
-      return res.data;
+      return res.data as ResumenData;
     },
     staleTime: 60_000,
   });
@@ -101,20 +129,20 @@ const SupplierResumenPage = () => {
   const { bcv_rate, totals, ves_needed, suppliers = [] } = data || {};
 
   const filtered = search
-    ? suppliers.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
+    ? suppliers.filter((s: SupplierResumen) => s.name.toLowerCase().includes(search.toLowerCase()))
     : suppliers;
 
-  const usdSuppliers     = filtered.filter((s) => Math.abs(s.balances.USD)     > 0.01);
-  const divisasSuppliers = filtered.filter((s) => Math.abs(s.balances.DIVISAS) > 0.01);
-  const copSuppliers     = filtered.filter((s) => Math.abs(s.balances.COP)     > 0.01);
+  const usdSuppliers     = filtered.filter((s: SupplierResumen) => Math.abs(s.balances.USD || 0)     > 0.01);
+  const divisasSuppliers = filtered.filter((s: SupplierResumen) => Math.abs(s.balances.DIVISAS || 0) > 0.01);
+  const copSuppliers     = filtered.filter((s: SupplierResumen) => Math.abs(s.balances.COP || 0)     > 0.01);
 
   // Totales calculados sobre los proveedores visibles (respetan el filtro de búsqueda)
   const visibleTotals = {
-    USD:     filtered.reduce((s, p) => s + (p.balances.USD     || 0), 0),
-    DIVISAS: filtered.reduce((s, p) => s + (p.balances.DIVISAS || 0), 0),
-    COP:     filtered.reduce((s, p) => s + (p.balances.COP     || 0), 0),
+    USD:     filtered.reduce((s: number, p: SupplierResumen) => s + (p.balances.USD     || 0), 0),
+    DIVISAS: filtered.reduce((s: number, p: SupplierResumen) => s + (p.balances.DIVISAS || 0), 0),
+    COP:     filtered.reduce((s: number, p: SupplierResumen) => s + (p.balances.COP     || 0), 0),
   };
-  const visibleVesNeeded = bcv_rate ? visibleTotals.USD * parseFloat(bcv_rate) : 0;
+  const visibleVesNeeded = bcv_rate ? visibleTotals.USD * parseFloat(String(bcv_rate)) : 0;
 
   return (
     <div className="space-y-6">
@@ -162,7 +190,7 @@ const SupplierResumenPage = () => {
           </div>
           <p className="text-xl font-bold text-gray-900">
             {bcv_rate
-              ? parseFloat(bcv_rate).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+              ? parseFloat(String(bcv_rate)).toLocaleString(LOCALE, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
               : 'N/A'}
           </p>
           <p className="text-xs text-gray-500 mt-1">Bs / USD</p>
@@ -222,8 +250,8 @@ const SupplierResumenPage = () => {
               ) : (
                 <>
                   {copSuppliers
-                    .sort((a, b) => b.balances.COP - a.balances.COP)
-                    .map((s) => (
+                    .sort((a: SupplierResumen, b: SupplierResumen) => (b.balances.COP || 0) - (a.balances.COP || 0))
+                    .map((s: SupplierResumen) => (
                       <SupplierRow
                         key={`cop-${s.id}`}
                         supplier={s}
@@ -232,9 +260,9 @@ const SupplierResumenPage = () => {
                       />
                     ))}
                   {usdSuppliers
-                    .filter((s) => !copSuppliers.some((c) => c.id === s.id))
-                    .sort((a, b) => b.balances.USD - a.balances.USD)
-                    .map((s) => (
+                    .filter((s: SupplierResumen) => !copSuppliers.some((c: SupplierResumen) => c.id === s.id))
+                    .sort((a: SupplierResumen, b: SupplierResumen) => (b.balances.USD || 0) - (a.balances.USD || 0))
+                    .map((s: SupplierResumen) => (
                       <SupplierRow
                         key={`usd-${s.id}`}
                         supplier={s}
@@ -243,9 +271,9 @@ const SupplierResumenPage = () => {
                       />
                     ))}
                   {divisasSuppliers
-                    .filter((s) => !copSuppliers.some((c) => c.id === s.id) && !usdSuppliers.some((u) => u.id === s.id))
-                    .sort((a, b) => b.balances.DIVISAS - a.balances.DIVISAS)
-                    .map((s) => (
+                    .filter((s: SupplierResumen) => !copSuppliers.some((c: SupplierResumen) => c.id === s.id) && !usdSuppliers.some((u: SupplierResumen) => u.id === s.id))
+                    .sort((a: SupplierResumen, b: SupplierResumen) => (b.balances.DIVISAS || 0) - (a.balances.DIVISAS || 0))
+                    .map((s: SupplierResumen) => (
                       <SupplierRow
                         key={`div-${s.id}`}
                         supplier={s}

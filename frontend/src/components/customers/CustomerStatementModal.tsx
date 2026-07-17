@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 const formatCurrency = (amount: number | string, currency?: string): string => {
-    const value = parseFloat(amount) || 0;
+    const value = parseFloat(String(amount)) || 0;
     return new Intl.NumberFormat('es-VE', {
         style: 'currency',
         currency: currency || 'USD',
@@ -43,7 +43,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
     useEffect(() => {
         const fetchDetail = async () => {
             try {
-                const data = await saleService.getSaleById(transaction.original_data.id);
+                const data = await saleService.getSaleById(transaction.original_data?.id);
                 setDetail(data.data || data);
             } catch (e) {
                 console.error('Error fetching sale detail:', e);
@@ -52,7 +52,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
             }
         };
         fetchDetail();
-    }, [transaction.original_data.id]);
+    }, [transaction.original_data?.id])
 
     if (loading) return (
         <div className="flex items-center gap-2 py-3 text-gray-500 text-sm">
@@ -64,7 +64,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
 
     const rate = parseFloat(detail.exchange_rate || 1);
 
-    const appliedCNs = transaction.original_data?.applied_credit_notes || [];
+    const appliedCNs: any[] = transaction.original_data?.applied_credit_notes || [];
 
     return (
         <div className="space-y-3">
@@ -84,7 +84,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
                         </tr>
                     </thead>
                     <tbody>
-                        {detail.details.map((item, i) => {
+                        {detail.details.map((item: any, i: number) => {
                             const unitPrice = parseFloat(item.unit_price || 0);
                             const qty = parseFloat(item.quantity || 0);
                             const subtotal = parseFloat(item.subtotal || unitPrice * qty);
@@ -105,7 +105,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
                     </tbody>
                     <tfoot>
                         <tr className="border-t-2 border-orange-200 bg-orange-50">
-                            <td colSpan="3" className="px-3 py-1.5 text-right font-semibold text-orange-800">Total</td>
+                            <td colSpan={3} className="px-3 py-1.5 text-right font-semibold text-orange-800">Total</td>
                             <td className="px-3 py-1.5 text-right font-bold text-orange-800">
                                 {formatCurrency(currency === 'COP' ? parseFloat(detail.total || 0) * rate : parseFloat(detail.total || 0), currency)}
                             </td>
@@ -118,7 +118,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
                     <div className="bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800">Devoluciones Aplicadas</div>
                     <table className="w-full text-xs">
                         <tbody>
-                            {appliedCNs.map((cn) => (
+                            {appliedCNs.map((cn: any) => (
                                 <tr key={cn.id} className="border-t border-primary-100">
                                     <td className="px-3 py-1.5 text-primary-700 font-medium">{cn.number}</td>
                                     <td className="px-3 py-1.5 text-gray-500">{formatDateShort(cn.date)}</td>
@@ -130,12 +130,12 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
                         </tbody>
                         <tfoot>
                             <tr className="border-t-2 border-primary-200 bg-primary-50">
-                                <td colSpan="2" className="px-3 py-1.5 text-right font-semibold text-primary-800">Neto a pagar</td>
+                                <td colSpan={2} className="px-3 py-1.5 text-right font-semibold text-primary-800">Neto a pagar</td>
                                 <td className="px-3 py-1.5 text-right font-bold text-orange-700">
                                     {formatCurrency(
                                         (currency === 'COP'
-                                            ? parseFloat(detail.total || 0) * rate - appliedCNs.reduce((s, cn) => s + cn.total_cop, 0)
-                                            : parseFloat(detail.total || 0) - appliedCNs.reduce((s, cn) => s + cn.total_usd, 0)),
+                                            ? parseFloat(detail.total || 0) * rate - appliedCNs.reduce((s: number, cn: any) => s + cn.total_cop, 0)
+                                            : parseFloat(detail.total || 0) - appliedCNs.reduce((s: number, cn: any) => s + cn.total_usd, 0)),
                                         currency
                                     )}
                                 </td>
@@ -154,28 +154,28 @@ interface CreditNoteDetailExpandedProps {
 
 const CreditNoteDetailExpanded = ({ transaction }: CreditNoteDetailExpandedProps) => {
     const note = transaction.original_data;
-    const exchangeRate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
-    const totalUSD = parseFloat(note.total || 0);
+    const exchangeRate = parseFloat(note?.exchange_rate || note?.sale?.exchange_rate || 1);
+    const totalUSD = parseFloat(note?.total || 0);
     const totalCOP = Math.round(totalUSD * exchangeRate);
 
-    const refundLabels = {
+    const refundLabels: Record<string, string> = {
         credit_balance: 'Monedero (Saldo a Favor)',
         cash: 'Efectivo',
         transfer: 'Transferencia',
         usdt: 'USDT',
         none: 'Sin reembolso'
     };
-    const typeLabels = { full: 'Devolución Total', partial: 'Devolución Parcial' };
+    const typeLabels: Record<string, string> = { full: 'Devolución Total', partial: 'Devolución Parcial' };
 
     return (
         <div className="flex flex-wrap gap-6 text-xs text-gray-600">
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Tipo</span>
-                <span className="text-gray-800">{typeLabels[note.type] || note.type}</span>
+                <span className="text-gray-800">{typeLabels[note?.type] || note?.type}</span>
             </div>
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Método de reembolso</span>
-                <span className="text-gray-800">{refundLabels[note.refund_method] || note.refund_method}</span>
+                <span className="text-gray-800">{refundLabels[note?.refund_method] || note?.refund_method}</span>
             </div>
             <div>
                 <span className="font-medium block text-gray-500 mb-0.5">Monto devuelto</span>
@@ -198,10 +198,10 @@ interface PaymentDetailExpandedProps {
 
 const PaymentDetailExpanded = ({ transaction, currency }: PaymentDetailExpandedProps) => {
     const pay = transaction.original_data;
-    const storedCurrency = pay.currency || 'USD';
-    const storedAmount = parseFloat(pay.amount || 0);
-    const storedRate = parseFloat(pay.exchange_rate || 1);
-    const saleRate = parseFloat(pay.sale?.exchange_rate || 1);
+    const storedCurrency = pay?.currency || 'USD';
+    const storedAmount = parseFloat(pay?.amount || 0);
+    const storedRate = parseFloat(pay?.exchange_rate || 1);
+    const saleRate = parseFloat(pay?.sale?.exchange_rate || 1);
 
     // Legacy detection: stored as USD with rate=1 but the sale has a real exchange rate.
     // This means the original payment was in COP but was incorrectly converted before saving.
@@ -218,7 +218,7 @@ const PaymentDetailExpanded = ({ transaction, currency }: PaymentDetailExpandedP
     const copEquivalent = isLegacy ? storedAmount * effectiveRate : (storedCurrency === 'COP' ? storedAmount : storedAmount * effectiveRate);
     const usdEquivalent = isLegacy ? storedAmount : (storedCurrency === 'USD' ? storedAmount : storedAmount / effectiveRate);
 
-    const methodLabels = {
+    const methodLabels: Record<string, string> = {
         cash: 'Efectivo',
         transfer: 'Transferencia',
         card: 'Tarjeta',
@@ -237,7 +237,7 @@ const PaymentDetailExpanded = ({ transaction, currency }: PaymentDetailExpandedP
             <div className="flex flex-wrap gap-6 text-xs text-gray-600">
                 <div>
                     <span className="font-medium block text-gray-500 mb-0.5">Método</span>
-                    <span className="text-gray-800">{methodLabels[pay.payment_method] || pay.payment_method}</span>
+                    <span className="text-gray-800">{methodLabels[pay?.payment_method] || pay?.payment_method}</span>
                 </div>
                 <div>
                     <span className="font-medium block text-gray-500 mb-0.5">{isLegacy ? 'Valor USD' : 'Monto recibido'}</span>
@@ -261,13 +261,13 @@ const PaymentDetailExpanded = ({ transaction, currency }: PaymentDetailExpandedP
                         <span className="text-gray-800">{effectiveRate.toLocaleString(LOCALE)} COP/USD</span>
                     </div>
                 )}
-                {pay.reference && (
+                {pay?.reference && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Referencia</span>
                         <span className="text-gray-800">{pay.reference}</span>
                     </div>
                 )}
-                {pay.sale?.sale_number && (
+                {pay?.sale?.sale_number && (
                     <div>
                         <span className="font-medium block text-gray-500 mb-0.5">Abono a</span>
                         <span className="text-gray-800">{pay.sale.sale_number}</span>
@@ -341,8 +341,8 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
         if (!statementData?.ledger) return [];
         let runningBalance = 0;
         return statementData.ledger
-            .filter(t => t.currency === selectedCurrency)
-            .map(t => {
+            .filter((t: Transaction) => t.currency === selectedCurrency)
+            .map((t: Transaction) => {
                 runningBalance = t.type === 'charge'
                     ? runningBalance + t.amount  // venta: suma deuda
                     : runningBalance - t.amount; // pagos, CN, y uso de saldo a favor: reducen deuda
@@ -381,7 +381,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
     const handlePaymentSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const credit = statementData?.summary?.[selectedCurrency]?.available_credit || 0;
-        const pending = getPendingInCurrency(selectedTransaction);
+        const pending = getPendingInCurrency(selectedTransaction!);
         const creditToApply = Math.min(credit, pending);
         const cashAmount = parseFloat(paymentData.amount) || 0;
 
@@ -392,10 +392,10 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
 
         setSubmittingPayment(true);
         try {
-            const saleId = selectedTransaction.original_data.id;
-            const rate = parseFloat(selectedTransaction.original_data.exchange_rate) || 1;
+            const saleId = selectedTransaction!.original_data!.id;
+            const rate = parseFloat(selectedTransaction!.original_data!.exchange_rate) || 1;
 
-            const payment_lines = [];
+            const payment_lines: any[] = [];
             if (creditToApply > 0) {
                 payment_lines.push({
                     amount: creditToApply,
@@ -418,7 +418,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
             await saleService.addPayment(saleId, {
                 payment_lines,
                 notes: paymentData.notes
-            });
+            } as any);
 
             toast.success('Pago registrado exitosamente');
 
@@ -535,7 +535,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                                             {renderSummaryCard(
                                                 'Total Facturado (Crédito)',
-                                                statementData.summary[selectedCurrency].total_invoiced,
+                                                Number(statementData.summary[selectedCurrency].total_invoiced),
                                                 selectedCurrency,
                                                 'bg-primary-50',
                                                 'text-primary-800',
@@ -543,7 +543,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                             )}
                                             {renderSummaryCard(
                                                 'Total Pagado (Histórico)',
-                                                statementData.summary[selectedCurrency].total_paid,
+                                                Number(statementData.summary[selectedCurrency].total_paid),
                                                 selectedCurrency,
                                                 'bg-teal-50',
                                                 'text-teal-800',
@@ -551,7 +551,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                             )}
                                             {renderSummaryCard(
                                                 'Saldo Pendiente',
-                                                Math.max(0, statementData.summary[selectedCurrency].balance),
+                                                Math.max(0, Number(statementData.summary[selectedCurrency].balance)),
                                                 selectedCurrency,
                                                 statementData.summary[selectedCurrency].balance > 0 ? 'bg-orange-50' : 'bg-gray-100',
                                                 statementData.summary[selectedCurrency].balance > 0 ? 'text-orange-800' : 'text-gray-600',
@@ -559,7 +559,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                             )}
                                             {renderSummaryCard(
                                                 'Saldo a Favor',
-                                                statementData.summary[selectedCurrency].available_credit,
+                                                Number(statementData.summary[selectedCurrency].available_credit),
                                                 selectedCurrency,
                                                 statementData.summary[selectedCurrency].available_credit > 0 ? 'bg-green-50' : 'bg-gray-50',
                                                 statementData.summary[selectedCurrency].available_credit > 0 ? 'text-green-700' : 'text-gray-500',
@@ -592,12 +592,12 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                 <tbody className="bg-white divide-y divide-gray-200">
                                                     {getFilteredLedger().length === 0 ? (
                                                         <tr>
-                                                            <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                                            <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                                                                 No se encontraron transacciones en {selectedCurrency}
                                                             </td>
                                                         </tr>
                                                     ) : (
-                                                        getFilteredLedger().map((t) => {
+                                                        getFilteredLedger().map((t: Transaction) => {
                                                             const isExpanded = expandedId === t.id;
                                                             const isCharge = t.type === 'charge';
                                                             const expandBg = isCharge ? 'bg-orange-50/60' : 'bg-green-50/60';
@@ -648,7 +648,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                                 <span className="text-xs text-gray-500">{t.description}</span>
                                                                                 {t.original_currency && t.original_currency !== selectedCurrency && (
                                                                                     <span className="text-[10px] text-gray-400 font-medium">
-                                                                                        Original: {formatCurrency(t.original_amount, t.original_currency)}
+                                                                                        Original: {formatCurrency(t.original_amount || 0, t.original_currency)}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
@@ -683,14 +683,14 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                         </td>
                                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold">
                                                                             <span className={
-                                                                                t.runningBalance > 0.009
+                                                                                (t.runningBalance || 0) > 0.009
                                                                                     ? 'text-red-600'
-                                                                                    : t.runningBalance < -0.009
+                                                                                    : (t.runningBalance || 0) < -0.009
                                                                                         ? 'text-green-600'
                                                                                         : 'text-gray-400'
                                                                             }>
-                                                                                {formatCurrency(Math.abs(t.runningBalance), t.currency)}
-                                                                                {t.runningBalance < -0.009 && (
+                                                                                {formatCurrency(Math.abs(t.runningBalance || 0), t.currency)}
+                                                                                {(t.runningBalance || 0) < -0.009 && (
                                                                                     <span className="block text-[10px] font-normal">a favor</span>
                                                                                 )}
                                                                             </span>
@@ -699,7 +699,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
 
                                                                     {isExpanded && (
                                                                         <tr className={expandBg}>
-                                                                            <td colSpan="6" className={`px-8 py-4 border-t ${expandBorder}`}>
+                                                                            <td colSpan={6} className={`px-8 py-4 border-t ${expandBorder}`}>
                                                                                 {t.type === 'charge' ? (
                                                                                     <SaleDetailExpanded transaction={t} currency={selectedCurrency} />
                                                                                 ) : t.type === 'credit' ? (
@@ -767,7 +767,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                         <div>
                                             <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
                                             <p className="text-base font-bold text-primary-700">
-                                                {formatCurrency(Math.min(statementData.summary[selectedCurrency].available_credit, getPendingInCurrency(selectedTransaction)), selectedCurrency)}
+                                                {formatCurrency(Math.min(Number(statementData.summary[selectedCurrency].available_credit), getPendingInCurrency(selectedTransaction)), selectedCurrency)}
                                             </p>
                                         </div>
                                         <p className="text-xs text-primary-600 font-medium text-right">Descontado del<br/>monto a pagar</p>
@@ -835,7 +835,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                         value={paymentData.notes}
                                         onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                        rows="2"
+                                        rows={2}
                                         placeholder="Observaciones sobre el pago..."
                                     ></textarea>
                                 </div>

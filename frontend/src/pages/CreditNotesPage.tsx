@@ -16,6 +16,43 @@ import { creditNoteService } from '../services/api/creditNoteService';
 import { ViewAction, Pagination, useTableLimit } from '../components/ui';
 import { formatByCurrency } from '../utils/formatUtils';
 
+interface CreditNote {
+  id: number;
+  credit_note_number: string;
+  credit_note_date: string;
+  customer?: {
+    businessName?: string;
+    firstName?: string;
+    lastName?: string;
+    documentType?: string;
+    documentNumber?: string;
+  };
+  sale?: {
+    sale_number: string;
+    currency?: string;
+  };
+  type: string;
+  refund_method: string;
+  total: number;
+  status: string;
+}
+
+interface CreditNotesResponse {
+  data?: CreditNote[];
+  pagination?: { total: number; totalPages: number };
+}
+
+interface CreditNoteStats {
+  totalCount?: number;
+  totalsByCurrency?: Record<string, number | string>;
+  pendingCount?: number;
+  cancelledCount?: number;
+}
+
+interface StatsResponse {
+  data?: CreditNoteStats;
+}
+
 const CreditNotesPage = () => {
   const [limit, setLimit] = useTableLimit();
   const [filters, setFilters] = useState({
@@ -38,10 +75,10 @@ const CreditNotesPage = () => {
     staleTime: 60_000,
   });
 
-  const notesResult = notesData as { data?: unknown[]; pagination?: { total: number; totalPages: number } } | undefined;
+  const notesResult = notesData as CreditNotesResponse | undefined;
   const creditNotes = notesResult?.data || [];
   const pagination = notesResult?.pagination || { total: 0, totalPages: 0 };
-  const stats = statsData?.data || null;
+  const stats = (statsData as StatsResponse | undefined)?.data || null;
 
   const handlePageChange = (newPage: number) => {
     setFilters(prev => ({ ...prev, page: newPage }));
@@ -66,7 +103,7 @@ const CreditNotesPage = () => {
     return new Intl.NumberFormat('es-VE', {
       style: 'currency',
       currency: 'COP'
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   return (
@@ -139,7 +176,7 @@ const CreditNotesPage = () => {
             </div>
 
             <button
-              onClick={refetch}
+              onClick={() => refetch()}
               className="p-2 border border-gray-300 rounded-md hover:bg-gray-50"
               title="Actualizar"
             >
@@ -166,19 +203,19 @@ const CreditNotesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     <ArrowClockwise className="w-8 h-8 mx-auto animate-spin mb-4" />
                     <p>Cargando notas de crédito...</p>
                   </td>
                 </tr>
               ) : creditNotes.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No se encontraron notas de crédito con los filtros actuales
                   </td>
                 </tr>
               ) : (
-                creditNotes.map((note) => (
+                creditNotes.map((note: CreditNote) => (
                   <tr key={note.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-primary-600">{note.credit_note_number}</div>
@@ -227,7 +264,7 @@ const CreditNotesPage = () => {
               total={pagination.total}
               limit={limit}
               onPageChange={handlePageChange}
-              onLimitChange={(newLimit) => { setLimit(newLimit); setFilters(prev => ({ ...prev, page: 1 })); }}
+              onLimitChange={(newLimit: number) => { setLimit(newLimit); setFilters(prev => ({ ...prev, page: 1 })); }}
             />
           </div>
         )}

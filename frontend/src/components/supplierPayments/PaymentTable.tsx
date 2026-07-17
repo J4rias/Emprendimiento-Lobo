@@ -2,7 +2,7 @@ import { Badge, Table, ViewAction, EditAction, CancelAction } from '../ui';
 import { formatMoney, formatDateShort } from '../../utils/formatUtils';
 
 const STATUS_LABEL = { recorded: 'Registrado', confirmed: 'Confirmado', cancelled: 'Cancelado' };
-const STATUS_VARIANT = { recorded: 'warning', confirmed: 'success', cancelled: 'error' };
+const STATUS_VARIANT = { recorded: 'warning', confirmed: 'success', cancelled: 'error' } as const;
 
 const METHOD_LABEL = {
   cash: 'Efectivo',
@@ -21,7 +21,7 @@ const METHOD_VARIANT = {
   other: 'neutral',
   credit_balance: 'purple',
   usdt: 'usdt',
-};
+} as const;
 
 const fmtAmt = (v: number | string, currency?: string): string =>
   formatMoney(v, currency || '', 2);
@@ -64,7 +64,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
       accessor: 'payment_number',
       sortable: true,
       sortKey: 'payment_number',
-      render: (_, p) => (
+      render: (_: unknown, p: SupplierPayment) => (
         <div>
           <div className="font-medium text-gray-900">{p.payment_number || 'N/A'}</div>
           <div className="text-xs text-gray-500">
@@ -76,7 +76,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Proveedor',
       accessor: 'supplier',
-      render: (_, p) => (
+      render: (_: unknown, p: SupplierPayment) => (
         <div>
           <div className="font-medium text-gray-900">{p.supplier?.name}</div>
           <div className="text-xs text-gray-500">{p.supplier?.company_name}</div>
@@ -86,7 +86,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Órdenes de compra',
       accessor: 'allocations',
-      render: (_, p) => {
+      render: (_: unknown, p: SupplierPayment) => {
         const allocs = p.allocations || [];
         if (allocs.length === 0)
           return <span className="text-xs text-gray-400">Sin asignación</span>;
@@ -97,7 +97,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
             </span>
           );
         const tooltip = allocs
-          .map((a) => a.purchaseOrder?.order_number || `OC #${a.purchase_order_id}`)
+          .map((a: NonNullable<SupplierPayment['allocations']>[number]) => a.purchaseOrder?.order_number || `OC #${a.purchase_order_id}`)
           .join('\n');
         return (
           <span className="text-sm text-primary-600 cursor-default" title={tooltip}>
@@ -111,18 +111,18 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
       accessor: 'status',
       sortable: true,
       sortKey: 'status',
-      render: (_, p) => (
-        <Badge variant={STATUS_VARIANT[p.status] ?? 'neutral'}>
-          {STATUS_LABEL[p.status] ?? p.status}
+      render: (_: unknown, p: SupplierPayment) => (
+        <Badge variant={STATUS_VARIANT[p.status as keyof typeof STATUS_VARIANT] ?? 'neutral'}>
+          {STATUS_LABEL[p.status as keyof typeof STATUS_LABEL] ?? p.status}
         </Badge>
       ),
     },
     {
       header: 'Método',
       accessor: 'payment_method',
-      render: (_, p) => (
-        <Badge variant={METHOD_VARIANT[p.payment_method] ?? 'neutral'}>
-          {METHOD_LABEL[p.payment_method] ?? p.payment_method}
+      render: (_: unknown, p: SupplierPayment) => (
+        <Badge variant={METHOD_VARIANT[p.payment_method as keyof typeof METHOD_VARIANT] ?? 'neutral'}>
+          {METHOD_LABEL[p.payment_method as keyof typeof METHOD_LABEL] ?? p.payment_method}
         </Badge>
       ),
     },
@@ -132,7 +132,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
       sortable: true,
       sortKey: 'amount',
       cellClassName: 'text-right',
-      render: (_, p) => (
+      render: (_: unknown, p: SupplierPayment) => (
         <div className="text-right">
           <div className="font-medium text-gray-900">{fmtAmt(p.amount, p.currency)}</div>
           {p.reference && <div className="text-xs text-gray-500">Ref: {p.reference}</div>}
@@ -142,7 +142,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Registrado por',
       accessor: 'creator',
-      render: (_, p) => (
+      render: (_: unknown, p: SupplierPayment) => (
         <span className="text-sm text-gray-600">
           {[p.creator?.first_name, p.creator?.last_name].filter(Boolean).join(' ') ||
             p.creator?.username ||
@@ -153,7 +153,7 @@ export function PaymentTable({ payments, loading, onView, onEdit, onCancel, hasP
     {
       header: 'Acciones',
       accessor: 'id',
-      render: (_, p) => (
+      render: (_: unknown, p: SupplierPayment) => (
         <div className="flex items-center gap-1">
           <ViewAction onClick={() => onView(p)} />
           {hasPermission('supplier_payments.update') && p.status !== 'cancelled' && (

@@ -58,10 +58,13 @@ const BrandsPage = () => {
   const { sortBy: brandSortBy, sortDir: brandSortDir, onSort: _brandOnSort } = useTableSort([], { serverSide: true, defaultField: 'name', defaultDir: 'asc' });
   const brandOnSort = (f: string, d: 'asc' | 'desc') => { _brandOnSort(f, d); setCurrentPage(1); };
 
-  const { data: brandsData, isLoading, error: fetchError } = useQuery({
+  const { data: brandsData, isLoading, error: fetchError } = useQuery<{
+    data: BrandRow[];
+    pagination: { totalPages: number; total: number };
+  }>({
     queryKey: ['brands', currentPage, searchTerm, limit, brandSortBy, brandSortDir],
     queryFn: () => api.get('/brands', { params: { page: currentPage, limit, search: searchTerm, sort_by: brandSortBy, sort_dir: brandSortDir } }).then(r => r.data),
-    keepPreviousData: true,
+    placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
 
@@ -131,7 +134,8 @@ const BrandsPage = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type, checked } = e.target;
+    const target = e.target as HTMLInputElement;
+    const { name, value, type, checked } = target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
@@ -334,7 +338,7 @@ const BrandsPage = () => {
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingBrand(null); }}
         brand={viewingBrand}
-        onEdit={() => { setShowViewModal(false); handleEdit(viewingBrand); }}
+        onEdit={() => { setShowViewModal(false); if (viewingBrand) handleEdit(viewingBrand); }}
       />
 
       {/* Delete Confirm Dialog */}

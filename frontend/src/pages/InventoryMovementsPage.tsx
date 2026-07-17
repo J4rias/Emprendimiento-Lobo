@@ -14,23 +14,66 @@ import { downloadCSV } from '../utils/csvUtils';
 
 import { formatDateShort } from '../utils/formatUtils';
 
-const fmtDate = (d) => formatDateShort(d);
+interface MovementUser {
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
 
-const getUserName = (user) => {
+interface MovementProduct {
+  name?: string;
+  sku?: string;
+  inventories?: { id: number; [key: string]: unknown }[];
+}
+
+interface MovementPresentation {
+  name?: string;
+  units_per_package?: number | string;
+}
+
+interface MovementWarehouse {
+  name?: string;
+}
+
+interface InventoryMovement {
+  id: number;
+  createdAt?: string;
+  created_at?: string;
+  quantity?: number | string;
+  package_quantity?: number | string | null;
+  loose_units?: number | string | null;
+  movement_type?: string;
+  document_number?: string;
+  sale_id?: number;
+  product?: MovementProduct;
+  presentation?: MovementPresentation;
+  warehouse?: MovementWarehouse;
+  user?: MovementUser;
+  [key: string]: unknown;
+}
+
+interface MovementsResponse {
+  data: InventoryMovement[];
+  pagination: { total: number; totalPages: number };
+}
+
+const fmtDate = (d: string) => formatDateShort(d);
+
+const getUserName = (user: MovementUser | undefined) => {
   if (!user) return 'Sistema';
   return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Sistema';
 };
 
 // Bultos/sueltas del movimiento: usa los valores persistidos si existen;
 // si no, los deriva de la cantidad total (quantity lleva signo en transferencias).
-const splitQty = (m) => {
-  const qty = Math.abs(parseFloat(m.quantity) || 0);
-  const pkg   = m.package_quantity != null ? Math.abs(parseFloat(m.package_quantity) || 0) : null;
-  const loose = m.loose_units      != null ? Math.abs(parseFloat(m.loose_units) || 0)      : null;
+const splitQty = (m: InventoryMovement) => {
+  const qty = Math.abs(parseFloat(String(m.quantity)) || 0);
+  const pkg   = m.package_quantity != null ? Math.abs(parseFloat(String(m.package_quantity)) || 0) : null;
+  const loose = m.loose_units      != null ? Math.abs(parseFloat(String(m.loose_units)) || 0)      : null;
   if (pkg !== null && (pkg > 0 || (loose || 0) > 0)) {
     return { bultos: pkg, sueltas: loose || 0, qty };
   }
-  const upu = parseFloat(m.presentation?.units_per_package) || 0;
+  const upu = parseFloat(String(m.presentation?.units_per_package)) || 0;
   return {
     bultos:  upu > 0 ? Math.floor(qty / upu) : 0,
     sueltas: upu > 0 ? qty % upu : qty,
@@ -50,14 +93,14 @@ const InventoryMovementsPage = () => {
   const [sortBy, setSortBy]       = useState('created_at');
   const [sortDir, setSortDir]     = useState('desc');
 
-  const handleSearch    = (v)    => { setSearch(v);    setPage(1); };
-  const handleTypeChange = (v)   => { setMovType(v);   setPage(1); };
-  const handleDateChange = (r)   => { setDateRange(r); setPage(1); };
+  const handleSearch    = (v: string)    => { setSearch(v);    setPage(1); };
+  const handleTypeChange = (v: string)   => { setMovType(v);   setPage(1); };
+  const handleDateChange = (r: { start_date: string; end_date: string })   => { setDateRange(r); setPage(1); };
 
   // ── Query ──────────────────────────────────────────────────────────────────
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<MovementsResponse>({
     queryKey: ['inventory-movements-global', page, limit, search, movType, dateRange, sortBy, sortDir],
-    queryFn: () =>
+    queryFn: async (): Promise<MovementsResponse> =>
       inventoryService.getMovements({
         page,
         limit,
@@ -67,22 +110,22 @@ const InventoryMovementsPage = () => {
         date_to:       dateRange.end_date   || undefined,
         sort_by:       sortBy,
         sort_dir:      sortDir,
-      }),
-    keepPreviousData: true,
+      }) as Promise<MovementsResponse>,
+    initialData: undefined,
   });
 
   const movements   = data?.data         || [];
-  const pagination  = data?.pagination   || {};
+  const pagination  = data?.pagination   || { total: 0, totalPages: 1 };
   const totalPages  = pagination.totalPages || 1;
   const total       = pagination.total      || 0;
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExport = () => {
     const headers = ['Fecha', 'Producto', 'SKU', 'Tipo', 'Presentación', 'Bultos', 'Sueltas', 'Total uds', 'Almacén', 'Referencia', 'Usuario'];
-    const rows = movements.map(m => {
+    const rows = movements.map((m: InventoryMovement) => {
       const { bultos, sueltas, qty } = splitQty(m);
       return [
-        fmtDate(m.createdAt || m.created_at),
+        fmtDate(m.createdAt || m.created_at || ''),
         m.product?.name || '',
         m.product?.sku  || '',
         m.movement_type || '',
@@ -99,18 +142,18 @@ const InventoryMovementsPage = () => {
   };
 
   // ── Columnas ───────────────────────────────────────────────────────────────
-  const columns = [
+  const columns: { header: string; className?: string; render: (m: InventoryMovement) => React.ReactNode }[] = [
     {
       header: 'Fecha',
-      render: (m) => (
+      render: (m: InventoryMovement) => (
         <span className="text-xs text-gray-500 whitespace-nowrap">
-          {fmtDate(m.createdAt || m.created_at)}
+          {fmtDate(m.createdAt || m.created_at || '')}
         </span>
       ),
     },
     {
       header: 'Producto',
-      render: (m) => {
+      render: (m: InventoryMovement) => {
         const inventoryId = m.product?.inventories?.[0]?.id;
         return (
           <div>
@@ -132,11 +175,11 @@ const InventoryMovementsPage = () => {
     },
     {
       header: 'Tipo',
-      render: (m) => <MovementTypeBadge type={m.movement_type} />,
+      render: (m: InventoryMovement) => <MovementTypeBadge type={m.movement_type || ''} />,
     },
     {
       header: 'Presentación',
-      render: (m) => (
+      render: (m: InventoryMovement) => (
         <span className="text-sm text-gray-600">
           {m.presentation?.name || <span className="text-gray-400 italic">—</span>}
         </span>
@@ -145,7 +188,7 @@ const InventoryMovementsPage = () => {
     {
       header: 'Bultos',
       className: 'text-right',
-      render: (m) => {
+      render: (m: InventoryMovement) => {
         const { bultos } = splitQty(m);
         return bultos > 0
           ? <span className="text-sm font-medium text-right block">{bultos}</span>
@@ -155,7 +198,7 @@ const InventoryMovementsPage = () => {
     {
       header: 'Sueltas',
       className: 'text-right',
-      render: (m) => {
+      render: (m: InventoryMovement) => {
         const { sueltas } = splitQty(m);
         return sueltas > 0
           ? <span className="text-sm font-medium text-right block">{sueltas}</span>
@@ -164,21 +207,22 @@ const InventoryMovementsPage = () => {
     },
     {
       header: 'Almacén',
-      render: (m) => (
+      render: (m: InventoryMovement) => (
         <span className="text-sm text-gray-600">{m.warehouse?.name || '—'}</span>
       ),
     },
     {
       header: 'Referencia',
-      render: (m) => {
+      render: (m: InventoryMovement) => {
         if (!m.document_number) return <span className="text-gray-300 text-xs">—</span>;
         // Prioridad: venta vinculada (subquery backend) > NC por prefijo > destino por tipo
         const isCreditNote = m.document_number.startsWith('NC-');
+        const destMap: Record<string, string> = { ingreso: '/purchase-orders', transferencia: '/transferencias' };
         const dest = m.sale_id
           ? null // manejado vía state con sale_id
           : isCreditNote
             ? '/credit-notes'
-            : { ingreso: '/purchase-orders', transferencia: '/transferencias' }[m.movement_type] ?? null;
+            : (m.movement_type ? destMap[m.movement_type] : undefined) ?? null;
 
         const handleClick = () => {
           if (m.sale_id) {
@@ -207,7 +251,7 @@ const InventoryMovementsPage = () => {
     },
     {
       header: 'Usuario',
-      render: (m) => (
+      render: (m: InventoryMovement) => (
         <span className="text-xs text-gray-500">{getUserName(m.user)}</span>
       ),
     },
@@ -293,7 +337,7 @@ const InventoryMovementsPage = () => {
                   </td>
                 </tr>
               ) : (
-                movements.map((m) => (
+                movements.map((m: InventoryMovement) => (
                   <tr key={m.id} className="hover:bg-gray-50">
                     {columns.map((col, i) => (
                       <td

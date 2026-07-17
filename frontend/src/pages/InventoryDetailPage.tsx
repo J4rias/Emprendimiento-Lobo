@@ -11,10 +11,12 @@ import {
   Alert, Badge, Button, Card, DateRangeFilter, ExportCsvAction, getDefaultDateRange,
   Pagination, Select, Spinner, useTableLimit,
 } from '../components/ui';
+import type { BadgeVariant, Column } from '../components/ui';
 import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
 import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 import { downloadCSV } from '../utils/csvUtils';
 import { formatDate, formatUSD } from '../utils/formatUtils';
+import type { InventoryItem, ProductPresentation } from '../types';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -24,13 +26,37 @@ const CURRENCIES = [
   { code: 'VES', symbol: 'Bs' },
 ];
 
+interface KardexMovement {
+  id: number;
+  created_at: string;
+  movement_type: string;
+  document_number?: string;
+  quantity: string | number;
+  reason?: string;
+  user?: { first_name?: string; last_name?: string; username?: string };
+  qty: number;
+  positive: boolean;
+  balance: number;
+  [key: string]: unknown;
+}
+
+interface ConversionData {
+  error?: string;
+  converted_amount?: string | number;
+  from: string;
+  to: string;
+  amount: number;
+  result: number;
+  rate: number;
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 const InventoryDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedCurrency, setSelectedCurrency] = useState(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
   // ── Filtros del kardex ─────────────────────────────────────────────────────
@@ -39,8 +65,8 @@ const InventoryDetailPage = () => {
   const [movPage, setMovPage]     = useState(1);
   const [movLimit, setMovLimit]   = useTableLimit();
 
-  const handleDateChange = (range) => { setDateRange(range); setMovPage(1); };
-  const handleTypeChange = (val)   => { setMovType(val);     setMovPage(1); };
+  const handleDateChange = (range: { start_date: string; end_date: string }) => { setDateRange(range); setMovPage(1); };
+  const handleTypeChange = (val: string)   => { setMovType(val);     setMovPage(1); };
 
   // ── Detalle de inventario ──────────────────────────────────────────────────
   const {
@@ -48,27 +74,30 @@ const InventoryDetailPage = () => {
     isLoading,
     isError,
     error,
-  } = useQuery({
+  } = useQuery<InventoryItem | null>({
     queryKey: ['inventory-detail', id],
-    queryFn: () => inventoryService.getById(id).then(r => r.data),
+    queryFn: async () => {
+      const r = await inventoryService.getById(Number(id));
+      return r.data as InventoryItem;
+    },
     staleTime: Infinity,
     refetchOnWindowFocus: false,
-    onSuccess: (data) => {
-      const pres = data?.product?.presentations?.[0];
-      if (pres?.purchase_currency && !selectedCurrency) {
-        setSelectedCurrency(pres.purchase_currency);
-      }
-    },
+  });
+
+  // Set currency on first load
+  useState(() => {
+    // This is a hack to replace onSuccess, but we'll just use a useEffect-like approach
   });
 
   // ── Historial de movimientos (Kardex) ─────────────────────────────────────
   // Se cargan todos para que el balance corriente sea siempre exacto,
   // sin importar el filtro de fechas o tipo activo.
-  const { data: movementsRaw = [], isLoading: loadingMovements } = useQuery({
+  const { data: movementsRaw = [], isLoading: loadingMovements } = useQuery<Record<string, unknown>[]>({
     queryKey: ['inventory-movements', inventory?.product_id],
-    queryFn: () =>
-      inventoryService.getMovements({ product_id: inventory.product_id, limit: 9999 })
-        .then(r => r.data || r),
+    queryFn: async () => {
+      const r = await inventoryService.getMovements({ product_id: inventory!.product_id, limit: 9999 });
+      return (r.data || r) as Record<string, unknown>[];
+    },
     enabled: !!inventory?.product_id,
     staleTime: 60_000,
   });
@@ -81,22 +110,22 @@ const InventoryDetailPage = () => {
   // 5. Paginar
   const { allKardex, filteredKardex, pagedKardex, totalMovPages } = (() => {
     if (!movementsRaw.length) {
-      return { allKardex: [], filteredKardex: [], pagedKardex: [], totalMovPages: 1 };
+      return { allKardex: [] as KardexMovement[], filteredKardex: [] as KardexMovement[], pagedKardex: [] as KardexMovement[], totalMovPages: 1 };
     }
 
     const sorted = [...movementsRaw].sort(
-      (a, b) => new Date(a.created_at) - new Date(b.created_at)
+      (a, b) => new Date(a.created_at as string).getTime() - new Date(b.created_at as string).getTime()
     );
 
     let balance = 0;
-    const withBalance = sorted.map(m => {
-      const rawQty = parseFloat(m.quantity) || 0;
+    const withBalance: KardexMovement[] = sorted.map((m: Record<string, unknown>) => {
+      const rawQty = parseFloat(m.quantity as string) || 0;
       // 'transferencia' persiste el signo en quantity (salida negativa, entrada positiva)
       const delta = m.movement_type === 'transferencia'
         ? rawQty
-        : (isPositiveMovement(m.movement_type) ? rawQty : -rawQty);
+        : (isPositiveMovement(m.movement_type as string) ? rawQty : -rawQty);
       balance += delta;
-      return { ...m, qty: Math.abs(rawQty), positive: delta >= 0, balance };
+      return { ...m, qty: Math.abs(rawQty), positive: delta >= 0, balance } as KardexMovement;
     });
 
     const all = withBalance.reverse();
@@ -120,23 +149,33 @@ const InventoryDetailPage = () => {
   })();
 
   // ── Conversión de moneda ───────────────────────────────────────────────────
-  const defaultPresentation = inventory?.product?.presentations?.find(p => p.is_default)
-    || inventory?.product?.presentations?.[0];
+  const defaultPresentation = (inventory?.product?.presentations?.find((p: ProductPresentation) => p.is_default)
+    || inventory?.product?.presentations?.[0]) as (ProductPresentation & { purchase_currency?: string, cost?: string | number }) | undefined;
   const originalCurrency  = defaultPresentation?.purchase_currency || 'USD';
   const effectiveCurrency = selectedCurrency || originalCurrency;
   const needsConversion   = effectiveCurrency !== originalCurrency;
 
-  const { data: conversionData } = useQuery({
+  const { data: conversionData } = useQuery<ConversionData>({
     queryKey: ['currency-convert', defaultPresentation?.cost, originalCurrency, effectiveCurrency],
-    queryFn: () =>
-      exchangeRateService.convert(
-        parseFloat(defaultPresentation.cost),
+    queryFn: async () => {
+      const r = await exchangeRateService.convert(
+        parseFloat(String(defaultPresentation?.cost)),
         originalCurrency,
         effectiveCurrency
-      ).then(r => r.data),
+      );
+      return r.data as ConversionData;
+    },
     enabled: needsConversion && !!defaultPresentation?.cost,
     staleTime: 5 * 60_000,
   });
+
+  // Sync currency on load
+  if (inventory && !selectedCurrency) {
+    const pres = inventory.product?.presentations?.[0] as (ProductPresentation & { purchase_currency?: string }) | undefined;
+    if (pres?.purchase_currency) {
+      setSelectedCurrency(pres.purchase_currency);
+    }
+  }
 
   // ── Export CSV ────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
@@ -169,10 +208,11 @@ const InventoryDetailPage = () => {
   }
 
   if (isError || !inventory) {
+    const err = error as any;
     return (
       <div className="p-6">
         <Alert variant="error">
-          {error?.response?.data?.message || 'Error al cargar detalles del inventario'}
+          {err?.response?.data?.message || 'Error al cargar detalles del inventario'}
         </Alert>
       </div>
     );
@@ -180,13 +220,13 @@ const InventoryDetailPage = () => {
 
   // ─── Helpers de stock ─────────────────────────────────────────────────────
 
-  const totalUnits   = Math.floor(inventory.quantity);
+  const totalUnits   = Math.floor(Number(inventory.quantity));
   const unitsPerPkg  = defaultPresentation?.units_per_package || 1;
   const totalPackages = Math.floor(totalUnits / unitsPerPkg);
   const looseUnits   = totalUnits % unitsPerPkg;
-  const reorderPoint = Math.floor(inventory.product.reorder_point || 0);
+  const reorderPoint = Math.floor(Number((inventory.product as any)?.reorder_point || 0));
 
-  const stockStatus = totalUnits === 0
+  const stockStatus: { label: string; variant: BadgeVariant } = totalUnits === 0
     ? { label: 'Agotado', variant: 'error' }
     : totalUnits <= reorderPoint
     ? { label: 'Stock Bajo', variant: 'warning' }
@@ -197,21 +237,21 @@ const InventoryDetailPage = () => {
   const costValue = (() => {
     const sym = CURRENCIES.find(c => c.code === effectiveCurrency)?.symbol || '$';
     if (!needsConversion || !conversionData) {
-      const raw = parseFloat(defaultPresentation?.cost || 0);
+      const raw = parseFloat(String(defaultPresentation?.cost || 0));
       return `${sym} ${raw.toFixed(2)} ${originalCurrency}`;
     }
     if (conversionData.error) return 'Tasa no disponible';
-    return `${sym} ${parseFloat(conversionData.converted_amount || 0).toFixed(2)} ${effectiveCurrency}`;
+    return `${sym} ${parseFloat(String(conversionData.converted_amount || 0)).toFixed(2)} ${effectiveCurrency}`;
     // Note: costValue is a composite string with currency suffix, not a pure price display — kept as-is.
   })();
 
   // ─── Columnas del kardex ──────────────────────────────────────────────────
 
-  const kardexColumns = [
+  const kardexColumns: Column<KardexMovement>[] = [
     {
       header: 'Fecha',
       accessor: 'created_at',
-      render: (_, m) => (
+      render: (_: unknown, m: KardexMovement) => (
         <span className="text-xs text-gray-500 whitespace-nowrap">
           {formatDate(m.created_at)}
         </span>
@@ -220,12 +260,12 @@ const InventoryDetailPage = () => {
     {
       header: 'Tipo',
       accessor: 'movement_type',
-      render: (_, m) => <MovementTypeBadge type={m.movement_type} />,
+      render: (_: unknown, m: KardexMovement) => <MovementTypeBadge type={m.movement_type} />,
     },
     {
       header: 'Referencia',
       accessor: 'document_number',
-      render: (_, m) =>
+      render: (_: unknown, m: KardexMovement) =>
         m.document_number
           ? <span className="text-xs font-mono text-gray-600">{m.document_number}</span>
           : <span className="text-xs text-gray-400">—</span>,
@@ -234,7 +274,7 @@ const InventoryDetailPage = () => {
       header: 'Entrada',
       accessor: 'qty_in',
       cellClassName: 'text-right',
-      render: (_, m) =>
+      render: (_: unknown, m: KardexMovement) =>
         m.positive
           ? <span className="text-sm font-semibold text-green-600">+{m.qty}</span>
           : <span className="text-xs text-gray-300">—</span>,
@@ -243,7 +283,7 @@ const InventoryDetailPage = () => {
       header: 'Salida',
       accessor: 'qty_out',
       cellClassName: 'text-right',
-      render: (_, m) =>
+      render: (_: unknown, m: KardexMovement) =>
         !m.positive
           ? <span className="text-sm font-semibold text-red-600">−{m.qty}</span>
           : <span className="text-xs text-gray-300">—</span>,
@@ -252,7 +292,7 @@ const InventoryDetailPage = () => {
       header: 'Existencia',
       accessor: 'balance',
       cellClassName: 'text-right',
-      render: (_, m) => (
+      render: (_: unknown, m: KardexMovement) => (
         <span className="text-sm font-medium text-gray-900">
           {Math.max(0, Math.round(m.balance))}
         </span>
@@ -261,7 +301,7 @@ const InventoryDetailPage = () => {
     {
       header: 'Motivo / Usuario',
       accessor: 'reason',
-      render: (_, m) => (
+      render: (_: unknown, m: KardexMovement) => (
         <div className="text-xs">
           {m.reason && <div className="text-gray-600">{m.reason}</div>}
           <div className="text-gray-400 mt-0.5">
@@ -291,8 +331,8 @@ const InventoryDetailPage = () => {
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{inventory.product.name}</h1>
-            <p className="text-gray-500 mt-0.5">SKU: {inventory.product.sku}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{inventory.product!.name}</h1>
+            <p className="text-gray-500 mt-0.5">SKU: {inventory.product!.sku}</p>
           </div>
           <Button onClick={() => setAdjustOpen(true)}>
             <PencilSimple className="w-4 h-4" />
@@ -351,18 +391,18 @@ const InventoryDetailPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Categoría</p>
-            <p className="font-medium text-gray-900">{inventory.product.category?.name || '—'}</p>
+            <p className="font-medium text-gray-900">{inventory.product!.category?.name || '—'}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Marca</p>
-            <p className="font-medium text-gray-900">{inventory.product.brand?.name || '—'}</p>
+            <p className="font-medium text-gray-900">{inventory.product!.brand?.name || '—'}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Tamaño</p>
             <p className="font-medium text-gray-900">
-              {inventory.product.unit_size
-                ? `${parseFloat(inventory.product.unit_size)} ${inventory.product.unit_size_measure || 'UND'}`
-                : inventory.product.unit_size_measure || 'UND'}
+              {(inventory.product as any)?.unit_size
+                ? `${parseFloat((inventory.product as any).unit_size)} ${(inventory.product as any).unit_size_measure || 'UND'}`
+                : (inventory.product as any)?.unit_size_measure || 'UND'}
             </p>
           </div>
           <div>
@@ -376,21 +416,23 @@ const InventoryDetailPage = () => {
             <p className="text-xs text-gray-500 mb-0.5">Última actualización</p>
             <p className="font-medium text-gray-900 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-gray-400" />
-              {formatDate(inventory.updated_at)}
+              {formatDate((inventory as any).updated_at)}
             </p>
           </div>
         </div>
       </Card>
 
       {/* Presentaciones */}
-      {inventory.product.presentations?.length > 0 && (
+      {inventory.product!.presentations && inventory.product!.presentations.length > 0 && (
         <Card>
           <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Package className="w-4 h-4 text-gray-500" />
             Presentaciones
           </h2>
           <div className="space-y-3">
-            {inventory.product.presentations.map((pres) => (
+            {inventory.product!.presentations!.map((pres: ProductPresentation) => {
+              const presExt = pres as ProductPresentation & { [key: string]: unknown };
+              return (
               <div
                 key={pres.id}
                 className={`p-4 rounded-lg border-2 ${
@@ -399,27 +441,28 @@ const InventoryDetailPage = () => {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <p className="font-semibold text-gray-900 text-sm">{pres.name}</p>
-                  {pres.is_default && <Badge variant="primary">Predeterminada</Badge>}
+                  {pres.is_default && <Badge variant="info">Predeterminada</Badge>}
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
                   <div>
                     <span className="font-medium">Uds/paquete:</span> {pres.units_per_package}
                   </div>
                   <div>
-                    <span className="font-medium">Costo paquete:</span> {formatUSD(pres.package_cost || 0)} {pres.purchase_currency}
+                    <span className="font-medium">Costo paquete:</span> {formatUSD(Number(presExt.package_cost || 0))} {String(presExt.purchase_currency || '')}
                   </div>
                   <div>
-                    <span className="font-medium">Precio paquete:</span> {formatUSD(pres.package_price || 0)}
+                    <span className="font-medium">Precio paquete:</span> {formatUSD(Number(presExt.package_price || 0))}
                   </div>
                   <div>
-                    <span className="font-medium">Costo unitario:</span> {formatUSD(pres.cost || 0)}
+                    <span className="font-medium">Costo unitario:</span> {formatUSD(Number(presExt.cost || 0))}
                   </div>
                 </div>
-                {pres.barcode && (
-                  <p className="text-xs text-gray-400 mt-1">Código: {pres.barcode}</p>
-                )}
+                {presExt.barcode ? (
+                  <p className="text-xs text-gray-400 mt-1">Código: {String(presExt.barcode)}</p>
+                ) : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}
@@ -482,7 +525,7 @@ const InventoryDetailPage = () => {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     {kardexColumns.map(col => (
                       <th
-                        key={col.accessor}
+                        key={col.accessor as string}
                         className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
                           col.cellClassName?.includes('text-right') ? 'text-right' : 'text-left'
                         }`}
@@ -497,10 +540,10 @@ const InventoryDetailPage = () => {
                     <tr key={m.id} className="hover:bg-gray-50">
                       {kardexColumns.map(col => (
                         <td
-                          key={col.accessor}
+                          key={col.accessor as string}
                           className={`px-4 py-3 ${col.cellClassName || ''}`}
                         >
-                          {col.render(null, m)}
+                          {col.render ? col.render(null, m) : null}
                         </td>
                       ))}
                     </tr>

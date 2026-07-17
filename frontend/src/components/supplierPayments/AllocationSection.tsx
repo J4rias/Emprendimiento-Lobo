@@ -94,8 +94,8 @@ export function AllocationSection({
 
   const addAllocation = (po: PurchaseOrder): void => {
     if (allocations.find((a) => a.purchase_order_id === po.id)) return;
-    const poTotal = po.balance !== undefined ? parseFloat(po.balance) : parseFloat(po.total);
-    const poOriginalTotal = parseFloat(po.total);
+    const poTotal = po.balance !== undefined ? parseFloat(String(po.balance)) : parseFloat(String(po.total));
+    const poOriginalTotal = parseFloat(String(po.total));
     const poCurrency = po.currency;
 
     const currentlyAllocated = allocations.reduce(
@@ -147,7 +147,7 @@ export function AllocationSection({
   // ─── Exchange rate UI helpers ──────────────────────────────────────────────────
 
   const hasCrossCurrency = allocations.some((a) => a.po_currency !== formCurrency);
-  const otherCur = allocations.find((a) => a.po_currency !== formCurrency)?.po_currency;
+  const otherCur = allocations.find((a) => a.po_currency !== formCurrency)?.po_currency || '';
 
   const fromCur = rateFlipped ? formCurrency : otherCur;
   const toCur = rateFlipped ? otherCur : formCurrency;
@@ -180,7 +180,7 @@ export function AllocationSection({
       {purchaseOrders.length > 0 && !prefillLocked && (
         <div className="mb-3">
           <select
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
               const po = purchaseOrders.find((p) => p.id === parseInt(e.target.value));
               if (po) addAllocation(po);
               e.target.value = '';
@@ -196,9 +196,9 @@ export function AllocationSection({
               .map((po) => (
                 <option key={po.id} value={po.id}>
                   {po.order_number} — Total: {po.currency}{' '}
-                  {formatMoney(po.total, '', 2).trim()} |
+                  {formatMoney(String(po.total), '', 2).trim()} |
                   Saldo: {po.currency}{' '}
-                  {formatMoney(po.balance ?? po.total, '', 2).trim()}
+                  {formatMoney(String(po.balance ?? po.total), '', 2).trim()}
                   {po.last_invoice_number ? ` (Fact: ${po.last_invoice_number})` : ''}
                 </option>
               ))}
@@ -230,7 +230,7 @@ export function AllocationSection({
               onClick={() => {
                 if (!systemRate) return;
                 setRateType('system');
-                onRateApply(systemRateForDir.toString(), fromCur, toCur);
+                onRateApply(systemRateForDir?.toString() || '', fromCur, toCur);
               }}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 loadingRate
@@ -268,7 +268,7 @@ export function AllocationSection({
             <span className="text-sm text-gray-600 whitespace-nowrap">1 {fromCur} =</span>
             {rateType === 'system' && systemRate ? (
               <div className="flex-1 px-3 py-2 bg-white border border-amber-200 rounded-lg font-bold text-amber-700 text-center">
-                {loadingRate ? 'Cargando...' : systemRateForDir.toFixed(4)}
+                {loadingRate ? 'Cargando...' : systemRateForDir?.toFixed(4)}
               </div>
             ) : (
               <input
@@ -276,7 +276,7 @@ export function AllocationSection({
                 step="0.000001"
                 min="0"
                 value={exchangeRate}
-                onChange={(e) => onRateApply(e.target.value, fromCur, toCur)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onRateApply(e.target.value, fromCur, toCur)}
                 placeholder="Ingrese la tasa"
                 className="flex-1 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-200 focus:border-amber-400 focus:outline-none font-bold text-amber-700 text-center"
               />
@@ -292,8 +292,8 @@ export function AllocationSection({
                   const rate = parseFloat(exchangeRate);
                   const amount = parseFloat(formAmount);
                   if (exchangeRateFrom === otherCur)
-                    return formatMoney(amount / rate, otherCur, 2);
-                  return formatMoney(amount * rate, otherCur, 2);
+                    return formatMoney(String(amount / rate), otherCur, 2);
+                  return formatMoney(String(amount * rate), otherCur, 2);
                 })()}
               </strong>
             </p>
@@ -321,9 +321,9 @@ export function AllocationSection({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-800">{alloc.order_number}</div>
                     <div className="text-xs text-gray-500">
-                      Saldo: {formatMoney(alloc.po_total, alloc.po_currency, 2)}
+                      Saldo: {formatMoney(String(alloc.po_total), alloc.po_currency, 2)}
                       {alloc.po_original_total && alloc.po_total !== alloc.po_original_total
-                        ? ` (de ${formatMoney(alloc.po_original_total, '', 2).trim()})`
+                        ? ` (de ${formatMoney(String(alloc.po_original_total), '', 2).trim()})`
                         : ''}
                       {crossCurrency && (
                         <span className="ml-1 text-amber-500">
@@ -343,7 +343,7 @@ export function AllocationSection({
                     <input
                       type="text"
                       value={alloc.invoice_number}
-                      onChange={(e) => updateInvoice(alloc.purchase_order_id, e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInvoice(alloc.purchase_order_id, e.target.value)}
                       placeholder="# Factura"
                       className="w-28 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-primary-200 focus:border-primary-500 focus:outline-none"
                     />
@@ -363,7 +363,7 @@ export function AllocationSection({
                         )
                       )
                     }
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const raw = parseNum(e.target.value);
                       setAllocations((prev) =>
                         prev.map((a) =>
@@ -405,8 +405,8 @@ export function AllocationSection({
 
                 {crossCurrency && equivalentInPO !== null && (
                   <div className="mt-1 text-xs text-amber-600 pl-1">
-                    ≈ {formatMoney(equivalentInPO, alloc.po_currency, 2)} de{' '}
-                    {formatMoney(alloc.po_total, alloc.po_currency, 2)}
+                    ≈ {formatMoney(String(equivalentInPO), alloc.po_currency, 2)} de{' '}
+                    {formatMoney(String(alloc.po_total), alloc.po_currency, 2)}
                   </div>
                 )}
               </div>
@@ -427,7 +427,7 @@ export function AllocationSection({
           <div className="flex justify-between">
             <span className="text-gray-600">Distribuido:</span>
             <span className="font-bold text-green-600">
-              {formatMoney(totalAllocated, formCurrency, 2)}
+              {formatMoney(String(totalAllocated), formCurrency, 2)}
             </span>
           </div>
 
@@ -436,7 +436,7 @@ export function AllocationSection({
               <div className="flex justify-between">
                 <span className="text-red-700 font-medium">⚠️ Error de distribución:</span>
                 <span className="font-bold text-red-700">
-                  {formatMoney(Math.abs(unallocated), formCurrency, 2)}
+                  {formatMoney(String(Math.abs(unallocated)), formCurrency, 2)}
                 </span>
               </div>
               <p className="text-xs text-red-600 mt-1">
@@ -450,7 +450,7 @@ export function AllocationSection({
               <div className="flex justify-between">
                 <span className="text-primary-700 font-medium">✨ Saldo a Favor generado:</span>
                 <span className="font-bold text-primary-700">
-                  {formatMoney(unallocated, formCurrency, 2)}
+                  {formatMoney(String(unallocated), formCurrency, 2)}
                 </span>
               </div>
               <p className="text-xs text-primary-600 mt-1">

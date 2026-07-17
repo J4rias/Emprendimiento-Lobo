@@ -13,25 +13,66 @@ import {
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
   ViewAction, TransitAction, DeliverAction, CancelAction,
 } from '../components/ui';
+import type { BadgeVariant, Column } from '../components/ui';
 import DeliveryViewSheet from '../components/deliveries/DeliveryViewSheet';
 import { localToday } from '../utils/dateUtils';
 import { formatDateShort } from '../utils/formatUtils';
 
+// ── Local Interfaces ──────────────────────────────────────────────────────────
+interface Delivery {
+  id: number;
+  delivery_number: string;
+  scheduled_date: string;
+  delivery_address: string;
+  delivery_city?: string;
+  delivery_state?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  delivery_method: string;
+  carrier?: string;
+  tracking_number?: string;
+  notes?: string;
+  status: 'pending' | 'in_transit' | 'delivered' | 'failed' | 'cancelled';
+  sale?: { sale_number: string; sale_date: string };
+  customer?: { name: string; phone: string };
+}
+
+interface DeliveryStats {
+  total_deliveries: number;
+  pending_deliveries: number;
+  in_transit_deliveries: number;
+  deliveries_by_status?: { status: string; count: number }[];
+}
+
+interface DeliveryForm {
+  sale_number: string;
+  scheduled_date: string;
+  delivery_address: string;
+  delivery_city: string;
+  delivery_state: string;
+  contact_name: string;
+  contact_phone: string;
+  delivery_method: string;
+  carrier: string;
+  tracking_number: string;
+  notes: string;
+}
+
 // ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_VARIANT = {
+const STATUS_VARIANT: Record<Delivery['status'], BadgeVariant> = {
   pending: 'warning', in_transit: 'info', delivered: 'success',
   failed: 'error',    cancelled: 'neutral',
 };
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<Delivery['status'], string> = {
   pending: 'Pendiente', in_transit: 'En Tránsito', delivered: 'Entregada',
   failed: 'Fallida',    cancelled: 'Cancelada',
 };
-const DELIVERY_METHODS = {
+const DELIVERY_METHODS: Record<string, string> = {
   pickup: 'Retiro en Tienda', courier: 'Mensajería',
   own_fleet: 'Flota Propia',  shipping_company: 'Transportadora',
 };
 
-const BLANK_FORM = {
+const BLANK_FORM: DeliveryForm = {
   sale_number: '',
   scheduled_date: localToday(),
   delivery_address: '',
@@ -45,7 +86,7 @@ const BLANK_FORM = {
   notes: '',
 };
 
-const StatusBadge = ({ status }) => (
+const StatusBadge = ({ status }: { status: Delivery['status'] }) => (
   <Badge variant={STATUS_VARIANT[status] || 'neutral'}>
     {STATUS_LABEL[status] || status}
   </Badge>
@@ -64,18 +105,18 @@ const DeliveriesPage = () => {
   // ─── UI state ─────────────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal]     = useState(false);
-  const [viewingDelivery, setViewingDelivery] = useState(null);
-  const [formData, setFormData]               = useState(BLANK_FORM);
+  const [viewingDelivery, setViewingDelivery] = useState<Delivery | null>(null);
+  const [formData, setFormData]               = useState<DeliveryForm>(BLANK_FORM);
 
   // State for action confirmations
-  const [transitTarget, setTransitTarget] = useState(null); // id
-  const [confirmTarget, setConfirmTarget] = useState(null); // id
-  const [cancelTarget, setCancelTarget]   = useState(null); // delivery object
+  const [transitTarget, setTransitTarget] = useState<number | null>(null); // id
+  const [confirmTarget, setConfirmTarget] = useState<number | null>(null); // id
+  const [cancelTarget, setCancelTarget]   = useState<Delivery | null>(null); // delivery object
   const [cancelReason, setCancelReason]   = useState('');
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: delSortBy, sortDir: delSortDir, onSort: _delOnSort } = useTableSort([], { serverSide: true, defaultField: 'scheduled_date', defaultDir: 'desc' });
-  const delOnSort = (f, d) => { _delOnSort(f, d); setCurrentPage(1); };
+  const delOnSort = (f: string, d: 'asc' | 'desc') => { _delOnSort(f, d); setCurrentPage(1); };
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
   const { data: deliveriesData, isLoading, isError: fetchError } = useQuery({
@@ -98,7 +139,7 @@ const DeliveriesPage = () => {
     queryFn:  () => deliveryService.getStats(),
     staleTime: 60_000,
   });
-  const stats = statsData?.data || null;
+  const stats: DeliveryStats | null = statsData?.data || null;
 
   // ─── Invalidate helper ────────────────────────────────────────────────────────
   const invalidate = () => {
@@ -108,7 +149,7 @@ const DeliveriesPage = () => {
 
   // ─── Mutations ────────────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: async (data) => {
+    mutationFn: async (data: DeliveryForm) => {
       const saleRes = await saleService.getBySaleNumber(data.sale_number);
       if (!saleRes.data) throw new Error('Venta no encontrada');
       return deliveryService.create({
@@ -131,21 +172,27 @@ const DeliveriesPage = () => {
       setFormData(BLANK_FORM);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || err.message || 'Error al crear la entrega'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || error?.message || 'Error al crear la entrega');
+    },
   });
 
   const transitMutation = useMutation({
-    mutationFn: (id) => deliveryService.markAsInTransit(id),
+    mutationFn: (id: number) => deliveryService.markAsInTransit(id),
     onSuccess: () => {
       toast.success('Entrega marcada como en tránsito');
       setTransitTarget(null);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al actualizar la entrega'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al actualizar la entrega');
+    },
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (id) => deliveryService.confirm(id, {
+    mutationFn: (id: number) => deliveryService.confirm(id, {
       delivery_date: localToday(),
     }),
     onSuccess: () => {
@@ -153,27 +200,34 @@ const DeliveriesPage = () => {
       setConfirmTarget(null);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al confirmar la entrega'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al confirmar la entrega');
+    },
   });
 
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }) => deliveryService.cancel(id, reason),
+    mutationFn: (params: { id: number; reason: string }) => deliveryService.cancel(params.id, params.reason),
     onSuccess: () => {
       toast.success('Entrega cancelada exitosamente');
       setCancelTarget(null);
       setCancelReason('');
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al cancelar la entrega'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al cancelar la entrega');
+    },
   });
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
-  const set = (f) => (e) => setFormData(p => ({ ...p, [f]: e.target.value }));
+  const set = (f: keyof DeliveryForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => 
+    setFormData(p => ({ ...p, [f]: e.target.value }));
 
-  const handleSearchChange  = (v) => { setSearch(v);            setCurrentPage(1); };
-  const handleStatusChange  = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleSearchChange  = (v: string) => { setSearch(v);            setCurrentPage(1); };
+  const handleStatusChange  = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
 
-  const handleViewDelivery = async (delivery) => {
+  const handleViewDelivery = async (delivery: Delivery) => {
     try {
       const response = await deliveryService.getById(delivery.id);
       setViewingDelivery(response.data);
@@ -184,13 +238,13 @@ const DeliveriesPage = () => {
   };
 
   // ─── Table columns ────────────────────────────────────────────────────────────
-  const columns = [
+  const columns: Column<Delivery>[] = [
     {
       key: 'delivery_number',
       header: 'Número',
       sortable: true,
       sortKey: 'delivery_number',
-      render: (_, row) => (
+      render: (_: unknown, row: Delivery) => (
         <div>
           <div className="font-medium text-gray-900">{row.delivery_number}</div>
           <div className="text-xs text-gray-500">
@@ -202,7 +256,7 @@ const DeliveriesPage = () => {
     {
       key: 'sale',
       header: 'Venta',
-      render: (_, row) => (
+      render: (_: unknown, row: Delivery) => (
         <div>
           <div className="font-medium text-primary-600">{row.sale?.sale_number}</div>
           <div className="text-xs text-gray-500">
@@ -214,7 +268,7 @@ const DeliveriesPage = () => {
     {
       key: 'customer',
       header: 'Cliente',
-      render: (_, row) => (
+      render: (_: unknown, row: Delivery) => (
         <div>
           <div className="font-medium text-gray-900">{row.customer?.name}</div>
           <div className="text-xs text-gray-500">{row.customer?.phone}</div>
@@ -224,14 +278,14 @@ const DeliveriesPage = () => {
     {
       key: 'delivery_address',
       header: 'Dirección',
-      render: (v) => (
-        <div className="text-sm text-gray-600 max-w-xs truncate" title={v}>{v}</div>
+      render: (v: unknown) => (
+        <div className="text-sm text-gray-600 max-w-xs truncate" title={String(v || '')}>{String(v || '')}</div>
       ),
     },
     {
       key: 'delivery_method',
       header: 'Método',
-      render: (_, row) => (
+      render: (_: unknown, row: Delivery) => (
         <div>
           <div className="text-sm text-gray-900">{DELIVERY_METHODS[row.delivery_method] || row.delivery_method}</div>
           {row.tracking_number && (
@@ -245,13 +299,13 @@ const DeliveriesPage = () => {
       header: 'Estado',
       sortable: true,
       sortKey: 'status',
-      render: (v) => <StatusBadge status={v} />,
+      render: (v: unknown) => <StatusBadge status={v as Delivery['status']} />,
     },
     {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_: unknown, row: Delivery) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => handleViewDelivery(row)} />
           {row.status === 'pending' && hasPermission('deliveries.update') && (
@@ -321,7 +375,7 @@ const DeliveriesPage = () => {
               <div>
                 <p className="text-sm text-green-700">Entregadas</p>
                 <p className="text-2xl font-bold text-green-900">
-                  {stats.deliveries_by_status?.find(s => s.status === 'delivered')?.count || 0}
+                  {stats.deliveries_by_status?.find((s: { status: string; count: number }) => s.status === 'delivered')?.count || 0}
                 </p>
               </div>
               <CheckCircle className="w-10 h-10 text-green-600 opacity-50" />
@@ -375,7 +429,7 @@ const DeliveriesPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -386,7 +440,7 @@ const DeliveriesPage = () => {
         title="Crear Nueva Entrega"
         size="lg"
       >
-        <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
+        <form onSubmit={(e: React.FormEvent) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Input
@@ -466,7 +520,7 @@ const DeliveriesPage = () => {
           <Textarea
             label="Motivo *"
             value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCancelReason(e.target.value)}
             rows={3}
             placeholder="Describe el motivo de cancelación..."
           />
@@ -477,7 +531,7 @@ const DeliveriesPage = () => {
             <Button
               variant="ghost"
               className="text-red-600 hover:bg-red-50"
-              onClick={() => cancelMutation.mutate({ id: cancelTarget.id, reason: cancelReason })}
+              onClick={() => cancelMutation.mutate({ id: cancelTarget!.id, reason: cancelReason })}
               loading={cancelMutation.isPending}
               disabled={!cancelReason.trim()}
             >
@@ -491,7 +545,7 @@ const DeliveriesPage = () => {
       <ConfirmDialog
         open={!!transitTarget}
         onClose={() => setTransitTarget(null)}
-        onConfirm={() => transitMutation.mutate(transitTarget)}
+        onConfirm={() => transitMutation.mutate(transitTarget!)}
         loading={transitMutation.isPending}
         title="¿Marcar en tránsito?"
         description="La entrega será marcada como en tránsito."
@@ -501,7 +555,7 @@ const DeliveriesPage = () => {
       <ConfirmDialog
         open={!!confirmTarget}
         onClose={() => setConfirmTarget(null)}
-        onConfirm={() => confirmMutation.mutate(confirmTarget)}
+        onConfirm={() => confirmMutation.mutate(confirmTarget!)}
         loading={confirmMutation.isPending}
         title="¿Confirmar entrega?"
         description="La entrega será marcada como completada con la fecha de hoy."

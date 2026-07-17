@@ -97,8 +97,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
               Imagen del Producto
             </h3>
             <ImageUpload
-              value={imagePreview}
-              onChange={onImageChange}
+              value={imagePreview ?? undefined}
+              onChange={onImageChange as unknown as (value: string | string[]) => void}
               type="products"
               placeholder="Click para subir imagen"
               previewSize="w-full h-48"
@@ -189,7 +189,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                   name="description"
                   value={formData.description}
                   onChange={onChange}
-                  rows="2"
+                  rows={2}
                   className="input"
                   placeholder="Descripción detallada del producto..."
                 />

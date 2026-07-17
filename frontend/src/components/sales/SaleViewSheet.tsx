@@ -67,8 +67,8 @@ interface SaleRecord {
   paid_amount?: number | string;
   notes?: string;
   customer?: Record<string, unknown> | null;
-  seller?: { first_name?: string; username?: string; [key: string]: unknown };
-  warehouse?: { name?: string; [key: string]: unknown };
+  seller?: { first_name?: string; username?: string; [key: string]: unknown; };
+  warehouse?: { name?: string; [key: string]: unknown; };
   details?: SaleDetailView[];
   payments?: SalePaymentView[];
   [key: string]: unknown;
@@ -167,7 +167,7 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500">{formatDateShort(p.payment_date)}</span>
                       <span className="font-semibold text-slate-700 capitalize">
-                        {PAYMENT_METHOD_LABEL[p.payment_method] || p.payment_method}
+                        {PAYMENT_METHOD_LABEL[p.payment_method!] || p.payment_method}
                       </span>
                       <span className="font-bold text-emerald-600">
                         {sale.currency_mode === 'USD'
@@ -177,8 +177,8 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
                     </div>
                     {showRate && (
                       <p className="text-[10px] text-gray-400 pl-1">
-                        {p.currency} {parseFloat(String(p.amount)).toLocaleString(LOCALE, { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
-                        {' @ '}{parseFloat(String(p.exchange_rate)).toFixed(2)} | Equiv: {formatUSD(equivUSD ?? 0)}
+                        {p.currency} {parseFloat(String(p.amount || 0)).toLocaleString(LOCALE, { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
+                        {' @ '}{parseFloat(String(p.exchange_rate || 1)).toFixed(2)} | Equiv: {formatUSD(equivUSD ?? 0)}
                       </p>
                     )}
                   </div>
@@ -193,7 +193,7 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
             <div className="flex justify-between font-bold text-base text-gray-900">
               <span>Total</span>
               <span className="text-primary-600">
-                {fmtByCurrency(parseFloat(String(sale.subtotal)) - parseFloat(String(sale.discount_amount || 0)), sale as Record<string, unknown>)}
+                {fmtByCurrency(parseFloat(String(sale.subtotal || 0)) - parseFloat(String(sale.discount_amount || 0)), sale as Record<string, unknown>)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-gray-500">

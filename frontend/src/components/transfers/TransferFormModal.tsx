@@ -90,15 +90,15 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
       if (sourceWarehouseId) {
         setFormData(prev => ({
           ...prev,
-          origin_warehouse_id: sourceWarehouseId.toString()
+          origin_warehouse_id: String(sourceWarehouseId)
         }));
       }
 
       if (preselectedItems && preselectedItems.length > 0) {
-        const initialItems = preselectedItems.map((item, index) => ({
+        const initialItems: TransferItem[] = preselectedItems.map((item, index) => ({
           _tempId: Date.now() + index,
-          product_id: item.product_id,
-          presentation_id: item.presentation_id,
+          product_id: String(item.product_id),
+          presentation_id: item.presentation_id !== null ? String(item.presentation_id) : null,
           package_quantity: item.package_quantity || 0,
           loose_units: item.loose_units || 0,
           batch_id: null
@@ -139,7 +139,8 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
       const response = await warehouseService.getAll();
       setWarehouses(response.data || []);
     } catch (error) {
-      void error;
+      const err = error as any;
+      void err;
       toast.error('Error al cargar almacenes');
     }
   };
@@ -170,7 +171,8 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
 
       setAvailableProducts(productsWithStock);
     } catch (error) {
-      void error;
+      const err = error as any;
+      void err;
       toast.error('Error al cargar productos disponibles');
     }
   };
@@ -239,7 +241,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
         // Auto-select default presentation if available
         const defaultPresentation = product.presentations?.find((p: TransferItemPresentation) => p.is_default) || product.presentations?.[0];
         if (defaultPresentation) {
-          updated.presentation_id = defaultPresentation.id.toString();
+          updated.presentation_id = String(defaultPresentation.id);
         } else {
           updated.presentation_id = null;
         }
@@ -363,7 +365,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
               </label>
               <select
                 value={formData.origin_warehouse_id}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const newOriginId = e.target.value;
                   // Clear destination if it's the same as the new origin
                   const newDestinationId = newOriginId === formData.destination_warehouse_id ? '' : formData.destination_warehouse_id;
@@ -393,7 +395,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
               </label>
               <select
                 value={formData.destination_warehouse_id}
-                onChange={(e) => setFormData({ ...formData, destination_warehouse_id: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, destination_warehouse_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
                 required
               >
@@ -414,7 +416,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
             </label>
             <textarea
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
               placeholder="Notas adicionales sobre esta transferencia..."
@@ -476,7 +478,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                                   ? availableProducts.find(p => p.id === parseInt(String(item.product_id)))?.name || ''
                                   : searchTerms[index] || ''
                               }
-                              onChange={(e) => {
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                 updateSearchTerm(index, e.target.value);
                                 // Clear selection when typing
                                 if (item.product_id) {
@@ -501,7 +503,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                                     <div
                                       key={p.id}
                                       onClick={() => {
-                                        updateItem(index, 'product_id', p.id.toString());
+                                        updateItem(index, 'product_id', String(p.id));
                                         updateSearchTerm(index, undefined);
                                       }}
                                       className="px-4 py-2 hover:bg-primary-50 cursor-pointer border-b border-gray-100 last:border-b-0"
@@ -561,14 +563,14 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                             </label>
                             <select
                               value={item.presentation_id || ''}
-                              onChange={(e) => updateItem(index, 'presentation_id', e.target.value || null)}
+                              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateItem(index, 'presentation_id', e.target.value || null)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
                             >
                               <option value="">Seleccionar presentación</option>
                               {product.presentations.map(p => (
                                 <option key={p.id} value={p.id}>
                                   {p.name} - {p.units_per_package} uds/paquete
-                                  {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${parseFloat(p.package_price).toFixed(2)}` : ''}
+                                  {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${parseFloat(String(p.package_price)).toFixed(2)}` : ''}
                                   {p.is_default ? ' (Predeterminada)' : ''}
                                 </option>
                               ))}
@@ -583,11 +585,11 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                                     <Package size={14} className="text-primary-600" />
                                     <span className="font-medium">Cada paquete contiene: {selectedPresentation.units_per_package} unidades</span>
                                   </div>
-                                  {selectedPresentation.package_cost > 0 && (
+                                  {selectedPresentation.package_cost && selectedPresentation.package_cost > 0 && (
                                     <div className="mt-1 ml-5">💰 Costo/paquete: ${parseFloat(String(selectedPresentation.package_cost)).toFixed(2)}</div>
                                   )}
-                                  {selectedPresentation.package_price > 0 && (
-                                    <div className="mt-1 ml-5">💵 Precio/paquete: ${parseFloat(selectedPresentation.package_price).toFixed(2)}</div>
+                                  {selectedPresentation.package_price && selectedPresentation.package_price > 0 && (
+                                    <div className="mt-1 ml-5">💵 Precio/paquete: ${parseFloat(String(selectedPresentation.package_price)).toFixed(2)}</div>
                                   )}
                                 </div>
                               );
@@ -619,7 +621,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                             min="0"
                             step="1"
                             value={item.package_quantity}
-                            onChange={(e) => updateItem(index, 'package_quantity', e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem(index, 'package_quantity', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
                           />
                         </div>
@@ -634,7 +636,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                             min="0"
                             step="1"
                             value={item.loose_units}
-                            onChange={(e) => updateItem(index, 'loose_units', e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem(index, 'loose_units', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
                           />
                         </div>
@@ -688,7 +690,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                           <input
                             type="text"
                             value={item.notes}
-                            onChange={(e) => updateItem(index, 'notes', e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem(index, 'notes', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
                             placeholder="Notas adicionales..."
                           />

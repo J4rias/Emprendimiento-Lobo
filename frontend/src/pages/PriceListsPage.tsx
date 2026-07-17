@@ -84,7 +84,7 @@ const PriceListsPage = () => {
         (async () => {
             try {
                 const res = await priceListService.getAll({ search: 'LP-0013', limit: 1 });
-                const list = (res.data || [])[0];
+                const list: PriceListRecord | undefined = (res.data || [])[0] as PriceListRecord | undefined;
                 if (list) {
                     openEditor(list);
                 }
@@ -97,7 +97,7 @@ const PriceListsPage = () => {
 
     // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(
-        (data: Record<string, any>) => priceListService.updateDetail(editingListRef.current?.id, data),
+        (data: unknown) => priceListService.updateDetail(editingListRef.current?.id ?? 0, data as Record<string, unknown>),
         []
     );
     const autoSaveOnConflict = useCallback(() => {
@@ -119,17 +119,17 @@ const PriceListsPage = () => {
     };
 
     // ===================== EDITOR =====================
-    const openEditor = async (list = null) => {
+    const openEditor = async (list: PriceListRecord | null = null) => {
         setLoadingProducts(true);
         try {
             // 1. Fetch current stock products (always needed to see new items)
             const stockRes = await priceListService.getProductsWithStock();
-            const stockProducts = stockRes.data || [];
+            const stockProducts: any[] = stockRes.data || [];
 
             if (list) {
                 // 2. Fetch existing list details
                 const res = await priceListService.getById(list.id);
-                const data = res.data;
+                const data: PriceListRecord = res.data;
                 setEditingList(data);
                 editingListRef.current = data;
                 setFormData({
@@ -140,15 +140,15 @@ const PriceListsPage = () => {
                     validity_days: data.validity_days || 5
                 });
 
-                const existingDetailsMap = new Map();
-                (data.details || []).forEach(d => {
+                const existingDetailsMap = new Map<string, any>();
+                (data.details || []).forEach((d: any) => {
                     existingDetailsMap.set(`${d.product_id}-${d.presentation_id}`, d);
                 });
 
-                const stockKeys = new Set(stockProducts.map(i => `${i.product_id}-${i.presentation.id}`));
+                const stockKeys = new Set(stockProducts.map((i: any) => `${i.product_id}-${i.presentation.id}`));
 
                 // Build merged list starting with current stock items
-                const mergedDetails = stockProducts.map(item => {
+                const mergedDetails: PriceListDetail[] = stockProducts.map((item: any): PriceListDetail => {
                     const key = `${item.product_id}-${item.presentation.id}`;
                     const existing = existingDetailsMap.get(key);
 
@@ -202,7 +202,7 @@ const PriceListsPage = () => {
                 });
 
                 // Add items that were in the list but are NOT currently in stock
-                (data.details || []).forEach(d => {
+                (data.details || []).forEach((d: any) => {
                     const key = `${d.product_id}-${d.presentation_id}`;
                     if (!stockKeys.has(key)) {
                         mergedDetails.push({
@@ -239,7 +239,7 @@ const PriceListsPage = () => {
                                 isDefault: false,
                     validity_days: 5
                 });
-                setDetails(stockProducts.map(item => ({
+                setDetails(stockProducts.map((item: any): PriceListDetail => ({
                     product_id: item.product_id,
                     presentation_id: item.presentation.id,
                     product_name: item.product?.name || '',
@@ -268,7 +268,7 @@ const PriceListsPage = () => {
         }
     };
 
-    const toggleFreeze = (index) => {
+    const toggleFreeze = (index: number) => {
         const item = { ...details[index] };
         if (item.is_frozen) {
             item.is_frozen = false;
@@ -308,7 +308,7 @@ const PriceListsPage = () => {
         }
     };
 
-    const updateDetailPrice = (index, field, value) => {
+    const updateDetailPrice = (index: number, field: string, value: string) => {
         const item = { ...details[index] };
         const numVal = parseFloat(value) || 0;
         const itemCostUsd = getCostInUSD(item.package_cost, item.native_currency);
@@ -377,7 +377,7 @@ const PriceListsPage = () => {
 
     // Mutation: export CSV
     const exportMutation = useMutation({
-        mutationFn: (id) => priceListService.exportCSV(id),
+        mutationFn: (id: number) => priceListService.exportCSV(id),
         onSuccess: () => {
             toast.success('CSV exportado');
         },
@@ -386,7 +386,7 @@ const PriceListsPage = () => {
         }
     });
 
-    const handleExportCSV = (id) => {
+    const handleExportCSV = (id: number) => {
         exportMutation.mutate(id);
     };
 
@@ -394,6 +394,7 @@ const PriceListsPage = () => {
         const content = printRef.current;
         if (!content) return;
         const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
         printWindow.document.write(`
       <html><head><title>Lista de Precios - ${editingList?.name || ''}</title>
       <style>
@@ -412,7 +413,7 @@ const PriceListsPage = () => {
     };
 
     // ===================== RENDER HELPER =====================
-    const renderCostDisplay = (usdAmount, baseCurrency, isBold = false) => {
+    const renderCostDisplay = (usdAmount: number, baseCurrency: string, isBold = false) => {
         if (baseCurrency !== 'USD') {
             const isCOP = baseCurrency === 'COP';
             return (
@@ -445,7 +446,7 @@ const PriceListsPage = () => {
     };
 
     // ===================== FILTERED DETAILS =====================
-    const filteredDetails = details.filter(d => {
+    const filteredDetails = details.filter((d: PriceListDetail) => {
         if (!detailSearch) return true;
         const q = detailSearch.toLowerCase();
         return (
@@ -509,7 +510,7 @@ const PriceListsPage = () => {
                                 <input
                                     type="text"
                                     value={detailSearch}
-                                    onChange={e => setDetailSearch(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDetailSearch(e.target.value)}
                                     className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent text-sm"
                                     placeholder="Buscar producto..."
                                 />
@@ -546,14 +547,14 @@ const PriceListsPage = () => {
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredDetails.length === 0 ? (
                                         <tr>
-                                            <td colSpan="7" className="px-4 py-8 text-center text-gray-500"> {/* 7 columns */}
+                                            <td colSpan={7} className="px-4 py-8 text-center text-gray-500"> {/* 7 columns */}
                                                 {details.length === 0
                                                     ? 'No hay productos con stock disponibles para esta lista.'
                                                     : 'No se encontraron productos que coincidan con la búsqueda.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredDetails.map((d, idx) => {
+                                        filteredDetails.map((d: PriceListDetail, idx: number) => {
                                             const realIdx = details.findIndex(x => x.presentation_id === d.presentation_id && x.product_id === d.product_id);
                                             const rowKey = `${d.product_id}-${d.presentation_id}`;
                                             const hasError = autoSaveErrorKeys.has(rowKey);
@@ -594,7 +595,7 @@ const PriceListsPage = () => {
                                                                                 ? (d.frozen_price ?? '')
                                                                                 : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
                                                                             }
-                                                                            onChange={e => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
+                                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
                                                                             className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
@@ -623,7 +624,7 @@ const PriceListsPage = () => {
                                                                             step={d.base_currency === 'COP' ? "100" : "0.01"}
                                                                             min="0"
                                                                             value={d.package_price || ''}
-                                                                            onChange={e => updateDetailPrice(realIdx, 'package_price', e.target.value)}
+                                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price', e.target.value)}
                                                                             className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
                                                                         />
                                                                     </div>
@@ -637,7 +638,7 @@ const PriceListsPage = () => {
                                                             step="0.5"
                                                             min="0"
                                                             value={d.package_price_usd || ''}
-                                                            onChange={e => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
                                                             className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
                                                         />
                                                     </td>
@@ -655,9 +656,9 @@ const PriceListsPage = () => {
                                                             } else {
                                                                 marginCop = d.margin_percentage || 0;
                                                             }
-                                                            const marginUsd = costUsd > 0 ? ((d.package_price_usd - costUsd) / costUsd * 100) : 0;
-                                                            const fmtMargin = (v) => v.toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                                                            const colorClass = (v) => v < 0 ? 'text-red-600' : v === 0 ? 'text-gray-400' : 'text-green-700';
+                                                            const marginUsd = costUsd > 0 ? (((d.package_price_usd ?? 0) - costUsd) / costUsd * 100) : 0;
+                                                            const fmtMargin = (v: number) => v.toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                                                            const colorClass = (v: number) => v < 0 ? 'text-red-600' : v === 0 ? 'text-gray-400' : 'text-green-700';
                                                             return (
                                                                 <div className="flex flex-col items-end leading-tight gap-0.5">
                                                                     <span className={`text-xs font-medium ${colorClass(marginCop)}`}>

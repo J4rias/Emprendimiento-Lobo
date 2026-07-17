@@ -22,6 +22,33 @@ import { PaymentEditModal } from '../components/supplierPayments/PaymentEditModa
 import { PaymentViewSheet } from '../components/supplierPayments/PaymentViewSheet';
 import { SupplierBalanceSummary } from '../components/supplierPayments/SupplierBalanceSummary';
 
+// ── Tipos locales derivados del uso ──────────────────────────────────────────
+interface SupplierPayment {
+  id: number;
+  [key: string]: unknown;
+}
+
+interface PaymentEditForm extends Record<string, unknown> {}
+
+interface Supplier {
+  id: number;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface PaymentStats {
+  total_payments: number;
+  total_by_currency?: { currency: string; total_amount: number }[];
+  payments_by_method?: { payment_method: string; count: number }[];
+  [key: string]: unknown;
+}
+
+interface PaymentsListResponse {
+  payments: SupplierPayment[];
+  totalPages: number;
+  total: number;
+}
+
 // ── Opciones de filtro de método de pago ─────────────────────────────────────
 const METHOD_FILTER_OPTIONS = [
   { value: '', label: 'Todos los métodos' },
@@ -34,7 +61,7 @@ const METHOD_FILTER_OPTIONS = [
   { value: 'other', label: 'Otro' },
 ];
 
-const METHOD_LABEL = {
+const METHOD_LABEL: Record<string, string> = {
   cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque',
   card: 'Tarjeta', other: 'Otro', credit_balance: 'Saldo a Favor', usdt: 'USDT',
 };
@@ -50,20 +77,28 @@ const SupplierPaymentsPage = () => {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('payment_date');
-  const [sortDir, setSortDir] = useState('desc');
-  const onSort = (f, d) => { setSortBy(f); setSortDir(d); setCurrentPage(1); };
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const onSort = (f: string) => {
+    if (sortBy === f) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(f);
+      setSortDir('asc');
+    }
+    setCurrentPage(1);
+  };
 
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [viewingPayment, setViewingPayment] = useState(null);
+  const [viewingPayment, setViewingPayment] = useState<SupplierPayment | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingPayment, setEditingPayment] = useState(null);
-  const [cancelTarget, setCancelTarget] = useState(null);
+  const [editingPayment, setEditingPayment] = useState<SupplierPayment | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<SupplierPayment | null>(null);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
 
   const {
-    data: paymentsData = {},
+    data: paymentsData = {} as PaymentsListResponse,
     isLoading: loadingPayments,
     isError: paymentsError,
   } = useQuery({
@@ -82,7 +117,7 @@ const SupplierPaymentsPage = () => {
         payments: res.data || [],
         totalPages: res.pagination?.totalPages || 1,
         total: res.pagination?.total || 0,
-      };
+      } as PaymentsListResponse;
     },
   });
 
@@ -94,18 +129,18 @@ const SupplierPaymentsPage = () => {
     queryKey: ['suppliers'],
     queryFn: async () => {
       const res = await supplierService.getAll({ limit: 1000 });
-      return res.data || [];
+      return (res.data || []) as Supplier[];
     },
     staleTime: Infinity,
   });
 
   // Stats — solo cuando hay filtro de proveedor
-  const { data: stats = null } = useQuery({
+  const { data: stats = null } = useQuery<PaymentStats | null>({
     queryKey: ['supplier-payment-stats', supplierFilter],
     queryFn: async () => {
       if (!supplierFilter) return null;
       const res = await supplierPaymentService.getStats({ supplier_id: supplierFilter });
-      return res.data || null;
+      return (res.data || null) as PaymentStats | null;
     },
     enabled: !!supplierFilter,
   });
@@ -115,7 +150,7 @@ const SupplierPaymentsPage = () => {
     queryKey: ['supplier-payable-balance', supplierFilter],
     queryFn: async () => {
       if (!supplierFilter) return null;
-      const res = await supplierPaymentService.getPayableBalance(supplierFilter);
+      const res = await supplierPaymentService.getPayableBalance(Number(supplierFilter));
       return res.data?.summary_by_currency || null;
     },
     enabled: !!supplierFilter,
@@ -131,59 +166,66 @@ const SupplierPaymentsPage = () => {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data) => supplierPaymentService.create(data),
+    mutationFn: (data: Record<string, unknown>) => supplierPaymentService.create(data),
     onSuccess: () => {
       toast.success('Pago registrado exitosamente');
       setShowCreateModal(false);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al registrar el pago'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al registrar el pago');
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => supplierPaymentService.update(id, data),
+    mutationFn: (params: { id: number; data: PaymentEditForm }) => supplierPaymentService.update(params.id, params.data),
     onSuccess: () => {
       toast.success('Pago actualizado exitosamente');
       setShowEditModal(false);
       setEditingPayment(null);
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al actualizar el pago'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al actualizar el pago');
+    },
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id) => supplierPaymentService.delete(id),
+    mutationFn: (id: number) => supplierPaymentService.delete(id),
     onSuccess: () => {
       toast.success('Pago anulado exitosamente');
       setCancelTarget(null);
       invalidate();
     },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Error al anular el pago');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al anular el pago');
       setCancelTarget(null);
     },
   });
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
-  const handleSupplierFilterChange = (value) => {
+  const handleSupplierFilterChange = (value: string) => {
     setSupplierFilter(value);
     setCurrentPage(1);
   };
 
-  const handleMethodFilterChange = (value) => {
+  const handleMethodFilterChange = (value: string) => {
     setPaymentMethodFilter(value);
     setCurrentPage(1);
   };
 
-  const handleSearchChange = (value) => {
+  const handleSearchChange = (value: string) => {
     setSearch(value);
     setCurrentPage(1);
   };
 
   // Stats card 3 — método predominante
   const topMethod = stats?.payments_by_method?.reduce(
-    (top, m) => (!top || m.count > top.count ? m : top),
+    (top: { payment_method: string; count: number } | null, m: { payment_method: string; count: number }) => (!top || m.count > top.count ? m : top),
     null
   );
 
@@ -221,7 +263,7 @@ const SupplierPaymentsPage = () => {
                 <p className="text-sm text-green-700">Total en USD</p>
                 <p className="text-2xl font-bold text-green-900">
                   {formatUSD(
-                    stats.total_by_currency?.find((c) => c.currency === 'USD')?.total_amount || 0
+                    stats.total_by_currency?.find((c: { currency: string; total_amount: number }) => c.currency === 'USD')?.total_amount || 0
                   )}
                 </p>
               </div>
@@ -265,10 +307,10 @@ const SupplierPaymentsPage = () => {
           <div className="w-52">
             <Select
               value={supplierFilter}
-              onChange={(e) => handleSupplierFilterChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSupplierFilterChange(e.target.value)}
             >
               <option value="">Todos los proveedores</option>
-              {suppliers.map((s) => (
+              {suppliers.map((s: Supplier) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
@@ -279,7 +321,7 @@ const SupplierPaymentsPage = () => {
           <div className="w-44">
             <Select
               value={paymentMethodFilter}
-              onChange={(e) => handleMethodFilterChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleMethodFilterChange(e.target.value)}
               options={METHOD_FILTER_OPTIONS}
             />
           </div>
@@ -296,15 +338,15 @@ const SupplierPaymentsPage = () => {
       {/* ── Tabla de pagos ────────────────────────────────────────────────────── */}
       <Card variant="flat" className="overflow-hidden">
         <PaymentTable
-          payments={payments}
+          payments={payments as any[]}
           loading={loadingPayments}
           hasPermission={hasPermission}
           sortBy={sortBy}
           sortDir={sortDir}
-          onSort={onSort}
-          onView={(p) => setViewingPayment(p)}
-          onEdit={(p) => { setEditingPayment(p); setShowEditModal(true); }}
-          onCancel={(p) => setCancelTarget(p)}
+          onSort={onSort as (key: string) => void}
+          onView={(p: any) => setViewingPayment(p as SupplierPayment)}
+          onEdit={(p: any) => { setEditingPayment(p as SupplierPayment); setShowEditModal(true); }}
+          onCancel={(p: any) => setCancelTarget(p as SupplierPayment)}
         />
         <Pagination
           page={currentPage}
@@ -312,7 +354,7 @@ const SupplierPaymentsPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -321,21 +363,21 @@ const SupplierPaymentsPage = () => {
       <PaymentFormModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSuccess={(payload) => createMutation.mutate(payload)}
-        suppliers={suppliers}
+        onSuccess={(payload: Record<string, unknown>) => createMutation.mutate(payload)}
+        suppliers={suppliers as any[]}
         isPending={createMutation.isPending}
       />
 
       <PaymentEditModal
-        payment={editingPayment}
+        payment={editingPayment as any}
         open={showEditModal}
         onClose={() => { setShowEditModal(false); setEditingPayment(null); }}
-        onSubmit={(data) => updateMutation.mutate({ id: editingPayment.id, data })}
+        onSubmit={(data: any) => updateMutation.mutate({ id: editingPayment!.id, data })}
         isPending={updateMutation.isPending}
       />
 
       <PaymentViewSheet
-        payment={viewingPayment}
+        payment={viewingPayment as any}
         open={!!viewingPayment}
         onClose={() => setViewingPayment(null)}
       />
@@ -343,7 +385,7 @@ const SupplierPaymentsPage = () => {
       <ConfirmDialog
         open={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
-        onConfirm={() => cancelMutation.mutate(cancelTarget?.id)}
+        onConfirm={() => cancelMutation.mutate(cancelTarget?.id as number)}
         loading={cancelMutation.isPending}
         variant="warning"
         title="¿Anular este pago?"

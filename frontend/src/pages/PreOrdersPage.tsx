@@ -18,24 +18,55 @@ import { preOrderService } from '../services/api/preOrderService';
 import { Pagination, useTableLimit } from '../components/ui';
 import { toast } from 'sonner';
 import { formatUSD, formatDate } from '../utils/formatUtils';
+import type { Icon } from '@phosphor-icons/react';
+import type { PreOrder } from '../types';
+
+interface PreOrderDetail extends PreOrder {
+  channel?: string;
+  customer?: { name?: string; email?: string } | null;
+  customerName?: string;
+  customerPhone?: string;
+  details?: Array<{
+    id: number;
+    product?: { name?: string };
+    presentation?: { name?: string };
+    quantity: string | number;
+    isUnit?: boolean;
+    total: number;
+  }>;
+  total?: number;
+  convertedSale?: { sale_number: string; total: number } | null;
+}
+
+interface PreOrderListItem extends PreOrder {
+  channel?: string;
+  customer?: { name?: string; email?: string } | null;
+  customerName?: string;
+  customerPhone?: string;
+  details?: unknown[];
+  total?: number;
+}
 
 const PreOrdersPage = () => {
   const queryClient = useQueryClient();
   const [limit, setLimit] = useTableLimit();
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    status: string;
+    channel: string;
+    page: number;
+  }>({
     status: '',
     channel: '',
     page: 1,
   });
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState<PreOrderDetail | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
 
   const { data: ordersData, isLoading } = useQuery({
     queryKey: ['pre-orders', filters, limit],
     queryFn: () => preOrderService.getAll({ ...filters, limit }),
-    keepPreviousData: true,
-    staleTime: 15_000,
+    initialData: { data: [], pagination: { total: 0, totalPages: 0, page: 1, limit: 10 } },
   });
 
   const { data: statsData } = useQuery({
@@ -44,46 +75,56 @@ const PreOrdersPage = () => {
     staleTime: 30_000,
   });
 
-  const preOrders = ordersData?.data || [];
+  const preOrders: PreOrderListItem[] = (ordersData?.data as PreOrderListItem[]) || [];
   const pagination = ordersData?.pagination || { total: 0, totalPages: 0, page: 1 };
   const stats = statsData?.data || { pending: 0, approved: 0, today: 0 };
 
   const approveMutation = useMutation({
-    mutationFn: (id) => preOrderService.approve(id),
+    mutationFn: (id: number) => preOrderService.approve(id),
     onSuccess: () => {
       toast.success('Pre-pedido aprobado');
       queryClient.invalidateQueries({ queryKey: ['pre-orders'] });
       queryClient.invalidateQueries({ queryKey: ['pre-orders-stats'] });
       setShowDetail(false);
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al aprobar'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al aprobar');
+    },
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (id) => preOrderService.reject(id),
+    mutationFn: (id: number) => preOrderService.reject(id),
     onSuccess: () => {
       toast.success('Pre-pedido rechazado');
       queryClient.invalidateQueries({ queryKey: ['pre-orders'] });
       queryClient.invalidateQueries({ queryKey: ['pre-orders-stats'] });
       setShowDetail(false);
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al rechazar'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al rechazar');
+    },
   });
 
   const convertMutation = useMutation({
-    mutationFn: (id) => preOrderService.convert(id, { sale_type: 'cash', payment_lines: [] }),
+    mutationFn: (id: number) => preOrderService.convert(id, { sale_type: 'cash', payment_lines: [] }),
     onSuccess: (data) => {
-      toast.success(`Venta ${data.data?.sale?.sale_number} creada`);
+      const saleNum = (data.data as { sale?: { sale_number?: string } })?.sale?.sale_number;
+      toast.success(`Venta ${saleNum || ''} creada`);
       queryClient.invalidateQueries({ queryKey: ['pre-orders'] });
       queryClient.invalidateQueries({ queryKey: ['pre-orders-stats'] });
       setShowDetail(false);
       setShowConvertConfirm(false);
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al convertir'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al convertir');
+    },
   });
 
-  const getStatusBadge = (status) => {
-    const badges = {
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { cls: string; icon: Icon; label: string }> = {
       pending: { cls: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pendiente' },
       approved: { cls: 'bg-primary-100 text-primary-800', icon: CheckCircle, label: 'Aprobado' },
       rejected: { cls: 'bg-red-100 text-red-800', icon: XCircle, label: 'Rechazado' },
@@ -100,19 +141,19 @@ const PreOrdersPage = () => {
     );
   };
 
-  const getChannelIcon = (channel) => {
+  const getChannelIcon = (channel: string) => {
     switch (channel) {
-      case 'messenger': return <ChatCircle className="w-4 h-4 text-primary-500" title="Messenger" />;
-      case 'telegram': return <PaperPlaneTilt className="w-4 h-4 text-sky-500" title="Telegram" />;
-      case 'web': return <Globe className="w-4 h-4 text-gray-500" title="Web" />;
+      case 'messenger': return <ChatCircle className="w-4 h-4 text-primary-500" />;
+      case 'telegram': return <PaperPlaneTilt className="w-4 h-4 text-sky-500" />;
+      case 'web': return <Globe className="w-4 h-4 text-gray-500" />;
       default: return null;
     }
   };
 
-  const openDetail = async (order) => {
+  const openDetail = async (order: PreOrderListItem) => {
     try {
       const result = await preOrderService.getById(order.id);
-      setSelectedOrder(result.data);
+      setSelectedOrder(result.data as PreOrderDetail);
       setShowDetail(true);
     } catch {
       toast.error('Error al cargar detalle');
@@ -204,7 +245,7 @@ const PreOrdersPage = () => {
               ) : preOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-mono font-medium text-gray-900">{order.code}</td>
-                  <td className="px-4 py-3">{getChannelIcon(order.channel)}</td>
+                  <td className="px-4 py-3">{order.channel ? getChannelIcon(order.channel) : null}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {order.customer?.name || order.customerName || 'Sin cliente'}
                     {order.customerPhone && (
@@ -213,11 +254,11 @@ const PreOrdersPage = () => {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{order.details?.length || 0}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium">
-                    {formatUSD(order.total)}
+                    {formatUSD(order.total || 0)}
                   </td>
                   <td className="px-4 py-3 text-center">{getStatusBadge(order.status)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {formatDate(order.createdAt)}
+                    {formatDate(order.created_at)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <ViewAction onClick={() => openDetail(order)} />
@@ -236,8 +277,8 @@ const PreOrdersPage = () => {
               totalPages={pagination.totalPages}
               total={pagination.total}
               limit={limit}
-              onPageChange={(p) => setFilters(f => ({ ...f, page: p }))}
-              onLimitChange={(newLimit) => { setLimit(newLimit); setFilters(f => ({ ...f, page: 1 })); }}
+              onPageChange={(p: number) => setFilters(f => ({ ...f, page: p }))}
+              onLimitChange={(newLimit: number) => { setLimit(newLimit); setFilters(f => ({ ...f, page: 1 })); }}
             />
           </div>
         )}
@@ -253,7 +294,7 @@ const PreOrdersPage = () => {
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">{selectedOrder.code}</h2>
                   <div className="flex items-center gap-2 mt-1">
-                    {getChannelIcon(selectedOrder.channel)}
+                    {selectedOrder.channel && getChannelIcon(selectedOrder.channel)}
                     {getStatusBadge(selectedOrder.status)}
                   </div>
                 </div>
@@ -289,7 +330,7 @@ const PreOrdersPage = () => {
                       <div>
                         <div className="text-sm font-medium">{detail.product?.name}</div>
                         <div className="text-xs text-gray-500">
-                          {detail.presentation?.name} &middot; {parseFloat(detail.quantity)} {detail.isUnit ? 'uds' : 'paq'}
+                          {detail.presentation?.name} &middot; {parseFloat(String(detail.quantity))} {detail.isUnit ? 'uds' : 'paq'}
                         </div>
                       </div>
                       <div className="text-sm font-medium">{formatUSD(detail.total)}</div>
@@ -297,7 +338,7 @@ const PreOrdersPage = () => {
                   ))}
                   <div className="p-3 flex justify-between items-center bg-gray-50 font-bold">
                     <div>Total</div>
-                    <div>{formatUSD(selectedOrder.total)}</div>
+                    <div>{formatUSD(selectedOrder.total || 0)}</div>
                   </div>
                 </div>
               </div>
@@ -355,7 +396,7 @@ const PreOrdersPage = () => {
               <h3 className="text-lg font-bold text-gray-800">Convertir a venta</h3>
             </div>
             <p className="text-sm text-gray-600">
-              Se creará una venta de contado por <strong>{formatUSD(selectedOrder.total)}</strong> basada
+              Se creará una venta de contado por <strong>{formatUSD(selectedOrder.total || 0)}</strong> basada
               en el pre-pedido <strong>{selectedOrder.code}</strong>. El inventario se descontará.
             </p>
             <p className="text-xs text-gray-400">

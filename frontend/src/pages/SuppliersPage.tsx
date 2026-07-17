@@ -299,8 +299,8 @@ const SuppliersPage = () => {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Contactos del Proveedor</label>
             <SupplierContactManager
-              contacts={formData.contacts}
-              onChange={(contacts: Contact[]) => setFormData((prev) => ({ ...prev, contacts }))}
+              contacts={formData.contacts as never}
+              onChange={((contacts: Contact[]) => setFormData((prev) => ({ ...prev, contacts }))) as never}
               readonly={false}
             />
           </div>
@@ -312,7 +312,7 @@ const SuppliersPage = () => {
       <SupplierViewSheet
         open={!!viewingSupplier}
         onClose={() => setViewingSupplier(null)}
-        supplier={viewingSupplier}
+        supplier={viewingSupplier as never}
         onEdit={() => { if (viewingSupplier) handleEdit(viewingSupplier); setViewingSupplier(null); }}
         hasPermission={hasPermission}
       />

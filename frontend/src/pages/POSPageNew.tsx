@@ -14,10 +14,61 @@ import {
   Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import type { Product, ProductPresentation, Customer, ExchangeRate } from '../types';
+import type { CartItem } from '../types/pos';
+
+interface PriceListItem {
+  is_frozen?: boolean;
+  package_price_usd?: string;
+  package_price?: string;
+  [key: string]: unknown;
+}
+
+interface PriceListDetails {
+  [key: string]: PriceListItem;
+}
+
+interface ProductCardProps {
+  product: Product;
+  priceListDetails: PriceListDetails;
+  otherReservations: Record<number, number>;
+  onAdd: (product: Product, presentation: ProductPresentation, quantity: number) => void;
+  toDisplay: (usd: number) => number;
+  displayCurrency: string;
+  displaySymbol: string;
+  exchangeRates: ExchangeRate[];
+  getEffectivePriceUSD: (presentation: ProductPresentation, priceListItem?: PriceListItem) => number;
+  fmt: (n: number) => string;
+}
+
+interface CartItemProps {
+  item: CartItem;
+  onQuantityChange: (productId: number, presentationId: number | null, sellByUnit: boolean, quantity: number) => void;
+  onRemove: (productId: number, presentationId: number | null, sellByUnit: boolean) => void;
+  onPriceChange: (productId: number, presentationId: number | null, sellByUnit: boolean, price: number) => void;
+  onToggleSellMode: (productId: number, presentationId: number | null, sellByUnit: boolean) => void;
+  onDiscountChange: (productId: number, presentationId: number | null, sellByUnit: boolean, discount: number) => void;
+  toDisplay: (usd: number) => number;
+  displaySymbol: string;
+  fmt: (n: number) => string;
+  getEffectiveUSDPrice: (item: CartItem) => number;
+  hasEditPricePermission: boolean;
+  customer: Customer | null;
+}
+
+interface SaleResultModalProps {
+  show: boolean;
+  onClose: () => void;
+  sale: Record<string, any> | null;
+  toDisplay: (usd: number) => number;
+  displaySymbol: string;
+  fmt: (n: number) => string;
+  onPrint: () => void;
+}
 
 // ============= MAIN COMPONENT =============
 const POSPage = () => {
-  const pos = usePOS();
+  const pos = usePOS() as any;
   const [showSendToCashier, setShowSendToCashier] = useState(false);
 
   if (!pos.hasPermission('sales.create')) {
@@ -119,15 +170,15 @@ const POSPage = () => {
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {pos.products
-                    .filter(product => {
+                    .filter((product: Product) => {
                       if (pos.isAdmin) return true;
                       const priceField = pos.displayCurrency === 'USD' ? 'package_price_usd' : 'package_price';
-                      return (product.presentations || []).some(p => {
+                      return (product.presentations || []).some((p: ProductPresentation) => {
                         const detail = pos.priceListDetails[`${product.id}-${p.id}`];
                         return detail && parseFloat(detail[priceField]) > 0;
                       });
                     })
-                    .map((product) => (
+                    .map((product: Product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -182,8 +233,8 @@ const POSPage = () => {
                         : pos.customer.businessName || pos.customer.tradeName || ''}
                     </p>
                     <p className="text-[10px] text-blue-600 truncate">
-                      {pos.customer.documentType}-{pos.customer.documentNumber}
-                      {pos.customer.discountPercentage > 0 && <span className="text-green-600 ml-1"> • {pos.customer.discountPercentage}% desc</span>}
+                      {String(pos.customer.documentType || '')}-{String(pos.customer.documentNumber || '')}
+                      {Number(pos.customer.discountPercentage || 0) > 0 && <span className="text-green-600 ml-1"> • {String(pos.customer.discountPercentage)}% desc</span>}
                     </p>
                   </div>
                 </div>
@@ -206,7 +257,7 @@ const POSPage = () => {
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {pos.cart.length > 0 ? (
-              pos.cart.map((item) => (
+              pos.cart.map((item: CartItem) => (
                 <CartItem
                   key={`${item.product_id}-${item.presentation_id}-${item.sellByUnit || false}`}
                   item={item}
@@ -333,6 +384,7 @@ const POSPage = () => {
         displayCurrency={pos.displayCurrency}
         isAdmin={pos.isAdmin}
         mode="create"
+        allowCredit={pos.isAdmin || pos.hasPermission('sales.credit')}
       />}
 
       <ConfirmDialog
@@ -379,12 +431,12 @@ const POSPage = () => {
       <CustomerSearch
         isOpen={pos.showCustomerSearch}
         onClose={() => pos.setShowCustomerSearch(false)}
-        onSelect={(c) => {
+        onSelect={(c: any) => {
           pos.handleSetCustomer(c);
           pos.setShowCustomerSearch(false);
         }}
         validateCredit={pos.saleType === 'credit' || pos.saleType === 'mixed'}
-        saleAmount={parseFloat(pos.total)}
+        saleAmount={parseFloat(String(pos.total))}
         exchangeRates={pos.exchangeRates}
       />
     </div>
@@ -393,14 +445,16 @@ const POSPage = () => {
 
 // ============= SUB-COMPONENTS =============
 
-function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, exchangeRates, getEffectivePriceUSD, fmt }) {
-  const [selectedPresentation, setSelectedPresentation] = useState(product.presentations?.[0]);
+interface InventoryItem { quantity: number | string; [key: string]: unknown; }
+
+function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, exchangeRates, getEffectivePriceUSD, fmt }: ProductCardProps) {
+  const [selectedPresentation, setSelectedPresentation] = useState<ProductPresentation | undefined>(product.presentations?.[0]);
   const [quantity, setQuantity] = useState(1);
 
   if (!selectedPresentation) return null;
 
-  const totalStock = product.inventories?.reduce((s, i) => s + parseFloat(i.quantity || 0), 0) || 0;
-  const unitsPerPkg = parseFloat(selectedPresentation.units_per_package) || 1;
+  const totalStock = product.inventories?.reduce((s: number, i: InventoryItem) => s + parseFloat(String(i.quantity || 0)), 0) || 0;
+  const unitsPerPkg = parseFloat(String(selectedPresentation.units_per_package)) || 1;
   const reservedByOthers = otherReservations[product.id] || 0;
   const available = totalStock - reservedByOthers;
   const availablePackages = Math.floor(available / unitsPerPkg);
@@ -421,7 +475,7 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
       {product.category && (
         <div
           className="w-2 h-2 rounded-full mb-1"
-          style={{ backgroundColor: product.category.color || '#9CA3AF' }}
+          style={{ backgroundColor: '#9CA3AF' }}
           title={product.category.name}
         />
       )}
@@ -429,17 +483,17 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
       <h3 className="font-semibold text-sm text-gray-900 truncate">{product.name}</h3>
 
       {/* Presentation selector */}
-      {product.presentations?.length > 1 ? (
+      {product.presentations && product.presentations.length > 1 ? (
         <select
           value={selectedPresentation.id}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => {
-            const p = product.presentations.find((p) => p.id === parseInt(e.target.value));
+            const p = product.presentations?.find((p: ProductPresentation) => p.id === parseInt(e.target.value));
             if (p) setSelectedPresentation(p);
           }}
           className="w-full text-xs border border-gray-200 rounded mt-1 mb-2 py-1 px-1"
         >
-          {product.presentations.map((p) => (
+          {product.presentations.map((p: ProductPresentation) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
@@ -464,7 +518,7 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
 
       {/* Price */}
       <div className="flex items-center gap-1">
-        {isFrozen && <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" title="Precio congelado" />}
+        {isFrozen && <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />}
         <p className={`font-bold text-base ${isFrozen ? 'text-amber-700' : 'text-blue-600'}`}>
           {displaySymbol} {fmt(toDisplay(priceUSD))}
         </p>
@@ -474,7 +528,7 @@ function ProductCard({ product, priceListDetails, otherReservations, onAdd, toDi
 }
 
 function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSellMode, onDiscountChange,
-  toDisplay, displaySymbol, fmt, getEffectiveUSDPrice, hasEditPricePermission, customer }) {
+  toDisplay, displaySymbol, fmt, getEffectiveUSDPrice, hasEditPricePermission, customer }: CartItemProps) {
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState('');
 
@@ -484,7 +538,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
   const hasSurcharge = item.sellByUnit && item.quantity < (item.units_per_package || 1) / 2;
 
   const startEdit = () => {
-    setPriceInput(Math.round(displayPrice * 100) / 100);
+    setPriceInput(String(Math.round(displayPrice * 100) / 100));
     setEditingPrice(true);
   };
 
@@ -547,7 +601,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
       {/* Row 3: price + subtotal */}
       <div className="flex justify-between items-center text-sm">
         <div className="flex items-center gap-1">
-          {item.is_frozen && <Lock className="w-3 h-3 text-amber-500" title="Precio congelado" />}
+          {item.is_frozen && <Lock className="w-3 h-3 text-amber-500" />}
           {hasEditPricePermission ? (
             editingPrice ? (
               <input
@@ -579,7 +633,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
       </div>
 
       {/* Row 4: discount (if customer has discount or item has discount) */}
-      {(customer?.discountPercentage > 0 || item.discount_percent > 0) && (
+      {(Number(customer?.discountPercentage || 0) > 0 || item.discount_percent > 0) && (
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500">Descuento:</span>
           <div className="flex items-center gap-1">
@@ -599,7 +653,7 @@ function CartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSel
   );
 }
 
-function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }: any) {
+function SaleResultModal({ show, onClose, sale, toDisplay, displaySymbol, fmt, onPrint }: SaleResultModalProps) {
   if (!show || !sale) return null;
 
   const isSentToCashier = sale.sentToCashier;

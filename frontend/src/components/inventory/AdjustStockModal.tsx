@@ -48,7 +48,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
   }, [item]);
 
   const adjustMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => inventoryService.adjustInventory(data as Parameters<typeof inventoryService.adjustInventory>[0]),
+    mutationFn: (data: Record<string, any>) => inventoryService.adjustInventory(data as Parameters<typeof inventoryService.adjustInventory>[0]),
     onSuccess: () => {
       toast.success('Stock ajustado correctamente');
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -56,7 +56,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
       onSuccess?.();
       onClose();
     },
-    onError: (err: unknown) => toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al ajustar inventario'),
+    onError: (err: unknown) => toast.error((err as any)?.response?.data?.message || 'Error al ajustar inventario'),
   });
 
   const handleSubmit = () => {
@@ -77,7 +77,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
       package_quantity: bultos || undefined,
       loose_units: unidades || undefined,
       reason: form.reason || undefined,
-    });
+    } as Record<string, any>);
   };
 
   return (
@@ -93,7 +93,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
             <Select
               value={form.type}
-              onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm(f => ({ ...f, type: e.target.value }))}
             >
               <option value="add">➕ Entrada (agregar stock)</option>
               <option value="remove">➖ Salida (retirar stock)</option>
@@ -105,7 +105,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
               <Input
                 type="number" min="0" step="1"
                 value={form.bultos}
-                onChange={(e) => setForm(f => ({ ...f, bultos: e.target.value }))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, bultos: e.target.value }))}
                 placeholder="0"
                 className="text-center"
               />
@@ -115,7 +115,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
               <Input
                 type="number" min="0" step="1"
                 value={form.unidades}
-                onChange={(e) => setForm(f => ({ ...f, unidades: e.target.value }))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, unidades: e.target.value }))}
                 placeholder="0"
                 className="text-center"
               />
@@ -125,7 +125,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
             <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
             <Input
               value={form.reason}
-              onChange={(e) => setForm(f => ({ ...f, reason: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, reason: e.target.value }))}
               placeholder="Ej: Compra de proveedor, pérdida..."
             />
           </div>

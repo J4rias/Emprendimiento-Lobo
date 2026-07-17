@@ -2,10 +2,12 @@ import React from 'react';
 import { Sheet, Badge, Button } from '../ui';
 import { formatDateShort } from '../../utils/formatUtils';
 
-const STATUS_VARIANT: Record<string, string> = { pending:'warning', in_transit:'info', delivered:'success', cancelled:'error' };
+type StatusVariant = "cop" | "error" | "info" | "neutral" | "outline" | "purple" | "success" | "usd" | "usdt" | "ves" | "warning" | null | undefined;
+
+const STATUS_VARIANT: Record<string, StatusVariant> = { pending:'warning', in_transit:'info', delivered:'success', cancelled:'error' };
 const STATUS_LABEL: Record<string, string>   = { pending:'Pendiente', in_transit:'En Tránsito', delivered:'Entregado', cancelled:'Cancelado' };
 const DELIVERY_METHODS: Record<string, string> = {
-  pickup: 'Retiro en Tienda', courier: 'Mensajería',
+  pickup: 'Retiro_en_Tienda', courier: 'Mensajería',
   own_fleet: 'Flota Propia', shipping_company: 'Transportadora',
 };
 
@@ -134,7 +136,7 @@ const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, de
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {delivery.details?.map((d, i) => (
+                {delivery.details?.map((d, i: number) => (
                   <tr key={i} className="hover:bg-gray-50">
                     <td className="px-3 py-2">
                       <p className="text-sm font-medium text-gray-900">{d.product?.name}</p>

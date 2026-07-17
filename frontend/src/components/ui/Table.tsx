@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils'
 import { SkeletonTable } from './Skeleton'
 import { EmptyState } from './EmptyState'
 
-interface Column<T = Record<string, unknown>> {
+export interface Column<T = Record<string, unknown>> {
   key?: string
   header: React.ReactNode
   accessor?: string | ((row: T) => unknown)

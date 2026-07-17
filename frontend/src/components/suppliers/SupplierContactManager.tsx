@@ -60,9 +60,9 @@ const SupplierContactManager: React.FC<SupplierContactManagerProps> = ({ contact
     
     // Limpiar campos vacíos
     if (field === 'email' || field === 'phone' || field === 'mobile') {
-      updatedContacts[index][field] = value.trim() || null;
+      updatedContacts[index][field] = String(value).trim() || null;
     } else {
-      updatedContacts[index][field] = value;
+      (updatedContacts[index] as unknown as Record<string, unknown>)[field] = value;
     }
     
     setLocalContacts(updatedContacts);
@@ -88,36 +88,40 @@ const SupplierContactManager: React.FC<SupplierContactManagerProps> = ({ contact
   return (
     <div className="space-y-4">
       {/* Contacto Principal */}
-      {getPrimaryContact() && (
-        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-          <div className="flex items-center mb-2">
-            <Star className="h-5 w-5 text-primary-600 mr-2" />
-            <span className="font-medium text-primary-900">Contacto Principal</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-700">{getPrimaryContact().name}</p>
-              {getPrimaryContact().position && (
-                <p className="text-xs text-gray-500">{getPrimaryContact().position}</p>
-              )}
+      {(() => {
+        const primary = getPrimaryContact();
+        if (!primary) return null;
+        return (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <Star className="h-5 w-5 text-primary-600 mr-2" />
+              <span className="font-medium text-primary-900">Contacto Principal</span>
             </div>
-            <div className="text-sm text-gray-600">
-              {getPrimaryContact().email && (
-                <div className="flex items-center">
-                  <Envelope className="h-3 w-3 mr-1" />
-                  {getPrimaryContact().email}
-                </div>
-              )}
-              {getPrimaryContact().phone && (
-                <div className="flex items-center">
-                  <Phone className="h-3 w-3 mr-1" />
-                  {getPrimaryContact().phone}
-                </div>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700">{primary.name}</p>
+                {primary.position && (
+                  <p className="text-xs text-gray-500">{primary.position}</p>
+                )}
+              </div>
+              <div className="text-sm text-gray-600">
+                {primary.email && (
+                  <div className="flex items-center">
+                    <Envelope className="h-3 w-3 mr-1" />
+                    {primary.email}
+                  </div>
+                )}
+                {primary.phone && (
+                  <div className="flex items-center">
+                    <Phone className="h-3 w-3 mr-1" />
+                    {primary.phone}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Lista de Contactos */}
       <div className="space-y-3">

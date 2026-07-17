@@ -3,7 +3,7 @@ import { Sheet, Badge } from '../ui';
 import { formatMoney, formatDateShort, formatDate } from '../../utils/formatUtils';
 
 const STATUS_LABEL   = { recorded: 'Registrado', confirmed: 'Confirmado', cancelled: 'Cancelado' };
-const STATUS_VARIANT = { recorded: 'warning',     confirmed: 'success',    cancelled: 'error' };
+const STATUS_VARIANT = { recorded: 'warning',     confirmed: 'success',    cancelled: 'error' } as const;
 const METHOD_LABEL   = {
   cash: 'Efectivo', transfer: 'Transferencia', check: 'Cheque',
   card: 'Tarjeta',  other: 'Otro', credit_balance: 'Saldo a Favor', usdt: 'USDT',
@@ -11,7 +11,7 @@ const METHOD_LABEL   = {
 const METHOD_VARIANT = {
   cash: 'success', transfer: 'info', check: 'purple',
   card: 'warning', other: 'neutral', credit_balance: 'purple', usdt: 'usdt',
-};
+} as const;
 
 const fmtAmt = (v: number | string, currency?: string): string =>
   formatMoney(v, currency || '', 2);
@@ -82,12 +82,12 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
             <p className="text-lg font-bold text-gray-900">{payment.payment_number}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
-            <Badge variant={STATUS_VARIANT[payment.status] ?? 'neutral'}>
-              {STATUS_LABEL[payment.status] ?? payment.status}
+            <Badge variant={STATUS_VARIANT[payment.status as keyof typeof STATUS_VARIANT] ?? 'neutral'}>
+              {STATUS_LABEL[payment.status as keyof typeof STATUS_LABEL] ?? payment.status}
             </Badge>
             {payment.payment_method && (
-              <Badge variant={METHOD_VARIANT[payment.payment_method] ?? 'neutral'}>
-                {METHOD_LABEL[payment.payment_method] ?? payment.payment_method}
+              <Badge variant={METHOD_VARIANT[payment.payment_method as keyof typeof METHOD_VARIANT] ?? 'neutral'}>
+                {METHOD_LABEL[payment.payment_method as keyof typeof METHOD_LABEL] ?? payment.payment_method}
               </Badge>
             )}
           </div>
@@ -119,13 +119,13 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
         </div>
 
         {/* ── Distribución del pago ────────────────────────────────────────── */}
-        {payment.allocations?.length > 0 && (
+        {(payment.allocations?.length ?? 0) > 0 && (
           <div className="pt-4 border-t border-gray-100">
             <p className="text-sm font-semibold text-gray-700 mb-3">
               Distribución del pago
             </p>
             <div className="space-y-2">
-              {payment.allocations.map((alloc) => (
+              {payment.allocations?.map((alloc) => (
                 <div
                   key={alloc.id}
                   className="flex items-start justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5"
@@ -140,9 +140,9 @@ export function PaymentViewSheet({ payment, open, onClose }: PaymentViewSheetPro
                     {alloc.purchaseOrder?.currency &&
                       alloc.purchaseOrder.currency !== payment.currency && (
                         <p className="text-xs text-gray-400">
-                          ≈ {formatMoney(alloc.allocated_amount_po_currency, alloc.purchaseOrder.currency, 2)}
+                          ≈ {formatMoney(alloc.allocated_amount_po_currency ?? 0, alloc.purchaseOrder.currency, 2)}
                           {alloc.exchange_rate_used && alloc.exchange_rate_used !== 1 &&
-                            ` (tasa: ${parseFloat(alloc.exchange_rate_used).toFixed(4)})`}
+                            ` (tasa: ${parseFloat(String(alloc.exchange_rate_used)).toFixed(4)})`}
                         </p>
                     )}
                   </div>

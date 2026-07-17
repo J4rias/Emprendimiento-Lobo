@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Barcode, Package, Plus, Minus, Check, X, ArrowLeft, Warehouse, WarningCircle, Camera, Keyboard } from '@phosphor-icons/react';
 import { productService } from '../services/api/productService';
-import { inventoryService } from '../services/api/inventoryService';
+import { inventoryService, type AdjustData } from '../services/api/inventoryService';
 import { warehouseService } from '../services/api/warehouseService';
 import { useAuth } from '../context/AuthContext';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
@@ -102,7 +102,7 @@ const StockReplenishmentPage = () => {
 
     try {
       const response = await productService.searchByBarcode(code);
-      const found = response.data?.[0] as ScannedProduct | undefined;
+      const found = ((response.data as unknown) as ScannedProduct[])?.[0];
 
       if (found) {
         setProduct(found);
@@ -179,7 +179,7 @@ const StockReplenishmentPage = () => {
         loose_units: looseUnits,
         type: 'add',
         reason: `Reposición de stock - Escáner móvil por ${user?.name || 'Usuario'}`
-      } as AnyObj);
+      } as unknown as AdjustData);
 
       // Add to history
       const historyItem: HistoryEntry = {
@@ -409,7 +409,7 @@ const StockReplenishmentPage = () => {
                     {presentations.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.name} - {p.units_per_package} uds/paquete
-                        {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${formatUSD(p.package_price)}` : ''}
+                        {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${formatUSD(p.package_price as number)}` : ''}
                         {p.is_default ? ' ⭐' : ''}
                       </option>
                     ))}

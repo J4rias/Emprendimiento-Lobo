@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sheet, Badge, Button } from '../ui';
+import type { BadgeVariant } from '../ui';
 import { formatMoney as fmtMoney, formatDateShort, LOCALE } from '../../utils/formatUtils';
 
 const STATUS_VARIANT: Record<string, string> = { draft:'neutral', sent:'info', confirmed:'warning', partial:'info', received:'success', cancelled:'error' };
@@ -83,11 +84,11 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
           <p className="text-xs text-gray-500">{order.warehouse?.name} · {formatDateShort(order.order_date)}</p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <Badge variant={STATUS_VARIANT[order.status] || 'neutral'}>
+          <Badge variant={(STATUS_VARIANT[order.status] || 'neutral') as BadgeVariant}>
             {STATUS_LABEL[order.status] || order.status}
           </Badge>
           {order.payment_status && PAYMENT_LABEL[order.payment_status] && (
-            <Badge variant={PAYMENT_VARIANT[order.payment_status] || 'neutral'}>
+            <Badge variant={(PAYMENT_VARIANT[order.payment_status] || 'neutral') as BadgeVariant}>
               {PAYMENT_LABEL[order.payment_status]}
             </Badge>
           )}
@@ -180,7 +181,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                         {new Date(rec.date).toLocaleDateString(LOCALE, { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
                       </td>
                       <td className="px-3 py-2 text-sm font-bold text-primary-600">{rec.document_number || order.order_number}</td>
-                      <td className="px-3 py-2 text-sm text-center font-bold text-green-600">+{parseFloat(rec.quantity).toLocaleString(LOCALE)}</td>
+                      <td className="px-3 py-2 text-sm text-center font-bold text-green-600">+{parseFloat(String(rec.quantity)).toLocaleString(LOCALE)}</td>
                       <td className="px-3 py-2 text-sm text-gray-600 italic">{rec.user}</td>
                     </tr>
                   ))}

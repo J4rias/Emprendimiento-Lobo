@@ -16,6 +16,7 @@ export { Pagination, useTableLimit } from './Pagination'
 export { DateRangeFilter, getDefaultDateRange } from './DateRangeFilter'
 export { SearchInput } from './SearchInput'
 export { Table } from './Table'
+export type { Column } from './Table'
 export {
   ViewAction, EditAction, DeleteAction, CancelAction, StatementAction,
   PaymentAction, ReturnAction, ApproveAction, ReceiveAction, PartialReceiveAction,

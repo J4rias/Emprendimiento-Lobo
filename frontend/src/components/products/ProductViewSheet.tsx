@@ -113,7 +113,7 @@ const ProductViewSheet: React.FC<ProductViewSheetProps> = ({ open, onClose, prod
               <p className="text-xs text-gray-500 mb-0.5">Tamaño de Unidad</p>
               <p className="text-gray-900">
                 {product.unit_size
-                  ? `${parseFloat(product.unit_size) % 1 === 0 ? parseInt(product.unit_size) : parseFloat(product.unit_size).toFixed(1)} ${product.unit_size_measure || 'UND'}`
+                  ? `${parseFloat(String(product.unit_size)) % 1 === 0 ? parseInt(String(product.unit_size)) : parseFloat(String(product.unit_size)).toFixed(1)} ${product.unit_size_measure || 'UND'}`
                   : '-'}
               </p>
             </div>

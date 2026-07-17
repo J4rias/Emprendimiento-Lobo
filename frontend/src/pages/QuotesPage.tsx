@@ -8,8 +8,9 @@ import { quoteService } from '../services/api/quoteService';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Pagination, SearchInput, Select, Table, useTableLimit,
   ViewAction, ConvertAction, DeleteAction,
+  type BadgeVariant, type Column,
 } from '../components/ui';
-import QuoteViewSheet from '../components/quotes/QuoteViewSheet';
+import QuoteViewSheet, { type QuoteData } from '../components/quotes/QuoteViewSheet';
 import { formatUSD, formatDateShort } from '../utils/formatUtils';
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -22,26 +23,8 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rechazada', converted: 'Convertida', expired: 'Vencida',
 };
 
-interface QuoteRow {
-  id: number;
-  code?: string;
-  status: string;
-  total: number;
-  customer?: {
-    businessName?: string;
-    business_name?: string;
-    trade_name?: string;
-    firstName?: string;
-    first_name?: string;
-    lastName?: string;
-    last_name?: string;
-    [key: string]: unknown;
-  };
-  quote_date?: string;
-  quoteDate?: string;
+interface QuoteRow extends QuoteData {
   created_at?: string;
-  valid_until?: string;
-  validUntil?: string;
   [key: string]: unknown;
 }
 
@@ -50,10 +33,10 @@ interface ConversionResult {
   quote_code: string;
 }
 
-const customerName = (c: QuoteRow['customer']) =>
-  c?.businessName || c?.business_name || c?.trade_name ||
+const customerName = (c: Record<string, unknown> | null | undefined) =>
+  (c?.businessName || c?.business_name || c?.trade_name ||
   `${c?.firstName || c?.first_name || ''} ${c?.lastName || c?.last_name || ''}`.trim() ||
-  'Cliente';
+  'Cliente') as string;
 
 const fmtDate = (d: string | undefined) => d ? formatDateShort(d) : '';
 const fmtUSD  = (n: number | string) => formatUSD(n);
@@ -94,7 +77,7 @@ const QuotesPage = () => {
     staleTime: 30_000,
   });
 
-  const quotes: QuoteRow[]     = quotesData?.data || [];
+  const quotes = (quotesData?.data || []) as unknown as QuoteRow[];
   const pagination = quotesData?.pagination;
   const totalPages = pagination?.totalPages || 1;
   const total      = pagination?.total || 0;
@@ -135,7 +118,7 @@ const QuotesPage = () => {
   });
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
-  const handleStatusChange = (quote: QuoteRow, newStatus: string) => {
+  const handleStatusChange = (quote: QuoteData, newStatus: string) => {
     statusMutation.mutate({ id: quote.id, status: newStatus });
   };
 
@@ -143,8 +126,8 @@ const QuotesPage = () => {
   const handleStatusFilter  = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
 
   // ─── Table columns ───────────────────────────────────────────────────────────
-  const columns = [
-    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: string) => <span className="font-mono text-sm">{v}</span> },
+  const columns: Column<QuoteRow>[] = [
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: unknown) => <span className="font-mono text-sm">{v as string}</span> },
     {
       key: 'customer',
       header: 'Cliente',
@@ -172,7 +155,7 @@ const QuotesPage = () => {
       sortable: true,
       sortKey: 'status',
       render: (_: unknown, row: QuoteRow) => (
-        <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
+        <Badge variant={(STATUS_VARIANT[row.status] || 'neutral') as BadgeVariant}>
           {STATUS_LABEL[row.status] || row.status}
         </Badge>
       ),
@@ -285,7 +268,7 @@ const QuotesPage = () => {
         quote={selectedQuote}
         hasPermission={hasPermission}
         onStatusChange={handleStatusChange}
-        onConvert={(q: QuoteRow) => { setConvertTarget(q); setSelectedQuote(null); }}
+        onConvert={(q: QuoteData) => { setConvertTarget(q as QuoteRow); setSelectedQuote(null); }}
         statusMutation={statusMutation}
       />
 

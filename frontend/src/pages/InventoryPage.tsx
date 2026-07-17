@@ -7,7 +7,7 @@ import { categoryService } from '../services/api/categoryService';
 import {
   Package, Warning, Calendar, CurrencyDollar, Funnel,
   ArrowClockwise, Plus, Info, X, Warehouse,
-  CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight
+  CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight,
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { formatMoney, formatDateShort } from '../utils/formatUtils';
@@ -18,31 +18,61 @@ import {
   Alert, Badge, Button, Card, EmptyState, ExportCsvAction, Input,
   Modal, SearchInput, Select, Spinner, Table, ViewAction, AdjustAction,
 } from '../components/ui';
+import type { BadgeVariant, Column } from '../components/ui';
 import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
+import type { InventoryItem, Category, ProductPresentation } from '../types/models';
+
+interface PresentationWithCost extends ProductPresentation {
+  package_cost?: number;
+  purchase_currency?: string;
+  is_active?: boolean;
+}
+
+interface InventoryRow extends InventoryItem {
+  updated_at?: string;
+  product: InventoryItem['product'] & {
+    reorder_point?: number;
+    category?: { id: number; name: string; color?: string } | null;
+    presentations?: PresentationWithCost[];
+  };
+}
+
+interface CountEdit {
+  bultos?: string;
+  unidades?: string;
+  dirty?: boolean;
+}
+
+interface ValuationData {
+  totalValue?: number;
+  totalsByCurrency?: Record<string, number>;
+  conversions?: { currency: string; rate: number; convertedAmount: number }[];
+  warnings?: { message: string }[];
+}
 
 const InventoryPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // ── Filters ────────────────────────────────────────────────────────────────
-  const [selectedWarehouse, setSelectedWarehouse] = useState('all');
-  const [selectedCategory, setSelectedCategory]   = useState('');
-  const [searchTerm, setSearchTerm]               = useState('');
-  const [showFilters, setShowFilters]             = useState(false);
-  const [filters, setFilters] = useState({ lowStock: false, expiring: false, outOfStock: false });
-  const [showHelp, setShowHelp]                   = useState(false);
-  const [showCurrencyBreakdown, setShowCurrencyBreakdown] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory]   = useState<string>('');
+  const [searchTerm, setSearchTerm]               = useState<string>('');
+  const [showFilters, setShowFilters]             = useState<boolean>(false);
+  const [filters, setFilters] = useState<{ lowStock: boolean; expiring: boolean; outOfStock: boolean }>({ lowStock: false, expiring: false, outOfStock: false });
+  const [showHelp, setShowHelp]                   = useState<boolean>(false);
+  const [showCurrencyBreakdown, setShowCurrencyBreakdown] = useState<boolean>(false);
 
   // ── Quick Count ────────────────────────────────────────────────────────────
-  const [quickCountMode, setQuickCountMode] = useState(false);
-  const [countEdits, setCountEdits]         = useState({});
-  const [saveStatus, setSaveStatus]         = useState({});
-  const countEditsRef = useRef({});
-  const timersRef     = useRef({});
-  const inputRefs     = useRef({});
+  const [quickCountMode, setQuickCountMode] = useState<boolean>(false);
+  const [countEdits, setCountEdits]         = useState<Record<number, CountEdit>>({});
+  const [saveStatus, setSaveStatus]         = useState<Record<number, string>>({});
+  const countEditsRef = useRef<Record<number, CountEdit>>({});
+  const timersRef     = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const inputRefs     = useRef<Record<string, HTMLInputElement | null>>({});
 
   // ── Individual Adjust ──────────────────────────────────────────────────────
-  const [adjustItem, setAdjustItem]   = useState(null);
+  const [adjustItem, setAdjustItem]   = useState<InventoryRow | null>(null);
 
   const currencies = [
     { code: 'USD', name: 'Dólar Estadounidense', symbol: '$' },
@@ -53,14 +83,13 @@ const InventoryPage = () => {
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: inventoryData, isLoading } = useQuery({
     queryKey: ['inventory', selectedWarehouse, searchTerm, selectedCategory, filters],
-    queryFn: () => inventoryService.getByWarehouse(selectedWarehouse, {
+    queryFn: () => inventoryService.getByWarehouse(Number(selectedWarehouse), {
       search: searchTerm,
-      category_id: selectedCategory || undefined,
       low_stock:   filters.lowStock,
       expiring:    filters.expiring,
       out_of_stock: filters.outOfStock,
       limit: 500,
-    }),
+    } as Record<string, unknown>),
     refetchOnWindowFocus: true,
     staleTime: 30000,
     refetchInterval: 60000,
@@ -73,7 +102,7 @@ const InventoryPage = () => {
   });
   const warehouses = warehousesData?.data || [];
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
       const res = await categoryService.getAll({ limit: 200 });
@@ -105,10 +134,10 @@ const InventoryPage = () => {
     refetchInterval: 60000,
   });
 
-  const { data: valuationData } = useQuery({
+  const { data: valuationData } = useQuery<{ data: ValuationData }>({
     queryKey: ['valuation', selectedWarehouse],
     queryFn: () => inventoryService.getValuation({
-      warehouse_id: selectedWarehouse === 'all' ? undefined : selectedWarehouse,
+      warehouse_id: selectedWarehouse === 'all' ? undefined : Number(selectedWarehouse),
     }),
     refetchOnWindowFocus: true,
     staleTime: 30000,
@@ -116,10 +145,10 @@ const InventoryPage = () => {
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const formatCOP = (val) =>
+  const formatCOP = (val: number) =>
     new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.ceil(val));
 
-  const toCOP = (amount, fromCurrency = 'USD') => {
+  const toCOP = (amount: number, fromCurrency: string = 'USD'): number | null => {
     if (!amount || amount === 0) return 0;
     if (fromCurrency === 'COP') return amount;
     const rate = calculateEffectiveRate(fromCurrency, 'COP', exchangeRates);
@@ -129,21 +158,21 @@ const InventoryPage = () => {
   };
 
   // Muestra en COP si hay tasa; si no, en la moneda original (sin mentir)
-  const formatValueCOP = (amount, fromCurrency = 'USD') => {
+  const formatValueCOP = (amount: number, fromCurrency: string = 'USD'): string => {
     const cop = toCOP(amount, fromCurrency);
     if (cop !== null) return formatCOP(cop);
     return new Intl.NumberFormat('es-VE', { style: 'currency', currency: fromCurrency, maximumFractionDigits: 0 }).format(amount || 0);
   };
 
-  const getDefaultPresentation = (item) =>
-    item.product.presentations?.find(p => p.is_default && p.is_active) ||
-    item.product.presentations?.find(p => p.is_active) ||
-    { units_per_package: 1, package_cost: 0 };
+  const getDefaultPresentation = (item: InventoryRow): PresentationWithCost =>
+    item.product.presentations?.find((p: PresentationWithCost) => p.is_default && p.is_active) ||
+    item.product.presentations?.find((p: PresentationWithCost) => p.is_active) ||
+    { id: -1, name: 'Default', units_per_package: 1, price: 0, is_default: true, package_cost: 0 };
 
-  const getStockStatus = (quantity, reorderPoint) => {
-    const qty = parseFloat(quantity);
+  const getStockStatus = (quantity: number, reorderPoint: number): { text: string; variant: BadgeVariant } => {
+    const qty = parseFloat(String(quantity));
     if (qty === 0) return { text: 'Agotado', variant: 'error' };
-    if (qty <= parseFloat(reorderPoint)) return { text: 'Stock Bajo', variant: 'warning' };
+    if (qty <= parseFloat(String(reorderPoint))) return { text: 'Stock Bajo', variant: 'warning' };
     return { text: 'Normal', variant: 'success' };
   };
 
@@ -158,7 +187,7 @@ const InventoryPage = () => {
   };
 
   // ── Quick Count handlers ────────────────────────────────────────────────────
-  const handleCountChange = (item, field, value) => {
+  const handleCountChange = (item: InventoryRow, field: 'bultos' | 'unidades', value: string) => {
     const id = item.id;
     if (!countEditsRef.current[id]) countEditsRef.current[id] = {};
     countEditsRef.current[id][field] = value;
@@ -171,13 +200,13 @@ const InventoryPage = () => {
     }, 800);
   };
 
-  const saveCountEdit = async (item, edits) => {
+  const saveCountEdit = async (item: InventoryRow, edits: CountEdit) => {
     const pres       = getDefaultPresentation(item);
-    const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-    const bultos     = parseFloat(edits.bultos)   || 0;
-    const unidades   = parseFloat(edits.unidades) || 0;
+    const unitsPerPkg = parseFloat(String(pres.units_per_package)) || 1;
+    const bultos     = parseFloat(String(edits.bultos))   || 0;
+    const unidades   = parseFloat(String(edits.unidades)) || 0;
     const newTotal   = (bultos * unitsPerPkg) + unidades;
-    const diff       = newTotal - parseFloat(item.quantity);
+    const diff       = newTotal - parseFloat(String(item.quantity));
     if (diff === 0) {
       setSaveStatus(prev => ({ ...prev, [item.id]: 'saved' }));
       setTimeout(() => setSaveStatus(prev => ({ ...prev, [item.id]: 'idle' })), 2000);
@@ -188,8 +217,8 @@ const InventoryPage = () => {
       await inventoryService.adjustInventory({
         product_id:   item.product_id,
         warehouse_id: item.warehouse_id,
-        type:         diff > 0 ? 'add' : 'remove',
-        loose_units:  Math.abs(diff),
+        type:         diff > 0 ? 'entrada' : 'ajuste',
+        quantity:     Math.abs(diff),
         reason:       'Conteo Rápido',
       });
       setSaveStatus(prev => ({ ...prev, [item.id]: 'saved' }));
@@ -201,7 +230,7 @@ const InventoryPage = () => {
     }
   };
 
-  const retrySave = (item) => saveCountEdit(item, countEditsRef.current[item.id] || {});
+  const retrySave = (item: InventoryRow) => saveCountEdit(item, countEditsRef.current[item.id] || {});
 
   const handleExitQuickCount = () => {
     Object.values(timersRef.current).forEach(t => clearTimeout(t));
@@ -213,7 +242,7 @@ const InventoryPage = () => {
   };
 
   // ── Individual Adjust ──────────────────────────────────────────────────────
-  const openAdjust = (item) => setAdjustItem(item);
+  const openAdjust = (item: InventoryRow) => setAdjustItem(item);
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
   const handleDownloadReport = () => {
@@ -226,11 +255,11 @@ const InventoryPage = () => {
     downloadCSV(
       `inventario-${warehouseName}-${timestamp}`,
       ['Producto', 'Categoría', 'Bultos', 'Unidades', 'Depósito', 'Estado'],
-      inventoryData.data.map(item => {
+      (inventoryData.data as InventoryRow[]).map((item: InventoryRow) => {
         const pres        = getDefaultPresentation(item);
-        const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
-        const qty         = parseFloat(item.quantity);
-        const status      = getStockStatus(qty, item.product.reorder_point);
+        const unitsPerPkg = parseFloat(String(pres.units_per_package)) || 1;
+        const qty         = parseFloat(String(item.quantity));
+        const status      = getStockStatus(qty, Number(item.product.reorder_point) || 0);
         return [
           item.product.name,
           item.product.category?.name || 'N/A',
@@ -244,11 +273,11 @@ const InventoryPage = () => {
   };
 
   // ── Columnas tabla normal ──────────────────────────────────────────────────
-  const inventoryColumns = [
+  const inventoryColumns: Column<InventoryRow>[] = [
     {
       header: 'Producto',
       accessor: 'product',
-      render: (_, item) => (
+      render: (_: unknown, item: InventoryRow) => (
         <div>
           <div className="font-medium text-gray-900">{item.product.name}</div>
           {selectedWarehouse === 'all' && (
@@ -260,7 +289,7 @@ const InventoryPage = () => {
     {
       header: 'Categoría',
       accessor: 'category',
-      render: (_, item) => item.product.category ? (
+      render: (_: unknown, item: InventoryRow) => item.product.category ? (
         <span
           className="px-2 py-1 text-xs rounded-full text-white font-medium"
           style={{ backgroundColor: item.product.category.color || '#6B7280' }}
@@ -275,26 +304,26 @@ const InventoryPage = () => {
       header: 'Bultos',
       accessor: 'bultos',
       cellClassName: 'text-center',
-      render: (_, item) => {
+      render: (_: unknown, item: InventoryRow) => {
         const pres = getDefaultPresentation(item);
-        const qty  = parseFloat(item.quantity);
-        return <span className="font-semibold text-gray-900">{Math.floor(qty / (parseFloat(pres.units_per_package) || 1))}</span>;
+        const qty  = parseFloat(String(item.quantity));
+        return <span className="font-semibold text-gray-900">{Math.floor(qty / (parseFloat(String(pres.units_per_package)) || 1))}</span>;
       },
     },
     {
       header: 'Unidades',
       accessor: 'unidades',
       cellClassName: 'text-center',
-      render: (_, item) => {
+      render: (_: unknown, item: InventoryRow) => {
         const pres = getDefaultPresentation(item);
-        const qty  = parseFloat(item.quantity);
-        return <span className="text-gray-600">{Math.round(qty % (parseFloat(pres.units_per_package) || 1))}</span>;
+        const qty  = parseFloat(String(item.quantity));
+        return <span className="text-gray-600">{Math.round(qty % (parseFloat(String(pres.units_per_package)) || 1))}</span>;
       },
     },
     {
       header: 'Último Ajuste',
       accessor: 'updated_at',
-      render: (_, item) => (
+      render: (_: unknown, item: InventoryRow) => (
         <span className="text-sm text-gray-500">
           {formatDateShort(item.updated_at)}
         </span>
@@ -304,11 +333,11 @@ const InventoryPage = () => {
       header: 'Valor Inventario',
       accessor: 'value',
       cellClassName: 'text-right',
-      render: (_, item) => {
+      render: (_: unknown, item: InventoryRow) => {
         const pres       = getDefaultPresentation(item);
-        const qty        = parseFloat(item.quantity);
-        const pkgCost    = parseFloat(pres.package_cost || 0);
-        const upu        = parseFloat(pres.units_per_package) || 1;
+        const qty        = parseFloat(String(item.quantity));
+        const pkgCost    = parseFloat(String(pres.package_cost || 0));
+        const upu        = parseFloat(String(pres.units_per_package)) || 1;
         const rawValue   = qty * (pkgCost / upu);
         return <span className="font-medium text-gray-700">{rawValue > 0 ? formatValueCOP(rawValue, pres.purchase_currency || 'USD') : '—'}</span>;
       },
@@ -316,15 +345,15 @@ const InventoryPage = () => {
     {
       header: 'Estado',
       accessor: 'status',
-      render: (_, item) => {
-        const s = getStockStatus(parseFloat(item.quantity), item.product.reorder_point);
+      render: (_: unknown, item: InventoryRow) => {
+        const s = getStockStatus(parseFloat(String(item.quantity)), Number(item.product.reorder_point) || 0);
         return <Badge variant={s.variant}>{s.text}</Badge>;
       },
     },
     {
       header: 'Acciones',
       accessor: 'id',
-      render: (_, item) => (
+      render: (_: unknown, item: InventoryRow) => (
         <div className="flex items-center gap-1">
           <ViewAction onClick={() => navigate(`/inventario/${item.id}`)} />
           <AdjustAction onClick={() => openAdjust(item)} />
@@ -465,10 +494,10 @@ const InventoryPage = () => {
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Valor Total</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatValueCOP(valuationData?.data?.totalValue || 0, 'USD')}
+                {formatValueCOP(Number(valuationData?.data?.totalValue || 0), 'USD')}
               </p>
               {valuationData?.data?.totalsByCurrency &&
-                Object.entries(valuationData.data.totalsByCurrency).filter(([, v]) => v > 0).length > 1 && (
+                Object.entries(valuationData.data.totalsByCurrency).filter(([, v]) => Number(v) > 0).length > 1 && (
                 <button
                   onClick={() => setShowCurrencyBreakdown(true)}
                   className="mt-1 text-xs text-green-700 hover:text-green-800 font-medium flex items-center gap-1"
@@ -505,7 +534,7 @@ const InventoryPage = () => {
                 onChange={(e) => setSelectedWarehouse(e.target.value)}
               >
                 <option value="all">Todos los Depósitos</option>
-                {warehouses.map(w => (
+                {warehouses.map((w: { id: number; name: string }) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </Select>
@@ -515,7 +544,7 @@ const InventoryPage = () => {
           <div className="w-full md:w-52">
             <Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
               <option value="">Todas las Categorías</option>
-              {categories.map(c => (
+              {categories.map((c: Category) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
@@ -547,11 +576,11 @@ const InventoryPage = () => {
 
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4">
-            {[
-              { key: 'lowStock',   label: 'Stock Bajo' },
-              { key: 'expiring',   label: 'Próximos a vencer' },
-              { key: 'outOfStock', label: 'Agotados' },
-            ].map(({ key, label }) => (
+            {([
+              { key: 'lowStock' as const,   label: 'Stock Bajo' },
+              { key: 'expiring' as const,   label: 'Próximos a vencer' },
+              { key: 'outOfStock' as const, label: 'Agotados' },
+            ]).map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -574,7 +603,7 @@ const InventoryPage = () => {
       ) : !inventoryData?.data?.length ? (
         <Card variant="flat">
           <EmptyState
-            icon={Package}
+            icon={Package as React.ComponentType<any>}
             title="No hay productos en el inventario"
             description="Comienza agregando productos para gestionar tu inventario"
             action={
@@ -600,15 +629,15 @@ const InventoryPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {inventoryData.data.map((item, index) => {
+                {(inventoryData.data as InventoryRow[]).map((item: InventoryRow, index: number) => {
                   const pres       = getDefaultPresentation(item);
-                  const upu        = parseFloat(pres.units_per_package) || 1;
-                  const qty        = parseFloat(item.quantity);
+                  const upu        = parseFloat(String(pres.units_per_package)) || 1;
+                  const qty        = parseFloat(String(item.quantity));
                   const bultos     = Math.floor(qty / upu);
                   const unidades   = Math.round(qty % upu);
                   const edit       = countEdits[item.id] || {};
                   const statusSave = saveStatus[item.id] || 'idle';
-                  const nextItem   = inventoryData.data[index + 1];
+                  const nextItem   = (inventoryData.data as InventoryRow[])[index + 1];
 
                   return (
                     <tr key={item.id} className={edit.dirty ? 'bg-primary-50/40' : 'hover:bg-gray-50'}>
@@ -630,7 +659,7 @@ const InventoryPage = () => {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') inputRefs.current[`${item.id}-unidades`]?.focus();
                           }}
-                          ref={(el) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
+                          ref={(el: HTMLInputElement | null) => { if (el) inputRefs.current[`${item.id}-bultos`] = el; }}
                           className="w-20 px-2 py-1.5 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
@@ -643,7 +672,7 @@ const InventoryPage = () => {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && nextItem) inputRefs.current[`${nextItem.id}-bultos`]?.focus();
                           }}
-                          ref={(el) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
+                          ref={(el: HTMLInputElement | null) => { if (el) inputRefs.current[`${item.id}-unidades`] = el; }}
                           className="w-20 px-2 py-1.5 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white text-sm"
                         />
                       </td>
@@ -679,7 +708,7 @@ const InventoryPage = () => {
         <Card variant="flat" className="overflow-hidden">
           <Table
             columns={inventoryColumns}
-            data={inventoryData.data}
+            data={inventoryData.data as InventoryRow[]}
             emptyMessage="No hay productos en el inventario"
           />
         </Card>
@@ -699,7 +728,7 @@ const InventoryPage = () => {
           <div>
             <p className="text-sm text-gray-600 mb-1">Total Convertido</p>
             <p className="text-3xl font-bold text-green-600">
-              {formatValueCOP(valuationData?.data?.totalValue || 0, 'USD')}
+              {formatValueCOP(Number(valuationData?.data?.totalValue || 0), 'USD')}
             </p>
           </div>
 
@@ -708,10 +737,10 @@ const InventoryPage = () => {
             <div className="space-y-3">
               {valuationData?.data?.totalsByCurrency &&
                 Object.entries(valuationData.data.totalsByCurrency)
-                  .filter(([, value]) => value > 0)
+                  .filter(([, value]) => Number(value) > 0)
                   .map(([currency, value]) => {
                     const currencyInfo = currencies.find(c => c.code === currency);
-                    const conversion   = valuationData.data.conversions?.find(c => c.currency === currency);
+                    const conversion   = valuationData?.data?.conversions?.find((c: { currency: string }) => c.currency === currency);
                     return (
                       <Card key={currency} variant="flat">
                         <div className="flex items-center justify-between mb-1">
@@ -719,7 +748,7 @@ const InventoryPage = () => {
                           <span className="text-sm text-gray-500">{currency}</span>
                         </div>
                         <p className="text-lg font-bold text-gray-900">
-                          {formatMoney(value, currencyInfo?.symbol)}
+                          {formatMoney(Number(value), currencyInfo?.symbol)}
                         </p>
                         {conversion && (
                           <div className="mt-2 pt-2 border-t border-gray-200">
@@ -738,10 +767,10 @@ const InventoryPage = () => {
             </div>
           </div>
 
-          {valuationData?.data?.warnings?.length > 0 && (
+          {valuationData?.data?.warnings && valuationData.data.warnings.length > 0 && (
             <Alert variant="warning">
               <p className="font-semibold text-xs mb-1">Advertencias:</p>
-              {valuationData.data.warnings.map((w, i) => (
+              {valuationData.data.warnings.map((w: { message: string }, i: number) => (
                 <p key={i} className="text-xs">{w.message}</p>
               ))}
             </Alert>

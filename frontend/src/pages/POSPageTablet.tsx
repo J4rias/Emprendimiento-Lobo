@@ -18,12 +18,22 @@ import {
   Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import type { Product, ProductPresentation } from '../types/models';
+import type { CartItem } from '../types/pos';
+import type { Bank } from '../types/models';
 
 const PAYMENT_ICONS: Record<string, React.ComponentType<any>> = { cash: Money, card: CreditCard, transfer: DeviceMobile, usdt: Hash };
 
+interface PriceListDetail {
+  package_price_usd?: string;
+  package_price?: string;
+  is_frozen?: boolean;
+  [key: string]: unknown;
+}
+
 // ============= TABLET POS =============
 const POSPageTablet = () => {
-  const pos = usePOS();
+  const pos = usePOS() as any;
   const { companySettings } = useCompany();
   const [showSendToCashier, setShowSendToCashier] = useState(false);
 
@@ -131,15 +141,15 @@ const POSPageTablet = () => {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   {pos.products
-                    .filter(product => {
+                    .filter((product: Product) => {
                       if (pos.isAdmin) return true;
                       const priceField = pos.displayCurrency === 'USD' ? 'package_price_usd' : 'package_price';
-                      return (product.presentations || []).some(p => {
+                      return (product.presentations || []).some((p: ProductPresentation) => {
                         const detail = pos.priceListDetails[`${product.id}-${p.id}`];
                         return detail && parseFloat(detail[priceField]) > 0;
                       });
                     })
-                    .map((product) => (
+                    .map((product: Product) => (
                     <TabletProductCard
                       key={product.id}
                       product={product}
@@ -193,8 +203,8 @@ const POSPageTablet = () => {
                         ? `${pos.customer.firstName || ''} ${pos.customer.lastName || ''}`.trim()
                         : pos.customer.businessName || pos.customer.tradeName || ''}
                     </p>
-                    {pos.customer.discountPercentage > 0 && (
-                      <p className="text-xs text-green-600">{pos.customer.discountPercentage}% desc</p>
+                    {Number(pos.customer.discountPercentage) > 0 && (
+                      <p className="text-xs text-green-600">{String(pos.customer.discountPercentage)}% desc</p>
                     )}
                   </div>
                 </div>
@@ -218,7 +228,7 @@ const POSPageTablet = () => {
           {/* Cart items */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {pos.cart.length > 0 ? (
-              pos.cart.map((item) => (
+              pos.cart.map((item: CartItem) => (
                 <TabletCartItem
                   key={`${item.product_id}-${item.presentation_id}-${item.sellByUnit || false}`}
                   item={item}
@@ -336,6 +346,7 @@ const POSPageTablet = () => {
         exchangeRates={pos.exchangeRates}
         displayCurrency={pos.displayCurrency}
         isAdmin={pos.isAdmin}
+        allowCredit={pos.isAdmin || pos.hasPermission('sales.credit')}
       />}
 
       <ConfirmDialog
@@ -381,12 +392,12 @@ const POSPageTablet = () => {
       <CustomerSearch
         isOpen={pos.showCustomerSearch}
         onClose={() => pos.setShowCustomerSearch(false)}
-        onSelect={(c) => {
+        onSelect={(c: any) => {
           pos.handleSetCustomer(c);
           pos.setShowCustomerSearch(false);
         }}
         validateCredit={pos.saleType === 'credit' || pos.saleType === 'mixed'}
-        saleAmount={parseFloat(pos.total)}
+        saleAmount={parseFloat(String(pos.total))}
         exchangeRates={pos.exchangeRates}
       />
     </div>
@@ -395,13 +406,25 @@ const POSPageTablet = () => {
 
 // ============= TABLET SUB-COMPONENTS =============
 
-function TabletProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, getEffectivePriceUSD, fmt }) {
-  const [selectedPresentation, setSelectedPresentation] = useState(product.presentations?.[0]);
+interface TabletProductCardProps {
+  product: Product;
+  priceListDetails: Record<string, PriceListDetail>;
+  otherReservations: Record<number, number>;
+  onAdd: (product: Product, presentation: ProductPresentation, quantity: number) => void;
+  toDisplay: (val: number) => number;
+  displayCurrency: string;
+  displaySymbol: string;
+  getEffectivePriceUSD: (presentation: ProductPresentation, priceListItem?: PriceListDetail) => number;
+  fmt: (val: number) => string;
+}
+
+function TabletProductCard({ product, priceListDetails, otherReservations, onAdd, toDisplay, displayCurrency, displaySymbol, getEffectivePriceUSD, fmt }: TabletProductCardProps) {
+  const [selectedPresentation, setSelectedPresentation] = useState<ProductPresentation | undefined>(product.presentations?.[0]);
 
   if (!selectedPresentation) return null;
 
-  const totalStock = product.inventories?.reduce((s, i) => s + parseFloat(i.quantity || 0), 0) || 0;
-  const unitsPerPkg = parseFloat(selectedPresentation.units_per_package) || 1;
+  const totalStock = product.inventories?.reduce((s: number, i: { quantity: number | string }) => s + parseFloat(String(i.quantity || 0)), 0) || 0;
+  const unitsPerPkg = parseFloat(String(selectedPresentation.units_per_package)) || 1;
   const reservedByOthers = otherReservations[product.id] || 0;
   const available = totalStock - reservedByOthers;
   const availablePackages = Math.floor(available / unitsPerPkg);
@@ -431,25 +454,25 @@ function TabletProductCard({ product, priceListDetails, otherReservations, onAdd
         {product.category && (
           <div
             className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-            style={{ backgroundColor: product.category.color || '#9CA3AF' }}
+            style={{ backgroundColor: '#9CA3AF' }}
           />
         )}
         <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
       </div>
 
       {/* Presentation */}
-      {product.presentations?.length > 1 ? (
+      {product.presentations && product.presentations.length > 1 ? (
         <select
           value={selectedPresentation.id}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => {
             e.stopPropagation();
-            const p = product.presentations.find((p) => p.id === parseInt(e.target.value));
+            const p = product.presentations?.find((p: ProductPresentation) => p.id === parseInt(e.target.value));
             if (p) setSelectedPresentation(p);
           }}
           className="w-full text-sm border border-gray-200 rounded-lg mt-1 mb-2 py-2 px-2 bg-white"
         >
-          {product.presentations.map((p) => (
+          {product.presentations.map((p: ProductPresentation) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
@@ -483,8 +506,23 @@ function TabletProductCard({ product, priceListDetails, otherReservations, onAdd
   );
 }
 
+interface TabletCartItemProps {
+  item: CartItem;
+  onQuantityChange: (productId: number, presentationId: number | null, sellByUnit: boolean, quantity: number) => void;
+  onRemove: (productId: number, presentationId: number | null, sellByUnit: boolean) => void;
+  onPriceChange: (productId: number, presentationId: number | null, sellByUnit: boolean, price: number) => void;
+  onToggleSellMode: (productId: number, presentationId: number | null, sellByUnit: boolean) => void;
+  onDiscountChange: (productId: number, presentationId: number | null, sellByUnit: boolean, discount: number) => void;
+  toDisplay: (val: number) => number;
+  displaySymbol: string;
+  fmt: (val: number) => string;
+  getEffectiveUSDPrice: (item: CartItem) => number;
+  hasEditPricePermission: boolean;
+  customer: Customer | null;
+}
+
 function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onToggleSellMode, onDiscountChange,
-  toDisplay, displaySymbol, fmt, getEffectiveUSDPrice, hasEditPricePermission, customer }) {
+  toDisplay, displaySymbol, fmt, getEffectiveUSDPrice, hasEditPricePermission, customer }: TabletCartItemProps) {
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState('');
 
@@ -494,7 +532,7 @@ function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onTog
   const hasSurcharge = item.sellByUnit && item.quantity < (item.units_per_package || 1) / 2;
 
   const startEdit = () => {
-    setPriceInput(Math.round(displayPrice * 100) / 100);
+    setPriceInput(String(Math.round(displayPrice * 100) / 100));
     setEditingPrice(true);
   };
 
@@ -597,7 +635,7 @@ function TabletCartItem({ item, onQuantityChange, onRemove, onPriceChange, onTog
       </div>
 
       {/* Row 4: discount */}
-      {(customer?.discountPercentage > 0 || item.discount_percent > 0) && (
+      {(Number(customer?.discountPercentage) > 0 || item.discount_percent > 0) && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Descuento:</span>
           <div className="flex items-center gap-1">
@@ -638,6 +676,7 @@ interface TabletCheckoutModalProps {
   exchangeRates: ExchangeRate[];
   displayCurrency: string;
   isAdmin: boolean;
+  allowCredit?: boolean;
 }
 
 function TabletCheckoutModal({
@@ -646,6 +685,7 @@ function TabletCheckoutModal({
   subtotal, discount, tax, total, totalCOP, copPerUSD,
   onComplete, saving,
   exchangeRates, displayCurrency, isAdmin,
+  allowCredit = true,
 }: TabletCheckoutModalProps) {
   const {
     isUSD, sSym, fmtTotal, fmtCOP, fmtLine,
@@ -741,7 +781,7 @@ function TabletCheckoutModal({
 
             {paymentLines.length > 0 && (
               <div className="space-y-2">
-                {paymentLines.map((line, i) => {
+                {paymentLines.map((line: PaymentLine, i: number) => {
                   const isCreditLine = line.method === 'credit';
                   const MethodIcon = isCreditLine ? CreditCard : (PAYMENT_ICONS[line.method] || Money);
                   return (
@@ -752,7 +792,7 @@ function TabletCheckoutModal({
                           {line.currency} {fmtLine(line.amount, line.currency)}
                         </span>
                         <span className={`text-sm ${isCreditLine ? 'text-amber-600' : 'text-green-600'}`}>
-                          ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label}{line.bank_id ? ` - ${banks.find(b => b.id === line.bank_id)?.name || ''}` : ''})
+                          ({isCreditLine ? 'Crédito' : PAYMENT_METHODS.find(m => m.id === line.method)?.label}{line.bank_id ? ` - ${banks.find((b: Bank) => b.id === line.bank_id)?.name || ''}` : ''})
                         </span>
                         {!isCreditLine && (line.method === 'usdt' || (line.currency !== displayCurrency && (line.display_rate || (line.currency !== 'COP' && line.cop_rate !== 1)))) && (
                           <span className="text-xs text-gray-400">
@@ -764,7 +804,7 @@ function TabletCheckoutModal({
                           </span>
                         )}
                       </div>
-                      <button onClick={() => setPaymentLines(paymentLines.filter((_, j) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
+                      <button onClick={() => setPaymentLines(paymentLines.filter((_: PaymentLine, j: number) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
                         <X className="w-5 h-5 text-red-500" />
                       </button>
                     </div>
@@ -785,7 +825,7 @@ function TabletCheckoutModal({
                 {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
                   <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                     <option value="">Banco</option>
-                    {filteredBanks.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                    {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                   </select>
                 )}
                 {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
@@ -838,7 +878,7 @@ function TabletCheckoutModal({
               </div>
               {/* Quick buttons */}
               <div className="flex gap-2 flex-wrap">
-                {!hasCreditLine && (() => {
+                {allowCredit && !hasCreditLine && (() => {
                   const remainingForCredit = effectiveTotalCOP - paidCOP;
                   const hasPartialPayment = paidCOP > 0;
                   return remainingForCredit > 0 ? (

@@ -14,23 +14,25 @@ import {
   Modal,
   Table,
 } from '../components/ui';
+import type { Column } from '../components/ui';
 import { exchangeRateService } from '../services/api/exchangeRateService';
+import type { ExchangeRate } from '../types';
 import { localToday } from '../utils/dateUtils';
 import { formatDateShort, formatDate } from '../utils/formatUtils';
 
 const ExchangeRatesPage = () => {
   const { hasPermission } = useAuth();
-  const [ratesRaw, setRatesRaw] = useState([]);
+  const [ratesRaw, setRatesRaw] = useState<ExchangeRate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
-  const [editingRate, setEditingRate] = useState(null);
-  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState(localToday());
   const [rateSortBy, setRateSortBy] = useState('effective_date');
-  const [rateSortDir, setRateSortDir] = useState('desc');
+  const [rateSortDir, setRateSortDir] = useState<'asc' | 'desc'>('desc');
   const [formData, setFormData] = useState({
     from_currency: 'USD',
     to_currency: 'VES',
@@ -61,12 +63,13 @@ const ExchangeRatesPage = () => {
         date_from: selectedDate,
         date_to: selectedDate,
         sort_by: rateSortBy,
-        sort_dir: rateSortDir as 'asc' | 'desc',
+        sort_dir: rateSortDir,
       });
 
       setRatesRaw(data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       setError(err.response?.data?.message || err.message || 'Error al cargar tasas de cambio');
     } finally {
       setLoading(false);
@@ -78,28 +81,34 @@ const ExchangeRatesPage = () => {
     setLoading(true);
 
     try {
+      const submitData = {
+        ...formData,
+        rate: Number(formData.rate),
+      };
+
       if (editingRate) {
-        await exchangeRateService.update(editingRate.id, formData);
+        await exchangeRateService.update(editingRate.id, submitData);
       } else {
-        await exchangeRateService.create(formData);
+        await exchangeRateService.create(submitData);
       }
 
       toast.success(editingRate ? 'Tasa actualizada' : 'Tasa registrada');
       await fetchRates();
       handleCloseModal();
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       toast.error(err.response?.data?.message || err.message || 'Error al guardar tasa de cambio');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (rate: any) => {
+  const handleEdit = (rate: ExchangeRate) => {
     setEditingRate(rate);
     setFormData({
       from_currency: rate.from_currency,
       to_currency: rate.to_currency,
-      rate: rate.rate,
+      rate: String(rate.rate),
       effective_date: rate.effective_date,
       source: rate.source || 'Manual',
       notes: rate.notes || ''
@@ -116,7 +125,8 @@ const ExchangeRatesPage = () => {
       await exchangeRateService.deleteRate(deleteTargetId!);
       toast.success('Tasa eliminada');
       await fetchRates();
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       toast.error(err.response?.data?.message || err.message || 'Error al eliminar tasa');
     } finally {
       setDeleteTargetId(null);
@@ -149,12 +159,12 @@ const ExchangeRatesPage = () => {
   const rates = ratesRaw;
   const rateOnSort = (f: string, d: 'asc' | 'desc') => { setRateSortBy(f); setRateSortDir(d); setCurrentPage(1); };
 
-  const columns = [
+  const columns: Column<ExchangeRate>[] = [
     {
       header: 'Desde',
       sortable: true,
       sortKey: 'from_currency',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div>
           <div className="font-medium">{rate.from_currency}</div>
           <div className="text-xs text-gray-500">{getCurrencyName(rate.from_currency)}</div>
@@ -165,7 +175,7 @@ const ExchangeRatesPage = () => {
       header: 'Hacia',
       sortable: true,
       sortKey: 'to_currency',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div>
           <div className="font-medium">{rate.to_currency}</div>
           <div className="text-xs text-gray-500">{getCurrencyName(rate.to_currency)}</div>
@@ -176,14 +186,14 @@ const ExchangeRatesPage = () => {
       header: 'Tasa',
       sortable: true,
       sortKey: 'rate',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div>
           <div className="flex items-center gap-2">
             <TrendUp className="h-4 w-4 text-green-600" />
-            <span className="font-mono text-lg font-semibold">{parseFloat(rate.rate).toFixed(6)}</span>
+            <span className="font-mono text-lg font-semibold">{Number(rate.rate).toFixed(6)}</span>
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            1 {rate.from_currency} = {parseFloat(rate.rate).toFixed(2)} {rate.to_currency}
+            1 {rate.from_currency} = {Number(rate.rate).toFixed(2)} {rate.to_currency}
           </div>
         </div>
       ),
@@ -192,7 +202,7 @@ const ExchangeRatesPage = () => {
       header: 'Fecha Efectiva',
       sortable: true,
       sortKey: 'effective_date',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-400" />
           {formatDateShort(rate.effective_date + 'T00:00:00')}
@@ -201,13 +211,13 @@ const ExchangeRatesPage = () => {
     },
     {
       header: 'Fuente',
-      render: (_, rate) => <Badge variant="info">{rate.source || 'Manual'}</Badge>,
+      render: (_: unknown, rate: ExchangeRate) => <Badge variant="info">{rate.source || 'Manual'}</Badge>,
     },
     {
       header: 'Creado por',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div>
-          <div className="text-sm">{rate.creator?.first_name || rate.creator?.username || 'N/A'}</div>
+          <div className="text-sm">{(rate.creator as any)?.first_name || (rate.creator as any)?.username || 'N/A'}</div>
           <div className="text-xs text-gray-500">{formatDate(rate.created_at)}</div>
         </div>
       ),
@@ -215,7 +225,7 @@ const ExchangeRatesPage = () => {
     ...(hasPermission('settings.manage') ? [{
       header: 'Acciones',
       className: 'text-right',
-      render: (_, rate) => (
+      render: (_: unknown, rate: ExchangeRate) => (
         <div className="flex items-center gap-1">
           <EditAction onClick={() => handleEdit(rate)} />
           <DeleteAction onClick={() => handleDelete(rate.id)} />
@@ -387,7 +397,7 @@ const ExchangeRatesPage = () => {
               name="notes"
               value={formData.notes}
               onChange={handleChange}
-              rows="3"
+              rows={3}
               className="input"
               placeholder="Notas adicionales sobre esta tasa..."
             />

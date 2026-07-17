@@ -203,7 +203,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
             console.error('Error creating credit note:', error);
             const err = error as { response?: { data?: { error?: string; message?: string } }; message?: string };
             const serverMsg = err.response?.data?.error || err.response?.data?.message || err.message;
-            setServerError(serverMsg);
+            setServerError(serverMsg ?? null);
             toast.error(`Error: ${serverMsg}`, { duration: 8000 });
         } finally {
             setSubmitting(false);

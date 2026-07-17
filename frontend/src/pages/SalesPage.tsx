@@ -11,7 +11,7 @@ import { saleService } from '../services/api/saleService';
 import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
-import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
+import { convertPaymentLinesToBackend, adjustPaymentLinesForChange, PaymentLine as PaymentLineUtil } from '../utils/paymentUtils';
 import { COP_TOLERANCE } from '../hooks/usePOS';
 import CheckoutModal from '../components/sales/CheckoutModal';
 import { formatDate, formatCOP, formatUSD, formatDateShort, formatByCurrency } from '../utils/formatUtils';
@@ -27,22 +27,60 @@ import {
   Pagination, SearchInput, Select, Table, Textarea, useTableLimit,
   ViewAction, PaymentAction, ReturnAction, CancelAction,
 } from '../components/ui';
+import type { BadgeVariant, Column } from '../components/ui';
+import type { Sale, SalePayment, Customer, PaymentLine, ExchangeRate } from '../types';
+
+// ── Local Interfaces ──────────────────────────────────────────────────────────
+interface SaleRow {
+  id: number;
+  sale_number: string;
+  sale_date: string;
+  sale_type: 'cash' | 'credit' | 'mixed' | 'pos_pending';
+  status: 'pending' | 'completed' | 'cancelled' | 'returned';
+  total: number | string;
+  subtotal?: number | string;
+  discount_amount?: number | string;
+  tax_amount?: number | string;
+  exchange_rate: number | string;
+  paid_amount?: number | string;
+  cn_count?: number | string;
+  cn_total_cop?: number | string;
+  currency_mode?: string;
+  customer?: Customer | null;
+  [key: string]: unknown;
+}
+
+interface SaleDetail extends Sale {
+  subtotal?: number;
+  discount_amount?: number;
+  tax_amount?: number;
+  paid_amount?: number;
+  currency_mode?: string;
+  customer?: Customer | null;
+  payments?: SalePayment[];
+}
+
+interface RefundLine {
+  payment_method: string;
+  amount: number;
+  currency: string;
+}
 
 // ── Status / type config ──────────────────────────────────────────────────────
-const SALE_TYPE_VARIANT = { cash: 'info',    credit: 'purple', mixed: 'warning', pos_pending: 'neutral' };
-const SALE_TYPE_LABEL   = { cash: 'Contado', credit: 'Crédito', mixed: 'Mixta',  pos_pending: 'Pendiente de Cobro' };
+const SALE_TYPE_VARIANT: Record<string, BadgeVariant> = { cash: 'info', credit: 'purple', mixed: 'warning', pos_pending: 'neutral' };
+const SALE_TYPE_LABEL: Record<string, string> = { cash: 'Contado', credit: 'Crédito', mixed: 'Mixta', pos_pending: 'Pendiente de Cobro' };
 
-const STATUS_VARIANT = {
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
   pending: 'warning', completed: 'success', cancelled: 'error', returned: 'neutral',
 };
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendiente', completed: 'Completada', cancelled: 'Cancelada', returned: 'Devuelta',
 };
 
 // Status badge with credit-note dev logic
-const StatusBadge = ({ status, cnCount, saleTotal, cnTotalCOP }) => {
-  const cnQty   = parseInt(cnCount || 0);
-  const saleNet = parseFloat(saleTotal || 0) - parseFloat(cnTotalCOP || 0);
+const StatusBadge = ({ status, cnCount, saleTotal, cnTotalCOP }: { status: string; cnCount: number | string; saleTotal: number | string; cnTotalCOP: number | string; }) => {
+  const cnQty   = parseInt(String(cnCount || 0));
+  const saleNet = parseFloat(String(saleTotal || 0)) - parseFloat(String(cnTotalCOP || 0));
   if (status === 'completed' && cnQty > 0) {
     return (
       <Badge variant={saleNet <= 0.01 ? 'neutral' : 'info'}>
@@ -57,7 +95,7 @@ const StatusBadge = ({ status, cnCount, saleTotal, cnTotalCOP }) => {
   );
 };
 
-const PAYMENT_METHOD_LABEL = {
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cash: 'Efectivo', transfer: 'Transferencia', card: 'Tarjeta',
   usdt: 'USDT', credit_balance: 'Monedero',
 };
@@ -76,25 +114,25 @@ const SalesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // ─── UI state ─────────────────────────────────────────────────────────────────
-  const [selectedSale, setSelectedSale]   = useState(null);
+  const [selectedSale, setSelectedSale]   = useState<SaleDetail | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [paymentSale, setPaymentSale]     = useState(null);
+  const [paymentSale, setPaymentSale]     = useState<SaleDetail | null>(null);
   const [paymentData, setPaymentData]     = useState({ amount_cop: '', method: 'cash', reference: '', notes: '' });
   const [customerCreditBalance, setCustomerCreditBalance] = useState({ usd: 0, cop: 0 });
-  const [returnSale, setReturnSale]       = useState(null);
+  const [returnSale, setReturnSale]       = useState<SaleDetail | null>(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
-  const [cancelSaleId, setCancelSaleId]   = useState(null);
+  const [cancelSaleId, setCancelSaleId]   = useState<number | null>(null);
   const [cancelReason, setCancelReason]   = useState('');
-  const [refundLines, setRefundLines]     = useState(null); // set after cancel if refund needed
+  const [refundLines, setRefundLines]     = useState<RefundLine[] | null>(null);
 
   // Checkout state for pos_pending collection
-  const [checkoutPaymentLines, setCheckoutPaymentLines] = useState([]);
+  const [checkoutPaymentLines, setCheckoutPaymentLines] = useState<PaymentLineUtil[]>([]);
   const [checkoutNotes, setCheckoutNotes] = useState('');
   const [collectSaving, setCollectSaving] = useState(false);
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: salesSortBy, sortDir: salesSortDir, onSort: _salesOnSort } = useTableSort([], { serverSide: true, defaultField: 'sale_date', defaultDir: 'desc' });
-  const salesOnSort = (f, d) => { _salesOnSort(f, d); setCurrentPage(1); };
+  const salesOnSort = (f: string, d: 'asc' | 'desc') => { _salesOnSort(f, d); setCurrentPage(1); };
 
   // Stats period: dashboard.view → date picker (default: current month), otherwise → today only
   const canSeeDashboard = hasPermission('dashboard.view');
@@ -117,21 +155,19 @@ const SalesPage = () => {
       search,
       status: statusFilter || undefined,
       sale_type: saleTypeFilter || undefined,
-      sort_by: salesSortBy,
-      sort_dir: salesSortDir,
       ...dateRange,
     }),
     staleTime: 30_000,
   });
-  const sales      = salesData?.data || [];
+  const sales: SaleRow[]      = salesData?.data || [];
   const totalPages = salesData?.pagination?.totalPages || 1;
   const total      = salesData?.pagination?.total || 0;
 
   const { data: statsData } = useQuery({
     queryKey: ['sales-stats', statusFilter, saleTypeFilter, dateRange.date_from, dateRange.date_to],
     queryFn: () => saleService.getSalesStats({
-      status: statusFilter || undefined,
-      sale_type: saleTypeFilter || undefined,
+      status: statusFilter ?? '',
+      sale_type: saleTypeFilter ?? '',
       ...dateRange,
     }),
     staleTime: 30_000,
@@ -153,7 +189,7 @@ const SalesPage = () => {
     queryFn: () => exchangeRateService.getLatest(),
     staleTime: 5 * 60_000,
   });
-  const exchangeRates = ratesData?.data || [];
+  const exchangeRates: ExchangeRate[] = ratesData?.data || [];
   const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
 
   // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -163,61 +199,67 @@ const SalesPage = () => {
   };
 
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }) => saleService.cancelSale(id, reason),
-    onSuccess: (res) => {
+    mutationFn: (vars: { id: number; reason: string }) => saleService.cancelSale(vars.id, vars.reason),
+    onSuccess: (res: any) => {
       setCancelSaleId(null);
       setCancelReason('');
       invalidateSales();
-      const lines = res?.refund_lines || [];
-      const cashLines = lines.filter(l => l.payment_method === 'cash' && l.amount > 0);
+      const lines: RefundLine[] = res?.refund_lines || [];
+      const cashLines = lines.filter((l: RefundLine) => l.payment_method === 'cash' && l.amount > 0);
       if (cashLines.length > 0) {
         setRefundLines(cashLines);
       } else {
         toast.success('Venta cancelada exitosamente');
       }
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al cancelar la venta'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al cancelar la venta');
+    },
   });
 
   const paymentMutation = useMutation({
-    mutationFn: ({ saleId, ...payload }) => saleService.addPayment(saleId, payload),
+    mutationFn: (vars: { saleId: number; payment_lines: SalePayment[]; notes?: string }) => saleService.addPayment(vars.saleId, vars as unknown as SalePayment),
     onSuccess: () => {
       toast.success('Pago registrado exitosamente');
       setPaymentSale(null);
       invalidateSales();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al registrar el pago'),
+    onError: (err: unknown) => {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al registrar el pago');
+    },
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
-  const copFormat = (usdAmount, saleRate = null) => {
-    const val  = parseFloat(usdAmount || 0);
+  const copFormat = (usdAmount: number | string, saleRate: number | string | null = null) => {
+    const val  = parseFloat(String(usdAmount || 0));
     const rate = saleRate
-      ? parseFloat(saleRate)
+      ? parseFloat(String(saleRate))
       : (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1);
     return formatCOP(val * rate);
   };
 
-  const fmtSaleAmount = (usdAmount, row) => {
-    const val = parseFloat(usdAmount || 0);
+  const fmtSaleAmount = (usdAmount: number | string, row: SaleRow) => {
+    const val = parseFloat(String(usdAmount || 0));
     if (row.currency_mode === 'USD') return formatUSD(val);
-    const rate = parseFloat(row.exchange_rate || 1);
+    const rate = parseFloat(String(row.exchange_rate || 1));
     return formatCOP(val * rate);
   };
 
-  const getCustomerName = (customer) => {
+  const getCustomerName = (customer: Customer | null | undefined) => {
     if (!customer) return 'Cliente General';
-    const words2 = (s) => (s || '').trim().split(/\s+/).slice(0, 2).join(' ');
-    if (customer.type === 'juridical') return customer.business_name || customer.trade_name || 'Empresa Sin Nombre';
-    return `${words2(customer.first_name)} ${words2(customer.last_name)}`.trim()
-      || customer.business_name || 'Cliente Sin Nombre';
+    const words2 = (s: string | undefined) => (s || '').trim().split(/\s+/).slice(0, 2).join(' ');
+    if (customer.type === 'juridica') return (customer.businessName as string) || (customer.tradeName as string) || 'Empresa Sin Nombre';
+    return `${words2(customer.firstName)} ${words2(customer.lastName)}`.trim()
+      || (customer.businessName as string) || 'Cliente Sin Nombre';
   };
 
-  const renderTotal = (row) => {
-    const saleTotal  = parseFloat(row.total) || (parseFloat(row.subtotal) - parseFloat(row.discount_amount));
-    const cnCount    = parseInt(row.cn_count || 0);
-    const cnTotalCOP = parseFloat(row.cn_total_cop || 0);
-    const rate       = parseFloat(row.exchange_rate || 1);
+  const renderTotal = (row: SaleRow) => {
+    const saleTotal  = parseFloat(String(row.total)) || (parseFloat(String(row.subtotal || 0)) - parseFloat(String(row.discount_amount || 0)));
+    const cnCount    = parseInt(String(row.cn_count || 0));
+    const cnTotalCOP = parseFloat(String(row.cn_total_cop || 0));
+    const rate       = parseFloat(String(row.exchange_rate || 1));
     const netCOP     = Math.ceil(saleTotal * rate) - Math.ceil(cnTotalCOP);
 
     // pos_pending: show full total as pending
@@ -231,12 +273,12 @@ const SalesPage = () => {
     }
 
     if ((row.sale_type === 'credit' || row.sale_type === 'mixed') && row.status !== 'cancelled') {
-      const pending = saleTotal - parseFloat(row.paid_amount || 0);
+      const pending = saleTotal - parseFloat(String(row.paid_amount || 0));
       if (pending > 0.01) {
         return (
           <div>
             <span className="text-sm font-bold text-red-600">{fmtSaleAmount(pending, row)}</span>
-            {parseFloat(row.paid_amount || 0) > 0 && (
+            {parseFloat(String(row.paid_amount || 0)) > 0 && (
               <div className="text-[10px] text-gray-400">de {fmtSaleAmount(saleTotal, row)}</div>
             )}
             {cnCount > 0 && (
@@ -261,9 +303,9 @@ const SalesPage = () => {
   };
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
-  const handleSearchChange = (v) => { setSearch(v);            setCurrentPage(1); };
-  const handleStatusChange = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
-  const handleTypeChange   = (e) => { setSaleTypeFilter(e.target.value); setCurrentPage(1); };
+  const handleSearchChange = (v: string) => { setSearch(v);            setCurrentPage(1); };
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleTypeChange   = (e: React.ChangeEvent<HTMLSelectElement>) => { setSaleTypeFilter(e.target.value); setCurrentPage(1); };
   const handleClear = () => {
     setSearch(''); setStatusFilter(''); setSaleTypeFilter(''); setCurrentPage(1);
   };
@@ -272,9 +314,9 @@ const SalesPage = () => {
   const handleExportCSV = async () => {
     setExportingCSV(true);
     try {
-      const allSales = [];
+      const allSales: SaleRow[] = [];
       let page = 1, hasMore = true;
-      const params = {
+      const params: Record<string, unknown> = {
         search: search || undefined,
         status: statusFilter || undefined,
         sale_type: saleTypeFilter || undefined,
@@ -282,23 +324,23 @@ const SalesPage = () => {
         ...dateRange,
       };
       while (hasMore) {
-        const res = await saleService.getSales({ ...params, page, limit: 200 });
+        const res = await saleService.getSales({ ...params, page, limit: 200 } as any);
         allSales.push(...(res.data || []));
         const pag = res.pagination || {};
         hasMore = pag.page < pag.totalPages;
         page++;
       }
-      const getCustomerLabel = (c) => {
+      const getCustomerLabel = (c: Customer | null | undefined) => {
         if (!c) return 'Cliente General';
-        if (c.type === 'juridical') return c.business_name || c.trade_name || '';
-        return `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente General';
+        if (c.type === 'juridica') return (c.businessName as string) || (c.tradeName as string) || '';
+        return `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Cliente General';
       };
       downloadCSV(
         `ventas_${new Date().toISOString().split('T')[0]}`,
         ['Número', 'Fecha', 'Cliente', 'Tipo', 'Estado', 'Total USD', 'Tasa', 'Total COP'],
-        allSales.map(s => {
-          const t = parseFloat(s.total) || 0;
-          const r = parseFloat(s.exchange_rate) || 1;
+        allSales.map((s: SaleRow) => {
+          const t = parseFloat(String(s.total)) || 0;
+          const r = parseFloat(String(s.exchange_rate)) || 1;
           return [
             s.sale_number,
             s.sale_date ? formatDateShort(s.sale_date) : '',
@@ -319,7 +361,7 @@ const SalesPage = () => {
     }
   };
 
-  const handleViewDetail = async (saleId) => {
+  const handleViewDetail = async (saleId: number) => {
     try {
       const data = await saleService.getSaleById(saleId);
       setSelectedSale(data.data);
@@ -338,12 +380,12 @@ const SalesPage = () => {
     }
   }, []);
 
-  const handleCancelSale = (saleId) => {
+  const handleCancelSale = (saleId: number) => {
     setCancelSaleId(saleId);
     setCancelReason('');
   };
 
-  const handleOpenPaymentModal = async (sale) => {
+  const handleOpenPaymentModal = async (sale: SaleDetail) => {
     if (sale.sale_type === 'pos_pending') {
       // Open full CheckoutModal for initial collection
       setCheckoutPaymentLines([]);
@@ -354,8 +396,8 @@ const SalesPage = () => {
     // credit/mixed abonos — simple modal
     setPaymentSale(sale);
     setCustomerCreditBalance({ usd: 0, cop: 0 });
-    const pendingUSD = parseFloat(sale.total) - parseFloat(sale.paid_amount || 0);
-    const rate = parseFloat(sale.exchange_rate) || 1;
+    const pendingUSD = parseFloat(String(sale.total)) - parseFloat(String(sale.paid_amount || 0));
+    const rate = parseFloat(String(sale.exchange_rate)) || 1;
     let pendingCOP = Math.ceil(pendingUSD * rate);
     if (sale.customer_id) {
       try {
@@ -374,8 +416,9 @@ const SalesPage = () => {
       return toast.error('Agrega al menos una forma de pago');
     }
     const sale = paymentSale;
-    const rate = parseFloat(sale.exchange_rate) || copPerUSD;
-    const saleTotalCOP = parseFloat(sale.total) * rate;
+    if (!sale) return;
+    const rate = parseFloat(String(sale.exchange_rate)) || copPerUSD;
+    const saleTotalCOP = parseFloat(String(sale.total)) * rate;
 
     setCollectSaving(true);
     try {
@@ -387,7 +430,7 @@ const SalesPage = () => {
       await saleService.addPayment(sale.id, {
         payment_lines: backendLines,
         notes: checkoutNotes || undefined,
-      });
+      } as any);
 
       toast.success('Cobro registrado exitosamente');
       setPaymentSale(null);
@@ -403,14 +446,15 @@ const SalesPage = () => {
           exchangeRate: rate,
         });
       } catch (_) {}
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al registrar el cobro');
+    } catch (err: unknown) {
+      const error = err as any;
+      toast.error(error?.response?.data?.message || 'Error al registrar el cobro');
     } finally {
       setCollectSaving(false);
     }
   };
 
-  const handleOpenReturnModal = async (saleId) => {
+  const handleOpenReturnModal = async (saleId: number) => {
     try {
       const data = await saleService.getSaleById(saleId);
       setReturnSale(data.data);
@@ -420,31 +464,30 @@ const SalesPage = () => {
     }
   };
 
-  const handlePaymentSubmit = (e) => {
+  const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!paymentSale) return;
     if (!paymentData.amount_cop || parseFloat(paymentData.amount_cop) <= 0) {
       return toast.error('Debe ingresar un monto válido mayor a 0');
     }
-    const rate = paymentSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+    const rate = Number(paymentSale.exchange_rate) || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
     const cashAmount = parseFloat(paymentData.amount_cop);
-    const remainingCOP = Math.ceil((parseFloat(paymentSale.total) - parseFloat(paymentSale.paid_amount || 0)) * rate);
+    const remainingCOP = Math.ceil((parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))) * rate);
 
-    const payment_lines = [{
+    const payment_lines: SalePayment[] = [{
+      id: 0,
       amount: cashAmount,
       method: paymentData.method,
       currency: 'COP',
-      exchange_rate: rate,
-      reference: paymentData.reference,
     }];
     if (customerCreditBalance.cop > 0) {
       const creditToApply = Math.min(customerCreditBalance.cop, Math.max(0, remainingCOP - cashAmount));
       if (creditToApply > 0) {
         payment_lines.push({
+          id: 0,
           amount: creditToApply,
           method: 'credit_balance',
           currency: 'COP',
-          exchange_rate: rate,
-          reference: 'Saldo a Favor Aplicado',
         });
       }
     }
@@ -453,46 +496,46 @@ const SalesPage = () => {
 
   const handlePrintTicket = () => {
     if (selectedSale) {
-      printSaleTicket(selectedSale, companySettings, {
+      printSaleTicket(selectedSale as any, companySettings, {
         displayCurrency: 'COP',
-        exchangeRate: selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
+        exchangeRate: Number(selectedSale.exchange_rate) || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
       });
     }
   };
 
   const handlePrintTicketPortable = () => {
     if (selectedSale) {
-      printSaleTicketPortable(selectedSale, companySettings, {
+      printSaleTicketPortable(selectedSale as any, companySettings, {
         displayCurrency: 'COP',
-        exchangeRate: selectedSale.exchange_rate || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
+        exchangeRate: Number(selectedSale.exchange_rate) || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
       });
     }
   };
 
   // ─── Table columns ────────────────────────────────────────────────────────────
-  const columns = [
+  const columns: Column<SaleRow>[] = [
     {
       key: 'sale_number',
       header: 'Número',
       sortable: true,
       sortKey: 'sale_number',
-      render: (v) => <span className="text-sm font-medium text-gray-900">{v}</span>,
+      render: (v: unknown) => <span className="text-sm font-medium text-gray-900">{String(v ?? '')}</span>,
     },
     {
       key: 'sale_date',
       header: 'Fecha',
       sortable: true,
       sortKey: 'sale_date',
-      render: (v) => (
+      render: (v: unknown) => (
         <span className="text-sm text-gray-600">
-          {formatDate(v)}
+          {formatDate(String(v ?? ''))}
         </span>
       ),
     },
     {
       key: 'customer',
       header: 'Cliente',
-      render: (_, row) => (
+      render: (_v: unknown, row: SaleRow) => (
         <span className="text-sm text-gray-900 font-medium block truncate max-w-[200px]" title={getCustomerName(row.customer)}>
           {getCustomerName(row.customer)}
         </span>
@@ -501,26 +544,26 @@ const SalesPage = () => {
     {
       key: 'sale_type',
       header: 'Tipo',
-      render: (v) => <Badge variant={SALE_TYPE_VARIANT[v] || 'neutral'}>{SALE_TYPE_LABEL[v] || v}</Badge>,
+      render: (v: unknown) => <Badge variant={SALE_TYPE_VARIANT[String(v)] || 'neutral'}>{SALE_TYPE_LABEL[String(v)] || String(v)}</Badge>,
     },
     {
       key: 'total',
       header: 'Total / Pendiente',
       sortable: true,
       sortKey: 'total',
-      render: (_, row) => renderTotal(row),
+      render: (_v: unknown, row: SaleRow) => renderTotal(row),
     },
     {
       key: 'status',
       header: 'Estado',
       sortable: true,
       sortKey: 'status',
-      render: (_, row) => (
+      render: (_v: unknown, row: SaleRow) => (
         <StatusBadge
           status={row.status}
-          cnCount={row.cn_count}
-          saleTotal={parseFloat(row.total || 0) * parseFloat(row.exchange_rate || 1)}
-          cnTotalCOP={row.cn_total_cop}
+          cnCount={row.cn_count || 0}
+          saleTotal={parseFloat(String(row.total || 0)) * parseFloat(String(row.exchange_rate || 1))}
+          cnTotalCOP={row.cn_total_cop || 0}
         />
       ),
     },
@@ -528,16 +571,16 @@ const SalesPage = () => {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_v: unknown, row: SaleRow) => (
         <div className="flex items-center gap-1">
           <ViewAction onClick={() => handleViewDetail(row.id)} />
           {(row.sale_type === 'credit' || row.sale_type === 'mixed' || row.sale_type === 'pos_pending') && row.status === 'pending' && (
-            <PaymentAction onClick={() => handleOpenPaymentModal(row)} title={row.sale_type === 'pos_pending' ? 'Cobrar' : 'Abonar Pago'} />
+            <PaymentAction onClick={() => handleOpenPaymentModal(row as unknown as SaleDetail)} title={row.sale_type === 'pos_pending' ? 'Cobrar' : 'Abonar Pago'} />
           )}
           {row.status === 'completed' && hasPermission('credit_notes.create') && (
             <ReturnAction onClick={() => handleOpenReturnModal(row.id)} />
           )}
-          {row.status !== 'cancelled' && row.status !== 'returned' && hasPermission('sales.delete') && (
+          {row.status !== 'cancelled' && row.status !== 'returned' && hasPermission('sales.cancel') && (
             <CancelAction onClick={() => handleCancelSale(row.id)} title="Cancelar venta" />
           )}
         </div>
@@ -618,7 +661,7 @@ const SalesPage = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Contado {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {stats.salesByType?.find(s => s.sale_type === 'cash')?.count || 0}
+                  {stats.salesByType?.find((s: any) => s.sale_type === 'cash')?.count || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -631,7 +674,7 @@ const SalesPage = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Crédito {statsPeriodLabel}</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {stats.salesByType?.find(s => s.sale_type === 'credit')?.count || 0}
+                  {stats.salesByType?.find((s: any) => s.sale_type === 'credit')?.count || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -695,7 +738,7 @@ const SalesPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -703,11 +746,11 @@ const SalesPage = () => {
       <SaleViewSheet
         open={showDetailModal}
         onClose={() => setShowDetailModal(false)}
-        sale={selectedSale}
+        sale={selectedSale as any}
         onPrint={handlePrintTicket}
         onPrintPortable={handlePrintTicketPortable}
-        exchangeRates={exchangeRates}
-        calculateEffectiveRate={calculateEffectiveRate}
+        exchangeRates={exchangeRates as any}
+        calculateEffectiveRate={calculateEffectiveRate as any}
       />
 
       {/* ── CheckoutModal for pos_pending collection ──────────────────────── */}
@@ -715,21 +758,21 @@ const SalesPage = () => {
         <CheckoutModal
           show={!!paymentSale}
           onClose={() => !collectSaving && setPaymentSale(null)}
-          subtotal={parseFloat(paymentSale.subtotal || paymentSale.total)}
-          discount={parseFloat(paymentSale.discount_amount || 0)}
-          tax={parseFloat(paymentSale.tax_amount || 0)}
-          total={parseFloat(paymentSale.total)}
-          totalCOP={parseFloat(paymentSale.total) * (parseFloat(paymentSale.exchange_rate) || copPerUSD)}
+          subtotal={parseFloat(String(paymentSale.subtotal || paymentSale.total))}
+          discount={parseFloat(String(paymentSale.discount_amount || 0))}
+          tax={parseFloat(String(paymentSale.tax_amount || 0))}
+          total={parseFloat(String(paymentSale.total))}
+          totalCOP={parseFloat(String(paymentSale.total)) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD)}
           copPerUSD={copPerUSD}
           paymentLines={checkoutPaymentLines}
-          setPaymentLines={setCheckoutPaymentLines}
+          setPaymentLines={setCheckoutPaymentLines as React.Dispatch<React.SetStateAction<PaymentLine[]>>}
           customer={paymentSale.customer ? {
             id: paymentSale.customer.id,
             type: paymentSale.customer.type,
-            firstName: paymentSale.customer.first_name,
-            lastName: paymentSale.customer.last_name,
-            businessName: paymentSale.customer.business_name,
-            tradeName: paymentSale.customer.trade_name,
+            firstName: paymentSale.customer.firstName,
+            lastName: paymentSale.customer.lastName,
+            businessName: paymentSale.customer.businessName,
+            tradeName: paymentSale.customer.tradeName,
           } : null}
           onCustomerSelect={null}
           saleType="cash"
@@ -760,13 +803,13 @@ const SalesPage = () => {
               <div>
                 <p className="text-xs text-emerald-800 font-semibold">Saldo Pendiente (Aprox)</p>
                 <p className="text-lg font-bold text-emerald-900">
-                  {copFormat(parseFloat(paymentSale.total) - parseFloat(paymentSale.paid_amount || 0), paymentSale.exchange_rate)}
+                  {copFormat(parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0)), paymentSale.exchange_rate)}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-emerald-800 font-semibold">Cliente</p>
                 <p className="text-sm font-medium text-emerald-900 truncate max-w-[150px]">
-                  {paymentSale.customer?.name || 'Cliente'}
+                  {paymentSale.customer?.firstName || 'Cliente'}
                 </p>
               </div>
             </div>
@@ -868,7 +911,7 @@ const SalesPage = () => {
             </Button>
             <Button
               variant="danger-outline"
-              onClick={() => cancelMutation.mutate({ id: cancelSaleId, reason: cancelReason.trim() })}
+              onClick={() => cancelMutation.mutate({ id: cancelSaleId!, reason: cancelReason.trim() })}
               loading={cancelMutation.isPending}
               disabled={!cancelReason.trim()}
             >
@@ -890,7 +933,7 @@ const SalesPage = () => {
             La venta fue cancelada. Devuelva el efectivo recibido al cliente.
           </Alert>
           <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden">
-            {(refundLines || []).map((line, i) => (
+            {(refundLines || []).map((line: RefundLine, i: number) => (
               <div key={i} className="flex justify-between items-center px-4 py-3 bg-white">
                 <span className="text-sm text-gray-600">
                   {line.currency === 'COP' ? 'Efectivo COP' :
@@ -915,7 +958,7 @@ const SalesPage = () => {
       <SaleReturnModal
         isOpen={showReturnModal}
         onClose={() => setShowReturnModal(false)}
-        sale={returnSale}
+        sale={returnSale as any}
         onReturnSuccess={() => {
           setShowReturnModal(false);
           invalidateSales();

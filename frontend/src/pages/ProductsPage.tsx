@@ -18,6 +18,55 @@ import { exchangeRateService } from '../services/api/exchangeRateService';
 import ProductTable from '../components/products/ProductTable';
 import ProductForm from '../components/products/ProductForm';
 import ProductViewSheet from '../components/products/ProductViewSheet';
+import type { Product, Category, Brand, ExchangeRate, ProductPresentation } from '../types';
+
+interface PresentationFormData {
+  id?: number;
+  isNew?: boolean;
+  name: string;
+  packaging_type_id?: string | number | null;
+  presentation_type_id?: string | number | null;
+  units_per_package: number;
+  package_price?: number;
+  package_cost?: number;
+  purchase_currency?: string;
+  is_default?: boolean;
+  is_active?: boolean;
+  cost?: number;
+}
+
+interface ExtendedProduct extends Product {
+  unit_size?: string | number;
+  unit_size_measure?: string;
+  is_perishable?: boolean;
+  has_batch_control?: boolean;
+  min_stock?: number;
+  max_stock?: number;
+  reorder_point?: number;
+  image_url?: string;
+  presentations?: (ProductPresentation & PresentationFormData)[];
+}
+
+interface PackagingType {
+  id: number;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface PresentationType {
+  id: number;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface StockAndValue {
+  bultos: number;
+  unidades: number;
+  totalValueCOP: number;
+  unitsPerPackage: number;
+}
+
+type ProductDetail = ExtendedProduct;
 
 const EMPTY_FORM = {
   name: '',
@@ -49,26 +98,32 @@ const ProductsPage = () => {
 
   // Modal / sheet state
   const [showModal, setShowModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
   const [showViewSheet, setShowViewSheet] = useState(false);
-  const [viewingProduct, setViewingProduct] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [viewingProduct, setViewingProduct] = useState<ProductDetail | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState(EMPTY_FORM);
-  const [presentations, setPresentations] = useState([]);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [formData, setFormData] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
+  const [presentations, setPresentations] = useState<PresentationFormData[]>([]);
+  const [imagePreview, setImagePreview] = useState<string | File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Barcode scanner state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [scannerError, setScannerError] = useState(null);
-  const [barcodeError, setBarcodeError] = useState(null);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
 
-  const { data: productsData = {}, isLoading: loading } = useQuery({
+  interface ProductsQueryData {
+    products: Product[];
+    totalPages: number;
+    total: number;
+  }
+
+  const { data: productsData = {} as ProductsQueryData, isLoading: loading } = useQuery<ProductsQueryData>({
     queryKey: ['products', currentPage, debouncedSearch, categoryFilter, limit],
     queryFn: async () => {
       const data = await productService.getAll({
@@ -85,11 +140,11 @@ const ProductsPage = () => {
     },
   });
 
-  const products = productsData.products || [];
-  const totalPages = productsData.totalPages || 1;
-  const totalCount = productsData.total || 0;
+  const products = productsData?.products || [];
+  const totalPages = productsData?.totalPages || 1;
+  const totalCount = productsData?.total || 0;
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
       const data = await categoryService.getAll();
@@ -98,7 +153,7 @@ const ProductsPage = () => {
     staleTime: Infinity,
   });
 
-  const { data: brands = [] } = useQuery({
+  const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: ['brands'],
     queryFn: async () => {
       const data = await brandService.getActive();
@@ -107,30 +162,30 @@ const ProductsPage = () => {
     staleTime: Infinity,
   });
 
-  const { data: packagingTypes = [] } = useQuery({
+  const { data: packagingTypes = [] } = useQuery<PackagingType[]>({
     queryKey: ['packaging-types'],
     queryFn: async () => {
       const data = await packagingTypeService.getActive();
-      return data.data || [];
+      return (data.data || []) as unknown as PackagingType[];
     },
     staleTime: Infinity,
   });
 
-  const { data: presentationTypes = [] } = useQuery({
+  const { data: presentationTypes = [] } = useQuery<PresentationType[]>({
     queryKey: ['presentation-types'],
     queryFn: async () => {
       const data = await presentationTypeService.getActive();
-      return data.data || [];
+      return (data.data || []) as unknown as PresentationType[];
     },
     staleTime: Infinity,
   });
 
-  const { data: ratesData } = useQuery({
+  const { data: ratesData } = useQuery<{ data: ExchangeRate[] } | undefined>({
     queryKey: ['exchange-rates'],
     queryFn: () => exchangeRateService.getLatest(),
     staleTime: Infinity,
   });
-  const exchangeRates = ratesData?.data || [];
+  const exchangeRates: ExchangeRate[] = ratesData?.data || [];
 
   // ─── Effects ─────────────────────────────────────────────────────────────────
 
@@ -158,36 +213,36 @@ const ProductsPage = () => {
 
   // ─── Business logic ───────────────────────────────────────────────────────────
 
-  const getEffectiveRate = (from, to) => {
+  const getEffectiveRate = (from: string, to: string): number => {
     if (!Array.isArray(exchangeRates) || exchangeRates.length === 0 || from === to) return 1;
     const direct = exchangeRates.find((r) => r.from_currency === from && r.to_currency === to);
-    if (direct) return parseFloat(direct.rate);
+    if (direct) return parseFloat(String(direct.rate));
     const inverse = exchangeRates.find((r) => r.from_currency === to && r.to_currency === from);
-    if (inverse) return 1 / parseFloat(inverse.rate);
+    if (inverse) return 1 / parseFloat(String(inverse.rate));
     const bridge = 'VES';
     if (from !== bridge && to !== bridge) {
-      const r1 = getEffectiveRate(from, bridge);
-      const r2 = getEffectiveRate(bridge, to);
+      const r1: number = getEffectiveRate(from, bridge);
+      const r2: number = getEffectiveRate(bridge, to);
       if (r1 !== 1 && r2 !== 1) return r1 * r2;
     }
     return 1;
   };
 
-  const calculateStockAndValue = (product) => {
+  const calculateStockAndValue = (product: ExtendedProduct): StockAndValue => {
     const totalUnits = (product.inventories || []).reduce(
-      (sum, inv) => sum + parseFloat(inv.quantity || 0),
+      (sum: number, inv: Record<string, unknown>) => sum + parseFloat(String(inv.quantity || 0)),
       0
     );
-    const pkgPresentation =
-      (product.presentations || []).find((p) => p.is_active && p.units_per_package > 1) ||
-      (product.presentations || []).find((p) => p.is_active) ||
-      { units_per_package: 1, cost: 0, purchase_currency: 'USD' };
+    const pkgPresentation: PresentationFormData =
+      ((product.presentations || []) as (ProductPresentation & PresentationFormData)[]).find((p: PresentationFormData) => p.is_active && p.units_per_package > 1) ||
+      ((product.presentations || []) as (ProductPresentation & PresentationFormData)[]).find((p: PresentationFormData) => p.is_active) ||
+      { units_per_package: 1, cost: 0, purchase_currency: 'USD' } as PresentationFormData;
 
     const unitsPerPackage = pkgPresentation.units_per_package || 1;
     const bultos = Math.floor(totalUnits / unitsPerPackage);
     const unidades = Math.round((totalUnits % unitsPerPackage) * 100) / 100;
 
-    const costPerUnitOriginal = parseFloat(pkgPresentation.cost || 0);
+    const costPerUnitOriginal = parseFloat(String(pkgPresentation.cost || 0));
     const originalCurrency = pkgPresentation.purchase_currency || 'USD';
     const costPerUnitCOP =
       originalCurrency !== 'COP'
@@ -199,13 +254,14 @@ const ProductsPage = () => {
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const target = e.target as HTMLInputElement;
+    const { name, value, type, checked } = target;
     if (name === 'barcode' && barcodeError) setBarcodeError(null);
     setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleBarcodeDetected = async (barcode) => {
+  const handleBarcodeDetected = async (barcode: string) => {
     if (!barcode) return;
     try {
       const data = await productService.searchByBarcode(barcode);
@@ -227,7 +283,7 @@ const ProductsPage = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
@@ -254,7 +310,7 @@ const ProductsPage = () => {
       // Validate presentations
       if (presentations.length > 0) {
         const invalidQty = presentations.find(
-          (p) => !p.units_per_package || p.units_per_package <= 0
+          (p: PresentationFormData) => !p.units_per_package || p.units_per_package <= 0
         );
         if (invalidQty) {
           setError(
@@ -263,7 +319,7 @@ const ProductsPage = () => {
           setSubmitting(false);
           return;
         }
-        const missingType = presentations.find((p) => !p.presentation_type_id);
+        const missingType = presentations.find((p: PresentationFormData) => !p.presentation_type_id);
         if (missingType) {
           setError(
             `La presentación "${missingType.name || 'sin nombre'}" debe tener un tipo de unidad seleccionado`
@@ -298,8 +354,9 @@ const ProductsPage = () => {
 
       const submitData = new FormData();
       Object.keys(formData).forEach((key) => {
-        if (key === 'description' || (formData[key] !== null && formData[key] !== '')) {
-          submitData.append(key, formData[key]);
+        const formKey = key as keyof typeof formData;
+        if (key === 'description' || (formData[formKey] !== null && formData[formKey] !== '')) {
+          submitData.append(key, String(formData[formKey]));
         }
       });
       if (!editingProduct) {
@@ -322,19 +379,20 @@ const ProductsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       handleCloseModal();
       toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado');
-    } catch (err) {
-      setError(err.message || 'Error al guardar el producto');
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string };
+      setError(errorObj?.message || 'Error al guardar el producto');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const savePresentations = async (productId) => {
-    const existingIds = (editingProduct?.presentations || []).map((p) => p.id);
-    const currentIds = presentations.filter((p) => p.id).map((p) => p.id);
+  const savePresentations = async (productId: number) => {
+    const existingIds = (editingProduct?.presentations || []).map((p: PresentationFormData) => p.id).filter((id): id is number => typeof id === 'number');
+    const currentIds = presentations.filter((p: PresentationFormData) => p.id).map((p: PresentationFormData) => p.id).filter((id): id is number => typeof id === 'number');
 
     // Delete removed presentations
-    for (const id of existingIds.filter((id) => !currentIds.includes(id))) {
+    for (const id of existingIds.filter((id: number) => !currentIds.includes(id))) {
       await presentationService.delete(id);
     }
 
@@ -360,30 +418,31 @@ const ProductsPage = () => {
     }
   };
 
-  const handleView = (product) => {
+  const handleView = (product: ExtendedProduct) => {
     setViewingProduct(product);
     setShowViewSheet(true);
   };
 
-  const handleEdit = (product) => {
-    setEditingProduct(product);
+  const handleEdit = (product: ExtendedProduct) => {
+    const extProduct = product;
+    setEditingProduct(extProduct);
     setFormData({
-      name: product.name || '',
-      description: product.description || '',
-      category_id: product.category_id || '',
-      barcode: product.barcodes?.[0]?.barcode || '',
-      brand_id: product.brand_id ? String(product.brand_id) : '',
-      unit_size: product.unit_size || '',
-      unit_size_measure: product.unit_size_measure || 'UND',
-      is_perishable: product.is_perishable || false,
-      has_batch_control: product.has_batch_control || false,
-      min_stock: parseInt(product.min_stock) || 0,
-      max_stock: parseInt(product.max_stock) || 0,
-      reorder_point: parseInt(product.reorder_point) || 0,
-      is_active: product.is_active !== undefined ? product.is_active : true,
+      name: extProduct.name || '',
+      description: extProduct.description || '',
+      category_id: String(extProduct.category_id || ''),
+      barcode: extProduct.barcodes?.[0]?.barcode || '',
+      brand_id: extProduct.brand_id ? String(extProduct.brand_id) : '',
+      unit_size: String(extProduct.unit_size || ''),
+      unit_size_measure: extProduct.unit_size_measure || 'UND',
+      is_perishable: extProduct.is_perishable || false,
+      has_batch_control: extProduct.has_batch_control || false,
+      min_stock: parseInt(String(extProduct.min_stock)) || 0,
+      max_stock: parseInt(String(extProduct.max_stock)) || 0,
+      reorder_point: parseInt(String(extProduct.reorder_point)) || 0,
+      is_active: extProduct.is_active !== undefined ? extProduct.is_active : true,
     });
-    setPresentations(product.presentations || []);
-    if (product.image_url) setImagePreview(product.image_url);
+    setPresentations((extProduct.presentations || []) as unknown as PresentationFormData[]);
+    if (extProduct.image_url) setImagePreview(extProduct.image_url);
     setShowModal(true);
   };
 
@@ -405,14 +464,19 @@ const ProductsPage = () => {
       toast.success('Producto eliminado');
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
-    onError: (err: any) => toast.error(err.response?.data?.message || err.message || 'Error al eliminar producto'),
+    onError: (err: unknown) => {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error(errorObj?.response?.data?.message || errorObj?.message || 'Error al eliminar producto');
+    },
   });
 
-  const handleDelete = (id) => setDeleteTarget(id);
+  const handleDelete = (id: number) => setDeleteTarget(id);
 
   const confirmDelete = () => {
-    deleteMutation.mutate(deleteTarget);
-    setDeleteTarget(null);
+    if (deleteTarget !== null) {
+      deleteMutation.mutate(deleteTarget);
+      setDeleteTarget(null);
+    }
   };
 
   const handleDownloadCSV = async () => {
@@ -427,13 +491,14 @@ const ProductsPage = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success('Lista de productos exportada');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'No se pudo descargar la lista de productos');
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error(errorObj?.response?.data?.message || errorObj?.message || 'No se pudo descargar la lista de productos');
     }
   };
 
   const activeCategoryName = categories.find(
-    (c) => String(c.id) === String(categoryFilter)
+    (c: Category) => String(c.id) === String(categoryFilter)
   )?.name;
 
   // ─── JSX ─────────────────────────────────────────────────────────────────────
@@ -471,16 +536,16 @@ const ProductsPage = () => {
             <SearchInput
               placeholder="Nombre, SKU o código de barras..."
               value={search}
-              onChange={(v) => { setSearch(v); setCurrentPage(1); }}
+              onChange={(v: string) => { setSearch(v); setCurrentPage(1); }}
             />
           </div>
           <div className="w-52">
             <Select
               value={categoryFilter}
-              onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
             >
               <option value="">Todas las categorías</option>
-              {categories.map((cat) => (
+              {categories.map((cat: Category) => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </Select>
@@ -510,19 +575,19 @@ const ProductsPage = () => {
 
       {/* Products Table */}
       <ProductTable
-        products={products}
+        products={products as any}
         loading={loading}
-        calculateStockAndValue={calculateStockAndValue}
+        calculateStockAndValue={calculateStockAndValue as any}
         hasPermission={hasPermission}
-        onView={handleView}
-        onEdit={handleEdit}
+        onView={handleView as any}
+        onEdit={handleEdit as any}
         onDelete={handleDelete}
         currentPage={currentPage}
         totalPages={totalPages}
         total={totalCount}
         limit={limit}
         onPageChange={setCurrentPage}
-        onLimitChange={(newLimit) => { setLimit(newLimit); setCurrentPage(1); }}
+        onLimitChange={(newLimit: number) => { setLimit(newLimit); setCurrentPage(1); }}
       />
 
       {/* Create / Edit Modal */}
@@ -551,9 +616,9 @@ const ProductsPage = () => {
           <ProductForm
             formData={formData}
             onChange={handleChange}
-            presentations={presentations}
-            onPresentationsChange={setPresentations}
-            imagePreview={imagePreview}
+            presentations={presentations as any}
+            onPresentationsChange={setPresentations as any}
+            imagePreview={imagePreview as string | null}
             onImageChange={setImagePreview}
             showBarcodeScanner={showBarcodeScanner}
             onToggleBarcodeScanner={setShowBarcodeScanner}
@@ -565,7 +630,6 @@ const ProductsPage = () => {
             brands={brands}
             packagingTypes={packagingTypes}
             presentationTypes={presentationTypes}
-            editingProduct={editingProduct}
             error={error}
           />
         </form>
@@ -575,11 +639,11 @@ const ProductsPage = () => {
       <ProductViewSheet
         open={showViewSheet}
         onClose={() => setShowViewSheet(false)}
-        product={viewingProduct}
+        product={viewingProduct as any}
         hasPermission={hasPermission}
         onEdit={() => {
           setShowViewSheet(false);
-          handleEdit(viewingProduct);
+          if (viewingProduct) handleEdit(viewingProduct);
         }}
       />
 

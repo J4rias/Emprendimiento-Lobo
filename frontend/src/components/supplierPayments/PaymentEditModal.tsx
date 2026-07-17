@@ -137,7 +137,7 @@ export function PaymentEditModal({ payment, open, onClose, onSubmit, isPending }
         </div>
 
         {/* Distribución read-only */}
-        {payment?.allocations?.length > 0 && (
+        {payment?.allocations && payment.allocations.length > 0 && (
           <div className="border-t border-gray-200 pt-4">
             <p className="text-sm font-semibold text-gray-700 mb-2">Distribución del pago</p>
             <div className="space-y-2">
@@ -155,7 +155,7 @@ export function PaymentEditModal({ payment, open, onClose, onSubmit, isPending }
                     )}
                   </div>
                   <span className="font-semibold text-gray-800">
-                    {formatMoney(alloc.allocated_amount, payment.currency, 2)}
+                    {formatMoney(alloc.allocated_amount, payment!.currency, 2)}
                   </span>
                 </div>
               ))}

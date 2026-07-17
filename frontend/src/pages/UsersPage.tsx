@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api/userService';
 import {
   Alert, Badge, Button, Card, ConfirmDialog, Input, Modal, SearchInput, Select, Table,
-  EditAction, ToggleLockAction,
+  EditAction, ToggleLockAction, type Column,
 } from '../components/ui';
 import { formatDateShort } from '../utils/formatUtils';
 
@@ -153,10 +153,10 @@ const UsersPage = () => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
   // ─── Table columns ───────────────────────────────────────────────────────────
-  const columns = [
-    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v: string) => v },
+  const columns: Column<UserRow>[] = [
+    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v: unknown) => String(v) },
     { key: 'name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_: unknown, r: UserRow) => `${r.first_name} ${r.last_name}` },
-    { key: 'email',     header: 'Email',    render: (v: string) => v },
+    { key: 'email',     header: 'Email',    render: (v: unknown) => String(v) },
     { key: 'phone',     header: 'Teléfono', render: (_: unknown, r: UserRow) => r.phone || '—' },
     { key: 'role',      header: 'Rol',      render: (_: unknown, r: UserRow) => r.role?.name || '—' },
     {

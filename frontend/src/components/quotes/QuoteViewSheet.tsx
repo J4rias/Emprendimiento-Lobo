@@ -33,7 +33,8 @@ interface QuoteDetail {
   total: string | number;
 }
 
-interface QuoteData {
+export interface QuoteData {
+  id: number;
   code: string;
   customer?: Record<string, unknown> | null;
   quote_date?: string;

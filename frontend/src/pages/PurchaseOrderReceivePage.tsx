@@ -11,7 +11,47 @@ import {
 } from '@phosphor-icons/react';
 import { Alert, Button, Card, Input, Modal, Spinner, Textarea } from '../components/ui';
 
-const ORDER_STATUS_LABEL = {
+interface ReceivedItem {
+  detail_id: number;
+  product_name: string;
+  presentation_name: string;
+  units_per_package: number;
+  ordered_packages: number;
+  ordered_units: number;
+  received_packages: number;
+  received_units: number;
+  pending_packages: number;
+  pending_units: number;
+  receiving_packages: number;
+  receiving_units: number;
+  batch_number: string;
+  manufacture_date: string;
+  expiry_date: string;
+}
+
+interface OrderDetail {
+  id: number;
+  product: { name: string };
+  presentation: { name: string; units_per_package: number };
+  package_quantity: number;
+  loose_units: number;
+  received_package_quantity: number;
+  received_loose_units: number;
+}
+
+interface PurchaseOrder {
+  status: string;
+  last_invoice_number?: string;
+  details: OrderDetail[];
+  order_number: string;
+  supplier: { name: string };
+  warehouse: { name: string };
+  order_date: string;
+  total: number;
+  currency: string;
+}
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
   sent: 'Enviada',
   confirmed: 'Confirmada',
   partially_received: 'Parcialmente Recibida',
@@ -22,10 +62,10 @@ const PurchaseOrderReceivePage = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
 
-  const [validationError, setValidationError] = useState(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
-  const [receivedItems, setReceivedItems] = useState([]);
+  const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFullyReceived, setIsFullyReceived] = useState(false);
   const initialized = useRef(false);
@@ -33,7 +73,7 @@ const PurchaseOrderReceivePage = () => {
   // --- Query ---
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['purchaseOrder', id],
-    queryFn: () => purchaseOrderService.getById(id).then(r => r.data),
+    queryFn: () => purchaseOrderService.getById(Number(id)).then((r: { data: PurchaseOrder }) => r.data),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
@@ -47,7 +87,7 @@ const PurchaseOrderReceivePage = () => {
     }
     initialized.current = true;
     setInvoiceNumber(order.last_invoice_number || '');
-    setReceivedItems(order.details.map(d => ({
+    setReceivedItems(order.details.map((d: OrderDetail) => ({
       detail_id: d.id,
       product_name: d.product.name,
       presentation_name: d.presentation.name,
@@ -68,18 +108,21 @@ const PurchaseOrderReceivePage = () => {
 
   // --- Mutation ---
   const receiveMutation = useMutation({
-    mutationFn: (data) => purchaseOrderService.receive(id, data),
+    mutationFn: (data: Record<string, unknown>) => purchaseOrderService.receive(Number(id), data),
     onSuccess: () => {
       toast.success('Mercancía recibida correctamente');
       queryClient.invalidateQueries({ queryKey: ['supplier-resumen'] });
       navigate('/purchase-orders');
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al recibir la mercancía'),
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err?.response?.data?.message || 'Error al recibir la mercancía');
+    },
   });
 
   // --- Handlers ---
-  const updateReceivingItem = (index, field, value) => {
-    setReceivedItems(prev => prev.map((item, i) => {
+  const updateReceivingItem = (index: number, field: 'receiving_packages' | 'receiving_units', value: string) => {
+    setReceivedItems(prev => prev.map((item: ReceivedItem, i: number) => {
       if (i !== index) return item;
       let val = parseInt(value) || 0;
       if (val < 0) val = 0;
@@ -91,7 +134,7 @@ const PurchaseOrderReceivePage = () => {
   };
 
   const handleReceiveAll = () => {
-    setReceivedItems(prev => prev.map(item => ({
+    setReceivedItems(prev => prev.map((item: ReceivedItem) => ({
       ...item,
       receiving_packages: item.pending_packages,
       receiving_units: item.pending_units,
@@ -99,7 +142,7 @@ const PurchaseOrderReceivePage = () => {
   };
 
   const handleReceive = () => {
-    const hasItems = receivedItems.some(item => item.receiving_packages > 0 || item.receiving_units > 0);
+    const hasItems = receivedItems.some((item: ReceivedItem) => item.receiving_packages > 0 || item.receiving_units > 0);
     if (!hasItems) {
       setValidationError('Debe especificar al menos un producto a recibir con cantidad mayor a cero');
       return;
@@ -110,7 +153,7 @@ const PurchaseOrderReceivePage = () => {
     }
     setValidationError(null);
     const remainsPending = receivedItems.some(
-      item => (item.pending_packages - item.receiving_packages) > 0 ||
+      (item: ReceivedItem) => (item.pending_packages - item.receiving_packages) > 0 ||
                (item.pending_units - item.receiving_units) > 0
     );
     setIsFullyReceived(!remainsPending);
@@ -121,8 +164,8 @@ const PurchaseOrderReceivePage = () => {
     setShowConfirmModal(false);
     receiveMutation.mutate({
       received_items: receivedItems
-        .filter(item => item.receiving_packages > 0 || item.receiving_units > 0)
-        .map(item => ({
+        .filter((item: ReceivedItem) => item.receiving_packages > 0 || item.receiving_units > 0)
+        .map((item: ReceivedItem) => ({
           detail_id: item.detail_id,
           package_quantity: item.receiving_packages,
           loose_units: item.receiving_units,
@@ -136,7 +179,7 @@ const PurchaseOrderReceivePage = () => {
   };
 
   const calculateTotalReceiving = () =>
-    receivedItems.reduce((total, item) =>
+    receivedItems.reduce((total: number, item: ReceivedItem) =>
       total + (item.receiving_packages * item.units_per_package) + item.receiving_units, 0);
 
   // --- Render states ---

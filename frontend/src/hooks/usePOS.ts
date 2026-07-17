@@ -725,12 +725,12 @@ export function usePOS() {
         : { adjustedLines: paymentLines, changeCOP: 0, changeAmount: '0.00' } as { adjustedLines: PaymentLine[]; changeCOP: number; changeAmount: string };
 
       const result = await saleService.createSale({
-        customer_id: customer?.id ?? null,
+        customer_id: customer?.id ?? undefined,
         warehouse_id: 1,
         sale_type: saleType as Sale['sale_type'],
         currency_mode: displayCurrency === 'USD' ? 'USD' : 'COP',
         session_id: sessionId,
-        tab_id: activeTabId,
+        tab_id: activeTabId!,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
         payment_lines: convertPaymentLinesToBackend(adjustedLines, exchangeRates),
         authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
@@ -750,8 +750,8 @@ export function usePOS() {
       setShowCheckoutModal(false);
       setShowResultModal(true);
 
-      closeTab(activeTabId);
-      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
+      closeTab(activeTabId!);
+      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId! });
 
       setPaymentLines([]);
       setNotes('');
@@ -780,7 +780,7 @@ export function usePOS() {
     if (saleType === 'credit') {
       const creditCOP = paymentLines
         .filter(l => l.method === 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       if (creditCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
           ? formatUSD((totalCOP - creditCOP) / copPerUSD)
@@ -793,10 +793,10 @@ export function usePOS() {
     if (saleType === 'cash' || saleType === 'mixed') {
       const cashPaidCOP = paymentLines
         .filter(l => l.method !== 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       const creditCOP = paymentLines
         .filter(l => l.method === 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(l.cop_rate) || 1)), 0);
+        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       const expectedCashCOP = totalCOP - creditCOP;
       if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
@@ -821,7 +821,7 @@ export function usePOS() {
     }
 
     // Admin or cash sale — proceed directly
-    await performSale(isAdmin ? user.id : null);
+    await performSale(isAdmin ? user!.id : null);
   };
 
   const handleCreditPinValidated = async (adminId: number) => {
@@ -838,7 +838,7 @@ export function usePOS() {
     setSaving(true);
     try {
       const result = await saleService.createSale({
-        customer_id: customer?.id || null,
+        customer_id: customer?.id || undefined,
         warehouse_id: 1,
         sale_type: 'pos_pending',
         currency_mode: displayCurrency === 'USD' ? 'USD' : 'COP',
@@ -861,8 +861,8 @@ export function usePOS() {
       setSaleResult({ ...result.data, totals: { subtotal, discount, tax, total }, sentToCashier: true });
       setShowResultModal(true);
 
-      closeTab(activeTabId);
-      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId });
+      closeTab(activeTabId!);
+      await posReservationService.releaseTab({ session_id: sessionId, tab_id: activeTabId! });
 
       setNotes('');
       toast.dismiss();

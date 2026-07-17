@@ -8,7 +8,7 @@ import CustomerQuickAdd from './CustomerQuickAdd';
 
 interface Customer {
   id: number;
-  type: 'natural' | 'juridical';
+  type: string;
   firstName?: string;
   lastName?: string;
   businessName?: string;

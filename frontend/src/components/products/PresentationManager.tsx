@@ -15,6 +15,7 @@ export interface Presentation {
   is_default: boolean;
   is_active: boolean;
   isNew?: boolean;
+  [key: string]: unknown;
 }
 
 interface PackagingType {
@@ -50,11 +51,11 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
   const generatePresentationName = (unitsPerPackage: number | string | undefined, packagingTypeId: number | string | null | undefined): string => {
     if (!productUnitSize || !unitsPerPackage) return '';
 
-    const packagingType = packagingTypes.find(t => t.id === parseInt(packagingTypeId));
+    const packagingType = packagingTypes.find(t => t.id === parseInt(String(packagingTypeId)));
     const packagingAbbr = packagingType ? packagingType.name.substring(0, 3).toUpperCase() : 'EMP';
 
     // Format unit size: show one decimal only if it's not a whole number
-    const unitSize = parseFloat(productUnitSize);
+    const unitSize = parseFloat(String(productUnitSize));
     const formattedUnitSize = unitSize % 1 === 0 ? unitSize.toString() : unitSize.toFixed(1);
 
     return `${formattedUnitSize} ${productUnitMeasure} ${packagingAbbr} x${unitsPerPackage}`;
@@ -123,13 +124,13 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
 
     // Convertir valores numéricos
     if (field === 'units_per_package') {
-      updatedPresentations[index][field] = parseInt(value) || 1;
+      (updatedPresentations[index] as Record<string, unknown>)[field] = parseInt(String(value)) || 1;
     } else if (field === 'package_price' || field === 'package_cost') {
-      updatedPresentations[index][field] = parseFloat(value) || 0;
+      (updatedPresentations[index] as Record<string, unknown>)[field] = parseFloat(String(value)) || 0;
     } else if (field === 'packaging_type_id' || field === 'presentation_type_id') {
-      updatedPresentations[index][field] = value ? parseInt(value) : null;
+      (updatedPresentations[index] as Record<string, unknown>)[field] = value ? parseInt(String(value)) : null;
     } else {
-      updatedPresentations[index][field] = value;
+      (updatedPresentations[index] as Record<string, unknown>)[field] = value;
     }
 
     // Auto-generate name when units_per_package or packaging_type_id changes
@@ -170,12 +171,12 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
   };
 
   const getPackagingTypeName = (id: number | string | null | undefined): string => {
-    const type = packagingTypes.find(t => t.id === parseInt(id));
+    const type = packagingTypes.find(t => t.id === parseInt(String(id)));
     return type ? type.name : 'N/A';
   };
 
   const getPresentationTypeName = (id: number | string | null | undefined): string => {
-    const type = presentationTypes.find(t => t.id === parseInt(id));
+    const type = presentationTypes.find(t => t.id === parseInt(String(id)));
     return type ? type.name : 'N/A';
   };
 
@@ -190,16 +191,16 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="text-sm font-medium text-gray-700">{getDefaultPresentation().name || 'Sin nombre'}</p>
+              <p className="text-sm font-medium text-gray-700">{getDefaultPresentation()?.name || 'Sin nombre'}</p>
               <p className="text-xs text-gray-500">
-                {getDefaultPresentation().units_per_package} unidad(es) por paquete
+                {getDefaultPresentation()?.units_per_package} unidad(es) por paquete
               </p>
             </div>
             <div className="text-sm text-gray-600">
-              {getDefaultPresentation().package_price > 0 && (
+              {getDefaultPresentation()!.package_price > 0 && (
                 <div className="flex items-center">
                   <CurrencyDollar className="h-3 w-3 mr-1" />
-                  Precio: {formatMoney(getDefaultPresentation().package_price, currencies.find(c => c.code === getDefaultPresentation().purchase_currency)?.symbol)}
+                  Precio: {formatMoney(getDefaultPresentation()!.package_price, currencies.find(c => c.code === getDefaultPresentation()?.purchase_currency)?.symbol)}
                 </div>
               )}
             </div>
@@ -373,9 +374,9 @@ const PresentationManager: React.FC<PresentationManagerProps> = ({ presentations
                         onChange={(e) => updatePresentation(index, 'package_cost', e.target.value)}
                       />
                     )}
-                    {(parseFloat(presentation.package_cost) > 0 && parseInt(presentation.units_per_package) > 1) && (
+                    {(parseFloat(String(presentation.package_cost)) > 0 && parseInt(String(presentation.units_per_package)) > 1) && (
                       <p className="text-xs text-primary-600 mt-0.5">
-                        Unitario: {formatMoney((parseFloat(presentation.package_cost) / (parseInt(presentation.units_per_package) || 1)), currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
+                        Unitario: {formatMoney((parseFloat(String(presentation.package_cost)) / (parseInt(String(presentation.units_per_package)) || 1)), currencies.find(c => c.code === presentation.purchase_currency)?.symbol)}
                       </p>
                     )}
                   </div>
