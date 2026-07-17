@@ -5,6 +5,7 @@ import { Input, Select, Alert, Button } from './ui';
 
 interface Customer {
   id: number;
+  type: string;
   [key: string]: unknown;
 }
 
@@ -110,12 +111,12 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
             const newDocType = value === 'natural' ? 'V' : 'J';
             setFormData(prev => ({
                 ...prev,
-                [name]: value,
+                [name]: value as CustomerFormData['type'],
                 documentType: newDocType
             }));
             setValidationErrors(prev => ({ ...prev, firstName: null, lastName: null, businessName: null }));
         } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
+            setFormData(prev => ({ ...prev, [name]: value } as CustomerFormData));
         }
     };
 
@@ -127,14 +128,15 @@ const CustomerQuickAdd: React.FC<CustomerQuickAddProps> = ({ onSave, onCancel, r
         setError(null);
 
         try {
-            const response = await customerService.create(formData);
+            const response = await customerService.create(formData as unknown as Record<string, unknown>);
             onSave(response.data);
-        } catch (err) {
+        } catch (err: unknown) {
             console.error('Save error:', err);
             let msg = 'Error al guardar el cliente.';
-            if (err.response?.data?.message) msg = err.response.data.message;
-            if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
-                msg = `${msg}: ${err.response.data.errors.map(e => e.message).join(', ')}`;
+            const axiosErr = err as { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } };
+            if (axiosErr.response?.data?.message) msg = axiosErr.response.data.message;
+            if (axiosErr.response?.data?.errors && Array.isArray(axiosErr.response.data.errors)) {
+                msg = `${msg}: ${axiosErr.response.data.errors.map((e: { message: string }) => e.message).join(', ')}`;
             }
             setError(msg);
         } finally {

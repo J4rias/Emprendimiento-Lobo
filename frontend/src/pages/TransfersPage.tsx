@@ -10,7 +10,18 @@ import TransferFormModal from '../components/transfers/TransferFormModal';
 import TransferViewSheet from '../components/transfers/TransferViewSheet';
 import { formatDateShort } from '../utils/formatUtils';
 
-const STATUS_CONFIG = {
+interface TransferRow {
+  id: number;
+  transfer_number: string;
+  transfer_date: string;
+  status: string;
+  originWarehouse?: { name: string };
+  destinationWarehouse?: { name: string };
+  details?: unknown[];
+  [key: string]: unknown;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; variant: string }> = {
   pending:   { label: 'Pendiente',   variant: 'warning' },
   completed: { label: 'Completada',  variant: 'success' },
   cancelled: { label: 'Cancelada',   variant: 'error' },
@@ -22,7 +33,7 @@ const TAB_OPTS = [
   { key: 'all',       label: 'Todas' },
 ];
 
-const TabBtn = ({ active, onClick, children }) => (
+const TabBtn = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -37,9 +48,9 @@ const TransfersPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('pending');
-  const [viewTransfer, setViewTransfer] = useState(null);     // for detail modal
-  const [confirmReceive, setConfirmReceive] = useState(null); // for receive ConfirmDialog
-  const [cancelTarget, setCancelTarget] = useState(null);     // for cancel Modal
+  const [viewTransfer, setViewTransfer] = useState<TransferRow | null>(null);     // for detail modal
+  const [confirmReceive, setConfirmReceive] = useState<TransferRow | null>(null); // for receive ConfirmDialog
+  const [cancelTarget, setCancelTarget] = useState<TransferRow | null>(null);     // for cancel Modal
   const [cancelReason, setCancelReason] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -52,22 +63,22 @@ const TransfersPage = () => {
     },
     staleTime: 30_000,
   });
-  const transfers = transfersData?.data || [];
+  const transfers: TransferRow[] = transfersData?.data || [];
 
   // --- Mutations ---
   const receiveMutation = useMutation({
-    mutationFn: (id) => transferService.receive(id),
+    mutationFn: (id: number) => transferService.receive(id),
     onSuccess: () => {
       toast.success('Transferencia recibida exitosamente');
       setConfirmReceive(null);
       setViewTransfer(null);
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al recibir la transferencia'),
+    onError: (err: unknown) => toast.error((err as any)?.response?.data?.message || 'Error al recibir la transferencia'),
   });
 
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }) => transferService.cancel(id, reason),
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => transferService.cancel(id, reason),
     onSuccess: () => {
       toast.success('Transferencia cancelada exitosamente');
       setCancelTarget(null);
@@ -75,23 +86,23 @@ const TransfersPage = () => {
       setViewTransfer(null);
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al cancelar la transferencia'),
+    onError: (err: unknown) => toast.error((err as any)?.response?.data?.message || 'Error al cancelar la transferencia'),
   });
 
   const createMutation = useMutation({
-    mutationFn: (formData) => transferService.create(formData),
+    mutationFn: (formData: Record<string, unknown>) => transferService.create(formData),
     onSuccess: () => {
       toast.success('Transferencia creada exitosamente');
       setShowCreateModal(false);
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
     },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Error al crear la transferencia');
+    onError: (err: unknown) => {
+      toast.error((err as any)?.response?.data?.message || 'Error al crear la transferencia');
       throw err; // re-throw so TransferFormModal can handle it
     },
   });
 
-  const handleViewDetails = async (transfer) => {
+  const handleViewDetails = async (transfer: TransferRow) => {
     try {
       const response = await transferService.getById(transfer.id);
       setViewTransfer(response.data);
@@ -100,7 +111,7 @@ const TransfersPage = () => {
     }
   };
 
-  const openCancel = (transfer) => {
+  const openCancel = (transfer: TransferRow) => {
     setCancelTarget(transfer);
     setCancelReason('');
   };
@@ -159,7 +170,7 @@ const TransfersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {transfers.map((transfer) => {
+                  {transfers.map((transfer: TransferRow) => {
                     const cfg = STATUS_CONFIG[transfer.status] || STATUS_CONFIG.pending;
                     return (
                       <tr key={transfer.id} className="hover:bg-gray-50">
@@ -209,15 +220,16 @@ const TransfersPage = () => {
         onClose={() => setViewTransfer(null)}
         transfer={viewTransfer}
         hasPermission={hasPermission}
-        onReceive={(t) => setConfirmReceive(t)}
-        onCancel={(t) => openCancel(t)}
+        onReceive={(t: TransferRow) => setConfirmReceive(t)}
+        onCancel={(t: TransferRow) => openCancel(t)}
       />
 
       {/* ── Receive ConfirmDialog ── */}
       <ConfirmDialog
         open={!!confirmReceive}
+        onClose={() => setConfirmReceive(null)}
         title="Confirmar Recepción"
-        message={
+        description={
           confirmReceive
             ? `¿Confirmas la recepción de la transferencia ${confirmReceive.transfer_number}? El inventario se actualizará automáticamente.`
             : ''
@@ -225,8 +237,7 @@ const TransfersPage = () => {
         confirmLabel="Confirmar Recepción"
         variant="success"
         loading={receiveMutation.isPending}
-        onConfirm={() => receiveMutation.mutate(confirmReceive.id)}
-        onCancel={() => setConfirmReceive(null)}
+        onConfirm={() => { if (confirmReceive) receiveMutation.mutate(confirmReceive.id); }}
       />
 
       {/* ── Cancel Modal ── */}
@@ -264,7 +275,7 @@ const TransfersPage = () => {
               variant="danger"
               className="flex-1"
               loading={cancelMutation.isPending}
-              onClick={() => cancelMutation.mutate({ id: cancelTarget.id, reason: cancelReason })}
+              onClick={() => { if (cancelTarget) cancelMutation.mutate({ id: cancelTarget.id, reason: cancelReason }); }}
             >
               <Prohibit className="w-4 h-4" />
               Confirmar Cancelación
@@ -277,7 +288,7 @@ const TransfersPage = () => {
       <TransferFormModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={(data) => createMutation.mutateAsync(data)}
+        onSubmit={(data: Record<string, unknown>) => createMutation.mutateAsync(data)}
       />
     </div>
   );

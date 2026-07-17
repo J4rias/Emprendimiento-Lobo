@@ -14,7 +14,7 @@ export interface SaleListParams {
 }
 
 export const saleService = {
-  createSale: async (saleData: Sale) => {
+  createSale: async (saleData: Partial<Sale> & Record<string, unknown>) => {
     const response = await api.post('/sales', saleData);
     return response.data;
   },

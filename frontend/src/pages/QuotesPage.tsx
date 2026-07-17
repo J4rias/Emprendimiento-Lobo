@@ -13,22 +13,50 @@ import QuoteViewSheet from '../components/quotes/QuoteViewSheet';
 import { formatUSD, formatDateShort } from '../utils/formatUtils';
 
 // ── Status config ────────────────────────────────────────────────────────────
-const STATUS_VARIANT = {
+const STATUS_VARIANT: Record<string, string> = {
   draft: 'neutral', sent: 'info', approved: 'success',
   rejected: 'error', converted: 'purple', expired: 'warning',
 };
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
   draft: 'Borrador', sent: 'Enviada', approved: 'Aprobada',
   rejected: 'Rechazada', converted: 'Convertida', expired: 'Vencida',
 };
 
-const customerName = (c) =>
+interface QuoteRow {
+  id: number;
+  code?: string;
+  status: string;
+  total: number;
+  customer?: {
+    businessName?: string;
+    business_name?: string;
+    trade_name?: string;
+    firstName?: string;
+    first_name?: string;
+    lastName?: string;
+    last_name?: string;
+    [key: string]: unknown;
+  };
+  quote_date?: string;
+  quoteDate?: string;
+  created_at?: string;
+  valid_until?: string;
+  validUntil?: string;
+  [key: string]: unknown;
+}
+
+interface ConversionResult {
+  sale_number: string;
+  quote_code: string;
+}
+
+const customerName = (c: QuoteRow['customer']) =>
   c?.businessName || c?.business_name || c?.trade_name ||
   `${c?.firstName || c?.first_name || ''} ${c?.lastName || c?.last_name || ''}`.trim() ||
   'Cliente';
 
-const fmtDate = (d) => formatDateShort(d);
-const fmtUSD  = (n) => formatUSD(n);
+const fmtDate = (d: string | undefined) => d ? formatDateShort(d) : '';
+const fmtUSD  = (n: number | string) => formatUSD(n);
 
 const QuotesPage = () => {
   const { hasPermission } = useAuth();
@@ -41,14 +69,14 @@ const QuotesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // ─── UI state ────────────────────────────────────────────────────────────────
-  const [selectedQuote, setSelectedQuote]   = useState(null);
-  const [deleteTarget, setDeleteTarget]     = useState(null);
-  const [convertTarget, setConvertTarget]   = useState(null); // quote to convert (confirm)
-  const [lastConversion, setLastConversion] = useState(null); // { sale_number, quote_code }
+  const [selectedQuote, setSelectedQuote]   = useState<QuoteRow | null>(null);
+  const [deleteTarget, setDeleteTarget]     = useState<QuoteRow | null>(null);
+  const [convertTarget, setConvertTarget]   = useState<QuoteRow | null>(null);
+  const [lastConversion, setLastConversion] = useState<ConversionResult | null>(null);
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: quoteSortBy, sortDir: quoteSortDir, onSort: _quoteOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
-  const quoteOnSort = (f, d) => { _quoteOnSort(f, d); setCurrentPage(1); };
+  const quoteOnSort = (f: string, d: 'asc' | 'desc') => { _quoteOnSort(f, d); setCurrentPage(1); };
 
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
@@ -62,80 +90,77 @@ const QuotesPage = () => {
       limit,
       ...(search       && { search }),
       ...(statusFilter && { status: statusFilter }),
-      sort_by: quoteSortBy,
-      sort_dir: quoteSortDir,
     }),
     staleTime: 30_000,
   });
 
-  const quotes     = quotesData?.data || [];
-  const pagination = quotesData?.pagination || {};
-  const totalPages = pagination.totalPages || pagination.pages || 1;
-  const total      = pagination.total || 0;
+  const quotes: QuoteRow[]     = quotesData?.data || [];
+  const pagination = quotesData?.pagination;
+  const totalPages = pagination?.totalPages || 1;
+  const total      = pagination?.total || 0;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['quotes'] });
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
-    mutationFn: (id) => quoteService.delete(id),
+    mutationFn: (id: number) => quoteService.delete(id),
     onSuccess: () => { toast.success('Cotización eliminada'); setDeleteTarget(null); invalidate(); },
-    onError:   (err) => { toast.error(err.response?.data?.message || 'Error al eliminar'); setDeleteTarget(null); },
+    onError:   (err: unknown) => { toast.error((err as any)?.response?.data?.message || 'Error al eliminar'); setDeleteTarget(null); },
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }) => quoteService.updateStatus(id, status),
-    onSuccess: (_, { status }) => {
-      toast.success(`Cotización marcada como: ${STATUS_LABEL[status] || status}`);
-      // Refresh the selected quote if open
+    mutationFn: ({ id, status }: { id: number; status: string }) => quoteService.update(id, { status } as any),
+    onSuccess: (_: unknown, vars: { id: number; status: string }) => {
+      toast.success(`Cotización marcada como: ${STATUS_LABEL[vars.status] || vars.status}`);
       if (selectedQuote) {
-        setSelectedQuote(q => ({ ...q, status }));
+        setSelectedQuote((q) => q ? { ...q, status: vars.status } : q);
       }
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al cambiar estado'),
+    onError: (err: unknown) => toast.error((err as any)?.response?.data?.message || 'Error al cambiar estado'),
   });
 
   const convertMutation = useMutation({
-    mutationFn: (id) => quoteService.convertToSale(id),
-    onSuccess: (res) => {
+    mutationFn: (id: number) => quoteService.convertToSale(id),
+    onSuccess: (res: any) => {
       setConvertTarget(null);
       setSelectedQuote(null);
       setLastConversion({ sale_number: res.data?.sale_number, quote_code: res.data?.quote_code });
       invalidate();
     },
-    onError: (err) => {
+    onError: (err: unknown) => {
       setConvertTarget(null);
-      toast.error(err.response?.data?.message || 'Error al convertir la cotización');
+      toast.error((err as any)?.response?.data?.message || 'Error al convertir la cotización');
     },
   });
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
-  const handleStatusChange = (quote, newStatus) => {
+  const handleStatusChange = (quote: QuoteRow, newStatus: string) => {
     statusMutation.mutate({ id: quote.id, status: newStatus });
   };
 
-  const handleSearchChange  = (value) => { setSearch(value); setCurrentPage(1); };
-  const handleStatusFilter  = (e)     => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleSearchChange  = (value: string) => { setSearch(value); setCurrentPage(1); };
+  const handleStatusFilter  = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v) => <span className="font-mono text-sm">{v}</span> },
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: string) => <span className="font-mono text-sm">{v}</span> },
     {
       key: 'customer',
       header: 'Cliente',
-      render: (_, row) => customerName(row.customer),
+      render: (_: unknown, row: QuoteRow) => customerName(row.customer),
     },
     {
       key: 'date',
       header: 'Fecha',
       sortable: true,
       sortKey: 'quote_date',
-      render: (_, row) => fmtDate(row.quote_date || row.quoteDate || row.created_at),
+      render: (_: unknown, row: QuoteRow) => fmtDate(row.quote_date || row.quoteDate || row.created_at),
     },
     {
       key: 'valid_until',
       header: 'Vence',
-      render: (_, row) => {
+      render: (_: unknown, row: QuoteRow) => {
         const d = row.valid_until || row.validUntil;
         const expired = d && new Date(d) < new Date() && row.status !== 'converted';
         return <span className={expired ? 'text-red-500 font-medium' : ''}>{fmtDate(d)}</span>;
@@ -146,7 +171,7 @@ const QuotesPage = () => {
       header: 'Estado',
       sortable: true,
       sortKey: 'status',
-      render: (_, row) => (
+      render: (_: unknown, row: QuoteRow) => (
         <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
           {STATUS_LABEL[row.status] || row.status}
         </Badge>
@@ -157,14 +182,14 @@ const QuotesPage = () => {
       header: 'Total',
       sortable: true,
       sortKey: 'total',
-      render: (_, row) => fmtUSD(row.total),
+      render: (_: unknown, row: QuoteRow) => fmtUSD(row.total),
       cellClassName: 'text-right font-semibold',
     },
     {
       key: 'actions',
       header: '',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_: unknown, row: QuoteRow) => (
         <div className="flex gap-1 justify-end">
           <ViewAction onClick={() => setSelectedQuote(row)} />
           {hasPermission('sales.quotes.update') && row.status === 'approved' && (
@@ -196,7 +221,7 @@ const QuotesPage = () => {
 
       {/* ── Conversión exitosa ────────────────────────────────────────────────── */}
       {lastConversion && (
-        <Alert variant="success" dismissible onDismiss={() => setLastConversion(null)}>
+        <Alert variant="success" dismissible autoClose={10000}>
           Cotización <strong>{lastConversion.quote_code}</strong> convertida a venta{' '}
           <strong>{lastConversion.sale_number}</strong> exitosamente.
         </Alert>
@@ -249,7 +274,7 @@ const QuotesPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -260,7 +285,7 @@ const QuotesPage = () => {
         quote={selectedQuote}
         hasPermission={hasPermission}
         onStatusChange={handleStatusChange}
-        onConvert={(q) => { setConvertTarget(q); setSelectedQuote(null); }}
+        onConvert={(q: QuoteRow) => { setConvertTarget(q); setSelectedQuote(null); }}
         statusMutation={statusMutation}
       />
 
@@ -268,7 +293,7 @@ const QuotesPage = () => {
       <ConfirmDialog
         open={!!convertTarget}
         onClose={() => setConvertTarget(null)}
-        onConfirm={() => convertMutation.mutate(convertTarget?.id)}
+        onConfirm={() => { if (convertTarget) convertMutation.mutate(convertTarget.id); }}
         loading={convertMutation.isPending}
         title="¿Convertir a Venta a Crédito?"
         description={
@@ -283,7 +308,7 @@ const QuotesPage = () => {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
         loading={deleteMutation.isPending}
         variant="danger"
         title="¿Eliminar esta cotización?"

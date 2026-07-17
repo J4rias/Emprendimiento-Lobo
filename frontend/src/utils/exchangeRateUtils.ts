@@ -1,4 +1,4 @@
-interface RateRecord {
+export interface RateRecord {
   from_currency: string;
   to_currency: string;
   rate: number | string;

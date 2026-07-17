@@ -22,16 +22,28 @@ import {
 import BrandViewSheet from '../components/brands/BrandViewSheet';
 import { formatDateShort } from '../utils/formatUtils';
 
+interface BrandRow {
+  id: number;
+  name: string;
+  description?: string;
+  logo_url?: string;
+  website?: string;
+  notes?: string;
+  is_active: boolean;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
 const BrandsPage = () => {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
-  const [editingBrand, setEditingBrand] = useState(null);
-  const [viewingBrand, setViewingBrand] = useState(null);
+  const [editingBrand, setEditingBrand] = useState<BrandRow | null>(null);
+  const [viewingBrand, setViewingBrand] = useState<BrandRow | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useTableLimit();
-  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -44,7 +56,7 @@ const BrandsPage = () => {
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: brandSortBy, sortDir: brandSortDir, onSort: _brandOnSort } = useTableSort([], { serverSide: true, defaultField: 'name', defaultDir: 'asc' });
-  const brandOnSort = (f, d) => { _brandOnSort(f, d); setCurrentPage(1); };
+  const brandOnSort = (f: string, d: 'asc' | 'desc') => { _brandOnSort(f, d); setCurrentPage(1); };
 
   const { data: brandsData, isLoading, error: fetchError } = useQuery({
     queryKey: ['brands', currentPage, searchTerm, limit, brandSortBy, brandSortDir],
@@ -59,12 +71,12 @@ const BrandsPage = () => {
   const loading    = isLoading;
   const error      = fetchError?.message;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const dataToSend = { ...formData };
-      if (!dataToSend.website || dataToSend.website.trim() === '') delete dataToSend.website;
-      if (!dataToSend.logo_url || dataToSend.logo_url.trim() === '') delete dataToSend.logo_url;
+      const dataToSend: Record<string, unknown> = { ...formData };
+      if (!formData.website || formData.website.trim() === '') delete dataToSend.website;
+      if (!formData.logo_url || formData.logo_url.trim() === '') delete dataToSend.logo_url;
 
       if (editingBrand) {
         await api.put(`/brands/${editingBrand.id}`, dataToSend);
@@ -74,17 +86,17 @@ const BrandsPage = () => {
       toast.success(editingBrand ? 'Marca actualizada' : 'Marca creada');
       queryClient.invalidateQueries({ queryKey: ['brands'] });
       handleCloseModal();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al guardar la marca');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al guardar la marca');
     }
   };
 
-  const handleView = (brand) => {
+  const handleView = (brand: BrandRow) => {
     setViewingBrand(brand);
     setShowViewModal(true);
   };
 
-  const handleEdit = (brand) => {
+  const handleEdit = (brand: BrandRow) => {
     setEditingBrand(brand);
     setFormData({
       name: brand.name || '',
@@ -97,7 +109,7 @@ const BrandsPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: number) => {
     setDeleteTargetId(id);
   };
 
@@ -105,8 +117,8 @@ const BrandsPage = () => {
     try {
       await api.delete(`/brands/${deleteTargetId}`);
       queryClient.invalidateQueries({ queryKey: ['brands'] });
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al eliminar la marca');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al eliminar la marca');
     } finally {
       setDeleteTargetId(null);
     }
@@ -118,19 +130,19 @@ const BrandsPage = () => {
     setFormData({ name: '', description: '', logo_url: '', website: '', notes: '', is_active: true });
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const formatDate = (date) => formatDateShort(date);
+  const formatDate = (date: string) => formatDateShort(date);
 
   const columns = [
     {
       header: 'Marca',
       sortable: true,
       sortKey: 'name',
-      render: (_, brand) => (
+      render: (_: unknown, brand: BrandRow) => (
         <div className="flex items-center">
           {brand.logo_url ? (
             <img src={brand.logo_url} alt={brand.name} className="max-h-10 w-10 mr-3 object-cover" />
@@ -144,13 +156,13 @@ const BrandsPage = () => {
     {
       header: 'Descripción',
       wrap: true,
-      render: (_, brand) => (
+      render: (_: unknown, brand: BrandRow) => (
         <div className="text-sm text-gray-900 max-w-xs truncate">{brand.description || '-'}</div>
       ),
     },
     {
       header: 'Sitio Web',
-      render: (_, brand) => brand.website ? (
+      render: (_: unknown, brand: BrandRow) => brand.website ? (
         <a
           href={brand.website}
           target="_blank"
@@ -168,7 +180,7 @@ const BrandsPage = () => {
       header: 'Estado',
       sortable: true,
       sortKey: 'is_active',
-      render: (_, brand) => (
+      render: (_: unknown, brand: BrandRow) => (
         <Badge variant={brand.is_active ? 'success' : 'error'}>
           {brand.is_active ? 'Activa' : 'Inactiva'}
         </Badge>
@@ -177,7 +189,7 @@ const BrandsPage = () => {
     {
       header: 'Acciones',
       className: 'text-right',
-      render: (_, brand) => (
+      render: (_: unknown, brand: BrandRow) => (
         <div className="flex items-center justify-end gap-1">
           <ViewAction onClick={() => handleView(brand)} />
           <EditAction onClick={() => handleEdit(brand)} />
@@ -280,7 +292,7 @@ const BrandsPage = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Logo de la Marca</label>
             <ImageUpload
               value={formData.logo_url}
-              onChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
+              onChange={(url) => setFormData(prev => ({ ...prev, logo_url: typeof url === 'string' ? url : url[0] || '' }))}
               type="brands"
               placeholder="Subir logo de la marca"
               previewSize="h-24"

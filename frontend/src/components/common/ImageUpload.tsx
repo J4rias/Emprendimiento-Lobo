@@ -36,7 +36,7 @@ const ImageUpload = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get base URL for images (API URL without /api suffix)
-  const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || window.location.origin;
+  const baseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/api$/, '') || window.location.origin;
 
   const handleFileSelect = async (files: File[]): Promise<void> => {
     if (!files || files.length === 0) return;
@@ -70,7 +70,7 @@ const ImageUpload = ({
             },
             onUploadProgress: (progressEvent) => {
               const percentCompleted = Math.round(
-                ((progressEvent.loaded * 100) / progressEvent.total) / files.length +
+                ((progressEvent.loaded * 100) / (progressEvent.total ?? 1)) / files.length +
                 (i * 100) / files.length
               );
               setUploadProgress(percentCompleted);
@@ -89,7 +89,7 @@ const ImageUpload = ({
           },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+              (progressEvent.loaded * 100) / (progressEvent.total ?? 1)
             );
             setUploadProgress(percentCompleted);
           }
@@ -144,13 +144,13 @@ const ImageUpload = ({
   };
 
   // Para múltiples imágenes
-  const removeImageAtIndex = (index) => {
+  const removeImageAtIndex = (index: number) => {
     const newUrls = Array.isArray(value) ? [...value] : [];
     newUrls.splice(index, 1);
     onChange(newUrls);
   };
 
-  const renderPreview = (url, index = null) => {
+  const renderPreview = (url: string, index: number | null = null) => {
     // Ensure URL has the base server URL
     let fullUrl = url;
     if (url && !url.startsWith('http') && !url.startsWith('data:')) {
@@ -196,7 +196,7 @@ const ImageUpload = ({
       {showPreview && value && (
         <div className={`flex flex-wrap gap-2${previewSize.includes('w-full') ? ' w-full' : ' justify-center'}`}>
           {Array.isArray(value) ? (
-            value.map((url, index) => renderPreview(url, index))
+            value.map((url: string, index: number) => renderPreview(url, index))
           ) : (
             renderPreview(value)
           )}

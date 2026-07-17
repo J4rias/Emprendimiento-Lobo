@@ -16,8 +16,8 @@ interface Customer {
   documentType?: string;
   documentNumber?: string;
   phone?: string;
-  creditLimit?: number | string;
-  discountPercentage?: number | string;
+  creditLimit?: number;
+  discountPercentage?: number;
   [key: string]: unknown;
 }
 
@@ -189,13 +189,13 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({ isOpen, onClose, onSele
                             {customer.phone && (
                               <p className="text-sm text-gray-500">Tel: {customer.phone}</p>
                             )}
-                            {customer.creditLimit > 0 && (
+                            {(customer.creditLimit ?? 0) > 0 && (
                               <div className="flex items-center gap-3 mt-1">
                                 <span className="text-xs text-green-600 flex items-center gap-1">
                                   <CreditCard className="w-3 h-3" />
-                                  Crédito: {formatCOP(customer.creditLimit || 0)}
+                                  Crédito: {formatCOP(customer.creditLimit ?? 0)}
                                 </span>
-                                {customer.discountPercentage > 0 && (
+                                {(customer.discountPercentage ?? 0) > 0 && (
                                   <span className="text-xs text-primary-600">
                                     Desc: {customer.discountPercentage}%
                                   </span>

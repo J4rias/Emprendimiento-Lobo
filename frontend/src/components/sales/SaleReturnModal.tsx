@@ -4,20 +4,58 @@ import { creditNoteService } from '../../services/api/creditNoteService';
 import { Modal } from '../ui';
 import { toast } from 'sonner';
 
+interface SaleCustomer {
+  business_name?: string;
+  businessName?: string;
+  first_name?: string;
+  firstName?: string;
+  last_name?: string;
+  lastName?: string;
+  [key: string]: unknown;
+}
+
+interface SaleDetailItem {
+  id: number;
+  product?: { name: string };
+  presentation?: { name: string; units_per_package?: number };
+  quantity: string | number;
+  unit_price: string | number;
+  is_unit?: boolean;
+  [key: string]: unknown;
+}
+
+interface SaleData {
+  id: number;
+  sale_number: string;
+  customer_id?: number;
+  customer?: SaleCustomer;
+  total: string | number;
+  exchange_rate?: number;
+  details?: SaleDetailItem[];
+  [key: string]: unknown;
+}
+
+interface ReturnItem extends SaleDetailItem {
+  returnQuantity: number;
+  maxQuantity: number;
+  originalQuantity: number;
+  alreadyReturned: number;
+}
+
 interface SaleReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  sale: Record<string, unknown> | null;
+  sale: SaleData | null;
   onReturnSuccess: () => void;
 }
 
 const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale, onReturnSuccess }) => {
-    const [returnItems, setReturnItems] = useState([]);
+    const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
     const [reason, setReason] = useState('return');
     const [reasonDescription, setReasonDescription] = useState('');
     const [refundMethod, setRefundMethod] = useState('credit_balance');
     const [submitting, setSubmitting] = useState(false);
-    const [serverError, setServerError] = useState(null);
+    const [serverError, setServerError] = useState<string | null>(null);
 
     // Initialize return items — subtract already returned quantities
     useEffect(() => {
@@ -25,17 +63,17 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
 
         const initItems = async () => {
             // Build map of already returned units per sale_detail_id
-            const returnedMap = {};
+            const returnedMap: Record<number, number> = {};
             // Build is_unit lookup from sale details
-            const isUnitMap = {};
-            for (const detail of sale.details) {
+            const isUnitMap: Record<number, boolean | undefined> = {};
+            for (const detail of sale.details!) {
                 isUnitMap[detail.id] = detail.is_unit;
             }
 
             try {
                 const cn = await creditNoteService.getAll({ sale_id: sale.id, status: 'applied', limit: 100 });
-                for (const note of cn.data || []) {
-                    for (const d of note.details || []) {
+                for (const note of (cn.data || []) as Array<{ details?: Array<Record<string, unknown>> }>) {
+                    for (const d of (note.details || []) as Array<{ sale_detail_id: number; presentation?: { units_per_package?: number }; package_quantity_returned: number; loose_units_returned?: number }>) {
                         const uph = d.presentation?.units_per_package || 1;
                         const effectiveUph = isUnitMap[d.sale_detail_id] ? 1 : uph;
                         const units = d.package_quantity_returned + ((d.loose_units_returned || 0) / effectiveUph);
@@ -44,8 +82,8 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                 }
             } catch (_) { /* ignore, fallback to original qty */ }
 
-            const items = sale.details.map(detail => {
-                const originalQty = parseFloat(detail.quantity);
+            const items = sale.details!.map(detail => {
+                const originalQty = parseFloat(String(detail.quantity));
                 const alreadyReturned = returnedMap[detail.id] || 0;
                 const available = Math.max(0, originalQty - alreadyReturned);
                 return {
@@ -89,7 +127,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
         let subtotal = 0;
         returnItems.forEach(item => {
             if (item.returnQuantity > 0) {
-                const unitPrice = parseFloat(item.unit_price);
+                const unitPrice = parseFloat(String(item.unit_price));
                 subtotal += unitPrice * item.returnQuantity;
             }
         });
@@ -100,7 +138,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
         // Check if it's a full return
         const isFullReturn = returnItems.every(item => item.returnQuantity === item.maxQuantity);
 
-        const finalTotal = isFullReturn ? (parseFloat(sale?.total || 0)) : subtotal;
+        const finalTotal = isFullReturn ? (parseFloat(String(sale?.total || 0))) : subtotal;
 
         return {
             subtotal,
@@ -137,7 +175,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
         setSubmitting(true);
         try {
             const payload = {
-                sale_id: sale.id,
+                sale_id: sale!.id,
                 reason,
                 reason_description: reasonDescription,
                 type: totals.isFullReturn ? 'full' : 'partial',
@@ -163,7 +201,8 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
             onReturnSuccess();
         } catch (error) {
             console.error('Error creating credit note:', error);
-            const serverMsg = error.response?.data?.error || error.response?.data?.message || error.message;
+            const err = error as { response?: { data?: { error?: string; message?: string } }; message?: string };
+            const serverMsg = err.response?.data?.error || err.response?.data?.message || err.message;
             setServerError(serverMsg);
             toast.error(`Error: ${serverMsg}`, { duration: 8000 });
         } finally {
@@ -201,7 +240,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                     </div>
                     <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Total Venta</p>
-                        <p className="text-sm font-medium text-gray-900">{formatCurrency(parseFloat(sale.total))}</p>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(parseFloat(String(sale.total)))}</p>
                     </div>
                     <div className="md:col-span-2">
                         <p className="text-xs font-semibold text-rose-600 uppercase">Importante</p>
@@ -230,7 +269,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                                     <tr key={item.id} className={item.returnQuantity > 0 ? 'bg-rose-50/30' : ''}>
                                         <td className="px-4 py-3">
                                             <div className="text-sm font-medium text-gray-900">{item.product?.name}</div>
-                                            <div className="text-xs text-gray-500">{item.presentation?.name || 'Unidad'} - {formatCurrency(parseFloat(item.unit_price))} / c.u.</div>
+                                            <div className="text-xs text-gray-500">{item.presentation?.name || 'Unidad'} - {formatCurrency(parseFloat(String(item.unit_price)))} / c.u.</div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-sm text-gray-600 font-medium">
                                             {item.originalQuantity ?? item.maxQuantity}
@@ -262,7 +301,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm font-medium text-rose-600">
                                             {item.returnQuantity > 0
-                                                ? formatCurrency(item.returnQuantity * parseFloat(item.unit_price))
+                                                ? formatCurrency(item.returnQuantity * parseFloat(String(item.unit_price)))
                                                 : '-'}
                                         </td>
                                     </tr>
@@ -296,7 +335,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                                 Observaciones
                             </label>
                             <textarea
-                                rows="2"
+                                rows={2}
                                 value={reasonDescription}
                                 onChange={(e) => setReasonDescription(e.target.value)}
                                 placeholder="Detalle brevemente por qué se anula o devuelve..."

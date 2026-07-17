@@ -20,16 +20,43 @@ import {
 } from '../components/ui';
 import { localToday } from '../utils/dateUtils';
 
+interface POItem {
+  product_id: number;
+  presentation_id: number;
+  product_name: string;
+  presentation_name: string;
+  units_per_package: number;
+  package_quantity: number;
+  loose_units: number;
+  unit_cost: number;
+  package_cost: number;
+  suggested_unit_cost?: number;
+  suggested_package_cost?: number;
+  suggested_cost_currency?: string;
+  discount_percent: number;
+  tax_percent: number;
+}
+
+interface POFormData {
+  supplier_id: string;
+  warehouse_id: string;
+  order_date: string;
+  expected_delivery_date: string;
+  currency: string;
+  notes: string;
+  items: POItem[];
+}
+
 const PurchaseOrderCreatePage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
 
-  const [validationError, setValidationError] = useState(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [productSearch, setProductSearch] = useState('');
-  const [products, setProducts] = useState([]);
-  const [formData, setFormData] = useState({
+  const [products, setProducts] = useState<any[]>([]);
+  const [formData, setFormData] = useState<POFormData>({
     supplier_id: '',
     warehouse_id: '',
     order_date: localToday(),
@@ -42,19 +69,19 @@ const PurchaseOrderCreatePage = () => {
   // --- Queries ---
   const { data: suppliersData } = useQuery({
     queryKey: ['suppliers', 'active'],
-    queryFn: () => supplierService.getActive().then(r => r.data),
+    queryFn: () => supplierService.getActive().then((r: any) => r.data),
   });
-  const suppliers = suppliersData || [];
+  const suppliers: any[] = suppliersData || [];
 
   const { data: warehousesData } = useQuery({
     queryKey: ['warehouses'],
     queryFn: () => api.get('/inventory/warehouses').then(r => r.data?.data || r.data),
   });
-  const warehouses = warehousesData || [];
+  const warehouses: any[] = warehousesData || [];
 
   const { data: orderData } = useQuery({
     queryKey: ['purchaseOrder', id],
-    queryFn: () => purchaseOrderService.getById(id).then(r => r.data),
+    queryFn: () => purchaseOrderService.getById(Number(id)).then((r: any) => r.data),
     enabled: !!id,
     staleTime: Infinity,
   });
@@ -74,7 +101,7 @@ const PurchaseOrderCreatePage = () => {
       expected_delivery_date: orderData.expected_delivery_date || '',
       currency: orderData.currency,
       notes: orderData.notes || '',
-      items: orderData.details.map(d => ({
+      items: orderData.details.map((d: any) => ({
         product_id: d.product_id,
         presentation_id: d.presentation_id,
         product_name: d.product.name,
@@ -96,7 +123,7 @@ const PurchaseOrderCreatePage = () => {
     const timer = setTimeout(async () => {
       try {
         const res = await productService.getAll({ search: productSearch, is_active: true, limit: 20 });
-        setProducts(res.products || res.data || res || []);
+        setProducts((res as any).products || (res as any).data || res || []);
       } catch {
         // silent — user can retry typing
       }
@@ -106,38 +133,38 @@ const PurchaseOrderCreatePage = () => {
 
   // --- Mutations ---
   const saveMutation = useMutation({
-    mutationFn: (data) => isEditing
-      ? purchaseOrderService.update(id, data)
+    mutationFn: (data: any) => isEditing
+      ? purchaseOrderService.update(Number(id), data)
       : purchaseOrderService.create(data),
     onSuccess: () => {
       toast.success(isEditing ? 'Orden actualizada' : 'Borrador guardado');
       navigate('/purchase-orders');
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al guardar la orden'),
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Error al guardar la orden'),
   });
 
   const saveAndApproveMutation = useMutation({
-    mutationFn: async (data) => {
+    mutationFn: async (data: any) => {
       const res = await purchaseOrderService.create(data);
-      await purchaseOrderService.approve(res.data?.id);
+      await purchaseOrderService.approve((res as any).data?.id);
     },
     onSuccess: () => {
       toast.success('Orden creada y aprobada');
       navigate('/purchase-orders');
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al crear y aprobar la orden'),
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Error al crear y aprobar la orden'),
   });
 
   const isSaving = saveMutation.isPending || saveAndApproveMutation.isPending;
 
   // --- Handlers ---
-  const handleChange = (e) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   // Barcode scanner: on Enter, auto-add if single/exact match
-  const handleKeyDown = async (e) => {
+  const handleKeyDown = async (e: any) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     setTimeout(async () => {
@@ -145,16 +172,16 @@ const PurchaseOrderCreatePage = () => {
       if (current.length === 0 && productSearch.length >= 2) {
         try {
           const res = await productService.getAll({ search: productSearch, is_active: true, limit: 20 });
-          current = res.products || res.data || res || [];
+          current = (res as any).products || (res as any).data || res || [];
           setProducts(current);
         } catch { /* ignore */ }
       }
       if (current.length === 1) {
         addProduct(current[0]);
       } else if (current.length > 1) {
-        const exact = current.find(p =>
+        const exact = current.find((p: any) =>
           p.sku === productSearch ||
-          (p.barcodes && p.barcodes.some(b => b.barcode === productSearch))
+          (p.barcodes && p.barcodes.some((b: any) => b.barcode === productSearch))
         );
         if (exact) addProduct(exact);
       }
@@ -167,14 +194,14 @@ const PurchaseOrderCreatePage = () => {
     setProducts([]);
   };
 
-  const addProduct = (product) => {
+  const addProduct = (product: any) => {
     if (!product.presentations?.length) {
       toast.error('El producto no tiene presentaciones configuradas');
       return;
     }
     const pres = product.presentations[0];
     const already = formData.items.find(
-      item => String(item.product_id) === String(product.id) &&
+      (item: POItem) => String(item.product_id) === String(product.id) &&
                String(item.presentation_id) === String(pres.id)
     );
     if (already) {
@@ -183,7 +210,7 @@ const PurchaseOrderCreatePage = () => {
     }
     setFormData(prev => {
       const dup = prev.items.find(
-        item => String(item.product_id) === String(product.id) &&
+        (item: POItem) => String(item.product_id) === String(product.id) &&
                 String(item.presentation_id) === String(pres.id)
       );
       if (dup) return prev;
@@ -215,16 +242,16 @@ const PurchaseOrderCreatePage = () => {
     closeProductSearch();
   };
 
-  const removeItem = (index) => {
-    setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  const removeItem = (index: number) => {
+    setFormData(prev => ({ ...prev, items: prev.items.filter((_: POItem, i: number) => i !== index) }));
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.map((item, i) => {
+      items: prev.items.map((item: POItem, i: number) => {
         if (i !== index) return item;
-        const updated = { ...item, [field]: parseFloat(value) || 0 };
+        const updated: any = { ...item, [field]: parseFloat(value) || 0 };
         if (field === 'unit_cost') updated.package_cost = updated.unit_cost * updated.units_per_package;
         if (field === 'package_cost') updated.unit_cost = updated.package_cost / updated.units_per_package;
         return updated;
@@ -232,7 +259,7 @@ const PurchaseOrderCreatePage = () => {
     }));
   };
 
-  const calculateItemTotal = (item) => {
+  const calculateItemTotal = (item: POItem) => {
     const subtotal = item.package_quantity * item.package_cost + item.loose_units * item.unit_cost;
     const discount = subtotal * (item.discount_percent / 100);
     const taxable = subtotal - discount;
@@ -241,7 +268,7 @@ const PurchaseOrderCreatePage = () => {
 
   const calculateTotals = () => {
     let subtotal = 0, discount = 0, tax = 0;
-    formData.items.forEach(item => {
+    formData.items.forEach((item: POItem) => {
       const itemSub = item.package_quantity * item.package_cost + item.loose_units * item.unit_cost;
       const itemDis = itemSub * (item.discount_percent / 100);
       const itemTax = (itemSub - itemDis) * (item.tax_percent / 100);
@@ -269,7 +296,7 @@ const PurchaseOrderCreatePage = () => {
     setValidationError(null);
     const payload = {
       ...formData,
-      items: formData.items.map(item => ({
+      items: formData.items.map((item: POItem) => ({
         product_id: item.product_id,
         presentation_id: item.presentation_id,
         package_quantity: item.package_quantity,
@@ -320,7 +347,7 @@ const PurchaseOrderCreatePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
                 <Select name="supplier_id" value={formData.supplier_id} onChange={handleChange}>
                   <option value="">Seleccione un proveedor</option>
-                  {suppliers.map(s => (
+                  {suppliers.map((s: any) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </Select>
@@ -330,7 +357,7 @@ const PurchaseOrderCreatePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Almacén Destino *</label>
                 <Select name="warehouse_id" value={formData.warehouse_id} onChange={handleChange}>
                   <option value="">Seleccione un almacén</option>
-                  {warehouses.map(w => (
+                  {warehouses.map((w: any) => (
                     <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
                 </Select>
@@ -392,7 +419,7 @@ const PurchaseOrderCreatePage = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {formData.items.map((item, index) => (
+                    {formData.items.map((item: POItem, index: number) => (
                       <tr key={index}>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
@@ -421,9 +448,9 @@ const PurchaseOrderCreatePage = () => {
                             onChange={(e) => updateItem(index, 'package_cost', e.target.value)}
                             className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-primary-200 focus:outline-none"
                           />
-                          {item.suggested_package_cost > 0 && (
+                          {(item.suggested_package_cost ?? 0) > 0 && (
                             <div className="text-xs text-gray-400 mt-0.5" title="Último costo registrado (en la moneda de compra del producto)">
-                              Ant: {formatMoney(item.suggested_package_cost, item.suggested_cost_currency || formData.currency)}
+                              Ant: {formatMoney(item.suggested_package_cost!, item.suggested_cost_currency || formData.currency)}
                             </div>
                           )}
                         </td>
@@ -552,7 +579,7 @@ const PurchaseOrderCreatePage = () => {
                 : 'Busca por nombre, SKU o código de barras'}
             </p>
           ) : (
-            products.map(product => (
+            products.map((product: any) => (
               <button
                 key={product.id}
                 onClick={() => addProduct(product)}

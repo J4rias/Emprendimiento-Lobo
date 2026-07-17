@@ -14,12 +14,46 @@ import { toast } from 'sonner';
 import { LOCALE, formatCOP, formatUSD } from '../utils/formatUtils';
 import { Button } from '../components/ui';
 
+interface PriceListDetail {
+    product_id: number;
+    presentation_id: number;
+    product_name: string;
+    product_sku: string;
+    presentation_name: string;
+    units_per_package: number;
+    package_cost: number;
+    unit_cost: number;
+    package_price: number;
+    unit_price: number;
+    margin_percentage: number;
+    base_currency: string;
+    native_currency: string;
+    is_frozen?: boolean;
+    frozen_price?: number | null;
+    frozen_currency?: string;
+    package_price_usd?: number;
+    package_price_cop_str?: string | undefined;
+    server_updated_at?: string | null;
+    [key: string]: unknown;
+}
+
+interface PriceListRecord {
+    id: number;
+    name: string;
+    description?: string;
+    currency: string;
+    isDefault: boolean;
+    validity_days?: number;
+    details?: Record<string, any>[];
+    [key: string]: unknown;
+}
+
 const PriceListsPage = () => {
     useAuth();
 
     // Editor state
     const [editorOpen, setEditorOpen] = useState(false);
-    const [editingList, setEditingList] = useState(null);
+    const [editingList, setEditingList] = useState<PriceListRecord | null>(null);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -27,12 +61,12 @@ const PriceListsPage = () => {
         isDefault: false,
         validity_days: 5
     });
-    const [details, setDetails] = useState([]);
+    const [details, setDetails] = useState<PriceListDetail[]>([]);
     const [detailSearch, setDetailSearch] = useState('');
     const [loadingProducts, setLoadingProducts] = useState(false);
 
-    const printRef = useRef();
-    const editingListRef = useRef(null);
+    const printRef = useRef<HTMLDivElement>(null);
+    const editingListRef = useRef<PriceListRecord | null>(null);
 
     // Query: exchange rates (static reference data)
     const { data: ratesData } = useQuery({
@@ -63,7 +97,7 @@ const PriceListsPage = () => {
 
     // Auto-save: guarda un detail individual con debounce de 800ms (KEPT SEPARATE - DO NOT CONVERT)
     const autoSaveFn = useCallback(
-        (data) => priceListService.updateDetail(editingListRef.current?.id, data),
+        (data: Record<string, any>) => priceListService.updateDetail(editingListRef.current?.id, data),
         []
     );
     const autoSaveOnConflict = useCallback(() => {
@@ -77,7 +111,7 @@ const PriceListsPage = () => {
     });
 
     // ===================== STATUS HELPERS =====================
-    const getCostInUSD = (cost, currency) => {
+    const getCostInUSD = (cost: any, currency: string) => {
         if (!cost) return 0;
         if (currency === 'USD') return parseFloat(cost);
         const rate = calculateEffectiveRate('USD', currency, exchangeRates) || 1;

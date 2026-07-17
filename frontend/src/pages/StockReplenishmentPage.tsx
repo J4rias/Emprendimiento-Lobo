@@ -9,18 +9,51 @@ import { useAuth } from '../context/AuthContext';
 import { BarcodeScannerComponent } from '../components/BarcodeScanner';
 import { formatUSD } from '../utils/formatUtils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = Record<string, any>;
+
+interface Presentation {
+  id: number;
+  name: string;
+  units_per_package: number;
+  package_price?: number | string;
+  is_default: boolean;
+}
+
+interface ScannedProduct {
+  id: number;
+  name: string;
+  sku: string;
+  presentations?: Presentation[];
+}
+
+interface HistoryEntry {
+  id: number;
+  product: string;
+  sku: string;
+  quantity: number;
+  warehouse: string | undefined;
+  timestamp: string;
+}
+
+interface WarehouseRow {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
+
 // Página táctil (escáner móvil): el diseño touch-first es deliberado,
 // igual que el POS — no migrar a los componentes de escritorio del UI kit.
 const StockReplenishmentPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [barcode, setBarcode] = useState('');
-  const [product, setProduct] = useState(null);
-  const [warehouseId, setWarehouseId] = useState(null);
-  const [presentations, setPresentations] = useState([]);
-  const [selectedPresentation, setSelectedPresentation] = useState(null);
+  const [product, setProduct] = useState<ScannedProduct | null>(null);
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [selectedPresentation, setSelectedPresentation] = useState<number | null>(null);
   const [packageQuantity, setPackageQuantity] = useState(0);
   const [looseUnits, setLooseUnits] = useState(0);
 
@@ -30,18 +63,18 @@ const StockReplenishmentPage = () => {
     queryFn: () => warehouseService.getAll(),
     staleTime: Infinity,
   });
-  const warehouses = (warehousesData?.data || []).filter(w => w.is_active);
+  const warehouses: WarehouseRow[] = (warehousesData?.data || []).filter((w: AnyObj) => w.is_active);
   useEffect(() => {
     if (warehouseId === null && warehouses.length > 0) setWarehouseId(warehouses[0].id);
   }, [warehouses, warehouseId]);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [scanMode, setScanMode] = useState(true);
   const [useCameraScanner, setUseCameraScanner] = useState(true);
-  const [cameraError, setCameraError] = useState(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
     // Auto-focus input when component mounts or after successful scan
@@ -50,8 +83,8 @@ const StockReplenishmentPage = () => {
     }
   }, [scanMode, success]);
 
-  const handleBarcodeInput = async (e) => {
-    const value = e.target.value;
+  const handleBarcodeInput = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const value = (e.target as HTMLInputElement).value;
     setBarcode(value);
 
     // Auto-submit when Enter is pressed or barcode length is sufficient
@@ -60,7 +93,7 @@ const StockReplenishmentPage = () => {
     }
   };
 
-  const searchProduct = async (code) => {
+  const searchProduct = async (code: string) => {
     if (!code || code.trim() === '') return;
 
     setLoading(true);
@@ -69,20 +102,20 @@ const StockReplenishmentPage = () => {
 
     try {
       const response = await productService.searchByBarcode(code);
-      const product = response.data?.[0];
+      const found = response.data?.[0] as ScannedProduct | undefined;
 
-      if (product) {
-        setProduct(product);
+      if (found) {
+        setProduct(found);
 
         // Load presentations
-        if (product.presentations && product.presentations.length > 0) {
-          setPresentations(product.presentations);
+        if (found.presentations && found.presentations.length > 0) {
+          setPresentations(found.presentations);
           // Select default presentation
-          const defaultPres = product.presentations.find(p => p.is_default);
+          const defaultPres = found.presentations.find((p: Presentation) => p.is_default);
           if (defaultPres) {
             setSelectedPresentation(defaultPres.id);
           } else {
-            setSelectedPresentation(product.presentations[0].id);
+            setSelectedPresentation(found.presentations[0].id);
           }
         }
 
@@ -97,7 +130,7 @@ const StockReplenishmentPage = () => {
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al buscar el producto');
+      setError((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Error al buscar el producto');
       setBarcode('');
       if (navigator.vibrate) {
         navigator.vibrate(200);
@@ -107,7 +140,7 @@ const StockReplenishmentPage = () => {
     }
   };
 
-  const handleBarcodeDetected = (result) => {
+  const handleBarcodeDetected = (result: string) => {
     if (result && !loading && scanMode) {
       // Vibrate on successful scan
       if (navigator.vibrate) {
@@ -121,7 +154,7 @@ const StockReplenishmentPage = () => {
     const presentation = presentations.find(p => p.id === selectedPresentation);
     const unitsPerPackage = presentation?.units_per_package || 1;
     const packageUnits = packageQuantity * unitsPerPackage;
-    return packageUnits + parseFloat(looseUnits || 0);
+    return packageUnits + looseUnits;
   };
 
   const handleReplenish = async () => {
@@ -140,16 +173,16 @@ const StockReplenishmentPage = () => {
     try {
       await inventoryService.adjustInventory({
         product_id: product.id,
-        warehouse_id: warehouseId,
+        warehouse_id: warehouseId!,
         ...(selectedPresentation && { presentation_id: selectedPresentation }),
         package_quantity: packageQuantity,
         loose_units: looseUnits,
         type: 'add',
         reason: `Reposición de stock - Escáner móvil por ${user?.name || 'Usuario'}`
-      });
+      } as AnyObj);
 
       // Add to history
-      const historyItem = {
+      const historyItem: HistoryEntry = {
         id: Date.now(),
         product: product.name,
         sku: product.sku,
@@ -173,7 +206,7 @@ const StockReplenishmentPage = () => {
       }, 1500);
 
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al reponer el stock');
+      setError((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Error al reponer el stock');
     } finally {
       setLoading(false);
     }
@@ -205,7 +238,7 @@ const StockReplenishmentPage = () => {
           <h1 className="text-xl font-bold">Reposición de Stock</h1>
           <div className="w-10"></div>
         </div>
-        
+
         {/* Warehouse Selector */}
         <div className="bg-primary-700 rounded-lg p-3">
           <label className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -213,7 +246,7 @@ const StockReplenishmentPage = () => {
             Depósito
           </label>
           <select
-            value={warehouseId}
+            value={warehouseId ?? ''}
             onChange={(e) => setWarehouseId(Number(e.target.value))}
             className="w-full px-4 py-3 bg-white text-gray-900 rounded-lg text-lg font-medium focus:ring-2 focus:ring-primary-200"
             disabled={!scanMode}
@@ -272,7 +305,7 @@ const StockReplenishmentPage = () => {
                     Apunta la cámara al código de barras
                   </p>
                 </div>
-                
+
                 <div className="relative bg-black" style={{ minHeight: '300px' }}>
                   {cameraError ? (
                     <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
@@ -294,11 +327,11 @@ const StockReplenishmentPage = () => {
                   ) : (
                     <BarcodeScannerComponent
                       onDetected={handleBarcodeDetected}
-                      onError={(err) => setCameraError(err)}
+                      onError={(err: string) => setCameraError(err)}
                     />
                   )}
                 </div>
-                
+
                 <div className="p-4 bg-gray-50 text-center text-sm text-gray-600">
                   <p>Mantén el código de barras dentro del marco</p>
                   <p className="text-xs mt-1">El escaneo es automático</p>
@@ -376,7 +409,7 @@ const StockReplenishmentPage = () => {
                     {presentations.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.name} - {p.units_per_package} uds/paquete
-                        {parseFloat(p.package_price || 0) > 0 ? ` - ${formatUSD(p.package_price)}` : ''}
+                        {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${formatUSD(p.package_price)}` : ''}
                         {p.is_default ? ' ⭐' : ''}
                       </option>
                     ))}

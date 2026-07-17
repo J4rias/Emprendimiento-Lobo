@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { convertPaymentLinesToBackend, adjustPaymentLinesForChange } from '../utils/paymentUtils';
 import { formatCOP, formatUSD } from '../utils/formatUtils';
 import type { PaymentLine } from '../utils/paymentUtils';
+import type { Sale } from '../types';
 
 // ============= CONSTANTS =============
 export const CURRENCIES = [
@@ -132,7 +133,7 @@ export function usePOS() {
   const toDisplay = useCallback(
     (amountUSD: number | string) => {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
-      return parseFloat(amountUSD || 0) * (rate || 1);
+      return parseFloat(String(amountUSD || 0)) * (rate || 1);
     },
     [displayCurrency, exchangeRates]
   );
@@ -140,14 +141,14 @@ export function usePOS() {
   const fromDisplay = useCallback(
     (amountDisplay: number | string) => {
       const rate = calculateEffectiveRate('USD', displayCurrency, exchangeRates);
-      return parseFloat(amountDisplay || 0) / (rate || 1);
+      return parseFloat(String(amountDisplay || 0)) / (rate || 1);
     },
     [displayCurrency, exchangeRates]
   );
 
   const fmt = useCallback(
     (amount: number | string) => {
-      const n = parseFloat(amount) || 0;
+      const n = parseFloat(String(amount)) || 0;
       if (displayCurrency === 'COP') {
         return formatCOP(n).replace('COP ', '');
       }
@@ -217,9 +218,9 @@ export function usePOS() {
       const lists = res.data || [];
       setPriceLists(lists);
       const saved = localStorage.getItem('lastPriceListId');
-      const exists = lists.some((l) => l.id === parseInt(saved));
-      const def = lists.find((l) => l.isDefault) || lists[0];
-      if (saved && exists) selectPriceList(parseInt(saved));
+      const exists = lists.some((l: any) => l.id === parseInt(saved || ''));
+      const def = lists.find((l: any) => l.isDefault) || lists[0];
+      if (saved && exists) selectPriceList(parseInt(saved, 10));
       else if (def) selectPriceList(def.id);
     } catch (e) {
       console.error('Error loading price lists:', e);
@@ -248,7 +249,7 @@ export function usePOS() {
       const trimmed = debouncedSearch.trim();
       if (trimmed && results.length === 1) {
         const product = results[0];
-        const match = (product.barcodes || []).some((b) => b.barcode === trimmed);
+        const match = (product.barcodes || []).some((b: any) => b.barcode === trimmed);
         if (match) {
           handleAddProduct(product, product.presentations?.[0], 1);
           setSearchTerm('');
@@ -308,8 +309,8 @@ export function usePOS() {
     try {
       const res = await priceListService.getById(listId);
       const data = res.data;
-      const map = {};
-      (data?.details || []).forEach((d) => {
+      const map: Record<string, any> = {};
+      (data?.details || []).forEach((d: any) => {
         map[`${d.product_id}-${d.presentation_id}`] = d;
       });
       setPriceListDetails(map);
@@ -325,7 +326,7 @@ export function usePOS() {
   // ============= PRICE HELPERS =============
   const getProductStock = useCallback((product: any) => {
     if (!product.inventories) return 0;
-    return product.inventories.reduce((sum, inv) => sum + parseFloat(inv.quantity || 0), 0);
+    return product.inventories.reduce((sum: number, inv: any) => sum + parseFloat(String(inv.quantity || 0)), 0);
   }, []);
 
   const getPrice = useCallback(
@@ -406,11 +407,11 @@ export function usePOS() {
   useEffect(() => {
     if (!activeTabId || cart.length === 0) return;
 
-    const priceMap = {};
+    const priceMap: Record<string, any> = {};
     cart.forEach(item => {
       const product = products.find(p => p.id === item.product_id);
       if (!product) return;
-      const presentation = product.presentations?.find(pr => pr.id === item.presentation_id);
+      const presentation = product.presentations?.find((pr: any) => pr.id === item.presentation_id);
       if (!presentation) return;
 
       const priceInfo = getPrice(product, presentation);
@@ -438,7 +439,7 @@ export function usePOS() {
 
   // ============= STOCK HELPERS =============
   const getProductStockDetails = useCallback((product: any, presentation: any) => {
-    const totalUnits = (product.inventories || []).reduce((s, i) => s + parseFloat(i.quantity || 0), 0);
+    const totalUnits = (product.inventories || []).reduce((s: number, i: any) => s + parseFloat(String(i.quantity || 0)), 0);
     const unitsPerPkg = parseFloat(presentation?.units_per_package) || 1;
     return {
       totalUnits,
@@ -478,7 +479,7 @@ export function usePOS() {
       await posReservationService.reserve({
         session_id: sessionId,
         tab_id: activeTabId,
-        user_id: user.id,
+        user_id: user?.id,
         product_id: product.id,
         presentation_id: presentation.id,
         units_requested: currentUnitsInCart + units,
@@ -488,7 +489,7 @@ export function usePOS() {
       const { pkgPrice, unitPrice: unitPriceFromList } = priceInfo;
       const unitPriceEach = unitPriceFromList || (pkgPrice / unitsPerPackage);
 
-      addToCart(activeTabId, {
+      addToCart(activeTabId!, {
         product_id: product.id,
         presentation_id: presentation.id,
         product_name: product.name,
@@ -501,7 +502,7 @@ export function usePOS() {
         unit_price_each: unitPriceEach,
         unit_price: sellByUnit ? unitPriceEach : pkgPrice,
         stock_units: totalStock,
-        discount_percent: customer?.discountPercentage || 0,
+        discount_percent: (customer as any)?.discountPercentage || 0,
         tax_percent: 0,
         is_frozen: priceInfo.is_frozen,
         frozen_price: priceInfo.frozen_price || null,
@@ -542,7 +543,7 @@ export function usePOS() {
         await posReservationService.reserve({
           session_id: sessionId,
           tab_id: activeTabId,
-          user_id: user.id,
+          user_id: user?.id,
           product_id: productId,
           presentation_id: presentationId,
           units_requested: otherUnits,
@@ -562,7 +563,7 @@ export function usePOS() {
         return;
       }
     }
-    removeFromCart(activeTabId, productId, presentationId, sellByUnit);
+    removeFromCart(activeTabId!, productId, presentationId, sellByUnit);
   };
 
   const handleQuantityChange = async (productId: number, presentationId: number, sellByUnit: boolean, newQty: number) => {
@@ -588,12 +589,12 @@ export function usePOS() {
       await posReservationService.reserve({
         session_id: sessionId,
         tab_id: activeTabId,
-        user_id: user.id,
+        user_id: user?.id,
         product_id: productId,
         presentation_id: presentationId,
         units_requested: totalUnitsRequested,
       });
-      updateQuantity(activeTabId, productId, presentationId, sellByUnit, newQty);
+      updateQuantity(activeTabId!, productId, presentationId, sellByUnit, newQty);
     } catch (err: any) {
       if (err.response?.status === 409) {
         setConflictData({
@@ -623,11 +624,11 @@ export function usePOS() {
       return;
     }
 
-    toggleSellMode(activeTabId, productId, presentationId, currentSellByUnit);
+    toggleSellMode(activeTabId!, productId, presentationId, currentSellByUnit);
   };
 
   const handlePriceChange = (productId: number, presentationId: number, sellByUnit: boolean, newPriceDisplay: number | string) => {
-    const rawVal = parseFloat(newPriceDisplay) || 0;
+    const rawVal = parseFloat(String(newPriceDisplay)) || 0;
 
     const item = cart.find(i =>
       i.product_id === productId &&
@@ -638,31 +639,31 @@ export function usePOS() {
     if (item?.is_frozen) {
       const toUSDRate = calculateEffectiveRate(displayCurrency, 'USD', exchangeRates) || 1;
       const usdPrice = rawVal * toUSDRate;
-      updateCartItemPrice(activeTabId, productId, presentationId, sellByUnit, usdPrice, {
+      updateCartItemPrice(activeTabId!, productId, presentationId, sellByUnit, usdPrice, {
         is_frozen: true,
         frozen_price: rawVal,
         frozen_currency: displayCurrency,
       });
     } else {
       const newPriceUSD = fromDisplay(rawVal);
-      updateCartItemPrice(activeTabId, productId, presentationId, sellByUnit, newPriceUSD);
+      updateCartItemPrice(activeTabId!, productId, presentationId, sellByUnit, newPriceUSD);
     }
   };
 
   const handleDiscountChange = (productId: number, presentationId: number, sellByUnit: boolean, val: number) => {
-    updateCartItemDiscount(activeTabId, productId, presentationId, sellByUnit, val);
+    updateCartItemDiscount(activeTabId!, productId, presentationId, sellByUnit, val);
   };
 
   const handleSetCustomer = (c: any) => {
-    setTabCustomer(activeTabId, c);
+    setTabCustomer(activeTabId!, c);
     if (c && c.discountPercentage > 0) {
-      applyDiscountToAll(activeTabId, c.discountPercentage);
+      applyDiscountToAll(activeTabId!, c.discountPercentage);
     }
   };
 
   const handleClearCustomer = () => {
-    setTabCustomer(activeTabId, null);
-    applyDiscountToAll(activeTabId, 0);
+    setTabCustomer(activeTabId!, null);
+    applyDiscountToAll(activeTabId!, 0);
   };
 
   // ============= SURCHARGE & EFFECTIVE PRICE =============
@@ -721,12 +722,12 @@ export function usePOS() {
       // Adjust payment lines for change (vuelto) using shared utility
       const { adjustedLines, changeAmount } = saleType === 'cash'
         ? adjustPaymentLinesForChange(paymentLines, totalCOP, copPerUSD, displayCurrency, COP_TOLERANCE)
-        : { adjustedLines: paymentLines, changeCOP: 0, changeAmount: '0.00' };
+        : { adjustedLines: paymentLines, changeCOP: 0, changeAmount: '0.00' } as { adjustedLines: PaymentLine[]; changeCOP: number; changeAmount: string };
 
       const result = await saleService.createSale({
-        customer_id: customer?.id || null,
+        customer_id: customer?.id ?? null,
         warehouse_id: 1,
-        sale_type: saleType,
+        sale_type: saleType as Sale['sale_type'],
         currency_mode: displayCurrency === 'USD' ? 'USD' : 'COP',
         session_id: sessionId,
         tab_id: activeTabId,

@@ -12,11 +12,24 @@ import { formatCOP, formatUSD, LOCALE } from '../utils/formatUtils';
 import { Alert, Button, Card, Skeleton, StatCard } from '../components/ui';
 import { localToday, localMonthStart } from '../utils/dateUtils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyData = Record<string, any>;
+
+interface DashboardStats {
+  today: AnyData;
+  monthRevenueCOP: number;
+  lowStock: number;
+  inventoryValueUSD: number;
+  inventoryByCurrency: Record<string, number>;
+  pendingSales: number;
+  categoriesStats: AnyData[];
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const getDashboardStats = async () => {
+  const getDashboardStats = async (): Promise<DashboardStats> => {
     const lowStockData = await inventoryService.getLowStock().catch(() => ({ data: [] }));
     const valuationData = await inventoryService.getValuation().catch(() => ({ data: { totalValue: 0 } }));
     const categoriesData = await categoryService.getAll({ limit: 100 }).catch(() => ({ data: [] }));
@@ -26,7 +39,7 @@ const Dashboard = () => {
     const todayStats = await saleService.getSalesStats({
       date_from: todayStr,
       date_to: todayStr,
-      top_limit: 5,
+      top_limit: '5',
     }).catch(() => ({ data: {} }));
 
     // Mes en curso (solo resumen)
@@ -50,19 +63,21 @@ const Dashboard = () => {
     };
   };
 
-  const { data = {}, isLoading: loading } = useQuery({
+  const { data, isLoading: loading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardStats,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   });
 
-  const today = data.today || {};
+  const stats = data || {} as Partial<DashboardStats>;
+
+  const today = stats.today || {};
   const byCurr = today.salesByCurrency || {};
   const paidCOP = byCurr.COP || { count: 0, total: 0 };
   const paidUSD = byCurr.USD || { count: 0, total: 0 };
   const topProducts = (today.topProducts || []).slice(0, 5);
-  const categoriesStats = data.categoriesStats || [];
+  const categoriesStats = stats.categoriesStats || [];
   const monthName = new Date().toLocaleDateString(LOCALE, { month: 'long' });
 
   if (loading) {
@@ -96,10 +111,10 @@ const Dashboard = () => {
       </div>
 
       {/* Alerta de stock bajo */}
-      {data.lowStock > 0 && (
+      {(stats.lowStock ?? 0) > 0 && (
         <Alert
           variant="warning"
-          title={`${data.lowStock} producto${data.lowStock !== 1 ? 's' : ''} con stock bajo`}
+          title={`${stats.lowStock} producto${stats.lowStock !== 1 ? 's' : ''} con stock bajo`}
           description="Revisa el inventario para evitar desabastecimiento."
           action={
             <Button variant="secondary" size="sm" onClick={() => navigate('/inventario')}>
@@ -139,7 +154,7 @@ const Dashboard = () => {
           />
           <StatCard
             label="Ingresos del mes"
-            value={formatCOP(data.monthRevenueCOP)}
+            value={formatCOP(stats.monthRevenueCOP ?? 0)}
             detail={monthName.charAt(0).toUpperCase() + monthName.slice(1)}
             icon={TrendUp}
             tone="primary"
@@ -154,26 +169,26 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
             label="Stock bajo"
-            value={data.lowStock}
+            value={stats.lowStock ?? 0}
             detail="Productos por debajo del punto de reorden"
             icon={Warning}
-            tone={data.lowStock > 0 ? 'warning' : 'success'}
+            tone={(stats.lowStock ?? 0) > 0 ? 'warning' : 'success'}
             onClick={() => navigate('/inventario')}
           />
           <StatCard
             label="Facturas por cobrar"
-            value={data.pendingSales}
+            value={stats.pendingSales ?? 0}
             detail="Ventas a crédito pendientes"
             icon={FileText}
-            tone={data.pendingSales > 0 ? 'warning' : 'neutral'}
+            tone={(stats.pendingSales ?? 0) > 0 ? 'warning' : 'neutral'}
             onClick={() => navigate('/cuentas-por-cobrar')}
           />
           <StatCard
             label="Valor del inventario"
-            value={formatUSD(data.inventoryValueUSD)}
+            value={formatUSD(stats.inventoryValueUSD ?? 0)}
             detail={[
-              data.inventoryByCurrency?.USD > 0 && `USD ${formatUSD(data.inventoryByCurrency.USD)}`,
-              data.inventoryByCurrency?.COP > 0 && formatCOP(data.inventoryByCurrency.COP),
+              (stats.inventoryByCurrency?.USD ?? 0) > 0 && `USD ${formatUSD(stats.inventoryByCurrency!.USD)}`,
+              (stats.inventoryByCurrency?.COP ?? 0) > 0 && formatCOP(stats.inventoryByCurrency!.COP),
             ].filter(Boolean).join(' · ') || 'Al costo de compra'}
             icon={Package}
             tone="neutral"
@@ -198,7 +213,7 @@ const Dashboard = () => {
             <p className="text-sm text-gray-400 py-6 text-center">Sin ventas registradas hoy</p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {topProducts.map((p, i) => (
+              {topProducts.map((p: AnyData, i: number) => (
                 <div key={p.product_id || i} className="flex items-center justify-between py-2.5">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="w-6 h-6 rounded-full bg-primary-50 text-primary-700 text-xs font-bold flex items-center justify-center shrink-0">
@@ -228,10 +243,10 @@ const Dashboard = () => {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {categoriesStats
-              .filter(cat => cat.productCount > 0)
-              .sort((a, b) => (b.productCount || 0) - (a.productCount || 0))
+              .filter((cat: AnyData) => cat.productCount > 0)
+              .sort((a: AnyData, b: AnyData) => (b.productCount || 0) - (a.productCount || 0))
               .slice(0, 6)
-              .map((category) => (
+              .map((category: AnyData) => (
                 <button
                   key={category.id}
                   onClick={() => navigate(`/productos?category=${category.id}`)}

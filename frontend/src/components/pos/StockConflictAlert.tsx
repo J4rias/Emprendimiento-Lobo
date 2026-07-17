@@ -43,22 +43,22 @@ export function StockConflictAlert({
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Stock total:</span>
-              <span className="font-semibold">{(parseFloat(available) + parseFloat(reservedByOthers)).toFixed(2)} uds</span>
+              <span className="font-semibold">{(parseFloat(String(available)) + parseFloat(String(reservedByOthers))).toFixed(2)} uds</span>
             </div>
 
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Reservado por otros:</span>
-              <span className="font-semibold text-amber-600">{parseFloat(reservedByOthers || 0).toFixed(2)} uds</span>
+              <span className="font-semibold text-amber-600">{parseFloat(String(reservedByOthers || 0)).toFixed(2)} uds</span>
             </div>
 
             <div className="border-t pt-2 flex justify-between text-sm font-semibold">
               <span className="text-gray-700">Disponible para ti:</span>
-              <span className="text-green-600">{Math.max(0, parseFloat(available || 0)).toFixed(2)} uds</span>
+              <span className="text-green-600">{Math.max(0, parseFloat(String(available || 0))).toFixed(2)} uds</span>
             </div>
 
             <div className="border-t pt-2 flex justify-between text-sm font-semibold bg-red-50 -mx-4 -my-2 px-4 py-2 rounded-b">
               <span className="text-red-700">Solicitaste:</span>
-              <span className="text-red-700">{parseFloat(requested || 0).toFixed(2)} uds</span>
+              <span className="text-red-700">{parseFloat(String(requested || 0)).toFixed(2)} uds</span>
             </div>
           </div>
 

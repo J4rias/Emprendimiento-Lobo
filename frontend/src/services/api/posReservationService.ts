@@ -1,15 +1,21 @@
 import api from './axios';
 
 interface ReserveData {
-  tab_id: string;
-  product_id: number;
-  quantity: number;
+  session_id: string;
+  tab_id: string | null;
   user_id?: number;
+  product_id: number;
+  presentation_id: number;
+  units_requested: number;
+  quantity?: number;
 }
 
 interface ReleaseData {
-  tab_id: string;
-  product_id: number;
+  session_id: string;
+  tab_id: string | null;
+  presentation_id: number;
+  units_to_release: number;
+  product_id?: number;
   quantity?: number;
 }
 
@@ -24,7 +30,7 @@ export const posReservationService = {
     return response.data;
   },
 
-  releaseTab: async (data: { tab_id: string; user_id?: number }) => {
+  releaseTab: async (data: { session_id: string; tab_id: string | null; user_id?: number }) => {
     const response = await api.delete('/pos/tab', { data });
     return response.data;
   },

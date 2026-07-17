@@ -18,10 +18,57 @@ const PAYMENT_METHOD_COLOR: Record<string, string> = {
 const formatMoney = (amount: string | number, currency = 'USD'): string =>
   fmtMoney(amount, currency, 2);
 
+interface PODetail {
+  id: number;
+  product?: { name: string };
+  presentation?: { name: string };
+  package_quantity: number;
+  loose_units: number;
+  received_package_quantity: number;
+  received_loose_units: number;
+  unit_cost: string | number;
+  line_total: string | number;
+}
+
+interface ReceptionRecord {
+  id: number;
+  date: string;
+  document_number?: string;
+  quantity: string | number;
+  user: string;
+}
+
+interface PaymentRecord {
+  id?: number;
+  payment_date: string;
+  payment_number: string;
+  payment_method: string;
+  allocated_amount_po_currency: string | number;
+}
+
+interface PurchaseOrder {
+  order_number: string;
+  supplier?: { name: string };
+  warehouse?: { name: string };
+  order_date: string;
+  status: string;
+  payment_status?: string;
+  invoices?: string[];
+  details?: PODetail[];
+  subtotal: string | number;
+  discount_amount: string | number;
+  tax_amount: string | number;
+  total: string | number;
+  currency: string;
+  reception_history?: ReceptionRecord[];
+  payment_history?: PaymentRecord[];
+  notes?: string;
+}
+
 interface PurchaseOrderViewSheetProps {
   open: boolean;
   onClose: () => void;
-  order: Record<string, unknown> | null;
+  order: PurchaseOrder | null;
 }
 
 const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, onClose, order }) => {
@@ -49,11 +96,11 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
 
       <div className="space-y-4">
         {/* Facturas */}
-        {order.invoices?.length > 0 && (
+        {order.invoices && order.invoices.length > 0 && (
           <section className="bg-primary-50 rounded-lg p-4 border border-primary-100">
             <p className="text-xs font-bold text-primary-600 uppercase tracking-wider mb-2">Documentos / Facturas</p>
             <div className="flex flex-wrap gap-2">
-              {order.invoices.map((inv, i) => (
+              {order.invoices.map((inv: string, i: number) => (
                 <span key={i} className="px-3 py-1 bg-white text-primary-700 font-bold rounded-full border border-primary-200 text-sm">
                   #{inv}
                 </span>
@@ -77,7 +124,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {order.details?.map((d) => (
+                {order.details?.map((d: PODetail) => (
                   <tr key={d.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-sm text-gray-900">{d.product?.name}</td>
                     <td className="px-3 py-2 text-sm text-gray-600">{d.presentation?.name}</td>
@@ -111,7 +158,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
         </section>
 
         {/* Historial de Recepciones */}
-        {order.reception_history?.length > 0 && (
+        {order.reception_history && order.reception_history.length > 0 && (
           <section className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
               <div className="w-1.5 h-4 bg-green-500 rounded-full" />
@@ -127,7 +174,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {order.reception_history.map((rec) => (
+                  {order.reception_history.map((rec: ReceptionRecord) => (
                     <tr key={rec.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-900">
                         {new Date(rec.date).toLocaleDateString(LOCALE, { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}
@@ -144,7 +191,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
         )}
 
         {/* Historial de Pagos */}
-        {order.payment_history?.length > 0 && (
+        {order.payment_history && order.payment_history.length > 0 && (
           <section className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
               <div className="w-1.5 h-4 bg-primary-500 rounded-full" />
@@ -160,7 +207,7 @@ const PurchaseOrderViewSheet: React.FC<PurchaseOrderViewSheetProps> = ({ open, o
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {order.payment_history.map((pay, i) => (
+                  {order.payment_history.map((pay: PaymentRecord, i: number) => (
                     <tr key={pay.id || i} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">
                         {formatDateShort(pay.payment_date)}

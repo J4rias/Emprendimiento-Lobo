@@ -330,8 +330,8 @@ export default function CheckoutModal({
       <CustomerSearch
         isOpen={showCustomerSearch}
         onClose={() => setShowCustomerSearch(false)}
-        onSelect={(c: Customer) => {
-          onCustomerSelect(c);
+        onSelect={(c) => {
+          onCustomerSelect(c as Customer);
           setShowCustomerSearch(false);
         }}
         validateCredit={saleType === 'credit' || saleType === 'mixed'}

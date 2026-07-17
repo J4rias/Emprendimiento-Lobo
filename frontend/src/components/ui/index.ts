@@ -1,5 +1,5 @@
 export { Button, buttonVariants } from './Button'
-export { Badge, badgeVariants } from './Badge'
+export { Badge, badgeVariants, type BadgeVariant } from './Badge'
 export { Input } from './Input'
 export { Textarea } from './Textarea'
 export { Select } from './Select'

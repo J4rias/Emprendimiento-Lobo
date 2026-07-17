@@ -48,7 +48,7 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
   }, [item]);
 
   const adjustMutation = useMutation({
-    mutationFn: (data: any) => inventoryService.adjustInventory(data),
+    mutationFn: (data: Record<string, unknown>) => inventoryService.adjustInventory(data as Parameters<typeof inventoryService.adjustInventory>[0]),
     onSuccess: () => {
       toast.success('Stock ajustado correctamente');
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -56,18 +56,19 @@ export function AdjustStockModal({ item, onClose, onSuccess }: AdjustStockModalP
       onSuccess?.();
       onClose();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al ajustar inventario'),
+    onError: (err: unknown) => toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al ajustar inventario'),
   });
 
   const handleSubmit = () => {
     const pres = getDefaultPresentation(item);
-    const unitsPerPkg = parseFloat(pres.units_per_package) || 1;
+    const unitsPerPkg = parseFloat(String(pres.units_per_package)) || 1;
     const bultos = parseFloat(form.bultos) || 0;
     const unidades = parseFloat(form.unidades) || 0;
     if ((bultos * unitsPerPkg) + unidades <= 0) {
       toast.error('Ingresa al menos una cantidad');
       return;
     }
+    if (!item) return;
     adjustMutation.mutate({
       product_id: item.product_id,
       warehouse_id: item.warehouse_id,

@@ -7,14 +7,41 @@ import { Printer, CurrencyDollar, Wallet, WarningCircle, CreditCard, ShoppingCar
 import { toast } from 'sonner';
 import { Button, Card, Input, Select, Spinner, StatCard } from '../components/ui';
 import { localToday } from '../utils/dateUtils';
-import { formatByCurrency, LOCALE } from '../utils/formatUtils';
+import { LOCALE } from '../utils/formatUtils';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = Record<string, any>;
+
+interface ActiveUser {
+    id: number;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+    is_active?: boolean;
+    name: string;
+}
+
+interface DailyReport {
+    date: string;
+    totalSalesCOP: number;
+    totalSalesUSD: number;
+    salesCount: number;
+    creditTotalUSD: number;
+    creditCollectedByCurrency: Record<string, number>;
+    cashRefunds: {
+        refund_count: number;
+        refund_by_currency: Record<string, number>;
+        refund_usd?: number;
+    };
+    paymentsBreakdown: Record<string, Record<string, number>>;
+}
 
 const DailyReportPage = () => {
     const { user, hasPermission } = useAuth();
 
     const [loading, setLoading] = useState(false);
-    const [report, setReport] = useState(null);
-    const [users, setUsers] = useState([]);
+    const [report, setReport] = useState<DailyReport | null>(null);
+    const [users, setUsers] = useState<ActiveUser[]>([]);
 
     const [filters, setFilters] = useState({ date: localToday(), user_id: '' });
 
@@ -50,8 +77,8 @@ const DailyReportPage = () => {
         }
     };
 
-    const getMethodLabel = (method) => {
-        const methods = {
+    const getMethodLabel = (method: string) => {
+        const methods: Record<string, string> = {
             cash: 'Efectivo',
             card: 'Punto de venta',
             transfer: 'Transferencia',
@@ -60,8 +87,8 @@ const DailyReportPage = () => {
         return methods[method] || method;
     };
 
-    const fmtAmount = (amount, currency = 'USD') => {
-        const val = parseFloat(amount || 0);
+    const fmtAmount = (amount: number | string, currency = 'USD') => {
+        const val = parseFloat(String(amount) || '0');
         if (currency === 'COP') return Math.round(val).toLocaleString(LOCALE);
         return val.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
@@ -78,7 +105,7 @@ const DailyReportPage = () => {
                     <td style="padding:3px 0; text-align:right; font-size:12px; font-weight:bold;">${currency === 'USD' ? '$ ' : ''}${fmtAmount(amount, currency)}</td>
                 </tr>`
             ).join('');
-            const total = Object.entries(methods).filter(([k]) => k !== '_salesCount').reduce((a, [, b]) => a + b, 0);
+            const total = Object.entries(methods).filter(([k]) => k !== '_salesCount').reduce((a, [, b]) => a + (b as number), 0);
             return `
                 <div style="margin-bottom:8px;">
                     <div style="font-weight:bold; font-size:13px; border-bottom:1px solid #000; padding-bottom:2px; margin-bottom:4px;">
@@ -123,10 +150,10 @@ const DailyReportPage = () => {
                         <td style="font-size:12px;">Cantidad</td>
                         <td style="text-align:right; font-size:12px; font-weight:bold;">${report.cashRefunds.refund_count}</td>
                     </tr>
-                    ${Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `
+                    ${Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => (v as number) > 0).map(([cur, amt]) => `
                     <tr>
                         <td style="font-size:12px;">Total ${cur}</td>
-                        <td style="text-align:right; font-size:12px; font-weight:bold;">${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)}</td>
+                        <td style="text-align:right; font-size:12px; font-weight:bold;">${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt as number, cur)}</td>
                     </tr>`).join('')}
                 </table>
                 <div style="border-top:1px dashed #000; margin:8px 0;"></div>
@@ -137,9 +164,9 @@ const DailyReportPage = () => {
                         const refundMap = report.cashRefunds?.refund_by_currency || {};
                         return Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
-                                const cash = methods.cash || 0;
-                                const refund = refundMap[currency] || 0;
-                                return [currency, cash - refund];
+                                const cash = (methods as AnyObj).cash || 0;
+                                const refund = (refundMap as AnyObj)[currency] || 0;
+                                return [currency, cash - refund] as [string, number];
                             })
                             .filter(([, amount]) => amount !== 0)
                             .map(([currency, amount]) =>
@@ -152,7 +179,7 @@ const DailyReportPage = () => {
                 </table>
                 ${(() => {
                     const usdtTotal = Object.values(report.paymentsBreakdown || {})
-                        .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
+                        .reduce((sum: number, methods) => sum + ((methods as AnyObj).usdt || 0), 0);
                     if (!usdtTotal) return '';
                     return `<div style="font-weight:bold; font-size:12px; margin-bottom:4px;">USDT recibido</div>
                     <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
@@ -219,11 +246,11 @@ const DailyReportPage = () => {
                         const currencyTotals = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
                             const total = Object.entries(methods)
                                 .filter(([k]) => k !== '_salesCount')
-                                .reduce((sum, [, amount]) => sum + amount, 0);
-                            return [currency, total];
+                                .reduce((sum: number, [, amount]) => sum + (amount as number), 0);
+                            return [currency, total] as [string, number];
                         }).filter(([, total]) => total > 0);
 
-                        const tones = { USD: 'success', COP: 'primary', VES: 'warning' };
+                        const tones: Record<string, 'success' | 'primary' | 'warning'> = { USD: 'success', COP: 'primary', VES: 'warning' };
                         return currencyTotals.length > 0 ? (
                             <div className={`grid grid-cols-1 ${currencyTotals.length >= 3 ? 'md:grid-cols-3' : currencyTotals.length === 2 ? 'md:grid-cols-2' : ''} gap-4`}>
                                 {currencyTotals.map(([currency, total]) => (
@@ -302,7 +329,7 @@ const DailyReportPage = () => {
                                     className="border-red-200"
                                 >
                                     <div className="text-2xl font-semibold text-red-600 mt-1">
-                                        {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd, 'USD')}`}
+                                        {Object.entries(report.cashRefunds.refund_by_currency || {}).filter(([, v]) => (v as number) > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt as number, cur)} ${cur}`).join(' / ') || `$ ${fmtAmount(report.cashRefunds.refund_usd ?? 0, 'USD')}`}
                                     </div>
                                 </StatCard>
                             )}
@@ -326,7 +353,7 @@ const DailyReportPage = () => {
                             ) : (
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {Object.entries(report.paymentsBreakdown).map(([currency, methods]) => {
-                                        const salesCount = methods._salesCount || 0;
+                                        const salesCount = (methods as AnyObj)._salesCount || 0;
                                         const paymentMethods = Object.entries(methods).filter(([k]) => k !== '_salesCount');
                                         return (
                                         <div key={currency} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -340,7 +367,7 @@ const DailyReportPage = () => {
                                                         <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
                                                         <span className="font-semibold text-gray-900 tabular-nums">
                                                             {currency === 'USD' ? '$' : ''}
-                                                            {amount.toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                            {(amount as number).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -348,7 +375,7 @@ const DailyReportPage = () => {
                                             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
                                                 <span className="text-gray-600">Total {currency}:</span>
                                                 <span className="text-gray-900 tabular-nums">
-                                                    {paymentMethods.reduce((a, [, b]) => a + b, 0).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                    {paymentMethods.reduce((a, [, b]) => a + (b as number), 0).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
@@ -364,15 +391,15 @@ const DailyReportPage = () => {
                         const refundMap = report.cashRefunds?.refund_by_currency || {};
                         const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
                             .map(([currency, methods]) => {
-                                const cash = methods.cash || 0;
-                                const refund = refundMap[currency] || 0;
-                                return [currency, cash - refund];
+                                const cash = (methods as AnyObj).cash || 0;
+                                const refund = (refundMap as AnyObj)[currency] || 0;
+                                return [currency, cash - refund] as [string, number];
                             })
                             .filter(([, amount]) => amount !== 0);
                         // USDT total across all currencies
-                        const usdtTotal = Object.values(report.paymentsBreakdown || {})
-                            .reduce((sum, methods) => sum + (methods.usdt || 0), 0);
-                        const hasAnyRefund = Object.values(refundMap).some(v => v > 0);
+                        const usdtTotal: number = Object.values(report.paymentsBreakdown || {})
+                            .reduce((sum: number, methods) => sum + ((methods as AnyObj).usdt || 0), 0);
+                        const hasAnyRefund = Object.values(refundMap).some((v) => (v as number) > 0);
                         if (cashByCurrency.length === 0 && !hasAnyRefund && !usdtTotal) return null;
                         return (
                             <div className="bg-gray-900 text-white p-6 rounded-lg shadow-sm">
@@ -395,7 +422,7 @@ const DailyReportPage = () => {
                                 )}
                                 {hasAnyRefund && (
                                     <p className="text-xs text-gray-400 mt-2">
-                                        Incluye descuento por devoluciones: {Object.entries(refundMap).filter(([, v]) => v > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt, cur)} ${cur}`).join(' / ')}
+                                        Incluye descuento por devoluciones: {Object.entries(refundMap).filter(([, v]) => (v as number) > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt as number, cur)} ${cur}`).join(' / ')}
                                     </p>
                                 )}
                             </div>

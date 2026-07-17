@@ -52,9 +52,9 @@ const Navbar = ({ onMenuClick }: NavbarProps): React.JSX.Element => {
                   <User className="h-5 w-5 text-gray-400 mr-2" />
                   <div>
                     <p className="font-medium text-gray-900">
-                      {user?.first_name} {user?.last_name}
+                      {user?.first_name as string} {user?.last_name as string}
                     </p>
-                    <p className="text-gray-500 text-xs">{user?.role?.name}</p>
+                    <p className="text-gray-500 text-xs">{user?.role?.name as string}</p>
                   </div>
                 </div>
 

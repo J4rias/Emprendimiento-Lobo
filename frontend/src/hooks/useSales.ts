@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { saleService } from '../services/api/saleService';
+import type { SaleListParams } from '../services/api/saleService';
+import type { Sale, SalePayment } from '../types';
 
 export const useSales = (params?: SaleListParams) => {
   return useQuery({ queryKey: ['sales', params], queryFn: () => saleService.getSales(params) });
@@ -22,7 +24,7 @@ export const useCreateSale = () => {
 
 export const useUpdateSale = () => {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: (data: { id: number; saleData: Partial<Sale> }) => saleService.updateSale(data.id, data.saleData), onSuccess: (_, { id }) => {
+  return useMutation({ mutationFn: (data: { id: number; saleData: Partial<Sale> & Record<string, unknown> }) => saleService.updateSale(data.id, data.saleData), onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales', id] });
     }, });

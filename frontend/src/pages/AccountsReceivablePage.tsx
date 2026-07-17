@@ -19,7 +19,9 @@ const BUCKETS = [
   { key: 'sin_termino', label: 'Sin término', color: 'slate' },
 ];
 
-const BUCKET_COLORS = {
+type BucketKey = 'vigente' | '0_30' | '31_60' | '61_90' | '+90' | 'sin_termino';
+
+const BUCKET_COLORS: Record<BucketKey, { bg: string; text: string; badge: string }> = {
   vigente:     { bg: 'bg-green-500',  text: 'text-green-700',  badge: 'bg-green-100 text-green-700' },
   '0_30':      { bg: 'bg-yellow-400', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
   '31_60':     { bg: 'bg-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
@@ -30,16 +32,21 @@ const BUCKET_COLORS = {
 
 // ─── Formateo ─────────────────────────────────────────────────────────────────
 
-const fmt = (n) =>
+const fmt = (n: number) =>
   new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
 
 import { formatDateShort } from '../utils/formatUtils';
 
-const fmtDate = (d) => formatDateShort(d);
+const fmtDate = (d: string) => formatDateShort(d);
 
 // ─── Barra de Aging ──────────────────────────────────────────────────────────
 
-function AgingBar({ distribution, total }) {
+interface AgingBarProps {
+  distribution: Array<{ bucket: string; pct: number; label: string; amount: number; count: number }>;
+  total: number;
+}
+
+function AgingBar({ distribution, total }: AgingBarProps) {
   if (!distribution?.length || !total) return null;
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
@@ -50,8 +57,8 @@ function AgingBar({ distribution, total }) {
         </span>
       </div>
       <div className="flex h-8 rounded-lg overflow-hidden mb-3">
-        {distribution.map(b => {
-          const colors = BUCKET_COLORS[b.bucket];
+        {distribution.map((b) => {
+          const colors = BUCKET_COLORS[b.bucket as BucketKey];
           if (!b.pct) return null;
           return (
             <div
@@ -64,8 +71,8 @@ function AgingBar({ distribution, total }) {
         })}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {distribution.map(b => {
-          const colors = BUCKET_COLORS[b.bucket];
+        {distribution.map((b) => {
+          const colors = BUCKET_COLORS[b.bucket as BucketKey];
           if (!b.count) return null;
           return (
             <div key={b.bucket} className="flex items-start gap-2">
@@ -111,7 +118,12 @@ function SkeletonCard() {
 
 // ─── Bucket filter pills ──────────────────────────────────────────────────────
 
-function BucketFilter({ activeBucket, onSelect }) {
+interface BucketFilterProps {
+  activeBucket: string;
+  onSelect: (key: string) => void;
+}
+
+function BucketFilter({ activeBucket, onSelect }: BucketFilterProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {BUCKETS.map(b => (
@@ -133,7 +145,12 @@ function BucketFilter({ activeBucket, onSelect }) {
 
 // ─── Modal PIN de configuración ──────────────────────────────────────────────
 
-function PinSetupModal({ open, onClose }) {
+interface PinSetupModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function PinSetupModal({ open, onClose }: PinSetupModalProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [show, setShow] = useState(false);
@@ -148,7 +165,8 @@ function PinSetupModal({ open, onClose }) {
       toast.success('PIN configurado exitosamente');
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Error al guardar el PIN');
+      const err = e as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Error al guardar el PIN');
     } finally {
       setLoading(false);
     }
@@ -223,14 +241,27 @@ function PinSetupModal({ open, onClose }) {
 
 // ─── Tab General ─────────────────────────────────────────────────────────────
 
-function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }) {
+interface TabProps {
+  data: Record<string, any>;
+  loading: boolean;
+  activeBucket: string;
+  onBucketSelect: (key: string) => void;
+  search: string;
+  onSearch: (v: string) => void;
+  limit: number;
+  onLimitChange: (n: number) => void;
+  currentPage: number;
+  onPageChange: (p: number) => void;
+}
+
+function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }: TabProps) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState('pending_cop');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const invoices = data?.invoices || [];
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -239,7 +270,7 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
     }
   };
 
-  const sorted = [...invoices].sort((a, b) => {
+  const sorted = [...invoices].sort((a: Record<string, any>, b: Record<string, any>) => {
     const r = a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0;
     return sortDir === 'asc' ? r : -r;
   });
@@ -248,12 +279,12 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
   const startIdx = (currentPage - 1) * limit;
   const paginated = sorted.slice(startIdx, startIdx + limit);
 
-  const SortIcon = ({ field }) => {
+  const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <span className="w-4 h-4 inline-block" />;
     return sortDir === 'asc' ? <CaretUp className="w-4 h-4" /> : <CaretDown className="w-4 h-4" />;
   };
 
-  const TH = ({ field, children }) => (
+  const TH = ({ field, children }: { field: string; children: React.ReactNode }) => (
     <th
       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
       onClick={() => handleSort(field)}
@@ -294,7 +325,7 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               ) : invoices.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <CheckCircle className="w-12 h-12 text-green-400" />
                       <p className="text-lg font-semibold text-green-700">¡Todo al día!</p>
@@ -303,8 +334,8 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
                   </td>
                 </tr>
               ) : (
-                paginated.map(inv => {
-                  const colors = BUCKET_COLORS[inv.aging_bucket] || BUCKET_COLORS.sin_termino;
+                paginated.map((inv: Record<string, any>) => {
+                  const colors = BUCKET_COLORS[inv.aging_bucket as BucketKey] || BUCKET_COLORS.sin_termino;
                   return (
                     <tr
                       key={inv.id}
@@ -348,14 +379,14 @@ function TabGeneral({ data, loading, activeBucket, onBucketSelect, search, onSea
 
 // ─── Tab Por Cliente ──────────────────────────────────────────────────────────
 
-function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }) {
+function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSearch, limit, onLimitChange, currentPage, onPageChange }: TabProps) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState('total_adeudado_cop');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const customers = data?.customers || [];
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -364,7 +395,7 @@ function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSe
     }
   };
 
-  const sorted = [...customers].sort((a, b) => {
+  const sorted = [...customers].sort((a: Record<string, any>, b: Record<string, any>) => {
     const r = a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0;
     return sortDir === 'asc' ? r : -r;
   });
@@ -423,9 +454,9 @@ function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSe
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginated.map(c => {
-              const worstColors = BUCKET_COLORS[c.worst_bucket] || BUCKET_COLORS.sin_termino;
-              const agingTotal = Object.values(c.aging || {}).reduce((s, v) => s + v, 0);
+            {paginated.map((c: Record<string, any>) => {
+              const worstColors = BUCKET_COLORS[c.worst_bucket as BucketKey] || BUCKET_COLORS.sin_termino;
+              const agingTotal = Object.values(c.aging || {}).reduce((s: number, v: unknown) => s + (v as number), 0);
               return (
                 <div
                   key={c.customer_id}
@@ -450,14 +481,14 @@ function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSe
 
                   {agingTotal > 0 && (
                     <div className="flex h-2 rounded-full overflow-hidden mb-3">
-                      {Object.entries(c.aging || {}).filter(([, v]) => v > 0).map(([bucket, amount]) => {
-                        const pct = Math.round((amount / agingTotal) * 100);
+                      {Object.entries(c.aging || {}).filter(([, v]) => (v as number) > 0).map(([bucket, amount]) => {
+                        const pct = Math.round(((amount as number) / agingTotal) * 100);
                         return (
                           <div
                             key={bucket}
-                            className={BUCKET_COLORS[bucket]?.bg || 'bg-gray-300'}
+                            className={BUCKET_COLORS[bucket as BucketKey]?.bg || 'bg-gray-300'}
                             style={{ width: `${pct}%` }}
-                            title={`${bucket}: ${fmt(amount)}`}
+                            title={`${bucket}: ${fmt(amount as number)}`}
                           />
                         );
                       })}
@@ -511,7 +542,7 @@ function TabClientes({ data, loading, activeBucket, onBucketSelect, search, onSe
 
 // ─── Tab button ───────────────────────────────────────────────────────────────
 
-const TabBtn = ({ active, onClick, children }) => (
+const TabBtn = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -548,7 +579,7 @@ export default function AccountsReceivablePage() {
     setCurrentPage(1);
   }, [activeBucket, search, activeTab]);
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setActiveBucket('all');
     setSearch('');
@@ -557,21 +588,21 @@ export default function AccountsReceivablePage() {
 
   // ── Queries ──
 
-  const queryParams = {
+  const queryParams: Record<string, string> = {
     ...(activeBucket !== 'all' && { bucket: activeBucket }),
     ...(search && { search }),
   };
 
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
     queryKey: ['ar-summary', activeBucket, search],
-    queryFn: () => arService.getSummary(queryParams).then(r => r.data),
+    queryFn: () => arService.getSummary(queryParams).then((r: Record<string, any>) => r.data),
     enabled: activeTab === 'general',
     staleTime: 60_000,
   });
 
   const { data: customersData, isLoading: loadingCustomers } = useQuery({
     queryKey: ['ar-customers', activeBucket, search],
-    queryFn: () => arService.getCustomers(queryParams).then(r => r.data),
+    queryFn: () => arService.getCustomers(queryParams).then((r: Record<string, any>) => r.data),
     enabled: activeTab === 'clientes',
     staleTime: 60_000,
   });
@@ -586,7 +617,7 @@ export default function AccountsReceivablePage() {
     if (activeTab === 'general') {
       arService.exportInvoicesCSV(queryParams);
     } else {
-      arService.exportCustomersCSV({ search: search || undefined });
+      arService.exportCustomersCSV({ search: search || '' });
     }
   };
 
@@ -596,7 +627,7 @@ export default function AccountsReceivablePage() {
     search,
     onSearch: setSearch,
     limit,
-    onLimitChange: (n) => { setLimit(n); setCurrentPage(1); },
+    onLimitChange: (n: number) => { setLimit(n); setCurrentPage(1); },
     currentPage,
     onPageChange: setCurrentPage,
   };

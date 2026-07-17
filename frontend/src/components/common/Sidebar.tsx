@@ -186,7 +186,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onCollapse }: SidebarProps): Reac
   // Auto-open the accordion that contains the current route
   useEffect(() => {
     const path = location.pathname;
-    const toOpen = new Set();
+    const toOpen = new Set<string>();
     MENU.forEach(({ items }) =>
       items.forEach(item => {
         if (item.isAccordion) {
@@ -278,7 +278,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onCollapse }: SidebarProps): Reac
     return (
       <NavLink
         key={item.path}
-        to={item.path}
+        to={item.path!}
         end={item.end}
         onClick={onClose}
         onMouseEnter={collapsed ? (e) => showTip(e, item.name) : undefined}
@@ -378,9 +378,9 @@ const Sidebar = ({ isOpen, onClose, collapsed, onCollapse }: SidebarProps): Reac
           className="pointer-events-none bg-gray-900 text-white text-xs rounded-md px-2.5 py-1.5 shadow-lg"
         >
           <div className="font-medium whitespace-nowrap">{tip.label}</div>
-          {tip.subs?.length > 0 && (
+          {(tip.subs?.length ?? 0) > 0 && (
             <div className="mt-1 space-y-0.5">
-              {tip.subs.map(s => (
+              {tip.subs!.map(s => (
                 <div key={s} className="text-gray-400 whitespace-nowrap">{s}</div>
               ))}
             </div>

@@ -22,10 +22,36 @@ const Field: React.FC<FieldProps> = ({ label, children, full }) => (
   </div>
 );
 
+interface DeliveryDetail {
+  product?: { name: string };
+  presentation?: { name: string };
+  package_quantity_delivered: number;
+  loose_units_delivered: number;
+}
+
+interface Delivery {
+  delivery_number: string;
+  sale?: { sale_number: string; sale_date: string };
+  status: string;
+  scheduled_date: string;
+  delivery_date?: string;
+  customer?: { name: string; phone?: string };
+  delivery_method: string;
+  delivery_address?: string;
+  delivery_city?: string;
+  delivery_state?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  carrier?: string;
+  tracking_number?: string;
+  details?: DeliveryDetail[];
+  notes?: string;
+}
+
 interface DeliveryViewSheetProps {
   open: boolean;
   onClose: () => void;
-  delivery: Record<string, unknown> | null;
+  delivery: Delivery | null;
 }
 
 const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, delivery }) => {
@@ -39,7 +65,7 @@ const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, de
           <h2 className="text-lg font-bold text-gray-900">{delivery.delivery_number}</h2>
           <p className="text-xs text-gray-500">
             Venta: {delivery.sale?.sale_number}
-            {delivery.sale?.sale_date && ` · ${formatDateShort(delivery.sale.sale_date)}`}
+            {delivery.sale?.sale_date ? ` · ${formatDateShort(delivery.sale.sale_date)}` : ''}
           </p>
         </div>
         <Badge variant={STATUS_VARIANT[delivery.status] || 'neutral'} className="shrink-0">
@@ -71,7 +97,7 @@ const DeliveryViewSheet: React.FC<DeliveryViewSheetProps> = ({ open, onClose, de
               {delivery.customer?.phone && <p className="text-xs text-gray-500">{delivery.customer.phone}</p>}
             </Field>
             <Field label="Método">
-              {DELIVERY_METHODS[delivery.delivery_method] || delivery.delivery_method}
+              {DELIVERY_METHODS[delivery.delivery_method] || delivery.delivery_method || '-'}
             </Field>
             <Field label="Dirección" full>
               <p>{delivery.delivery_address}</p>

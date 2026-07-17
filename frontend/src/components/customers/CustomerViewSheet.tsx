@@ -3,7 +3,8 @@ import { PencilSimple } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
 import { formatCOP } from '../../utils/formatUtils';
 
-const STATUS_VARIANT: Record<string, string> = { active: 'success', inactive: 'neutral', blocked: 'error' };
+type BadgeVariant = 'success' | 'neutral' | 'error' | 'warning' | 'info' | 'purple' | 'outline' | 'usd' | 'cop' | 'ves' | 'usdt';
+const STATUS_VARIANT: Record<string, BadgeVariant> = { active: 'success', inactive: 'neutral', blocked: 'error' };
 const STATUS_LABEL: Record<string, string>   = { active: 'Activo',  inactive: 'Inactivo', blocked: 'Bloqueado' };
 
 interface FieldProps {
@@ -35,9 +36,9 @@ interface Customer {
   address?: string | null;
   city?: string | null;
   state?: string | null;
-  creditLimit?: number | string;
+  creditLimit?: number;
   creditDays?: number;
-  discountPercentage?: number | string;
+  discountPercentage?: number;
   notes?: string | null;
 }
 
@@ -100,7 +101,7 @@ const CustomerViewSheet = ({ open, onClose, customer, onEdit, hasPermission }: C
               {formatCOP(customer.creditLimit || 0)}
             </Field>
             <Field label="Días de Crédito">{customer.creditDays || 0} días</Field>
-            <Field label="Descuento">{parseFloat(customer.discountPercentage || 0).toFixed(2)}%</Field>
+            <Field label="Descuento">{(customer.discountPercentage ?? 0).toFixed(2)}%</Field>
           </div>
         </section>
 

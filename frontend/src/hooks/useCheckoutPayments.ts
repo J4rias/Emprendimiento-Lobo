@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { bankService } from '../services/api/bankService';
-import type { PaymentLine, ExchangeRate } from '../utils/paymentUtils';
+import type { PaymentLine } from '../utils/paymentUtils';
+import type { ExchangeRate } from '../utils/paymentUtils';
 import {
   CURRENCIES,
   PAYMENT_METHODS,

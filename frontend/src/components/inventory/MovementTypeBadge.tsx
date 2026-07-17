@@ -1,6 +1,6 @@
 import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import { TrendUp, TrendDown, ArrowsLeftRight, SlidersHorizontal } from '@phosphor-icons/react';
-import { Badge } from '../ui';
+import { Badge, type BadgeVariant } from '../ui';
 
 // ─── Configuración por tipo de movimiento ─────────────────────────────────────
 //
@@ -15,7 +15,7 @@ import { Badge } from '../ui';
 type MovementType = 'ingreso' | 'egreso' | 'ajuste_positivo' | 'ajuste_negativo' | 'transferencia';
 
 interface TypeConfigEntry {
-  variant: string;
+  variant: BadgeVariant;
   label: string;
   icon: PhosphorIcon | null;
 }
@@ -40,9 +40,9 @@ interface MovementTypeBadgeProps {
 }
 
 export function MovementTypeBadge({ type, showIcon = true }: MovementTypeBadgeProps) {
-  const cfg = TYPE_CONFIG[type as MovementType] ?? {
-    variant: 'neutral',
-    label: type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—',
+  const cfg: TypeConfigEntry = TYPE_CONFIG[type as MovementType] ?? {
+    variant: 'neutral' as BadgeVariant,
+    label: type?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || '—',
     icon: null,
   };
 

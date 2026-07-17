@@ -11,11 +11,48 @@ interface PreselectedItem {
   loose_units?: number;
 }
 
-interface TransferFormData {
-  origin_warehouse_id: string;
-  destination_warehouse_id: string;
-  notes: string;
-  items: Record<string, unknown>[];
+interface TransferItemPresentation {
+  id: number;
+  name: string;
+  units_per_package: number;
+  package_cost?: number;
+  package_price?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+}
+
+interface TransferProduct {
+  id: number;
+  name: string;
+  sku?: string;
+  presentations?: TransferItemPresentation[];
+}
+
+interface AvailableProduct {
+  id: number;
+  name: string;
+  sku?: string;
+  available_quantity: number;
+  quantity: number;
+  reserved_quantity: number;
+  presentations: TransferItemPresentation[];
+  product: TransferProduct;
+}
+
+interface TransferItem {
+  _tempId: number;
+  product_id: string;
+  presentation_id: string | null;
+  package_quantity: number | string;
+  loose_units: number | string;
+  batch_id: string | null;
+  notes?: string;
+  selectedProduct?: AvailableProduct;
+}
+
+interface Warehouse {
+  id: number;
+  name: string;
 }
 
 interface TransferFormModalProps {
@@ -27,17 +64,22 @@ interface TransferFormModalProps {
 }
 
 const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, onSubmit, preselectedItems = [], sourceWarehouseId = null }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    origin_warehouse_id: string;
+    destination_warehouse_id: string;
+    notes: string;
+    items: TransferItem[];
+  }>({
     origin_warehouse_id: '',
     destination_warehouse_id: '',
     notes: '',
     items: []
   });
 
-  const [warehouses, setWarehouses] = useState([]);
-  const [availableProducts, setAvailableProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerms, setSearchTerms] = useState({}); // Un término de búsqueda por cada item
+  const [searchTerms, setSearchTerms] = useState<Record<number, string | undefined>>({}); // Un término de búsqueda por cada item
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -102,20 +144,20 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
     }
   };
 
-  const fetchAvailableProducts = async (warehouseId) => {
+  const fetchAvailableProducts = async (warehouseId: string | number) => {
     try {
-      const response = await inventoryService.getByWarehouse(warehouseId, { limit: 1000 });
+      const response = await inventoryService.getByWarehouse(Number(warehouseId), { limit: 1000 });
 
       // Extract inventory items with stock
       const inventoryData = response.data || [];
 
       // Filter products with available stock and map to include quantity info
-      const productsWithStock = inventoryData
-        .filter(item => {
+      const productsWithStock = (inventoryData as Record<string, any>[])
+        .filter((item: Record<string, any>) => {
           const availableQty = parseFloat(item.available_quantity || item.quantity || 0);
           return availableQty > 0;
         })
-        .map(item => ({
+        .map((item: Record<string, any>) => ({
           id: item.product?.id || item.product_id,
           name: item.product?.name || 'Producto sin nombre',
           sku: item.product?.sku,
@@ -134,39 +176,34 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
   };
 
   const addItem = () => {
+    const newItem: TransferItem = {
+      _tempId: Date.now(),
+      product_id: '',
+      presentation_id: null,
+      package_quantity: 0,
+      loose_units: 0,
+      batch_id: null,
+      notes: ''
+    };
     setFormData({
       ...formData,
-      items: [
-        ...formData.items,
-        {
-          _tempId: Date.now(), // Add unique temporary ID for tracking
-          product_id: '',
-          presentation_id: null,
-          package_quantity: 0,
-          loose_units: 0,
-          batch_id: null,
-          notes: ''
-        }
-      ]
+      items: [...formData.items, newItem]
     });
   };
 
   const removeItem = (index: number) => {
-    const newItems = formData.items.filter((_, i) => i !== index);
+    const newItems = formData.items.filter((_: TransferItem, i: number) => i !== index);
     setFormData({ ...formData, items: newItems });
 
     // Reorganize search terms - shift down all indices after the removed one
-    const newSearchTerms = {};
+    const newSearchTerms: Record<number, string | undefined> = {};
     Object.keys(searchTerms).forEach(key => {
       const idx = parseInt(key);
       if (idx < index) {
-        // Keep items before the removed index
         newSearchTerms[idx] = searchTerms[idx];
       } else if (idx > index) {
-        // Shift down items after the removed index
         newSearchTerms[idx - 1] = searchTerms[idx];
       }
-      // Skip the removed index
     });
     setSearchTerms(newSearchTerms);
   };
@@ -178,11 +215,11 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
     });
   };
 
-  const getFilteredProducts = (index: number) => {
+  const getFilteredProducts = (index: number): AvailableProduct[] => {
     const searchTerm = searchTerms[index] || '';
     if (!searchTerm) return availableProducts;
 
-    return availableProducts.filter(p =>
+    return availableProducts.filter((p: AvailableProduct) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -190,36 +227,37 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
 
   const updateItem = (index: number, field: string, value: string | null) => {
     const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    const updated = { ...newItems[index], [field]: value } as TransferItem;
 
     // If product changes, update its presentations
     if (field === 'product_id' && value) {
-      const product = availableProducts.find(p => p.id === parseInt(value));
+      const product = availableProducts.find((p: AvailableProduct) => p.id === parseInt(value));
 
       if (product) {
-        newItems[index].selectedProduct = product;
+        updated.selectedProduct = product;
 
         // Auto-select default presentation if available
-        const defaultPresentation = product.presentations?.find(p => p.is_default) || product.presentations?.[0];
+        const defaultPresentation = product.presentations?.find((p: TransferItemPresentation) => p.is_default) || product.presentations?.[0];
         if (defaultPresentation) {
-          newItems[index].presentation_id = defaultPresentation.id.toString();
+          updated.presentation_id = defaultPresentation.id.toString();
         } else {
-          newItems[index].presentation_id = null;
+          updated.presentation_id = null;
         }
       }
     }
 
+    newItems[index] = updated;
     setFormData({ ...formData, items: newItems });
   };
 
   // Calculate total units for an item
-  const calculateTotalUnits = (item: Record<string, unknown>, product: Record<string, unknown> | undefined) => {
+  const calculateTotalUnits = (item: TransferItem, product: AvailableProduct | undefined) => {
     if (!product) return 0;
 
-    const presentation = product.presentations?.find(p => p.id === parseInt(item.presentation_id));
+    const presentation = product.presentations?.find((p: TransferItemPresentation) => p.id === parseInt(String(item.presentation_id)));
     const unitsPerPkg = presentation?.units_per_package || 1;
-    const pkgUnits = (parseInt(item.package_quantity) || 0) * unitsPerPkg;
-    const looseUnits = parseInt(item.loose_units) || 0;
+    const pkgUnits = (parseInt(String(item.package_quantity)) || 0) * unitsPerPkg;
+    const looseUnits = parseInt(String(item.loose_units)) || 0;
     return pkgUnits + looseUnits;
   };
 
@@ -251,13 +289,13 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
       }
 
       // Validate product has presentations
-      const product = item.selectedProduct || availableProducts.find(p => p.id === parseInt(item.product_id));
+      const product = item.selectedProduct || availableProducts.find((p: AvailableProduct) => p.id === parseInt(String(item.product_id)));
       if (!product?.presentations || product.presentations.length === 0) {
         toast.error(`El producto en el ítem ${i + 1} no tiene presentaciones configuradas. Primero debes agregar una presentación al producto.`);
         return;
       }
 
-      const total = parseFloat(item.package_quantity || 0) + parseFloat(item.loose_units || 0);
+      const total = parseFloat(String(item.package_quantity || 0)) + parseFloat(String(item.loose_units || 0));
       if (total <= 0) {
         toast.error(`La cantidad debe ser mayor a cero en el ítem ${i + 1}`);
         return;
@@ -271,13 +309,13 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
         ...formData,
         origin_warehouse_id: parseInt(formData.origin_warehouse_id),
         destination_warehouse_id: parseInt(formData.destination_warehouse_id),
-        items: formData.items.map(({ _tempId, selectedProduct, ...item }) => ({
+        items: formData.items.map(({ _tempId: _t, selectedProduct: _sp, ...item }) => ({
           ...item,
-          product_id: parseInt(item.product_id),
-          presentation_id: item.presentation_id ? parseInt(item.presentation_id) : null,
-          package_quantity: parseInt(item.package_quantity) || 0,
-          loose_units: parseInt(item.loose_units) || 0,
-          batch_id: item.batch_id ? parseInt(item.batch_id) : null
+          product_id: parseInt(String(item.product_id)),
+          presentation_id: item.presentation_id ? parseInt(String(item.presentation_id)) : null,
+          package_quantity: parseInt(String(item.package_quantity)) || 0,
+          loose_units: parseInt(String(item.loose_units)) || 0,
+          batch_id: item.batch_id ? parseInt(String(item.batch_id)) : null
         }))
       };
 
@@ -408,7 +446,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
             ) : (
               <div className="space-y-4">
                 {formData.items.map((item, index) => {
-                  const product = item.selectedProduct || availableProducts.find(p => p.id === parseInt(item.product_id));
+                  const product = item.selectedProduct || availableProducts.find(p => p.id === parseInt(String(item.product_id)));
                   return (
                     <div key={item._tempId || index} className="border rounded-lg p-4 bg-gray-50">
                       <div className="flex justify-between items-start mb-4">
@@ -435,7 +473,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                               placeholder="Buscar y seleccionar producto..."
                               value={
                                 item.product_id
-                                  ? availableProducts.find(p => p.id === parseInt(item.product_id))?.name || ''
+                                  ? availableProducts.find(p => p.id === parseInt(String(item.product_id)))?.name || ''
                                   : searchTerms[index] || ''
                               }
                               onChange={(e) => {
@@ -530,7 +568,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                               {product.presentations.map(p => (
                                 <option key={p.id} value={p.id}>
                                   {p.name} - {p.units_per_package} uds/paquete
-                                  {parseFloat(p.package_price || 0) > 0 ? ` - ${parseFloat(p.package_price).toFixed(2)}` : ''}
+                                  {parseFloat(String(p.package_price || 0)) > 0 ? ` - ${parseFloat(p.package_price).toFixed(2)}` : ''}
                                   {p.is_default ? ' (Predeterminada)' : ''}
                                 </option>
                               ))}
@@ -538,7 +576,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
 
                             {/* Visual indicator for selected presentation */}
                             {item.presentation_id && (() => {
-                              const selectedPresentation = product.presentations.find(p => p.id === parseInt(item.presentation_id));
+                              const selectedPresentation = product.presentations.find(p => p.id === parseInt(String(item.presentation_id)));
                               return selectedPresentation && (
                                 <div className="mt-2 p-2 bg-primary-50 border border-primary-200 rounded text-xs text-gray-700">
                                   <div className="flex items-center gap-2">
@@ -546,7 +584,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                                     <span className="font-medium">Cada paquete contiene: {selectedPresentation.units_per_package} unidades</span>
                                   </div>
                                   {selectedPresentation.package_cost > 0 && (
-                                    <div className="mt-1 ml-5">💰 Costo/paquete: ${parseFloat(selectedPresentation.package_cost).toFixed(2)}</div>
+                                    <div className="mt-1 ml-5">💰 Costo/paquete: ${parseFloat(String(selectedPresentation.package_cost)).toFixed(2)}</div>
                                   )}
                                   {selectedPresentation.package_price > 0 && (
                                     <div className="mt-1 ml-5">💵 Precio/paquete: ${parseFloat(selectedPresentation.package_price).toFixed(2)}</div>
@@ -568,7 +606,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Cantidad de Paquetes
                             {item.presentation_id && (() => {
-                              const selectedPresentation = product?.presentations?.find(p => p.id === parseInt(item.presentation_id));
+                              const selectedPresentation = product?.presentations?.find(p => p.id === parseInt(String(item.presentation_id)));
                               return selectedPresentation && (
                                 <span className="text-xs text-gray-500 ml-1">
                                   ({selectedPresentation.units_per_package} uds/paquete)
@@ -602,7 +640,7 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                         </div>
 
                         {/* Total Units Calculation Display */}
-                        {product && item.presentation_id && (parseInt(item.package_quantity) > 0 || parseInt(item.loose_units) > 0) && (
+                        {product && item.presentation_id && (parseInt(String(item.package_quantity)) > 0 || parseInt(String(item.loose_units)) > 0) && (
                           <div className="md:col-span-2">
                             <div className="p-3 bg-green-50 border border-green-300 rounded-lg">
                               <div className="text-sm font-medium text-green-900">
@@ -610,10 +648,10 @@ const TransferFormModal: React.FC<TransferFormModalProps> = ({ isOpen, onClose, 
                               </div>
                               <div className="text-xs text-green-700 mt-1">
                                 {(() => {
-                                  const selectedPresentation = product.presentations?.find(p => p.id === parseInt(item.presentation_id));
+                                  const selectedPresentation = product.presentations?.find(p => p.id === parseInt(String(item.presentation_id)));
                                   const unitsPerPkg = selectedPresentation?.units_per_package || 1;
-                                  const pkgQty = parseInt(item.package_quantity) || 0;
-                                  const looseUnits = parseInt(item.loose_units) || 0;
+                                  const pkgQty = parseInt(String(item.package_quantity)) || 0;
+                                  const looseUnits = parseInt(String(item.loose_units)) || 0;
                                   const pkgUnits = pkgQty * unitsPerPkg;
                                   const totalUnits = pkgUnits + looseUnits;
 

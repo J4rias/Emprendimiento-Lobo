@@ -25,7 +25,52 @@ interface PrintOptions {
 /**
  * Build ticket HTML string (shared by desktop and portable print)
  */
-const buildTicketHTML = (sale: Record<string, unknown>, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): string => {
+interface SaleCustomer {
+  business_name?: string;
+  businessName?: string;
+  first_name?: string;
+  firstName?: string;
+  last_name?: string;
+  lastName?: string;
+  address?: string;
+  document_number?: string;
+  documentNumber?: string;
+  document_type?: string;
+  documentType?: string;
+  [key: string]: unknown;
+}
+
+interface SaleDetailItem {
+  id: number;
+  is_unit?: boolean;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  product?: { name: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+interface SaleSeller {
+  first_name?: string;
+  last_name?: string;
+  [key: string]: unknown;
+}
+
+interface SaleRecord {
+  sale_number?: string;
+  sale_date?: string | Date;
+  sale_type?: string;
+  subtotal?: number | string;
+  discount_amount?: number | string;
+  total?: number | string;
+  notes?: string;
+  customer?: SaleCustomer;
+  seller?: SaleSeller;
+  details?: SaleDetailItem[];
+  [key: string]: unknown;
+}
+
+const buildTicketHTML = (sale: SaleRecord, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): string => {
   const {
     displayCurrency = 'USD',
     currencySymbol = '$',
@@ -34,7 +79,7 @@ const buildTicketHTML = (sale: Record<string, unknown>, companyInfo: CompanyInfo
 
   const isCOP = displayCurrency === 'COP';
   const tFormat = (amount: string | number): string => {
-    const val = parseFloat(amount || 0) * exchangeRate;
+    const val = parseFloat(String(amount || 0)) * exchangeRate;
     if (isCOP) {
       const rounded = Math.round(val);
       return `${currencySymbol} ${rounded.toLocaleString(LOCALE)}`;
@@ -43,15 +88,15 @@ const buildTicketHTML = (sale: Record<string, unknown>, companyInfo: CompanyInfo
     return `${currencySymbol} ${roundedVal.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const subtotal = parseFloat(sale.subtotal || 0);
-  const discount = parseFloat(sale.discount_amount || 0);
+  const subtotal = parseFloat(String(sale.subtotal || 0));
+  const discount = parseFloat(String(sale.discount_amount || 0));
 
   return `
     <div style="width: 100%; max-width: 100%; padding: 0; margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.1; color: #000; overflow: hidden;">
       <!-- Sale Info -->
       <div style="margin-bottom: 8px; font-size: 13px;">
         <div style="text-align: center; font-weight: bold; margin-bottom: 4px;">PRESUPUESTO</div>
-        <div><strong>Nro:</strong> ${(sale.sale_number || '').replace(/^VEN/, 'PRE')}</div>
+        <div><strong>Nro:</strong> ${(String(sale.sale_number || '')).replace(/^VEN/, 'PRE')}</div>
         <div><strong>Fecha:</strong> ${formatDate(sale.sale_date || new Date())}</div>
 
         ${sale.customer ? `
@@ -135,7 +180,7 @@ const buildTicketHTML = (sale: Record<string, unknown>, companyInfo: CompanyInfo
 /**
  * Print sale ticket via browser print dialog (desktop)
  */
-export const printSaleTicket = (sale: Record<string, unknown>, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): void => {
+export const printSaleTicket = (sale: SaleRecord, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): void => {
   const ticketHTML = buildTicketHTML(sale, companyInfo, printOptions);
   printHTML(ticketHTML, `Ticket ${sale.sale_number}`);
 };
@@ -143,7 +188,7 @@ export const printSaleTicket = (sale: Record<string, unknown>, companyInfo: Comp
 /**
  * Print sale ticket via RawBT (portable Bluetooth thermal printer)
  */
-export const printSaleTicketPortable = (sale: Record<string, unknown>, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): void => {
+export const printSaleTicketPortable = (sale: SaleRecord, companyInfo: CompanyInfo = {}, printOptions: PrintOptions = {}): void => {
   const ticketHTML = buildTicketHTML(sale, companyInfo, printOptions);
   printPortable(ticketHTML);
 };

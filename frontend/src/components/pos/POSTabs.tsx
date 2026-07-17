@@ -11,7 +11,7 @@ import { toast } from 'sonner';
  * - Each tab has its own cart
  * - Confirmation when closing tab with items
  */
-export default function POSTabs({ onTabClose = null }) {
+export default function POSTabs({ onTabClose = null }: { onTabClose?: ((tabId: string) => void) | null }) {
   const { tabs, activeTabId, addTab, closeTab, setActiveTab } = usePOSStore(
     useShallow(s => ({
       tabs: s.tabs, activeTabId: s.activeTabId,
@@ -32,7 +32,7 @@ export default function POSTabs({ onTabClose = null }) {
     toast.success('Nueva venta abierta');
   };
 
-  const handleCloseTab = (tabId) => {
+  const handleCloseTab = (tabId: string) => {
     const tab = tabs.find(t => t.id === tabId);
 
     // If tab has items, ask for confirmation

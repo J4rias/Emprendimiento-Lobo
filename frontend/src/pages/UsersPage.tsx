@@ -11,7 +11,37 @@ import {
 } from '../components/ui';
 import { formatDateShort } from '../utils/formatUtils';
 
-const emptyForm = () => ({
+interface UserRow {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  role_id: string | number;
+  is_active: boolean;
+  role?: { id: number; name: string };
+  last_login?: string;
+  [key: string]: unknown;
+}
+
+interface RoleRow {
+  id: number;
+  name: string;
+}
+
+interface UserFormData {
+  username: string;
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  role_id: string;
+  is_active: boolean;
+}
+
+const emptyForm = (): UserFormData => ({
   username: '',
   email: '',
   password: '',
@@ -32,9 +62,9 @@ const UsersPage = () => {
 
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [toggleTarget, setToggleTarget] = useState(null);
-  const [formData, setFormData] = useState(emptyForm());
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [toggleTarget, setToggleTarget] = useState<UserRow | null>(null);
+  const [formData, setFormData] = useState<UserFormData>(emptyForm());
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
   const {
@@ -56,8 +86,8 @@ const UsersPage = () => {
     staleTime: Infinity,
   });
 
-  const usersRaw = usersData?.data || [];
-  const roles    = rolesData?.data?.roles || [];
+  const usersRaw: UserRow[] = usersData?.data || [];
+  const roles: RoleRow[] = rolesData?.data?.roles || [];
 
   const { sortBy: userSortBy, sortDir: userSortDir, onSort: userOnSort, sortedData: users } = useTableSort(usersRaw);
 
@@ -65,7 +95,7 @@ const UsersPage = () => {
   const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['users'] });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: (data: Record<string, unknown>) => {
       if (editingUser) return userService.update(editingUser.id, data);
       return userService.create(data);
     },
@@ -74,19 +104,19 @@ const UsersPage = () => {
       handleCloseModal();
       invalidateUsers();
     },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Error al guardar el usuario');
+    onError: (err: unknown) => {
+      toast.error((err as any)?.response?.data?.message || 'Error al guardar el usuario');
     },
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (user) => userService.update(user.id, { is_active: !user.is_active }),
-    onSuccess: (_, user) => {
+    mutationFn: (user: UserRow) => userService.update(user.id, { is_active: !user.is_active }),
+    onSuccess: (_: unknown, user: UserRow) => {
       toast.success(user.is_active ? 'Usuario desactivado' : 'Usuario activado');
       invalidateUsers();
     },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Error al actualizar el usuario');
+    onError: (err: unknown) => {
+      toast.error((err as any)?.response?.data?.message || 'Error al actualizar el usuario');
     },
   });
 
@@ -97,7 +127,7 @@ const UsersPage = () => {
     setFormData(emptyForm());
   };
 
-  const handleEdit = (user) => {
+  const handleEdit = (user: UserRow) => {
     setEditingUser(user);
     setFormData({
       username:   user.username,
@@ -106,33 +136,33 @@ const UsersPage = () => {
       first_name: user.first_name,
       last_name:  user.last_name,
       phone:      user.phone || '',
-      role_id:    user.role_id,
+      role_id:    String(user.role_id),
       is_active:  user.is_active,
     });
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...formData };
-    if (editingUser && !payload.password) delete payload.password;
+    const payload: Record<string, unknown> = { ...formData };
+    if (editingUser && !formData.password) delete payload.password;
     saveMutation.mutate(payload);
   };
 
-  const set = (field) => (e) =>
+  const set = (field: keyof UserFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v) => v },
-    { key: 'name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_, r) => `${r.first_name} ${r.last_name}` },
-    { key: 'email',     header: 'Email',    render: (v) => v },
-    { key: 'phone',     header: 'Teléfono', render: (_, r) => r.phone || '—' },
-    { key: 'role',      header: 'Rol',      render: (_, r) => r.role?.name || '—' },
+    { key: 'username', header: 'Usuario', sortable: true, sortKey: 'username', render: (v: string) => v },
+    { key: 'name', header: 'Nombre', sortable: true, sortKey: 'first_name', render: (_: unknown, r: UserRow) => `${r.first_name} ${r.last_name}` },
+    { key: 'email',     header: 'Email',    render: (v: string) => v },
+    { key: 'phone',     header: 'Teléfono', render: (_: unknown, r: UserRow) => r.phone || '—' },
+    { key: 'role',      header: 'Rol',      render: (_: unknown, r: UserRow) => r.role?.name || '—' },
     {
       key: 'status',
       header: 'Estado',
-      render: (_, r) => (
+      render: (_: unknown, r: UserRow) => (
         <Badge variant={r.is_active ? 'success' : 'neutral'}>
           {r.is_active ? 'Activo' : 'Inactivo'}
         </Badge>
@@ -143,7 +173,7 @@ const UsersPage = () => {
       header: 'Último acceso',
       sortable: true,
       sortKey: 'last_login',
-      render: (_, r) =>
+      render: (_: unknown, r: UserRow) =>
         r.last_login
           ? formatDateShort(r.last_login)
           : 'Nunca',
@@ -152,7 +182,7 @@ const UsersPage = () => {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, r) => (
+      render: (_: unknown, r: UserRow) => (
         <div className="flex gap-1">
           {hasPermission('users.update') && (
             <>
@@ -201,7 +231,7 @@ const UsersPage = () => {
           <div className="w-52">
             <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
               <option value="">Todos los roles</option>
-              {roles.map((role) => (
+              {roles.map((role: RoleRow) => (
                 <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </Select>
@@ -279,7 +309,7 @@ const UsersPage = () => {
               required
             >
               <option value="">Seleccione un rol</option>
-              {roles.map((role) => (
+              {roles.map((role: RoleRow) => (
                 <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </Select>
@@ -312,7 +342,7 @@ const UsersPage = () => {
       <ConfirmDialog
         open={!!toggleTarget}
         onClose={() => setToggleTarget(null)}
-        onConfirm={() => { toggleMutation.mutate(toggleTarget); setToggleTarget(null); }}
+        onConfirm={() => { if (toggleTarget) toggleMutation.mutate(toggleTarget); setToggleTarget(null); }}
         loading={toggleMutation.isPending}
         title={`${toggleTarget?.is_active ? 'Desactivar' : 'Activar'} usuario`}
         description={`${toggleTarget?.first_name} ${toggleTarget?.last_name} ${toggleTarget?.is_active ? 'perderá acceso al sistema.' : 'recuperará acceso al sistema.'}`}

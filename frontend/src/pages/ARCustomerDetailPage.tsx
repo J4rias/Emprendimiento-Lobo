@@ -15,15 +15,17 @@ import { LOCALE, formatDateShort } from '../utils/formatUtils';
 
 // ─── Utilidades ────────────────────────────────────────────────────────────────
 
-const fmt = (amount) =>
+const fmt = (amount: number | string) =>
   new Intl.NumberFormat('es-VE', {
     style: 'currency', currency: 'COP',
     minimumFractionDigits: 0, maximumFractionDigits: 0
-  }).format(parseFloat(amount) || 0);
+  }).format(parseFloat(String(amount)) || 0);
 
-const fmtDate = (d) => formatDateShort(d);
+const fmtDate = (d: string) => formatDateShort(d);
 
-const BUCKET_COLORS = {
+type BucketKey = 'vigente' | '0_30' | '31_60' | '61_90' | '+90' | 'sin_termino';
+
+const BUCKET_COLORS: Record<BucketKey, string> = {
   vigente:     'bg-green-100 text-green-800',
   '0_30':      'bg-yellow-100 text-yellow-800',
   '31_60':     'bg-orange-100 text-orange-800',
@@ -32,28 +34,43 @@ const BUCKET_COLORS = {
   sin_termino: 'bg-gray-100 text-gray-600',
 };
 
-const BUCKET_LABELS = {
+const BUCKET_LABELS: Record<BucketKey, string> = {
   vigente: 'Vigente', '0_30': '0-30d', '31_60': '31-60d',
   '61_90': '61-90d', '+90': '+90d', sin_termino: 'Sin término',
 };
 
-const METHOD_LABELS = {
+const METHOD_LABELS: Record<string, string> = {
   cash: 'Efectivo', transfer: 'Transferencia', card: 'Tarjeta',
   check: 'Cheque', credit_balance: 'Monedero', usdt: 'USDT',
 };
 
-function canReverseEntry(entry) {
+interface LedgerEntry {
+  id: string;
+  date: string;
+  type: string;
+  amount: number;
+  currency: string;
+  reference?: string;
+  description?: string;
+  can_reverse?: boolean;
+  isInternal?: boolean;
+  original_data?: Record<string, any>;
+  runningBalance: number;
+  [key: string]: unknown;
+}
+
+function canReverseEntry(entry: LedgerEntry) {
   if (entry.type !== 'payment' && entry.type !== 'internal_transfer') return false;
   return entry.can_reverse === true;
 }
 
 // ─── Detalle expandible: Venta ─────────────────────────────────────────────────
 
-const SaleExpandedDetail = ({ transaction }) => {
+const SaleExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) => {
   const { data: detail, isLoading } = useQuery({
-    queryKey: ['sale-detail-ar', transaction.original_data.id],
-    queryFn: () => saleService.getSaleById(transaction.original_data.id)
-      .then(r => { const d = r.data || r; return d.sale || d; }),
+    queryKey: ['sale-detail-ar', transaction.original_data?.id],
+    queryFn: () => saleService.getSaleById(transaction.original_data!.id)
+      .then((r: any) => { const d = r.data || r; return d.sale || d; }),
     staleTime: 5 * 60_000,
   });
 
@@ -89,7 +106,7 @@ const SaleExpandedDetail = ({ transaction }) => {
             </tr>
           </thead>
           <tbody>
-            {detail.details.map((item, i) => {
+            {detail.details.map((item: any, i: number) => {
               const unitPrice = parseFloat(item.unit_price || 0);
               const qty = parseFloat(item.quantity || 0);
               const subtotal = parseFloat(item.subtotal || unitPrice * qty);
@@ -108,7 +125,7 @@ const SaleExpandedDetail = ({ transaction }) => {
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-orange-200 bg-orange-50">
-              <td colSpan="3" className="px-3 py-1.5 text-right font-semibold text-orange-800">Total</td>
+              <td colSpan={3} className="px-3 py-1.5 text-right font-semibold text-orange-800">Total</td>
               <td className="px-3 py-1.5 text-right font-bold text-orange-800">{fmt(parseFloat(detail.total || 0) * rate)}</td>
             </tr>
           </tfoot>
@@ -120,7 +137,7 @@ const SaleExpandedDetail = ({ transaction }) => {
           <div className="bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800">Devoluciones Aplicadas</div>
           <table className="w-full text-xs">
             <tbody>
-              {appliedCNs.map(cn => (
+              {appliedCNs.map((cn: any) => (
                 <tr key={cn.id} className="border-t border-primary-100">
                   <td className="px-3 py-1.5 text-primary-700 font-medium">{cn.number}</td>
                   <td className="px-3 py-1.5 text-gray-500">{fmtDate(cn.date)}</td>
@@ -137,8 +154,8 @@ const SaleExpandedDetail = ({ transaction }) => {
 
 // ─── Detalle expandible: Pago ──────────────────────────────────────────────────
 
-const PaymentExpandedDetail = ({ transaction }) => {
-  const pay = transaction.original_data;
+const PaymentExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) => {
+  const pay = transaction.original_data!;
   const rate = parseFloat(
     (pay.exchange_rate && parseFloat(pay.exchange_rate) !== 1)
       ? pay.exchange_rate
@@ -176,15 +193,15 @@ const PaymentExpandedDetail = ({ transaction }) => {
 
 // ─── Detalle expandible: Nota de Crédito ──────────────────────────────────────
 
-const CreditNoteExpandedDetail = ({ transaction }) => {
-  const note = transaction.original_data;
+const CreditNoteExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) => {
+  const note = transaction.original_data!;
   const rate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
   const totalCOP = Math.ceil(parseFloat(note.total || 0) * rate);
-  const refundLabels = {
+  const refundLabels: Record<string, string> = {
     credit_balance: 'Monedero (Saldo a Favor)', cash: 'Efectivo',
     transfer: 'Transferencia', none: 'Sin reembolso'
   };
-  const typeLabels = { full: 'Devolución Total', partial: 'Devolución Parcial' };
+  const typeLabels: Record<string, string> = { full: 'Devolución Total', partial: 'Devolución Parcial' };
   return (
     <div className="flex flex-wrap gap-6 text-xs text-gray-600">
       <div><span className="font-medium block text-gray-500 mb-0.5">Tipo</span>{typeLabels[note.type] || note.type}</div>
@@ -199,14 +216,20 @@ const CreditNoteExpandedDetail = ({ transaction }) => {
 
 // ─── Modal de Reversión (2 pasos) ─────────────────────────────────────────────
 
-const ReversalModal = ({ payment, onClose, onSuccess }) => {
+interface ReversalModalProps {
+  payment: LedgerEntry;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const ReversalModal = ({ payment, onClose, onSuccess }: ReversalModalProps) => {
   const [step, setStep] = useState(1);
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
   const [shaking, setShaking] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const pay = payment.original_data;
+  const pay = payment.original_data!;
   const rate = parseFloat(
     (pay.exchange_rate && parseFloat(pay.exchange_rate) !== 1)
       ? pay.exchange_rate
@@ -221,7 +244,7 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
     setTimeout(() => setShaking(false), 500);
   };
 
-  const submitReversal = async (pin) => {
+  const submitReversal = async (pin: string) => {
     if (loading) return;
     setLoading(true);
     try {
@@ -229,7 +252,8 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
       toast.success('Abono revertido exitosamente');
       onSuccess();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Error al revertir el abono';
+      const e = err as { response?: { data?: { message?: string } } };
+      const msg = e.response?.data?.message || 'Error al revertir el abono';
       setPinError(msg);
       setPinValue('');
       triggerShake();
@@ -238,14 +262,14 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
     }
   };
 
-  const handlePinChange = (e) => {
+  const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6);
     setPinValue(val);
     setPinError('');
     if (val.length === 6) submitReversal(val);
   };
 
-  const handlePinKeyDown = (e) => {
+  const handlePinKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && pinValue.length >= 4) submitReversal(pinValue);
   };
 
@@ -384,7 +408,7 @@ const ReversalModal = ({ payment, onClose, onSuccess }) => {
 
 // ─── Tarjeta de resumen ────────────────────────────────────────────────────────
 
-const SummaryCard = ({ title, value, icon: Icon, colorClass }) => (
+const SummaryCard = ({ title, value, icon: Icon, colorClass }: { title: string; value: number; icon: React.ElementType; colorClass: string }) => (
   <div className={`rounded-xl p-4 border ${colorClass}`}>
     <div className="flex items-center justify-between mb-1">
       <p className="text-sm font-medium opacity-80">{title}</p>
@@ -402,10 +426,10 @@ const ARCustomerDetailPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
-  const [expandedId, setExpandedId] = useState(null);
-  const [reversalPayment, setReversalPayment] = useState(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [reversalPayment, setReversalPayment] = useState<LedgerEntry | null>(null);
   const [sortField, setSortField] = useState('date');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useTableLimit();
 
@@ -413,7 +437,7 @@ const ARCustomerDetailPage = () => {
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['ar-customer-statement', id],
-    queryFn: () => arService.getCustomerStatement(id).then(r => r.data),
+    queryFn: () => arService.getCustomerStatement(Number(id)).then((r: any) => r.data),
     staleTime: 60_000,
   });
 
@@ -421,15 +445,15 @@ const ARCustomerDetailPage = () => {
     if (!data?.ledger) return [];
     let runningBalance = 0;
     const ledger = data.ledger
-      .filter(t => t.currency === 'COP')
-      .map(t => {
+      .filter((t: any) => t.currency === 'COP')
+      .map((t: any) => {
         runningBalance = t.type === 'charge'
           ? runningBalance + t.amount
           : runningBalance - t.amount;
         return { ...t, runningBalance };
       });
 
-    return [...ledger].sort((a, b) => {
+    return [...ledger].sort((a: Record<string, any>, b: Record<string, any>) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
       if (sortField === 'created_at' || sortField === 'date') {
@@ -448,7 +472,7 @@ const ARCustomerDetailPage = () => {
   const startIdx = (currentPage - 1) * limit;
   const paginatedLedger = copLedger.slice(startIdx, startIdx + limit);
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -458,14 +482,14 @@ const ARCustomerDetailPage = () => {
     setCurrentPage(1);
   };
 
-  const SortIcon = ({ field }) => {
+  const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <span className="w-4 h-4 inline-block" />;
     return sortDir === 'asc' ? <CaretUp className="w-4 h-4" /> : <CaretDown className="w-4 h-4" />;
   };
 
   // ─── Fila del ledger ──────────────────────────────────────────────────────
 
-  const renderRow = (entry) => {
+  const renderRow = (entry: LedgerEntry) => {
     const isCharge = entry.type === 'charge';
     const isCredit = entry.type === 'credit';
     const isPayment = entry.type === 'payment' || entry.type === 'internal_transfer';
@@ -474,7 +498,7 @@ const ARCustomerDetailPage = () => {
     const aging = entry.original_data?.aging_bucket;
 
     let typeLabel = '';
-    let TypeIcon = null;
+    let TypeIcon: React.ElementType | null = null;
     let rowBg = '';
     if (isCharge) {
       typeLabel = 'Cargo'; TypeIcon = ArrowDownRight; rowBg = 'hover:bg-orange-50/50';
@@ -523,8 +547,8 @@ const ARCustomerDetailPage = () => {
           </td>
           <td className="px-2 py-3 hidden lg:table-cell">
             {isCharge && aging && (
-              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${BUCKET_COLORS[aging] || 'bg-gray-100 text-gray-600'}`}>
-                {BUCKET_LABELS[aging] || aging}
+              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${BUCKET_COLORS[aging as BucketKey] || 'bg-gray-100 text-gray-600'}`}>
+                {BUCKET_LABELS[aging as BucketKey] || aging}
               </span>
             )}
           </td>
@@ -581,10 +605,11 @@ const ARCustomerDetailPage = () => {
   }
 
   if (isError || !data) {
+    const errObj = error as { response?: { data?: { message?: string } } } | null;
     return (
       <div className="p-6 space-y-4">
         <Alert variant="error">
-          {error?.response?.data?.message || 'Error al cargar el estado de cuenta'}
+          {errObj?.response?.data?.message || 'Error al cargar el estado de cuenta'}
         </Alert>
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
@@ -717,7 +742,7 @@ const ARCustomerDetailPage = () => {
               total={copLedger.length}
               limit={limit}
               onPageChange={setCurrentPage}
-              onLimitChange={(n) => { setLimit(n); setCurrentPage(1); }}
+              onLimitChange={(n: number) => { setLimit(n); setCurrentPage(1); }}
             />
           </>
         )}

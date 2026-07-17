@@ -28,7 +28,7 @@ const CreditNotesPage = () => {
   const { data: notesData, isLoading: loading, refetch } = useQuery({
     queryKey: ['credit-notes', filters, limit],
     queryFn: () => creditNoteService.getAll({ ...filters, limit }),
-    keepPreviousData: true,
+    placeholderData: (prev: unknown) => prev,
     staleTime: 30_000,
   });
 
@@ -38,15 +38,16 @@ const CreditNotesPage = () => {
     staleTime: 60_000,
   });
 
-  const creditNotes = notesData?.data || [];
-  const pagination = notesData?.pagination || { total: 0, totalPages: 0 };
+  const notesResult = notesData as { data?: unknown[]; pagination?: { total: number; totalPages: number } } | undefined;
+  const creditNotes = notesResult?.data || [];
+  const pagination = notesResult?.pagination || { total: 0, totalPages: 0 };
   const stats = statsData?.data || null;
 
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     setFilters(prev => ({ ...prev, page: newPage }));
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'draft':
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><Clock className="w-4 h-4 mr-1" /> Borrador</span>;
@@ -61,7 +62,7 @@ const CreditNotesPage = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number | string) => {
     return new Intl.NumberFormat('es-VE', {
       style: 'currency',
       currency: 'COP'

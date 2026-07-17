@@ -36,6 +36,8 @@ export interface Product {
   category?: Pick<Category, 'id' | 'name'>;
   brand?: Pick<Brand, 'id' | 'name'>;
   presentations?: ProductPresentation[];
+  barcodes?: { barcode: string; [key: string]: unknown }[];
+  inventories?: { quantity: number | string; [key: string]: unknown }[];
 }
 
 // ── Customer ──
@@ -68,7 +70,7 @@ export interface SaleDetail {
 export interface Sale {
   id: number;
   sale_number: string;
-  sale_type: 'cash' | 'credit' | 'mixed';
+  sale_type: 'cash' | 'credit' | 'mixed' | 'pos_pending';
   status: 'completed' | 'pending' | 'cancelled';
   total: number;
   exchange_rate: number;

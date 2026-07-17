@@ -14,20 +14,20 @@ const LoginPage = () => {
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(f => ({ ...f, [e.target.name]: e.target.value }));
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       await login(formData.username, formData.password);
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Credenciales incorrectas. Verifique e intente de nuevo.');
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Credenciales incorrectas. Verifique e intente de nuevo.');
     } finally {
       setLoading(false);
     }

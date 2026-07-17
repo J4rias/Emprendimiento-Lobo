@@ -20,9 +20,37 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 import { formatDateShort } from '../utils/formatUtils';
 
-const fmtDate = (d) => formatDateShort(d);
+interface Contact {
+  name: string;
+  email?: string;
+  phone?: string;
+  is_primary?: boolean;
+  [key: string]: unknown;
+}
 
-const emptyForm = () => ({
+interface SupplierRow {
+  id: number;
+  name: string;
+  tax_id?: string;
+  payment_terms?: string;
+  notes?: string;
+  is_active: boolean;
+  contacts?: Contact[];
+  [key: string]: unknown;
+}
+
+interface SupplierFormData {
+  name: string;
+  tax_id: string;
+  payment_terms: string;
+  notes: string;
+  is_active: boolean;
+  contacts: Contact[];
+}
+
+const fmtDate = (d: string) => formatDateShort(d);
+
+const emptyForm = (): SupplierFormData => ({
   name: '', tax_id: '', payment_terms: '', notes: '', is_active: true, contacts: [],
 });
 
@@ -38,18 +66,18 @@ const SuppliersPage = () => {
 
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState(null);
-  const [viewingSupplier, setViewingSupplier] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [formData, setFormData] = useState(emptyForm());
+  const [editingSupplier, setEditingSupplier] = useState<SupplierRow | null>(null);
+  const [viewingSupplier, setViewingSupplier] = useState<SupplierRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SupplierRow | null>(null);
+  const [formData, setFormData] = useState<SupplierFormData>(emptyForm());
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: supSortBy, sortDir: supSortDir, onSort: _supOnSort } = useTableSort([], { serverSide: true, defaultField: 'name', defaultDir: 'asc' });
-  const supOnSort = (f, d) => { _supOnSort(f, d); setCurrentPage(1); };
+  const supOnSort = (f: string, d: 'asc' | 'desc') => { _supOnSort(f, d); setCurrentPage(1); };
 
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
-    data: suppliersData = {},
+    data: suppliersData,
     isLoading,
     isError: fetchError,
   } = useQuery({
@@ -58,7 +86,7 @@ const SuppliersPage = () => {
     staleTime: 30_000,
   });
 
-  const suppliers  = suppliersData?.data || [];
+  const suppliers: SupplierRow[]  = suppliersData?.data || [];
   const totalPages = suppliersData?.pagination?.totalPages || 1;
   const total      = suppliersData?.pagination?.total || 0;
 
@@ -66,7 +94,7 @@ const SuppliersPage = () => {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['suppliers'] });
 
   const saveMutation = useMutation({
-    mutationFn: (data) =>
+    mutationFn: (data: Record<string, unknown>) =>
       editingSupplier
         ? supplierService.update(editingSupplier.id, data)
         : supplierService.create(data),
@@ -75,18 +103,18 @@ const SuppliersPage = () => {
       handleCloseModal();
       invalidate();
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Error al guardar el proveedor'),
+    onError: (err: unknown) => toast.error((err as any)?.response?.data?.message || 'Error al guardar el proveedor'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => supplierService.delete(id),
+    mutationFn: (id: number) => supplierService.delete(id),
     onSuccess: () => {
       toast.success('Proveedor desactivado exitosamente');
       setDeleteTarget(null);
       invalidate();
     },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Error al eliminar el proveedor');
+    onError: (err: unknown) => {
+      toast.error((err as any)?.response?.data?.message || 'Error al eliminar el proveedor');
       setDeleteTarget(null);
     },
   });
@@ -98,7 +126,7 @@ const SuppliersPage = () => {
     setFormData(emptyForm());
   };
 
-  const handleEdit = (supplier) => {
+  const handleEdit = (supplier: SupplierRow) => {
     setEditingSupplier(supplier);
     setFormData({
       name:          supplier.name || '',
@@ -112,7 +140,7 @@ const SuppliersPage = () => {
     setShowModal(true);
   };
 
-  const set = (field) => (e) =>
+  const set = (field: keyof SupplierFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
   // ─── Table columns ───────────────────────────────────────────────────────────
@@ -122,7 +150,7 @@ const SuppliersPage = () => {
       header: 'Proveedor',
       sortable: true,
       sortKey: 'name',
-      render: (_, row) => (
+      render: (_: unknown, row: SupplierRow) => (
         <div className="flex items-center gap-3">
           <Building className="h-5 w-5 text-gray-400 shrink-0" />
           <div>
@@ -135,10 +163,10 @@ const SuppliersPage = () => {
     {
       key: 'contact',
       header: 'Contacto',
-      render: (_, row) => {
+      render: (_: unknown, row: SupplierRow) => {
         if (!row.contacts?.length)
           return <span className="text-sm text-gray-400">Sin contactos</span>;
-        const primary = row.contacts.find((c) => c.is_primary) || row.contacts[0];
+        const primary = row.contacts.find((c: Contact) => c.is_primary) || row.contacts[0];
         return (
           <div className="text-sm space-y-0.5">
             <div className="flex items-center gap-1.5 font-medium text-gray-900">
@@ -167,7 +195,7 @@ const SuppliersPage = () => {
       header: 'Estado',
       sortable: true,
       sortKey: 'is_active',
-      render: (_, row) => (
+      render: (_: unknown, row: SupplierRow) => (
         <Badge variant={row.is_active ? 'success' : 'error'}>
           {row.is_active ? 'Activo' : 'Inactivo'}
         </Badge>
@@ -177,7 +205,7 @@ const SuppliersPage = () => {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_: unknown, row: SupplierRow) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => setViewingSupplier(row)} />
           <StatementAction onClick={() => navigate(`/proveedores/${row.id}/estado-cuenta`)} />
@@ -219,7 +247,7 @@ const SuppliersPage = () => {
       <Card variant="flat">
         <SearchInput
           value={search}
-          onChange={(value) => { setSearch(value); setCurrentPage(1); }}
+          onChange={(value: string) => { setSearch(value); setCurrentPage(1); }}
           placeholder="Buscar proveedores..."
         />
       </Card>
@@ -241,7 +269,7 @@ const SuppliersPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -262,7 +290,7 @@ const SuppliersPage = () => {
           </>
         }
       >
-        <form id="supplier-form" onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(formData); }} className="space-y-4">
+        <form id="supplier-form" onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(formData as unknown as Record<string, unknown>); }} className="space-y-4">
           <Input label="Nombre del Proveedor *" name="name" value={formData.name} onChange={set('name')} required />
           <div className="grid grid-cols-2 gap-4">
             <Input label="RIF / Tax ID" name="tax_id" value={formData.tax_id} onChange={set('tax_id')} placeholder="Ej: J-123456789" />
@@ -272,7 +300,7 @@ const SuppliersPage = () => {
             <label className="block text-xs font-medium text-gray-600 mb-1">Contactos del Proveedor</label>
             <SupplierContactManager
               contacts={formData.contacts}
-              onChange={(contacts) => setFormData((prev) => ({ ...prev, contacts }))}
+              onChange={(contacts: Contact[]) => setFormData((prev) => ({ ...prev, contacts }))}
               readonly={false}
             />
           </div>
@@ -285,7 +313,7 @@ const SuppliersPage = () => {
         open={!!viewingSupplier}
         onClose={() => setViewingSupplier(null)}
         supplier={viewingSupplier}
-        onEdit={() => { handleEdit(viewingSupplier); setViewingSupplier(null); }}
+        onEdit={() => { if (viewingSupplier) handleEdit(viewingSupplier); setViewingSupplier(null); }}
         hasPermission={hasPermission}
       />
 
@@ -293,7 +321,7 @@ const SuppliersPage = () => {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
         loading={deleteMutation.isPending}
         variant="danger"
         title="¿Desactivar este proveedor?"

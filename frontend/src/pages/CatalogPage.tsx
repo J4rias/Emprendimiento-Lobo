@@ -54,7 +54,7 @@ const CatalogPage = () => {
   }, [data, search]);
 
   const groupedByCategory = useMemo(() => {
-    const groups = {};
+    const groups: Record<number, { name: string; products: CatalogProduct[] }> = {};
     filtered.forEach(p => {
       if (!groups[p.category_id]) groups[p.category_id] = { name: p.category_name, products: [] };
       groups[p.category_id].products.push(p);
@@ -73,13 +73,13 @@ const CatalogPage = () => {
   const topProductsList = useMemo(() => {
     if (!data) return [];
     const map = new Map(data.products.map(p => [p.id, p]));
-    return (data.topProducts || []).map(id => map.get(id)).filter(Boolean);
+    return (data.topProducts || []).map(id => map.get(id)).filter((p): p is CatalogProduct => !!p);
   }, [data]);
 
   const newArrivalsList = useMemo(() => {
     if (!data) return [];
     const map = new Map(data.products.map(p => [p.id, p]));
-    return (data.newArrivals || []).map(id => map.get(id)).filter(Boolean);
+    return (data.newArrivals || []).map(id => map.get(id)).filter((p): p is CatalogProduct => !!p);
   }, [data]);
 
   if (loading) return <LoadingScreen />;
@@ -132,7 +132,7 @@ const CatalogPage = () => {
                 onClick={() => scrollToCategory(cat.id)}
                 className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${activeCategory === cat.id ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
-                {CATEGORY_ICONS[cat.name] || '📦'} {cat.name}
+                {CATEGORY_ICONS[cat.name as keyof typeof CATEGORY_ICONS] || '📦'} {cat.name}
               </button>
             ))}
           </div>
@@ -178,18 +178,21 @@ const CatalogPage = () => {
               )}
 
               {/* Products by Category */}
-              {groupedByCategory.map(([catId, group]) => (
+              {groupedByCategory.map(([catId, group]) => {
+                const g = group as { name: string; products: CatalogProduct[] };
+                return (
                 <section key={catId} ref={el => categoryRefs.current[catId] = el} className="scroll-mt-28">
                   <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-gray-200">
-                    <span className="text-xl">{CATEGORY_ICONS[group.name] || '📦'}</span>
-                    <h2 className="text-base font-bold text-slate-800">{group.name}</h2>
-                    <span className="text-xs text-gray-400 ml-auto">{group.products.length} productos</span>
+                    <span className="text-xl">{CATEGORY_ICONS[g.name as keyof typeof CATEGORY_ICONS] || '📦'}</span>
+                    <h2 className="text-base font-bold text-slate-800">{g.name}</h2>
+                    <span className="text-xs text-gray-400 ml-auto">{g.products.length} productos</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                    {group.products.map(p => <ProductCard key={p.id} product={p} />)}
+                    {g.products.map(p => <ProductCard key={p.id} product={p} />)}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </>
           )}
         </div>

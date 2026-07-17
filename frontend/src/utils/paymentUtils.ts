@@ -1,4 +1,5 @@
 import { calculateEffectiveRate } from './exchangeRateUtils';
+import type { RateRecord } from './exchangeRateUtils';
 
 // ============= TYPES =============
 
@@ -19,13 +20,8 @@ export interface BackendPaymentLine {
   bank_id?: number;
 }
 
-export interface ExchangeRate {
-  id: number;
-  baseCurrency: string;
-  targetCurrency: string;
-  rate: number | string;
-  [key: string]: unknown;
-}
+// Re-export RateRecord as ExchangeRate for backward compatibility
+export type ExchangeRate = RateRecord;
 
 export interface AdjustResult {
   adjustedLines: PaymentLine[];

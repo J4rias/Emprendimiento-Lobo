@@ -19,6 +19,17 @@ import {
   useTableLimit,
 } from '../components/ui';
 
+interface CategoryRow {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  color?: string;
+  productCount?: number;
+  is_active?: boolean;
+  [key: string]: unknown;
+}
+
 const CategoriesPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -26,8 +37,8 @@ const CategoriesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useTableLimit();
   const [showModal, setShowModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editingCategory, setEditingCategory] = useState<CategoryRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -38,7 +49,7 @@ const CategoriesPage = () => {
 
   const { data: categoriesData, isLoading, error: fetchError } = useQuery({
     queryKey: ['categories', currentPage, search, limit],
-    queryFn: () => categoryService.getAll({ page: currentPage, search: search.trim(), limit }),
+    queryFn: () => categoryService.getAll({ page: currentPage, search: search.trim(), limit }) as Promise<{ data: CategoryRow[]; pagination: { totalPages: number; total: number } }>,
     keepPreviousData: true,
     staleTime: 30_000,
   });
@@ -49,7 +60,7 @@ const CategoriesPage = () => {
   const loading = isLoading;
   const error = fetchError?.message;
 
-  const handleOpenModal = (category = null) => {
+  const handleOpenModal = (category: CategoryRow | null = null) => {
     setEditingCategory(category);
     setFormData({
       code: category?.code || '',
@@ -66,7 +77,7 @@ const CategoriesPage = () => {
     setFormData({ code: '', name: '', description: '', color: '#6B7280' });
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -74,7 +85,7 @@ const CategoriesPage = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
@@ -88,24 +99,24 @@ const CategoriesPage = () => {
       }
       handleCloseModal();
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al guardar categoría');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al guardar categoría');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = (category) => {
+  const handleDelete = (category: CategoryRow) => {
     setDeleteTarget(category);
   };
 
   const confirmDelete = async () => {
     try {
-      await categoryService.delete(deleteTarget.id);
+      await categoryService.delete(deleteTarget!.id);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('Categoría eliminada');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al eliminar categoría');
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al eliminar categoría');
     } finally {
       setDeleteTarget(null);
     }
@@ -157,7 +168,7 @@ const CategoriesPage = () => {
         ) : categories.length === 0 ? (
           <div className="col-span-full">
             <EmptyState
-              icon={Tag}
+              icon={Tag as React.ComponentType<{ size: number; weight: string; className: string }>}
               title={search ? 'No se encontraron categorías' : 'No hay categorías'}
               description={search ? 'Intenta con otra búsqueda' : 'Crea tu primera categoría para organizar tus productos'}
               action={!search && hasPermission('products.create') ? (
@@ -169,7 +180,7 @@ const CategoriesPage = () => {
             />
           </div>
         ) : (
-          categories.map((category) => (
+          categories.map((category: CategoryRow) => (
             <div
               key={category.id}
               className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
@@ -246,7 +257,7 @@ const CategoriesPage = () => {
               value={formData.code}
               onChange={handleChange}
               required
-              maxLength="10"
+              maxLength={10}
               className="input uppercase"
               placeholder="Ej: BEB, LAC, SNK"
               style={{ textTransform: 'uppercase' }}
@@ -279,7 +290,7 @@ const CategoriesPage = () => {
               name="description"
               value={formData.description}
               onChange={handleChange}
-              rows="3"
+              rows={3}
               className="input"
               placeholder="Descripción opcional de la categoría..."
             />

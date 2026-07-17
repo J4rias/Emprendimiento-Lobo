@@ -22,15 +22,36 @@ const VE_DOC_TYPES = [
   { value: 'P', label: 'P - Pasaporte' },
 ];
 
-const DOC_TYPES_BY_TYPE = {
+const DOC_TYPES_BY_TYPE: Record<string, string[]> = {
   natural: ['V', 'E', 'P'],
   juridical: ['J', 'G'],
 };
 
-const STATUS_VARIANT = { active: 'success', inactive: 'neutral', blocked: 'error' };
-const STATUS_LABEL   = { active: 'Activo', inactive: 'Inactivo', blocked: 'Bloqueado' };
+const STATUS_VARIANT: Record<string, string> = { active: 'success', inactive: 'neutral', blocked: 'error' };
+const STATUS_LABEL: Record<string, string>   = { active: 'Activo', inactive: 'Inactivo', blocked: 'Bloqueado' };
 
-const emptyForm = () => ({
+interface CustomerFormData {
+  type: string;
+  documentType: string;
+  documentNumber: string;
+  businessName: string;
+  tradeName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  address: string;
+  city: string;
+  state: string;
+  creditLimit: number;
+  creditDays: number;
+  priceListId: null;
+  discountPercentage: number;
+  notes: string;
+}
+
+const emptyForm = (): CustomerFormData => ({
   type: 'natural',
   documentType: 'V',
   documentNumber: '',
@@ -51,6 +72,33 @@ const emptyForm = () => ({
   notes: '',
 });
 
+interface CustomerRow {
+  id: number;
+  code: string;
+  type: string;
+  firstName?: string;
+  lastName?: string;
+  businessName?: string;
+  tradeName?: string;
+  documentType?: string;
+  documentNumber?: string;
+  phone?: string;
+  mobile?: string;
+  status: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  creditLimit?: number;
+  creditDays?: number;
+  priceListId?: number | null;
+  discountPercentage?: number;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+type FormErrors = Record<string, string | undefined>;
+
 const CustomersPage = () => {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -65,20 +113,20 @@ const CustomersPage = () => {
   // ─── UI state ────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
-  const [viewingCustomer, setViewingCustomer] = useState(null);
-  const [statementCustomer, setStatementCustomer] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [formData, setFormData] = useState(emptyForm());
-  const [formErrors, setFormErrors] = useState({});
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<CustomerRow | null>(null);
+  const [statementCustomer, setStatementCustomer] = useState<CustomerRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerRow | null>(null);
+  const [formData, setFormData] = useState<CustomerFormData>(emptyForm());
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   // ─── Sort (server-side) ───────────────────────────────────────────────────────
   const { sortBy: custSortBy, sortDir: custSortDir, onSort: _custOnSort } = useTableSort([], { serverSide: true, defaultField: 'created_at', defaultDir: 'desc' });
-  const custOnSort = (f, d) => { _custOnSort(f, d); setCurrentPage(1); };
+  const custOnSort = (f: string, d: string) => { _custOnSort(f, d); setCurrentPage(1); };
 
   // ─── Query ───────────────────────────────────────────────────────────────────
   const {
-    data: customersData = {},
+    data: customersData = {} as Record<string, unknown>,
     isLoading,
     isError: fetchError,
   } = useQuery({
@@ -95,51 +143,51 @@ const CustomersPage = () => {
     staleTime: 30_000,
   });
 
-  const customers  = customersData?.data || [];
-  const totalPages = customersData?.pagination?.totalPages || 1;
-  const total      = customersData?.pagination?.total || 0;
+  const customers  = (customersData as Record<string, any>)?.data || [];
+  const totalPages = (customersData as Record<string, any>)?.pagination?.totalPages || 1;
+  const total      = (customersData as Record<string, any>)?.pagination?.total || 0;
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['customers'] });
 
   const createMutation = useMutation({
-    mutationFn: (data) => customerService.create(data),
+    mutationFn: (data: Record<string, unknown>) => customerService.create(data),
     onSuccess: () => {
       toast.success('Cliente creado exitosamente');
       handleCloseModal();
       invalidate();
     },
-    onError: (err) => {
+    onError: (err: { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } }) => {
       const d = err.response?.data;
       let msg = d?.message || 'Error al crear el cliente';
-      if (d?.errors?.length) msg += ': ' + d.errors.map((e) => e.message).join(', ');
+      if (d?.errors?.length) msg += ': ' + d.errors.map((e: { message: string }) => e.message).join(', ');
       toast.error(msg);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => customerService.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) => customerService.update(id, data),
     onSuccess: () => {
       toast.success('Cliente actualizado exitosamente');
       handleCloseModal();
       invalidate();
     },
-    onError: (err) => {
+    onError: (err: { response?: { data?: { message?: string; errors?: Array<{ message: string }> } } }) => {
       const d = err.response?.data;
       let msg = d?.message || 'Error al actualizar el cliente';
-      if (d?.errors?.length) msg += ': ' + d.errors.map((e) => e.message).join(', ');
+      if (d?.errors?.length) msg += ': ' + d.errors.map((e: { message: string }) => e.message).join(', ');
       toast.error(msg);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => customerService.delete(id),
+    mutationFn: (id: number) => customerService.delete(id),
     onSuccess: () => {
       toast.success('Cliente eliminado exitosamente');
       setDeleteTarget(null);
       invalidate();
     },
-    onError: (err) => {
+    onError: (err: { response?: { data?: { message?: string } } }) => {
       toast.error(err.response?.data?.message || 'Error al eliminar el cliente');
       setDeleteTarget(null);
     },
@@ -148,14 +196,14 @@ const CustomersPage = () => {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
-  const handleSearchChange = (value) => { setSearch(value); setCurrentPage(1); };
-  const handleTypeFilter   = (e) => { setTypeFilter(e.target.value); setCurrentPage(1); };
-  const handleStatusFilter = (e) => { setStatusFilter(e.target.value); setCurrentPage(1); };
+  const handleSearchChange = (value: string) => { setSearch(value); setCurrentPage(1); };
+  const handleTypeFilter   = (e: React.ChangeEvent<HTMLSelectElement>) => { setTypeFilter(e.target.value); setCurrentPage(1); };
+  const handleStatusFilter = (e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setCurrentPage(1); };
 
-  const handleView          = (c) => { setViewingCustomer(c); setShowViewModal(true); };
-  const handleShowStatement = (c) => setStatementCustomer(c);
+  const handleView          = (c: CustomerRow) => { setViewingCustomer(c); setShowViewModal(true); };
+  const handleShowStatement = (c: CustomerRow) => setStatementCustomer(c);
 
-  const handleEdit = (customer) => {
+  const handleEdit = (customer: CustomerRow) => {
     setEditingCustomer(customer);
     setFormData({
       type:               customer.type || 'natural',
@@ -173,7 +221,7 @@ const CustomersPage = () => {
       state:              customer.state || '',
       creditLimit:        customer.creditLimit || 0,
       creditDays:         customer.creditDays || 0,
-      priceListId:        customer.priceListId || null,
+      priceListId:        null,
       discountPercentage: customer.discountPercentage || 0,
       notes:              customer.notes || '',
     });
@@ -187,7 +235,7 @@ const CustomersPage = () => {
     setFormErrors({});
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'type') {
       const validDocs = DOC_TYPES_BY_TYPE[value];
@@ -202,8 +250,8 @@ const CustomersPage = () => {
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const validateForm = () => {
-    const errors = {};
+  const validateForm = (): FormErrors => {
+    const errors: FormErrors = {};
     if (!formData.documentNumber?.trim()) errors.documentNumber = 'Requerido';
     if (formData.type === 'natural') {
       if (!formData.firstName?.trim()) errors.firstName = 'Requerido';
@@ -214,7 +262,7 @@ const CustomersPage = () => {
     return errors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
@@ -224,9 +272,9 @@ const CustomersPage = () => {
     }
     setFormErrors({});
     if (editingCustomer) {
-      updateMutation.mutate({ id: editingCustomer.id, data: formData });
+      updateMutation.mutate({ id: editingCustomer.id, data: formData as unknown as Record<string, unknown> });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(formData as unknown as Record<string, unknown>);
     }
   };
 
@@ -236,13 +284,13 @@ const CustomersPage = () => {
 
   // ─── Table columns ───────────────────────────────────────────────────────────
   const columns = [
-    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v) => v },
+    { key: 'code', header: 'Código', sortable: true, sortKey: 'code', render: (v: string) => v },
     {
       key: 'name',
       header: 'Nombre / Razón Social',
       sortable: true,
       sortKey: 'firstName',
-      render: (_, row) =>
+      render: (_: unknown, row: CustomerRow) =>
         row.type === 'juridical'
           ? row.businessName || row.tradeName
           : `${row.firstName} ${row.lastName}`,
@@ -250,25 +298,25 @@ const CustomersPage = () => {
     {
       key: 'type',
       header: 'Tipo',
-      render: (_, row) => (row.type === 'natural' ? 'Natural' : 'Jurídica'),
+      render: (_: unknown, row: CustomerRow) => (row.type === 'natural' ? 'Natural' : 'Jurídica'),
     },
     {
       key: 'document',
       header: 'Documento',
-      render: (_, row) => `${row.documentType}-${row.documentNumber}`,
+      render: (_: unknown, row: CustomerRow) => `${row.documentType}-${row.documentNumber}`,
     },
     {
       key: 'phone',
       header: 'Teléfono',
-      render: (_, row) => row.phone || row.mobile || '—',
+      render: (_: unknown, row: CustomerRow) => row.phone || row.mobile || '—',
     },
     {
       key: 'status',
       header: 'Estado',
       sortable: true,
       sortKey: 'status',
-      render: (_, row) => (
-        <Badge variant={STATUS_VARIANT[row.status] || 'neutral'}>
+      render: (_: unknown, row: CustomerRow) => (
+        <Badge variant={(STATUS_VARIANT[row.status] || 'neutral') as any}>
           {STATUS_LABEL[row.status] || row.status}
         </Badge>
       ),
@@ -277,7 +325,7 @@ const CustomersPage = () => {
       key: 'actions',
       header: 'Acciones',
       className: 'w-px',
-      render: (_, row) => (
+      render: (_: unknown, row: CustomerRow) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => handleView(row)} />
           <StatementAction onClick={() => handleShowStatement(row)} />
@@ -360,7 +408,7 @@ const CustomersPage = () => {
           total={total}
           limit={limit}
           onPageChange={setCurrentPage}
-          onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+          onLimitChange={(l: number) => { setLimit(l); setCurrentPage(1); }}
         />
       </Card>
 
@@ -489,7 +537,7 @@ const CustomersPage = () => {
         open={showViewModal}
         onClose={() => { setShowViewModal(false); setViewingCustomer(null); }}
         customer={viewingCustomer}
-        onEdit={() => { setShowViewModal(false); handleEdit(viewingCustomer); }}
+        onEdit={() => { setShowViewModal(false); if (viewingCustomer) handleEdit(viewingCustomer); }}
         hasPermission={hasPermission}
       />
 
@@ -505,7 +553,7 @@ const CustomersPage = () => {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         loading={deleteMutation.isPending}
         variant="danger"
         title="¿Eliminar este cliente?"
