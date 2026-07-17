@@ -68,7 +68,7 @@ const DailyReportPage = () => {
         try {
             setLoading(true);
             const res = await saleService.getDailyClosure(filters);
-            setReport(res);
+            setReport(res.data || res);
         } catch (err) {
             console.error(err);
             toast.error('Error al cargar el reporte de caja.');

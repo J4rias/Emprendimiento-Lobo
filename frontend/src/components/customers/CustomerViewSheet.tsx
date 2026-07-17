@@ -101,7 +101,7 @@ const CustomerViewSheet = ({ open, onClose, customer, onEdit, hasPermission }: C
               {formatCOP(customer.creditLimit || 0)}
             </Field>
             <Field label="Días de Crédito">{customer.creditDays || 0} días</Field>
-            <Field label="Descuento">{(customer.discountPercentage ?? 0).toFixed(2)}%</Field>
+            <Field label="Descuento">{Number(customer.discountPercentage ?? 0).toFixed(2)}%</Field>
           </div>
         </section>
 
