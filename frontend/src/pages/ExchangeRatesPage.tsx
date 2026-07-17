@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { Plus, CurrencyDollar, Calendar, TrendUp, ArrowClockwise } from '@phosphor-icons/react';
@@ -14,12 +14,11 @@ import {
   Modal,
   Table,
 } from '../components/ui';
-
+import { exchangeRateService } from '../services/api/exchangeRateService';
 import { localToday } from '../utils/dateUtils';
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const ExchangeRatesPage = () => {
-  const { token, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [ratesRaw, setRatesRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,65 +54,46 @@ const ExchangeRatesPage = () => {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
+      const data = await exchangeRateService.getAll({
         page: currentPage,
         limit: 20,
         date_from: selectedDate,
         date_to: selectedDate,
         sort_by: rateSortBy,
-        sort_dir: rateSortDir,
+        sort_dir: rateSortDir as 'asc' | 'desc',
       });
 
-      const response = await fetch(`${API_URL}/exchange-rates?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error('Error al cargar tasas de cambio');
-
-      const data = await response.json();
       setRatesRaw(data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Error al cargar tasas de cambio');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const url = editingRate
-        ? `${API_URL}/exchange-rates/${editingRate.id}`
-        : `${API_URL}/exchange-rates`;
-
-      const response = await fetch(url, {
-        method: editingRate ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al guardar tasa de cambio');
+      if (editingRate) {
+        await exchangeRateService.update(editingRate.id, formData);
+      } else {
+        await exchangeRateService.create(formData);
       }
 
       toast.success(editingRate ? 'Tasa actualizada' : 'Tasa registrada');
       await fetchRates();
       handleCloseModal();
-    } catch (err) {
-      toast.error(err.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Error al guardar tasa de cambio');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (rate) => {
+  const handleEdit = (rate: any) => {
     setEditingRate(rate);
     setFormData({
       from_currency: rate.from_currency,
@@ -126,26 +106,17 @@ const ExchangeRatesPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: number) => {
     setDeleteTargetId(id);
   };
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch(`${API_URL}/exchange-rates/${deleteTargetId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar tasa');
-      }
-
+      await exchangeRateService.deleteRate(deleteTargetId!);
       toast.success('Tasa eliminada');
       await fetchRates();
-    } catch (err) {
-      toast.error(err.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Error al eliminar tasa');
     } finally {
       setDeleteTargetId(null);
     }
@@ -165,17 +136,17 @@ const ExchangeRatesPage = () => {
     setError(null);
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const getCurrencyName = (code) => {
+  const getCurrencyName = (code: string) => {
     return currencies.find(c => c.code === code)?.name || code;
   };
 
   const rates = ratesRaw;
-  const rateOnSort = (f, d) => { setRateSortBy(f); setRateSortDir(d); setCurrentPage(1); };
+  const rateOnSort = (f: string, d: 'asc' | 'desc') => { setRateSortBy(f); setRateSortDir(d); setCurrentPage(1); };
 
   const columns = [
     {

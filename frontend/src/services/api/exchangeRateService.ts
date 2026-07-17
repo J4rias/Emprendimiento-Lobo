@@ -22,6 +22,8 @@ export interface ExchangeRateParams {
   is_active?: boolean;
   date_from?: string;
   date_to?: string;
+  sort_by?: string;
+  sort_dir?: 'asc' | 'desc';
 }
 
 export const exchangeRateService = {

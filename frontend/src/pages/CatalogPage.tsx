@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MagnifyingGlass, CaretUp, Fire, Sparkle, Package } from '@phosphor-icons/react';
+import { catalogService, type CatalogData, type CatalogProduct } from '../services/api/catalogService';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -16,20 +17,19 @@ const CATEGORY_ICONS = {
 };
 
 const CatalogPage = () => {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const contentRef = useRef(null);
-  const categoryRefs = useRef({});
-  const pillsRef = useRef(null);
+  const contentRef = useRef<HTMLElement>(null);
+  const categoryRefs = useRef<Record<string, HTMLElement | null>>({});
+  const pillsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/catalog`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
+    catalogService.get()
+      .then(res => { setData(res.data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
@@ -61,7 +61,7 @@ const CatalogPage = () => {
     return Object.entries(groups).sort(([, a], [, b]) => a.name.localeCompare(b.name));
   }, [filtered]);
 
-  const scrollToCategory = (catId) => {
+  const scrollToCategory = (catId: number) => {
     const el = categoryRefs.current[catId];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveCategory(catId);
@@ -226,7 +226,7 @@ const CatalogPage = () => {
 
 // ===== Sub-components =====
 
-const ProductCard = ({ product }) => (
+const ProductCard = ({ product }: { product: CatalogProduct }) => (
   <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
     {/* Product image */}
     <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100">
@@ -265,14 +265,14 @@ const ProductCard = ({ product }) => (
   </div>
 );
 
-const SectionTitle = ({ icon, title }) => (
+const SectionTitle = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
   <div className="flex items-center gap-1.5 mb-2">
     {icon}
     <h2 className="text-sm font-bold text-slate-800">{title}</h2>
   </div>
 );
 
-const HorizontalScroll = ({ products }) => (
+const HorizontalScroll = ({ products }: { products: CatalogProduct[] }) => (
   <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
     {products.map(p => (
       <div key={p.id} className="flex-shrink-0 w-36 snap-start">
@@ -290,7 +290,7 @@ const LoadingScreen = () => (
   </div>
 );
 
-const ErrorScreen = ({ error }) => (
+const ErrorScreen = ({ error }: { error: string }) => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
     <div className="text-center">
       <p className="text-4xl mb-3">😕</p>
