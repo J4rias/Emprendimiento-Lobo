@@ -25,7 +25,7 @@ export interface AdjustData {
 }
 
 export const inventoryService = {
-  getByWarehouse: async (warehouseId: number, params?: InventoryListParams): Promise<InventoryListResponse> => {
+  getByWarehouse: async (warehouseId: number | string, params?: InventoryListParams): Promise<InventoryListResponse> => {
     const response = await api.get('/inventory', { params: { ...params, warehouse_id: warehouseId } });
     return response.data;
   },

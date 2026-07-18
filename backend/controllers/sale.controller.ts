@@ -144,11 +144,7 @@ export const getSales = async (req: Request, res: Response) => {
     const { count, rows } = await Sale.findAndCountAll({
       where,
       include: [
-        {
-          model: Customer,
-          as: 'customer',
-          attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'document_number']
-        },
+        { model: Customer, as: 'customer' },
         {
           model: Warehouse,
           as: 'warehouse',

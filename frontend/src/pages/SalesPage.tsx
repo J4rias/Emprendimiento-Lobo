@@ -247,12 +247,16 @@ const SalesPage = () => {
     return formatCOP(val * rate);
   };
 
-  const getCustomerName = (customer: Customer | null | undefined) => {
+  const getCustomerName = (customer: any) => {
     if (!customer) return 'Cliente General';
     const words2 = (s: string | undefined) => (s || '').trim().split(/\s+/).slice(0, 2).join(' ');
-    if (customer.type === 'juridica') return (customer.businessName as string) || (customer.tradeName as string) || 'Empresa Sin Nombre';
-    return `${words2(customer.firstName)} ${words2(customer.lastName)}`.trim()
-      || (customer.businessName as string) || 'Cliente Sin Nombre';
+    const fn = customer.firstName || customer.first_name;
+    const ln = customer.lastName || customer.last_name;
+    const bn = customer.businessName || customer.business_name;
+    const tn = customer.tradeName || customer.trade_name;
+    if (customer.type === 'juridical' || customer.type === 'juridica')
+      return bn || tn || 'Empresa Sin Nombre';
+    return `${words2(fn)} ${words2(ln)}`.trim() || bn || 'Cliente Sin Nombre';
   };
 
   const renderTotal = (row: SaleRow) => {
@@ -423,9 +427,9 @@ const SalesPage = () => {
     setCollectSaving(true);
     try {
       const { adjustedLines } = adjustPaymentLinesForChange(
-        checkoutPaymentLines, saleTotalCOP, copPerUSD, sale.currency_mode || 'COP', COP_TOLERANCE
+        checkoutPaymentLines, saleTotalCOP, rate, sale.currency_mode || 'COP', COP_TOLERANCE
       );
-      const backendLines = convertPaymentLinesToBackend(adjustedLines, exchangeRates);
+      const backendLines = convertPaymentLinesToBackend(adjustedLines, exchangeRates, rate);
 
       await saleService.addPayment(sale.id, {
         payment_lines: backendLines,
@@ -763,7 +767,7 @@ const SalesPage = () => {
           tax={parseFloat(String(paymentSale.tax_amount || 0))}
           total={parseFloat(String(paymentSale.total))}
           totalCOP={parseFloat(String(paymentSale.total)) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD)}
-          copPerUSD={copPerUSD}
+          copPerUSD={parseFloat(String(paymentSale.exchange_rate)) || copPerUSD}
           paymentLines={checkoutPaymentLines}
           setPaymentLines={setCheckoutPaymentLines as React.Dispatch<React.SetStateAction<PaymentLine[]>>}
           customer={paymentSale.customer ? {

@@ -102,7 +102,8 @@ const StockReplenishmentPage = () => {
 
     try {
       const response = await productService.searchByBarcode(code);
-      const found = ((response.data as unknown) as ScannedProduct[])?.[0];
+      const rawData = response.data;
+      const found = (Array.isArray(rawData) ? rawData[0] : rawData) as ScannedProduct | null;
 
       if (found) {
         setProduct(found);

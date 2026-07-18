@@ -687,6 +687,34 @@ export function usePOS() {
     return applyUnitSurcharge(item.unit_price, item);
   }, [exchangeRates, applyUnitSurcharge]);
 
+  // Genera items para el backend, ajustando unit_price para preservar precisión COP
+  const buildSaleItems = useCallback((copRate: number) => {
+    return cart.map((item) => {
+      let unitPriceUSD = getEffectiveUSDPrice(item);
+
+      // Fix precisión COP: cuando el precio origen es COP (frozen),
+      // recalcular unit_price para que line_total * rate dé un COP exacto.
+      if (item.is_frozen && item.frozen_price && (item.frozen_currency || 'USD') !== 'USD' && copRate > 0) {
+        const fp = typeof item.frozen_price === 'string' ? parseFloat(item.frozen_price) : item.frozen_price;
+        const frozenUnit = item.sellByUnit
+          ? fp / (item.units_per_package || 1)
+          : fp;
+        const lineTotalCOP = Math.ceil(frozenUnit * item.quantity);
+        unitPriceUSD = lineTotalCOP / copRate / item.quantity;
+      }
+
+      return {
+        product_id: item.product_id,
+        presentation_id: item.presentation_id,
+        quantity: item.quantity,
+        is_unit: item.sellByUnit || false,
+        unit_price: unitPriceUSD,
+        discount_percent: item.discount_percent,
+        tax_percent: item.tax_percent,
+      };
+    });
+  }, [cart, getEffectiveUSDPrice]);
+
   // ============= TOTALS =============
   const calculateTotals = useCallback(() => {
     let subtotal = 0;
@@ -734,15 +762,7 @@ export function usePOS() {
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
         payment_lines: convertPaymentLinesToBackend(adjustedLines, exchangeRates),
         authorized_by: (saleType === 'credit' || saleType === 'mixed') ? authorizedBy : null,
-        items: cart.map((item) => ({
-          product_id: item.product_id,
-          presentation_id: item.presentation_id,
-          quantity: item.quantity,
-          is_unit: item.sellByUnit || false,
-          unit_price: getEffectiveUSDPrice(item),
-          discount_percent: item.discount_percent,
-          tax_percent: item.tax_percent,
-        })),
+        items: buildSaleItems(copPerUSD),
         notes,
       });
 
@@ -780,7 +800,7 @@ export function usePOS() {
     if (saleType === 'credit') {
       const creditCOP = paymentLines
         .filter(l => l.method === 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
+        .reduce((sum, l) => sum + Math.round(l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       if (creditCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
           ? formatUSD((totalCOP - creditCOP) / copPerUSD)
@@ -793,10 +813,10 @@ export function usePOS() {
     if (saleType === 'cash' || saleType === 'mixed') {
       const cashPaidCOP = paymentLines
         .filter(l => l.method !== 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
+        .reduce((sum, l) => sum + Math.round(l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       const creditCOP = paymentLines
         .filter(l => l.method === 'credit')
-        .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
+        .reduce((sum, l) => sum + Math.round(l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
       const expectedCashCOP = totalCOP - creditCOP;
       if (saleType === 'cash' && cashPaidCOP < totalCOP - COP_TOLERANCE) {
         const faltante = displayCurrency === 'USD'
@@ -846,15 +866,7 @@ export function usePOS() {
         tab_id: activeTabId,
         exchange_rate: calculateEffectiveRate('USD', 'COP', exchangeRates) || 1,
         payment_lines: [],
-        items: cart.map((item) => ({
-          product_id: item.product_id,
-          presentation_id: item.presentation_id,
-          quantity: item.quantity,
-          is_unit: item.sellByUnit || false,
-          unit_price: getEffectiveUSDPrice(item),
-          discount_percent: item.discount_percent,
-          tax_percent: item.tax_percent,
-        })),
+        items: buildSaleItems(copPerUSD),
         notes,
       });
 

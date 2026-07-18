@@ -83,7 +83,7 @@ const InventoryPage = () => {
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: inventoryData, isLoading } = useQuery({
     queryKey: ['inventory', selectedWarehouse, searchTerm, selectedCategory, filters],
-    queryFn: () => inventoryService.getByWarehouse(Number(selectedWarehouse), {
+    queryFn: () => inventoryService.getByWarehouse(selectedWarehouse === 'all' ? 'all' : Number(selectedWarehouse), {
       search: searchTerm,
       low_stock:   filters.lowStock,
       expiring:    filters.expiring,

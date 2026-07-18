@@ -52,8 +52,9 @@ const COP_TOLERANCE = 40;
 export function convertPaymentLinesToBackend(
   lines: PaymentLine[],
   exchangeRates: ExchangeRate[],
+  copPerUSDOverride?: number,
 ): BackendPaymentLine[] {
-  const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
+  const copPerUSD = copPerUSDOverride || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
   return lines.map(line => {
     const base: BackendPaymentLine = {
       currency: line.currency,
