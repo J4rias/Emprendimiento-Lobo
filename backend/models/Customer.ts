@@ -22,6 +22,7 @@ interface CustomerAttributes {
   postal_code: string | null;
   credit_limit: number;
   credit_used: number;
+  credit_balance: number;
   credit_days: number;
   price_list_id: number | null;
   discount_percentage: number;
@@ -35,7 +36,7 @@ interface CustomerAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface CustomerCreationAttributes extends Optional<
   CustomerAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'type' | 'document_type' | 'country' | 'credit_limit' | 'credit_used' | 'credit_days' | 'discount_percentage' | 'status'
+  'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'type' | 'document_type' | 'country' | 'credit_limit' | 'credit_used' | 'credit_balance' | 'credit_days' | 'discount_percentage' | 'status'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -138,6 +139,12 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
       allowNull: false,
       defaultValue: 0,
       comment: 'Crédito actualmente usado por el cliente'
+    },
+    credit_balance: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Saldo a favor del cliente (sobrepagos, notas de crédito) en USD'
     },
     credit_days: {
       type: DataTypes.INTEGER,
@@ -244,6 +251,7 @@ const Customer = sequelize.define<Model<CustomerAttributes, CustomerCreationAttr
     documentNumber:     v.document_number,
     creditLimit:        v.credit_limit,
     creditUsed:         v.credit_used,
+    creditBalance:      v.credit_balance,
     creditDays:         v.credit_days,
     priceListId:        v.price_list_id,
     discountPercentage: v.discount_percentage,

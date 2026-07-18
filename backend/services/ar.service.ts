@@ -1,4 +1,6 @@
 import ExchangeRate from '../models/ExchangeRate';
+import Customer from '../models/Customer';
+import { recordLedgerEntry } from './customerLedger.service';
 
 const { sequelize } = require('../config/database');
 const { computeDueDate, computeAgingBucket } = require('../services/statementService');
@@ -430,6 +432,32 @@ export async function reverseSalePayment(paymentId: string, adminId: number, pin
       `UPDATE sales SET paid_amount = ?, updated_at = NOW() WHERE id = ?`,
       { replacements: [newPaidUSD, pay.sale_id], transaction: t }
     );
+
+    // Restore credit_used for the reversed payment amount
+    const payAmountUSD = pay.currency === 'COP'
+      ? parseFloat(pay.amount) / (parseFloat(pay.exchange_rate) || 1)
+      : parseFloat(pay.amount);
+    if (pay.customer_id && payAmountUSD > 0) {
+      const customer = await Customer.findByPk(pay.customer_id, { transaction: t }) as any;
+      if (customer) {
+        await customer.update({
+          credit_used: parseFloat(customer.credit_used || 0) + payAmountUSD
+        }, { transaction: t });
+
+        await recordLedgerEntry({
+          customerId: pay.customer_id,
+          transactionDate: new Date(),
+          transactionType: 'adjustment',
+          referenceId: parseInt(paymentId),
+          referenceType: 'sale_payment',
+          description: `Reversión de pago #${paymentId}`,
+          debit: payAmountUSD,
+          credit: 0,
+          createdBy: adminId,
+          transaction: t
+        });
+      }
+    }
 
     await t.commit();
     return { payment_id: paymentId, new_paid_amount: newPaidUSD, new_status: newStatus };

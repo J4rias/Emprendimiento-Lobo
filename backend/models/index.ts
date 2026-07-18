@@ -42,6 +42,7 @@ import PreOrder from './PreOrder';
 import PreOrderDetail from './PreOrderDetail';
 import Bank from './Bank';
 import AuditLog from './AuditLog';
+import CustomerLedger from './CustomerLedger';
 
 import { registerAuditHooks } from '../utils/auditHooks';
 
@@ -321,6 +322,9 @@ Sale.hasMany(CreditNote, { foreignKey: 'sale_id', as: 'creditNotes' });
 // CreditNote - Customer (Many to One)
 CreditNote.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
 Customer.hasMany(CreditNote, { foreignKey: 'customer_id', as: 'creditNotes' });
+Customer.hasMany(CustomerLedger, { foreignKey: 'customer_id', as: 'ledgerEntries' });
+CustomerLedger.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+CustomerLedger.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
 // CreditNote - Warehouse (Many to One)
 CreditNote.belongsTo(Warehouse, { foreignKey: 'warehouse_id', as: 'warehouse' });
@@ -461,4 +465,5 @@ export {
   PreOrderDetail,
   Bank,
   AuditLog,
+  CustomerLedger,
 };

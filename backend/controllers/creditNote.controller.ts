@@ -18,6 +18,8 @@ import Inventory from '../models/Inventory';
 import InventoryMovement from '../models/InventoryMovement';
 import User from '../models/User';
 
+import { recordLedgerEntry } from '../services/customerLedger.service';
+
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
@@ -612,18 +614,42 @@ export const approveCreditNote = async (req: Request, res: Response) => {
       }
     }
 
-    // Update customer credit balance if refund method is credit_balance
-    // Only decrement credit_used for credit/mixed sales (pos_pending/cash never incremented it)
+    // Update customer credit/balance based on refund method
     const saleSaleType = creditNote.sale?.sale_type;
-    if (creditNote.refund_method === 'credit_balance' && creditNote.refund_amount > 0
-        && (saleSaleType === 'credit' || saleSaleType === 'mixed')) {
+    const refundAmountUSD = parseFloat(creditNote.refund_amount || 0);
+
+    if (creditNote.customer_id && refundAmountUSD > 0) {
       const customer = await Customer.findByPk(creditNote.customer_id, { transaction }) as any;
       if (customer) {
-        // Add to customer's available credit
-        const newCreditUsed = Math.max(0, parseFloat(customer.credit_used || 0) - parseFloat(creditNote.refund_amount));
-        await customer.update({
-          credit_used: newCreditUsed
-        }, { transaction });
+        const updates: any = {};
+
+        // Decrement credit_used for credit/mixed sales
+        if (creditNote.refund_method === 'credit_balance'
+            && (saleSaleType === 'credit' || saleSaleType === 'mixed')) {
+          updates.credit_used = Math.max(0, parseFloat(customer.credit_used || 0) - refundAmountUSD);
+        }
+
+        // Increment credit_balance when refunding to monedero
+        if (creditNote.refund_method === 'credit_balance') {
+          updates.credit_balance = parseFloat(customer.credit_balance || 0) + refundAmountUSD;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await customer.update(updates, { transaction });
+        }
+
+        await recordLedgerEntry({
+          customerId: creditNote.customer_id,
+          transactionDate: new Date(),
+          transactionType: 'credit_note',
+          referenceId: creditNote.id,
+          referenceType: 'credit_note',
+          description: `Nota de crédito ${creditNote.credit_note_number} (${creditNote.refund_method})`,
+          debit: 0,
+          credit: refundAmountUSD,
+          createdBy: (req as any).user.id,
+          transaction
+        });
       }
     }
 

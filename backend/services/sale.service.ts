@@ -11,6 +11,7 @@ import Inventory from '../models/Inventory';
 import InventoryMovement from '../models/InventoryMovement';
 import PosReservation from '../models/PosReservation';
 import ExchangeRate from '../models/ExchangeRate';
+import { recordLedgerEntry } from './customerLedger.service';
 
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
@@ -328,6 +329,19 @@ export async function createSale(
       const currentCreditUsed = parseFloat(customer.credit_used || 0);
       await customer.update({ credit_used: currentCreditUsed + credit_amount }, { transaction });
 
+      await recordLedgerEntry({
+        customerId: customer_id,
+        transactionDate: new Date(),
+        transactionType: 'sale',
+        referenceId: null, // sale not created yet, will be set after creation if needed
+        referenceType: 'sale',
+        description: `Venta a crédito ${sale_number}`,
+        debit: credit_amount,
+        credit: 0,
+        createdBy: userId,
+        transaction
+      });
+
       const creditDays = parseInt(customer.credit_days) || 0;
       if (creditDays > 0) {
         credit_due_date = new Date();
@@ -399,8 +413,21 @@ export async function createSale(
       if (creditBalanceDeductionUSD > 0 && customer_id) {
         const customer = await Customer.findByPk(customer_id, { transaction }) as any;
         if (customer) {
-          const newBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - creditBalanceDeductionUSD);
-          await customer.update({ creditBalance: newBalance }, { transaction });
+          const newBalance = Math.max(0, parseFloat(customer.credit_balance || 0) - creditBalanceDeductionUSD);
+          await customer.update({ credit_balance: newBalance }, { transaction });
+
+          await recordLedgerEntry({
+            customerId: customer_id,
+            transactionDate: new Date(),
+            transactionType: 'payment',
+            referenceId: null,
+            referenceType: 'sale',
+            description: `Pago con saldo a favor - Venta ${sale_number}`,
+            debit: 0,
+            credit: creditBalanceDeductionUSD,
+            createdBy: userId,
+            transaction
+          });
         }
       }
     }
@@ -517,6 +544,19 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
         await customer.update({
           credit_used: Math.max(0, currentCreditUsed - creditToRevert)
         }, { transaction });
+
+        await recordLedgerEntry({
+          customerId: sale.customer_id,
+          transactionDate: new Date(),
+          transactionType: 'cancellation',
+          referenceId: saleId,
+          referenceType: 'sale',
+          description: `Cancelación venta ${sale.sale_number}`,
+          debit: 0,
+          credit: creditToRevert,
+          createdBy: userId,
+          transaction
+        });
       }
     }
 
@@ -668,7 +708,7 @@ export async function addPayment(
     }
     await sale.update(saleUpdateData, { transaction });
 
-    // Update customer's credit_used and creditBalance (skip for pos_pending — no credit involved)
+    // Update customer's credit_used and credit_balance (skip for pos_pending — no credit involved)
     if (sale.customer_id && sale.sale_type !== 'pos_pending') {
       const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
       if (customer) {
@@ -676,9 +716,22 @@ export async function addPayment(
           credit_used: Math.max(0, parseFloat(customer.credit_used || 0) - totalNewlyPaidUSD)
         };
         if (addPayCreditBalanceUSD > 0) {
-          updates.creditBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - addPayCreditBalanceUSD);
+          updates.credit_balance = Math.max(0, parseFloat(customer.credit_balance || 0) - addPayCreditBalanceUSD);
         }
         await customer.update(updates, { transaction });
+
+        await recordLedgerEntry({
+          customerId: sale.customer_id,
+          transactionDate: new Date(),
+          transactionType: 'payment',
+          referenceId: createdPayments[0]?.id || null,
+          referenceType: 'sale_payment',
+          description: `Abono a venta ${sale.sale_number}`,
+          debit: 0,
+          credit: totalNewlyPaidUSD,
+          createdBy: userId,
+          transaction
+        });
       }
     }
 
