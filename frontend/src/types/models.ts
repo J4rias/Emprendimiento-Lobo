@@ -57,6 +57,9 @@ export interface SalePayment {
   method: string;
   amount: number;
   currency: string;
+  exchange_rate?: number;
+  reference?: string;
+  bank_id?: number;
 }
 
 export interface SaleDetail {

@@ -484,6 +484,8 @@ const SalesPage = () => {
       amount: cashAmount,
       method: paymentData.method,
       currency: 'COP',
+      exchange_rate: rate,
+      reference: paymentData.reference || undefined,
     }];
     if (customerCreditBalance.cop > 0) {
       const creditToApply = Math.min(customerCreditBalance.cop, Math.max(0, remainingCOP - cashAmount));
@@ -493,6 +495,7 @@ const SalesPage = () => {
           amount: creditToApply,
           method: 'credit_balance',
           currency: 'COP',
+          exchange_rate: rate,
         });
       }
     }
