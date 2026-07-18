@@ -20,6 +20,7 @@ const { sequelize } = require('../models');
 let adminToken = '';
 let testProduct = null;     // { id, presentation_id, unit_price, stock_before }
 let testCustomer = null;    // { id, credit_used_before }
+let anyCustomerId = null;   // any valid customer for required customer_id
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 beforeAll(async () => {
@@ -74,12 +75,14 @@ beforeAll(async () => {
     }
   }
 
-  // Find a customer with credit
+  // Find customers
   const customersRes = await request(app)
     .get('/api/customers')
     .query({ limit: 10 })
     .set('Authorization', `Bearer ${adminToken}`);
-  for (const c of (customersRes.body.data || [])) {
+  const allCustomers = customersRes.body.data || [];
+  if (allCustomers.length > 0) anyCustomerId = allCustomers[0].id;
+  for (const c of allCustomers) {
     if (parseFloat(c.credit_limit) > 0) {
       testCustomer = {
         id: c.id,
@@ -100,6 +103,7 @@ const createPosPending = async (overrides = {}) => {
     .post('/api/sales')
     .set('Authorization', `Bearer ${adminToken}`)
     .send({
+      customer_id: anyCustomerId,
       warehouse_id: 1,
       sale_type: 'pos_pending',
       currency_mode: 'USD',
@@ -168,12 +172,10 @@ describe('pos_pending creation', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  it('creates pos_pending WITHOUT customer (walk-in)', async () => {
+  it('rejects pos_pending WITHOUT customer', async () => {
     if (!testProduct) return;
     const res = await createPosPending({ customer_id: null });
-    if (res.status === 409) { console.log('Skipping: stock depleted by prior tests'); return; }
-    expect(res.status).toBeLessThan(300);
-    expect(res.body.data.customer_id).toBeNull();
+    expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
   it('creates pos_pending WITH customer without touching credit_used', async () => {
@@ -519,7 +521,7 @@ describe('real sales replay as pos_pending', () => {
           exchange_rate: parseFloat(realSale.exchange_rate) || 1,
           payment_lines: [],
           items,
-          customer_id: realSale.customer_id || null,
+          customer_id: realSale.customer_id || anyCustomerId,
         });
 
       if (createRes.status >= 400) {

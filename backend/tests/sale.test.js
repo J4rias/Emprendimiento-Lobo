@@ -187,10 +187,22 @@ describe('Sales API — pos_pending (vendedor flow)', () => {
       return;
     }
 
+    // Fetch a valid customer
+    const customersRes = await request(app)
+      .get('/api/customers')
+      .query({ limit: 1 })
+      .set('Authorization', `Bearer ${authToken}`);
+    const customerId = customersRes.body.data?.[0]?.id;
+    if (!customerId) {
+      console.log('Skipping: no customers in DB');
+      return;
+    }
+
     const res = await request(app)
       .post('/api/sales')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
+        customer_id: customerId,
         warehouse_id: 1,
         sale_type: 'pos_pending',
         currency_mode: 'USD',

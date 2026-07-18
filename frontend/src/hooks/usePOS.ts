@@ -791,11 +791,8 @@ export function usePOS() {
 
   const handleCompleteSale = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
+    if (!customer) { toast.error('Selecciona un cliente'); return; }
     if (paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
-    if ((saleType === 'credit' || saleType === 'mixed') && !customer) {
-      toast.error('Selecciona un cliente para ventas a crédito');
-      return;
-    }
 
     if (saleType === 'credit') {
       const creditCOP = paymentLines
@@ -853,6 +850,7 @@ export function usePOS() {
 
   const sendToCashier = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
+    if (!customer) { toast.error('Selecciona un cliente'); return; }
     if (cart.length === 0) { toast.error('Agrega al menos un producto'); return; }
 
     setSaving(true);

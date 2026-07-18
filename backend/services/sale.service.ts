@@ -134,6 +134,11 @@ export async function createSale(
       }, 0);
     }
 
+    if (!customer_id) {
+      await transaction.rollback();
+      throw new ServiceError(400, 'Debe seleccionar un cliente para la venta');
+    }
+
     if (!items || items.length === 0) {
       await transaction.rollback();
       throw new ServiceError(400, 'La venta debe tener al menos un producto');
