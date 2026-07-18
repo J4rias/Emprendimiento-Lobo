@@ -270,6 +270,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
       refund_amount,
       refund_reference,
       notes,
+      exchange_rate: payloadExchangeRate,
       items // Array of { sale_detail_id, package_quantity_returned, loose_units_returned, return_to_stock }
     } = req.body;
 
@@ -420,7 +421,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
       reason_description: reason_description || null,
       type,
       status: 'draft',
-      exchange_rate: parseFloat(sale.exchange_rate || 1),
+      exchange_rate: payloadExchangeRate ? parseFloat(payloadExchangeRate) : parseFloat(sale.exchange_rate || 1),
       subtotal,
       tax_amount,
       total,

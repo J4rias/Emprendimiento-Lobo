@@ -741,14 +741,37 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     };
     if (user_id) salesWhere.user_id = user_id;
 
-    const totalSalesUSD = await Sale.sum('total', { where: salesWhere }) || 0;
+    const grossSalesUSD = await Sale.sum('total', { where: salesWhere }) || 0;
     const copResult = await Sale.findOne({
       where: salesWhere,
       attributes: [[sequelize.literal('SUM(total * exchange_rate)'), 'totalCOP']],
       raw: true
     }) as any;
-    const totalSalesCOP = parseFloat(copResult?.totalCOP) || 0;
+    const grossSalesCOP = parseFloat(copResult?.totalCOP) || 0;
     const salesCount = await Sale.count({ where: salesWhere });
+
+    // Subtract applied credit notes for today's sales (partial + full returns)
+    const cnDeductionResult = await sequelize.query(
+      `SELECT
+         COALESCE(SUM(cn.total), 0) AS deduction_usd,
+         COALESCE(SUM(cn.total * cn.exchange_rate), 0) AS deduction_cop
+       FROM credit_notes cn
+       JOIN sales s ON s.id = cn.sale_id
+       WHERE cn.status = 'applied'
+         AND s.sale_date BETWEEN :startOfDay AND :endOfDay
+         AND s.status IN ('completed', 'pending', 'returned')
+         AND s.sale_type != 'pos_pending'
+         ${user_id ? 'AND s.user_id = :user_id' : ''}`,
+      {
+        replacements: { startOfDay, endOfDay, ...(user_id ? { user_id } : {}) },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+    const cnRow = (cnDeductionResult as any[])[0] || {};
+    const cnDeductionUSD = parseFloat(cnRow.deduction_usd || 0);
+    const cnDeductionCOP = parseFloat(cnRow.deduction_cop || 0);
+    const totalSalesUSD = grossSalesUSD - cnDeductionUSD;
+    const totalSalesCOP = grossSalesCOP - cnDeductionCOP;
 
     // Credit extended today (total - paid_amount for credit/mixed sales)
     const creditResult = await Sale.findOne({
@@ -849,52 +872,33 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     });
 
     // === CASH REFUNDS FROM CREDIT NOTES (devoluciones en efectivo) ===
-    // Group by the sale's currency_mode so we only deduct from the correct currency
-    // Ventana en UTC explícito: en raw queries sequelize serializa Date en hora
-    // local (el ORM usa UTC) y las NC aprobadas de noche caían al día siguiente.
+    // ALL cash refunds are physically given in COP regardless of sale currency.
+    // cn.total is in USD, cn.exchange_rate converts to COP at the time of refund.
     const toUtcSql = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
     const cashRefundResult = await sequelize.query(
       `SELECT
-         s.currency_mode,
          COALESCE(SUM(cn.total * cn.exchange_rate), 0) AS refund_cop,
          COALESCE(SUM(cn.total), 0) AS refund_usd,
          COUNT(*) AS refund_count
        FROM credit_notes cn
-       JOIN sales s ON s.id = cn.sale_id
        WHERE cn.status = 'applied'
          AND cn.refund_method = 'cash'
          AND cn.approved_at BETWEEN :startOfDay AND :endOfDay
-         ${user_id ? 'AND cn.created_by = :user_id' : ''}
-       GROUP BY s.currency_mode`,
+         ${user_id ? 'AND cn.created_by = :user_id' : ''}`,
       {
         replacements: { startOfDay: toUtcSql(startOfDay), endOfDay: toUtcSql(endOfDay), ...(user_id ? { user_id } : {}) },
         type: sequelize.QueryTypes.SELECT
       }
     );
-    // Build per-currency refund map
-    const refundByCurrency: Record<string, number> = {};
-    let totalRefundCOP = 0;
-    let totalRefundUSD = 0;
-    let totalRefundCount = 0;
-    for (const row of cashRefundResult as any[]) {
-      const mode = row.currency_mode || 'USD';
-      const count = parseInt(row.refund_count || 0);
-      totalRefundCount += count;
-      if (mode === 'COP') {
-        const amount = Math.round(parseFloat(row.refund_cop || 0));
-        refundByCurrency['COP'] = (refundByCurrency['COP'] || 0) + amount;
-        totalRefundCOP += amount;
-      } else {
-        const amount = parseFloat(row.refund_usd || 0);
-        refundByCurrency['USD'] = (refundByCurrency['USD'] || 0) + amount;
-        totalRefundUSD += amount;
-      }
-    }
+    const refundRow = (cashRefundResult as any[])[0] || {};
+    const totalRefundCOP = Math.round(parseFloat(refundRow.refund_cop || 0));
+    const totalRefundUSD = parseFloat(refundRow.refund_usd || 0);
+    const totalRefundCount = parseInt(refundRow.refund_count || 0);
     const cashRefunds = {
       refund_cop: totalRefundCOP,
       refund_usd: totalRefundUSD,
       refund_count: totalRefundCount,
-      refund_by_currency: refundByCurrency
+      refund_by_currency: { COP: totalRefundCOP } as Record<string, number>
     };
 
     // Pending POS sales (vendedor-created, awaiting cashier collection)
@@ -912,6 +916,10 @@ export const getDailyClosure = async (req: Request, res: Response) => {
         date: `${startOfDay.getFullYear()}-${String(startOfDay.getMonth()+1).padStart(2,'0')}-${String(startOfDay.getDate()).padStart(2,'0')}`,
         totalSalesUSD,
         totalSalesCOP: Math.round(totalSalesCOP),
+        grossSalesUSD,
+        grossSalesCOP: Math.round(grossSalesCOP),
+        cnDeductionUSD,
+        cnDeductionCOP: Math.round(cnDeductionCOP),
         salesCount,
         creditTotalUSD,
         paymentsBreakdown,

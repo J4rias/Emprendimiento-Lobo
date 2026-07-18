@@ -98,3 +98,4 @@ scripts/orq10_*.py
 scripts/orq11_*.py
 scripts/__pycache__/
 scripts/api-tests/__pycache__/
+frontend/serve-preview.cjs

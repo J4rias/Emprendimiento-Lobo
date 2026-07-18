@@ -89,17 +89,19 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
 
   return (
     <Sheet open={open} onClose={onClose} title={`Detalle de Venta — ${sale.sale_number}`} size="xl">
-      {/* Print actions */}
-      <div className="flex gap-2 mb-5">
-        <Button variant="ghost" size="sm" onClick={onPrint}
-          className="text-primary-600 hover:bg-primary-50 border border-primary-100 text-xs font-bold">
-          <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onPrintPortable}
-          className="text-amber-600 hover:bg-amber-50 border border-amber-100 text-xs font-bold">
-          <DeviceMobile className="w-3.5 h-3.5 mr-1" /> Portátil
-        </Button>
-      </div>
+      {/* Print actions — solo cuando el pago ya fue procesado */}
+      {sale.sale_type !== 'pos_pending' && (
+        <div className="flex gap-2 mb-5">
+          <Button variant="ghost" size="sm" onClick={onPrint}
+            className="text-primary-600 hover:bg-primary-50 border border-primary-100 text-xs font-bold">
+            <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onPrintPortable}
+            className="text-amber-600 hover:bg-amber-50 border border-amber-100 text-xs font-bold">
+            <DeviceMobile className="w-3.5 h-3.5 mr-1" /> Portátil
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Metadata */}

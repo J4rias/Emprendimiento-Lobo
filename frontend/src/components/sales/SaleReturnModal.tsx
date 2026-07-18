@@ -36,8 +36,10 @@ interface SaleData {
 }
 
 interface ReturnItem extends SaleDetailItem {
-  returnQuantity: number;
-  maxQuantity: number;
+  returnQuantity: number;       // For is_unit=true: units to return. For is_unit=false: packages to return
+  looseQuantity: number;        // For is_unit=false only: individual loose units to return
+  maxQuantity: number;          // Max packages (or units for is_unit=true)
+  maxLooseUnits: number;        // Max loose units returnable (total units in remaining packages)
   originalQuantity: number;
   alreadyReturned: number;
 }
@@ -54,6 +56,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
     const [reason, setReason] = useState('return');
     const [reasonDescription, setReasonDescription] = useState('');
     const [refundMethod, setRefundMethod] = useState('credit_balance');
+    const [returnExchangeRate, setReturnExchangeRate] = useState<number>(0);
     const [submitting, setSubmitting] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
 
@@ -86,10 +89,16 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                 const originalQty = parseFloat(String(detail.quantity));
                 const alreadyReturned = returnedMap[detail.id] || 0;
                 const available = Math.max(0, originalQty - alreadyReturned);
+                const uph = detail.presentation?.units_per_package || 1;
+                const isUnit = detail.is_unit !== false;
+                // For packages: max loose = total available base units (packages * uph)
+                const maxLoose = isUnit ? 0 : available * uph;
                 return {
                     ...detail,
                     returnQuantity: 0,
+                    looseQuantity: 0,
                     maxQuantity: available,
+                    maxLooseUnits: maxLoose,
                     originalQuantity: originalQty,
                     alreadyReturned
                 };
@@ -98,6 +107,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
             setReason('return');
             setReasonDescription('');
             setRefundMethod(sale.customer_id ? 'credit_balance' : 'cash');
+            setReturnExchangeRate(sale.exchange_rate || 1);
         };
 
         initItems();
@@ -106,19 +116,35 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
     const handleQuantityChange = (id: number, value: string) => {
         const qty = parseFloat(value) || 0;
         setReturnItems(prev => prev.map(item => {
-            if (item.id === id) {
-                return { ...item, returnQuantity: Math.min(Math.max(0, qty), item.maxQuantity) };
+            if (item.id !== id) return item;
+            const clamped = Math.min(Math.max(0, qty), item.maxQuantity);
+            const isUnit = item.is_unit !== false;
+            if (!isUnit) {
+                // Clamp loose units: total base units can't exceed maxLooseUnits
+                const uph = item.presentation?.units_per_package || 1;
+                const maxLooseNow = item.maxLooseUnits - clamped * uph;
+                const clampedLoose = Math.min(item.looseQuantity, Math.max(0, maxLooseNow));
+                return { ...item, returnQuantity: clamped, looseQuantity: clampedLoose };
             }
-            return item;
+            return { ...item, returnQuantity: clamped };
+        }));
+    };
+
+    const handleLooseQuantityChange = (id: number, value: string) => {
+        const qty = Math.floor(parseFloat(value) || 0);
+        setReturnItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const uph = item.presentation?.units_per_package || 1;
+            const maxLooseNow = item.maxLooseUnits - item.returnQuantity * uph;
+            const clamped = Math.min(Math.max(0, qty), Math.max(0, maxLooseNow));
+            return { ...item, looseQuantity: clamped };
         }));
     };
 
     const handleSetMax = (id: number) => {
         setReturnItems(prev => prev.map(item => {
-            if (item.id === id) {
-                return { ...item, returnQuantity: item.maxQuantity };
-            }
-            return item;
+            if (item.id !== id) return item;
+            return { ...item, returnQuantity: item.maxQuantity, looseQuantity: 0 };
         }));
     };
 
@@ -126,17 +152,23 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
     const calculateTotals = () => {
         let subtotal = 0;
         returnItems.forEach(item => {
-            if (item.returnQuantity > 0) {
-                const unitPrice = parseFloat(String(item.unit_price));
-                subtotal += unitPrice * item.returnQuantity;
+            const unitPrice = parseFloat(String(item.unit_price));
+            const isUnit = item.is_unit !== false;
+            if (isUnit) {
+                if (item.returnQuantity > 0) subtotal += unitPrice * item.returnQuantity;
+            } else {
+                // Package: unit_price is per-package, loose units priced proportionally
+                const uph = item.presentation?.units_per_package || 1;
+                const pkgTotal = unitPrice * item.returnQuantity;
+                const looseTotal = (unitPrice / uph) * item.looseQuantity;
+                subtotal += pkgTotal + looseTotal;
             }
         });
 
-        // We can proportionally discount if needed, but for simplicity we'll just return raw subtotal
-        // In a production system, one might calculate tax and discounts proportionally to the returned items.
-
-        // Check if it's a full return
-        const isFullReturn = returnItems.every(item => item.returnQuantity === item.maxQuantity);
+        // Check if it's a full return (all packages returned, no loose remainder)
+        const isFullReturn = returnItems.every(item =>
+            item.returnQuantity === item.maxQuantity && item.looseQuantity === 0
+        );
 
         const finalTotal = isFullReturn ? (parseFloat(String(sale?.total || 0))) : subtotal;
 
@@ -148,7 +180,8 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
     };
 
     const totals = calculateTotals();
-    const COP_RATE = sale?.exchange_rate || 1; // Simplification, normally fetched from effective rate
+    const needsRate = refundMethod === 'cash' || refundMethod === 'transfer';
+    const COP_RATE = needsRate ? (returnExchangeRate || 1) : (sale?.exchange_rate || 1);
 
     const formatCurrency = (val: number): string => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.round(val * COP_RATE));
@@ -157,7 +190,7 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        const itemsToReturn = returnItems.filter(item => item.returnQuantity > 0);
+        const itemsToReturn = returnItems.filter(item => item.returnQuantity > 0 || item.looseQuantity > 0);
 
         if (itemsToReturn.length === 0) {
             toast.error('Debe especificar al menos un producto a devolver');
@@ -180,13 +213,13 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                 reason_description: reasonDescription,
                 type: totals.isFullReturn ? 'full' : 'partial',
                 refund_method: isConsumidorFinal ? (refundMethod === 'credit_balance' ? 'none' : refundMethod) : refundMethod,
+                exchange_rate: returnExchangeRate,
                 items: itemsToReturn.map(item => {
-                    const isUnit = item.is_unit;
-                    const unitsPerPackage = item.presentation?.units_per_package || 1;
+                    const isUnit = item.is_unit !== false;
                     return {
                         sale_detail_id: item.id,
-                        package_quantity_returned: isUnit ? item.returnQuantity : Math.floor(item.returnQuantity / unitsPerPackage),
-                        loose_units_returned: isUnit ? 0 : item.returnQuantity % unitsPerPackage,
+                        package_quantity_returned: isUnit ? item.returnQuantity : item.returnQuantity,
+                        loose_units_returned: isUnit ? 0 : item.looseQuantity,
                         return_to_stock: true
                     };
                 })
@@ -265,47 +298,100 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {returnItems.map(item => (
-                                    <tr key={item.id} className={item.returnQuantity > 0 ? 'bg-rose-50/30' : ''}>
+                                {returnItems.map(item => {
+                                    const isUnit = item.is_unit !== false;
+                                    const uph = item.presentation?.units_per_package || 1;
+                                    const hasReturn = item.returnQuantity > 0 || item.looseQuantity > 0;
+                                    const unitPrice = parseFloat(String(item.unit_price));
+                                    const rowSubtotal = isUnit
+                                        ? unitPrice * item.returnQuantity
+                                        : unitPrice * item.returnQuantity + (unitPrice / uph) * item.looseQuantity;
+
+                                    return (
+                                    <tr key={item.id} className={hasReturn ? 'bg-rose-50/30' : ''}>
                                         <td className="px-4 py-3">
                                             <div className="text-sm font-medium text-gray-900">{item.product?.name}</div>
-                                            <div className="text-xs text-gray-500">{item.presentation?.name || 'Unidad'} - {formatCurrency(parseFloat(String(item.unit_price)))} / c.u.</div>
+                                            <div className="text-xs text-gray-500">{item.presentation?.name || 'Unidad'} - {formatCurrency(unitPrice)} / c.u.</div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-sm text-gray-600 font-medium">
                                             {item.originalQuantity ?? item.maxQuantity}
+                                            {!isUnit && <div className="text-xs text-gray-400">({(item.originalQuantity ?? item.maxQuantity) * uph} uds)</div>}
                                             {item.alreadyReturned > 0 && (
                                                 <div className="text-xs text-orange-500">({item.alreadyReturned} devueltos)</div>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 bg-primary-50/20 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max={item.maxQuantity}
-                                                    step="1"
-                                                    value={item.returnQuantity === 0 ? '' : item.returnQuantity}
-                                                    onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                                    placeholder="0"
-                                                    className="w-20 px-2 py-1 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleSetMax(item.id)}
-                                                    className="text-xs px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded border border-gray-200"
-                                                    title="Devolver todo este ítem"
-                                                >
-                                                    Max
-                                                </button>
-                                            </div>
+                                            {isUnit ? (
+                                                /* Unit item: single input */
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={item.maxQuantity}
+                                                        step="1"
+                                                        value={item.returnQuantity === 0 ? '' : item.returnQuantity}
+                                                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                                                        placeholder="0"
+                                                        data-testid="quantity-input"
+                                                        className="w-20 px-2 py-1 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSetMax(item.id)}
+                                                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded border border-gray-200"
+                                                        title="Devolver todo este ítem"
+                                                    >
+                                                        Max
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                /* Package item: two inputs — packages + loose units */
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max={item.maxQuantity}
+                                                            step="1"
+                                                            value={item.returnQuantity === 0 ? '' : item.returnQuantity}
+                                                            onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                                                            placeholder="0"
+                                                            data-testid="packages-input"
+                                                            className="w-16 px-2 py-1 text-center border border-primary-300 rounded focus:ring-2 focus:ring-primary-200 bg-white"
+                                                        />
+                                                        <span className="text-xs text-gray-500">bultos</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSetMax(item.id)}
+                                                            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded border border-gray-200"
+                                                            title="Devolver todo este ítem"
+                                                        >
+                                                            Max
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max={Math.max(0, item.maxLooseUnits - item.returnQuantity * uph)}
+                                                            step="1"
+                                                            value={item.looseQuantity === 0 ? '' : item.looseQuantity}
+                                                            onChange={(e) => handleLooseQuantityChange(item.id, e.target.value)}
+                                                            placeholder="0"
+                                                            data-testid="loose-input"
+                                                            className="w-16 px-2 py-1 text-center border border-orange-300 rounded focus:ring-2 focus:ring-orange-200 bg-white"
+                                                        />
+                                                        <span className="text-xs text-orange-600">uds sueltas</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm font-medium text-rose-600">
-                                            {item.returnQuantity > 0
-                                                ? formatCurrency(item.returnQuantity * parseFloat(String(item.unit_price)))
-                                                : '-'}
+                                            {hasReturn ? formatCurrency(rowSubtotal) : '-'}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -362,11 +448,36 @@ const SaleReturnModal: React.FC<SaleReturnModalProps> = ({ isOpen, onClose, sale
                             </select>
                         </div>
 
+                        {/* Exchange rate — shown for cash/transfer refunds */}
+                        {needsRate && (
+                            <div>
+                                <label htmlFor="return-exchange-rate" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Tasa de cambio (COP por 1 USD)
+                                </label>
+                                <input
+                                    id="return-exchange-rate"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={returnExchangeRate || ''}
+                                    onChange={(e) => setReturnExchangeRate(parseFloat(e.target.value) || 0)}
+                                    placeholder="Ej: 4200"
+                                    className="w-full px-3 py-2 border border-primary-300 rounded-md focus:ring-primary-200 focus:border-primary-500 bg-white"
+                                />
+                            </div>
+                        )}
+
                         <div className="pt-4 border-t border-gray-200">
                             <div className="flex justify-between items-center text-lg font-bold">
-                                <span className="text-gray-800">Monto Acreditar:</span>
-                                <span className="text-rose-600">{formatCurrency(totals.total)}</span>
+                                <span className="text-gray-800">Monto a devolver:</span>
+                                <span className="text-rose-600">USD {totals.total.toFixed(2)}</span>
                             </div>
+                            {needsRate && returnExchangeRate > 0 && (
+                                <div className="flex justify-between items-center text-base font-semibold mt-1">
+                                    <span className="text-gray-600">Equivalente COP:</span>
+                                    <span className="text-rose-500">{formatCurrency(totals.total)}</span>
+                                </div>
+                            )}
                             <p className="text-xs text-gray-500 text-right mt-1">
                                 {totals.isFullReturn ? 'Devolución Total' : 'Devolución Parcial'}
                             </p>

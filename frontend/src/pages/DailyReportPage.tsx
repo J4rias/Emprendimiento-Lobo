@@ -25,11 +25,16 @@ interface DailyReport {
     date: string;
     totalSalesCOP: number;
     totalSalesUSD: number;
+    grossSalesUSD?: number;
+    grossSalesCOP?: number;
+    cnDeductionUSD?: number;
+    cnDeductionCOP?: number;
     salesCount: number;
     creditTotalUSD: number;
     creditCollectedByCurrency: Record<string, number>;
     cashRefunds: {
         refund_count: number;
+        refund_cop?: number;
         refund_by_currency: Record<string, number>;
         refund_usd?: number;
     };
@@ -241,12 +246,15 @@ const DailyReportPage = () => {
             ) : (
                 <div className="space-y-6 print-container">
 
-                    {/* Totales recibidos por moneda */}
+                    {/* Totales recibidos por moneda (neto: pagos − devoluciones COP) */}
                     {(() => {
+                        const refundCOP = report.cashRefunds?.refund_cop || Object.values(report.cashRefunds?.refund_by_currency || {}).reduce((s, v) => s + v, 0);
                         const currencyTotals = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
-                            const total = Object.entries(methods)
+                            let total = Object.entries(methods)
                                 .filter(([k]) => k !== '_salesCount')
                                 .reduce((sum: number, [, amount]) => sum + (amount as number), 0);
+                            // Subtract cash refunds from COP (all refunds are in COP)
+                            if (currency === 'COP') total -= refundCOP;
                             return [currency, total] as [string, number];
                         }).filter(([, total]) => total > 0);
 
@@ -278,9 +286,9 @@ const DailyReportPage = () => {
                         return (
                         <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
                             <StatCard
-                                label="Ventas del día"
+                                label="Ventas del día (neto)"
                                 value={`$ ${fmtAmount(report.totalSalesUSD || 0, 'USD')}`}
-                                detail={`COP ${fmtAmount(report.totalSalesCOP || 0, 'COP')}`}
+                                detail={report.cnDeductionUSD ? `COP ${fmtAmount(report.totalSalesCOP || 0, 'COP')} (−$${fmtAmount(report.cnDeductionUSD, 'USD')} devuelto)` : `COP ${fmtAmount(report.totalSalesCOP || 0, 'COP')}`}
                                 icon={ShoppingCart}
                                 tone="primary"
                             />
