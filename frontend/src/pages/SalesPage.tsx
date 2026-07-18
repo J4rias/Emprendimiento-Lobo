@@ -422,7 +422,8 @@ const SalesPage = () => {
     const sale = paymentSale;
     if (!sale) return;
     const rate = parseFloat(String(sale.exchange_rate)) || copPerUSD;
-    const saleTotalCOP = parseFloat(String(sale.total)) * rate;
+    const remainingUSD = parseFloat(String(sale.total)) - parseFloat(String(sale.paid_amount || 0));
+    const saleTotalCOP = remainingUSD * rate;
 
     setCollectSaving(true);
     try {
@@ -762,11 +763,11 @@ const SalesPage = () => {
         <CheckoutModal
           show={!!paymentSale}
           onClose={() => !collectSaving && setPaymentSale(null)}
-          subtotal={parseFloat(String(paymentSale.subtotal || paymentSale.total))}
-          discount={parseFloat(String(paymentSale.discount_amount || 0))}
-          tax={parseFloat(String(paymentSale.tax_amount || 0))}
-          total={parseFloat(String(paymentSale.total))}
-          totalCOP={parseFloat(String(paymentSale.total)) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD)}
+          subtotal={parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))}
+          discount={0}
+          tax={0}
+          total={parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))}
+          totalCOP={(parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD)}
           copPerUSD={parseFloat(String(paymentSale.exchange_rate)) || copPerUSD}
           paymentLines={checkoutPaymentLines}
           setPaymentLines={setCheckoutPaymentLines as React.Dispatch<React.SetStateAction<PaymentLine[]>>}

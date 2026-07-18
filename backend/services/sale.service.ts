@@ -370,7 +370,7 @@ export async function createSale(
       let creditBalanceDeductionUSD = 0;
 
       for (const payLine of cashLines) {
-        if (parseFloat(payLine.amount) === 0) continue;
+        if (parseFloat(payLine.amount) <= 0) continue;
         paymentBatch.push({
           sale_id: sale.id,
           payment_date: new Date(),
@@ -599,15 +599,17 @@ export async function addPayment(
       throw new ServiceError(400, 'No se enviaron líneas de pago');
     }
 
-    // Validate all amounts are positive
-    for (const payLine of payment_lines) {
-      if ((parseFloat(payLine.amount) || 0) <= 0) {
-        await transaction.rollback();
-        throw new ServiceError(400, 'El monto de cada línea de pago debe ser positivo');
-      }
+    // Separate real payments from change lines (negative COP = vuelto given in cash)
+    const realLines = payment_lines.filter((l: any) => (parseFloat(l.amount) || 0) > 0);
+    const changeLines = payment_lines.filter((l: any) => (parseFloat(l.amount) || 0) < 0);
+
+    if (realLines.length === 0) {
+      await transaction.rollback();
+      throw new ServiceError(400, 'No se enviaron líneas de pago válidas');
     }
 
-    const totalNewlyPaidUSD = payment_lines.reduce((sum: number, payLine: any) => {
+    // Net paid = real payments minus change given back
+    const totalNewlyPaidUSD = [...realLines, ...changeLines].reduce((sum: number, payLine: any) => {
       return sum + (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
     }, 0);
 
@@ -617,13 +619,12 @@ export async function addPayment(
       throw new ServiceError(400, 'El pago excede el saldo pendiente de la venta');
     }
 
-    let newlyPaidUSD = 0;
     const createdPayments: any[] = [];
     let addPayCreditBalanceUSD = 0;
 
-    for (const payLine of payment_lines) {
+    // Only create SalePayment records for real payments (not change lines)
+    for (const payLine of realLines) {
       const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
-      newlyPaidUSD += amountUSD;
 
       const payment = await SalePayment.create({
         sale_id: sale.id,
@@ -645,8 +646,9 @@ export async function addPayment(
       }
     }
 
-    const newPaidAmount = Math.min(parseFloat(sale.paid_amount) + newlyPaidUSD, parseFloat(sale.total));
-    const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - newlyPaidUSD);
+    // Use net paid (real - change) for balance update
+    const newPaidAmount = Math.min(parseFloat(sale.paid_amount) + totalNewlyPaidUSD, parseFloat(sale.total));
+    const newCreditAmount = Math.max(0, parseFloat(sale.credit_amount) - totalNewlyPaidUSD);
     const newStatus = newPaidAmount >= parseFloat(sale.total) - 0.01 ? 'completed' : 'pending';
 
     const saleUpdateData: any = {
@@ -666,7 +668,7 @@ export async function addPayment(
       const customer = await Customer.findByPk(sale.customer_id, { transaction }) as any;
       if (customer) {
         const updates: any = {
-          credit_used: Math.max(0, parseFloat(customer.credit_used || 0) - newlyPaidUSD)
+          credit_used: Math.max(0, parseFloat(customer.credit_used || 0) - totalNewlyPaidUSD)
         };
         if (addPayCreditBalanceUSD > 0) {
           updates.creditBalance = Math.max(0, parseFloat(customer.creditBalance || 0) - addPayCreditBalanceUSD);

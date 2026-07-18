@@ -115,22 +115,7 @@ export function adjustPaymentLinesForChange(
       }
     }
 
-    // 2. Deduct from non-COP cash lines (USD, VES, etc.) using their cop_rate
-    if (remainingChange > copTolerance) {
-      for (let i = adjustedLines.length - 1; i >= 0 && remainingChange > copTolerance; i--) {
-        const line = adjustedLines[i];
-        if (line.method !== 'credit' && line.currency !== 'COP') {
-          const copRate = parseFloat(String(line.cop_rate)) || 1;
-          const lineMaxCOP = line.amount * copRate;
-          const deductCOP = Math.min(remainingChange, lineMaxCOP);
-          const deductNative = deductCOP / copRate;
-          adjustedLines[i] = { ...line, amount: parseFloat((line.amount - deductNative).toFixed(2)) };
-          remainingChange -= deductCOP;
-        }
-      }
-    }
-
-    // 3. Fallback: negative COP line (should rarely happen now)
+    // 2. Remaining change → vuelto always given in COP cash (never deduct from USD/VES)
     if (remainingChange > copTolerance) {
       adjustedLines.push({
         currency: 'COP',
@@ -141,7 +126,9 @@ export function adjustPaymentLinesForChange(
     }
   }
 
-  return { adjustedLines, changeCOP, changeAmount };
+  // Filter out zero-amount lines (fully deducted COP); keep negative lines (vuelto in COP)
+  const filtered = adjustedLines.filter(l => l.amount !== 0);
+  return { adjustedLines: filtered, changeCOP, changeAmount };
 }
 
 /**
