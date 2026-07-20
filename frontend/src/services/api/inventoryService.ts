@@ -19,9 +19,13 @@ interface InventoryListResponse {
 export interface AdjustData {
   product_id: number;
   warehouse_id: number;
-  quantity: number;
-  reason: string;
-  type: 'entrada' | 'ajuste';
+  type: 'add' | 'remove';
+  presentation_id?: number;
+  package_quantity?: number;
+  loose_units?: number;
+  reason?: string;
+  document_number?: string;
+  batch_id?: number;
 }
 
 export const inventoryService = {

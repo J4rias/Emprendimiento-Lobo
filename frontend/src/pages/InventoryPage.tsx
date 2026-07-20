@@ -217,8 +217,8 @@ const InventoryPage = () => {
       await inventoryService.adjustInventory({
         product_id:   item.product_id,
         warehouse_id: item.warehouse_id,
-        type:         diff > 0 ? 'entrada' : 'ajuste',
-        quantity:     Math.abs(diff),
+        type:         diff > 0 ? 'add' : 'remove',
+        loose_units:  Math.abs(diff),
         reason:       'Conteo Rápido',
       });
       setSaveStatus(prev => ({ ...prev, [item.id]: 'saved' }));

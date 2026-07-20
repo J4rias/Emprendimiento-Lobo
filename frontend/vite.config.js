@@ -11,6 +11,9 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Para acceso remoto vía Tailscale, descomentar:
+    // allowedHosts: ['spooky.tail0d213e.ts.net'],
+    // hmr: { host: 'spooky.tail0d213e.ts.net', protocol: 'wss', clientPort: 443 },
     proxy: {
       '/api': {
         target: 'http://localhost:5001',
