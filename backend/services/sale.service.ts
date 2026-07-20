@@ -11,6 +11,8 @@ import Inventory from '../models/Inventory';
 import InventoryMovement from '../models/InventoryMovement';
 import PosReservation from '../models/PosReservation';
 import ExchangeRate from '../models/ExchangeRate';
+import CreditNote from '../models/CreditNote';
+import CreditNoteDetail from '../models/CreditNoteDetail';
 import { recordLedgerEntry } from './customerLedger.service';
 
 const logger = require('../config/logger');
@@ -491,6 +493,27 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
       throw new ServiceError(400, 'La venta ya está cancelada');
     }
 
+    // Query applied credit notes for this sale to avoid double-returning stock
+    const appliedCNs = await CreditNote.findAll({
+      where: { sale_id: saleId, status: 'applied' },
+      include: [{ model: CreditNoteDetail, as: 'details' }],
+      transaction
+    }) as any[];
+
+    // Map: sale_detail_id → total units already returned
+    const returnedByDetail = new Map<number, number>();
+    for (const cn of appliedCNs) {
+      for (const cnd of cn.details) {
+        const pkgUnits = parseFloat(cnd.package_quantity_returned) || 0;
+        const looseUnits = parseFloat(cnd.loose_units_returned) || 0;
+        // Find the sale_detail to get units_per_package
+        const sd = sale.details.find((d: any) => d.id === cnd.sale_detail_id);
+        const upp = sd?.presentation?.units_per_package || 1;
+        const totalReturned = pkgUnits * upp + looseUnits;
+        returnedByDetail.set(cnd.sale_detail_id, (returnedByDetail.get(cnd.sale_detail_id) || 0) + totalReturned);
+      }
+    }
+
     // Batch pre-fetch inventories with row-level locks
     const cancelProductIds = [...new Set<number>(sale.details.map((d: any) => d.product_id))];
     const cancelInvRows = await Inventory.findAll({
@@ -505,11 +528,15 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
       const inventory = cancelInvMap.get(detail.product_id);
 
       if (inventory) {
-        const units_to_return = detail.is_unit
+        const fullUnits = detail.is_unit
           ? parseFloat(detail.quantity)
           : (parseFloat(detail.quantity) * (detail.presentation?.units_per_package || 1));
 
-        if (['completed', 'pending', 'partial'].includes(sale.status)) {
+        // Subtract units already returned via credit notes
+        const alreadyReturned = returnedByDetail.get(detail.id) || 0;
+        const units_to_return = Math.max(0, fullUnits - alreadyReturned);
+
+        if (units_to_return > 0 && ['completed', 'pending', 'partial'].includes(sale.status)) {
           await inventory.update({
             quantity: parseFloat(inventory.quantity) + units_to_return
           }, { transaction });
@@ -528,6 +555,14 @@ export async function cancelSale(saleId: number, reason: string, userId: number)
           });
         }
       }
+    }
+
+    // Cancel associated credit notes so they don't appear in daily report
+    if (appliedCNs.length > 0) {
+      await CreditNote.update(
+        { status: 'cancelled', notes: `Cancelada automáticamente por cancelación de venta ${sale.sale_number}` },
+        { where: { sale_id: saleId, status: 'applied' }, transaction }
+      );
     }
 
     if (cancelMovements.length > 0) {
