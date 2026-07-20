@@ -111,6 +111,9 @@ class CustomerController {
         credit_limit, credit_days, price_list_id, discount_percentage, notes
       } = req.body;
 
+      if (!type || !document_number) {
+        return res.status(400).json({ message: 'Tipo de cliente y número de documento son obligatorios' });
+      }
       if (type === 'juridical' && !business_name) {
         return res.status(400).json({ message: 'La razón social es obligatoria para personas jurídicas' });
       }

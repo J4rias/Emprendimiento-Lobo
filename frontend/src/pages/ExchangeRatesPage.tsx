@@ -16,7 +16,7 @@ import {
 } from '../components/ui';
 import type { Column } from '../components/ui';
 import { exchangeRateService } from '../services/api/exchangeRateService';
-import type { ExchangeRate } from '../types';
+import type { ExchangeRate, Currency } from '../types';
 import { localToday } from '../utils/dateUtils';
 import { formatDateShort, formatDate } from '../utils/formatUtils';
 
@@ -33,7 +33,14 @@ const ExchangeRatesPage = () => {
   const [selectedDate, setSelectedDate] = useState(localToday());
   const [rateSortBy, setRateSortBy] = useState('effective_date');
   const [rateSortDir, setRateSortDir] = useState<'asc' | 'desc'>('desc');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    from_currency: Currency;
+    to_currency: Currency;
+    rate: string;
+    effective_date: string;
+    source: string;
+    notes: string;
+  }>({
     from_currency: 'USD',
     to_currency: 'VES',
     rate: '',
@@ -149,7 +156,7 @@ const ExchangeRatesPage = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value } as typeof prev));
   };
 
   const getCurrencyName = (code: string) => {

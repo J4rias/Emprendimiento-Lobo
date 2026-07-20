@@ -9,8 +9,10 @@ export interface Brand {
 // ── Category ──
 export interface Category {
   id: number;
+  code: string;
   name: string;
   description?: string;
+  color?: string;
   product_count?: number;
   is_active: boolean;
 }
@@ -86,10 +88,12 @@ export interface Sale {
 }
 
 // ── Exchange Rate ──
+export type Currency = 'USD' | 'COP' | 'VES';
+
 export interface ExchangeRate {
   id: number;
-  from_currency: string;
-  to_currency: string;
+  from_currency: Currency;
+  to_currency: Currency;
   rate: number;
   effective_date: string;
   source?: string;

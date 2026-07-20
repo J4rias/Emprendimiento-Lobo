@@ -8,6 +8,7 @@ export type {
   Sale,
   SalePayment,
   SaleDetail,
+  Currency,
   ExchangeRate,
   InventoryItem,
   Quote,

@@ -2,21 +2,18 @@ import api from './axios';
 
 interface ReserveData {
   session_id: string;
-  tab_id: string | null;
+  tab_id: string;
   user_id?: number;
   product_id: number;
   presentation_id: number;
   units_requested: number;
-  quantity?: number;
 }
 
 interface ReleaseData {
   session_id: string;
-  tab_id: string | null;
+  tab_id: string;
   presentation_id: number;
   units_to_release: number;
-  product_id?: number;
-  quantity?: number;
 }
 
 export const posReservationService = {

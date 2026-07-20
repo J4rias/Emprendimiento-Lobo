@@ -542,7 +542,7 @@ export function usePOS() {
       if (otherUnits > 0) {
         await posReservationService.reserve({
           session_id: sessionId,
-          tab_id: activeTabId,
+          tab_id: activeTabId!,
           user_id: user?.id,
           product_id: productId,
           presentation_id: presentationId,
@@ -551,7 +551,7 @@ export function usePOS() {
       } else {
         await posReservationService.releaseItem({
           session_id: sessionId,
-          tab_id: activeTabId,
+          tab_id: activeTabId!,
           presentation_id: presentationId,
           units_to_release: unitsToRelease,
         });
@@ -588,7 +588,7 @@ export function usePOS() {
     try {
       await posReservationService.reserve({
         session_id: sessionId,
-        tab_id: activeTabId,
+        tab_id: activeTabId!,
         user_id: user?.id,
         product_id: productId,
         presentation_id: presentationId,
