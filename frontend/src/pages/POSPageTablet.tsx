@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { usePOS, CURRENCIES, PAYMENT_METHODS, COP_TOLERANCE, saveRate } from '../hooks/usePOS';
 import { useCheckoutPayments } from '../hooks/useCheckoutPayments';
-import { getCustomerDisplayName } from '../utils/paymentUtils';
+import { getCustomerDisplayName, roundToNearest100COP } from '../utils/paymentUtils';
 import type { PaymentLine, ExchangeRate, Customer } from '../utils/paymentUtils';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { formatCOP } from '../utils/formatUtils';
@@ -693,7 +693,7 @@ function TabletCheckoutModal({
     changeRate, showCustomerSearch, banks,
     setNewPayAmount, setNewPayRate, setNewPayBank, setChangeRate, setShowCustomerSearch,
     handleCurrencyChange, handleMethodChange, addPaymentLine,
-    cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP,
+    cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP, vueltoCOP,
     availableMethods, hasCreditLine, filteredBanks, effectiveCurrency,
   } = useCheckoutPayments({
     paymentLines, setPaymentLines,
@@ -905,14 +905,15 @@ function TabletCheckoutModal({
               <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{sSym} {fmtCOP(paidCOP)}</span></div>
               <div className="flex justify-between border-t pt-1.5">
                 {changeCOP >= 0 ? (
-                  <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">{sSym} {fmtCOP(changeCOP)}</span></>
+                  <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600 text-lg">{sSym} {fmtCOP(vueltoCOP)}</span></>
                 ) : (
                   <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600 text-lg">{sSym} {fmtCOP(Math.abs(changeCOP))}</span></>
                 )}
               </div>
               {isUSD && changeCOP > 0 && (() => {
                 const changeUSD = changeCOP / copPerUSD;
-                const vueltoCOP = Math.round(changeUSD * changeRate);
+                const rawVueltoCOP = Math.round(changeUSD * changeRate);
+                const vueltoRounded = roundToNearest100COP(rawVueltoCOP);
                 return (
                   <div className="space-y-1.5 border-t border-dashed pt-1.5 mt-1.5">
                     <div className="flex items-center justify-end gap-2 text-sm text-gray-500">
@@ -927,7 +928,7 @@ function TabletCheckoutModal({
                     </div>
                     <div className="flex justify-between text-base font-semibold text-green-700">
                       <span>Entregar:</span>
-                      <span>{formatCOP(vueltoCOP)}</span>
+                      <span>{formatCOP(vueltoRounded)}</span>
                     </div>
                   </div>
                 );

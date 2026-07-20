@@ -85,6 +85,7 @@ const InventoryPage = () => {
     queryKey: ['inventory', selectedWarehouse, searchTerm, selectedCategory, filters],
     queryFn: () => inventoryService.getByWarehouse(selectedWarehouse === 'all' ? 'all' : Number(selectedWarehouse), {
       search: searchTerm,
+      category_id: selectedCategory ? Number(selectedCategory) : undefined,
       low_stock:   filters.lowStock,
       expiring:    filters.expiring,
       out_of_stock: filters.outOfStock,

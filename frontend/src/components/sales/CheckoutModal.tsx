@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCheckoutPayments } from '../../hooks/useCheckoutPayments';
-import { getCustomerDisplayName } from '../../utils/paymentUtils';
+import { getCustomerDisplayName, roundToNearest100COP } from '../../utils/paymentUtils';
 import type { PaymentLine, ExchangeRate, Customer } from '../../utils/paymentUtils';
 import { CURRENCIES, PAYMENT_METHODS, METHODS_BY_CURRENCY, COP_TOLERANCE, saveRate } from '../../hooks/usePOS';
 import { LOCALE } from '../../utils/formatUtils';
@@ -67,7 +67,7 @@ export default function CheckoutModal({
     changeRate, showCustomerSearch, banks,
     setNewPayAmount, setNewPayRate, setNewPayBank, setChangeRate, setShowCustomerSearch,
     handleCurrencyChange, handleMethodChange, addPaymentLine,
-    cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP,
+    cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP, vueltoCOP,
     availableMethods, hasCreditLine, filteredBanks, effectiveCurrency,
   } = checkout;
 
@@ -272,14 +272,15 @@ export default function CheckoutModal({
             <div className="flex justify-between"><span>Pagado:</span><span className="font-semibold text-blue-700">{sSym} {fmtCOP(paidCOP)}</span></div>
             <div className="flex justify-between border-t pt-1">
               {changeCOP >= 0 ? (
-                <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">{sSym} {fmtCOP(changeCOP)}</span></>
+                <><span className="font-semibold">Vuelto:</span><span className="font-bold text-green-600">{sSym} {fmtCOP(vueltoCOP)}</span></>
               ) : (
                 <><span className="font-semibold text-red-600">Faltante:</span><span className="font-bold text-red-600">{sSym} {fmtCOP(Math.abs(changeCOP))}</span></>
               )}
             </div>
             {isUSD && changeCOP > 0 && (() => {
               const changeUSD = changeCOP / copPerUSD;
-              const vueltoCOP = Math.round(changeUSD * changeRate);
+              const rawVueltoCOP = Math.round(changeUSD * changeRate);
+              const vueltoRounded = roundToNearest100COP(rawVueltoCOP);
               return (
                 <div className="space-y-1 border-t border-dashed pt-1 mt-1">
                   <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
@@ -294,7 +295,7 @@ export default function CheckoutModal({
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-green-700">
                     <span>Entregar:</span>
-                    <span>COP$ {vueltoCOP.toLocaleString(LOCALE)}</span>
+                    <span>COP$ {vueltoRounded.toLocaleString(LOCALE)}</span>
                   </div>
                 </div>
               );

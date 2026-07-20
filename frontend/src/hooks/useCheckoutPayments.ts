@@ -13,6 +13,7 @@ import {
   saveRate,
 } from './usePOS';
 import { formatCOP, formatUSD } from '../utils/formatUtils';
+import { roundToNearest100COP } from '../utils/paymentUtils';
 
 // ============= TYPES =============
 
@@ -64,6 +65,7 @@ export interface UseCheckoutPaymentsReturn {
   effectiveTotalCOP: number;
   rawChangeCOP: number;
   changeCOP: number;
+  vueltoCOP: number;
   availableMethods: typeof PAYMENT_METHODS;
   hasCreditLine: boolean;
   filteredBanks: Bank[];
@@ -189,6 +191,8 @@ export function useCheckoutPayments({
   const effectiveTotalCOP = totalCOP - creditCOP;
   const rawChangeCOP = paidCOP - effectiveTotalCOP;
   const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : rawChangeCOP;
+  // Vuelto rounded to nearest 100 COP (smallest bill denomination for change)
+  const vueltoCOP = changeCOP > 0 ? roundToNearest100COP(changeCOP) : 0;
 
   const availableMethods = PAYMENT_METHODS.filter(m =>
     (METHODS_BY_CURRENCY[effectiveCurrency as keyof typeof METHODS_BY_CURRENCY] || ['cash']).includes(m.id)
@@ -236,6 +240,7 @@ export function useCheckoutPayments({
     effectiveTotalCOP,
     rawChangeCOP,
     changeCOP,
+    vueltoCOP,
     availableMethods,
     hasCreditLine,
     filteredBanks,

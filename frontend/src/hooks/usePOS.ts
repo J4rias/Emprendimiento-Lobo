@@ -741,7 +741,7 @@ export function usePOS() {
 
   // ============= COP DERIVED VALUES =============
   const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-  const totalCOP = total * copPerUSD;
+  const totalCOP = Math.round(total * copPerUSD);
 
   // ============= CHECKOUT =============
   const performSale = async (authorizedBy: number | null) => {

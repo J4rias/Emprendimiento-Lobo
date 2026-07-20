@@ -43,6 +43,17 @@ export interface Customer {
 
 const COP_TOLERANCE = 40;
 
+// ============= HELPERS =============
+
+/**
+ * Rounds a COP amount to the nearest 100 (smallest bill denomination).
+ * Business rule: vueltos are always given in multiples of 100 COP.
+ * Examples: 1101 → 1100, 1263 → 1300, 550 → 600.
+ */
+export function roundToNearest100COP(amount: number): number {
+  return Math.round(amount / 100) * 100;
+}
+
 // ============= FUNCTIONS =============
 
 /**
@@ -90,13 +101,18 @@ export function adjustPaymentLinesForChange(
   displayCurrency: string,
   copTolerance: number = COP_TOLERANCE,
 ): AdjustResult {
+  // Round totalCOP to integer to eliminate floating-point noise (e.g. 59000.0001 → 59000)
+  const totalCOPRounded = Math.round(totalCOP);
+
+  // Use Math.round per line to match useCheckoutPayments.lineCOP exactly
+  const lineCOP = (l: PaymentLine) => Math.round(l.amount * (parseFloat(String(l.cop_rate)) || 1));
   const paidCOP = paymentLines
     .filter(l => l.method !== 'credit')
-    .reduce((sum, l) => sum + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
+    .reduce((sum, l) => sum + lineCOP(l), 0);
   const creditCOP = paymentLines
     .filter(l => l.method === 'credit')
-    .reduce((s, l) => s + (l.amount * (parseFloat(String(l.cop_rate)) || 1)), 0);
-  const rawChangeCOP = paidCOP - (totalCOP - creditCOP);
+    .reduce((s, l) => s + lineCOP(l), 0);
+  const rawChangeCOP = paidCOP - (totalCOPRounded - creditCOP);
   const changeCOP = Math.abs(rawChangeCOP) <= copTolerance ? 0 : Math.max(0, rawChangeCOP);
   const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
@@ -115,12 +131,12 @@ export function adjustPaymentLinesForChange(
       }
     }
 
-    // 2. Remaining change → vuelto always given in COP cash (never deduct from USD/VES)
+    // 2. Remaining change → vuelto always given in COP cash, rounded to nearest 100
     if (remainingChange > copTolerance) {
       adjustedLines.push({
         currency: 'COP',
         method: 'cash',
-        amount: -Math.round(remainingChange),
+        amount: -roundToNearest100COP(remainingChange),
         cop_rate: 1,
       });
     }
