@@ -196,6 +196,7 @@ export async function createSale(
 
     let subtotal = 0;
     let tax_amount = 0;
+    let totalCommission = 0;
     const saleDetails: any[] = [];
     const inventoryMovements: any[] = [];
     let vesUsdRate: number | null = null;
@@ -266,6 +267,12 @@ export async function createSale(
         }
       }
 
+      // Comisión fija en COP (monto por paquete o por unidad suelta)
+      const commissionCop = is_unit
+        ? (parseFloat(item.quantity) * (parseFloat(presentation.unit_commission) || 0))
+        : (parseFloat(item.quantity) * (parseFloat(presentation.package_commission) || 0));
+      totalCommission += commissionCop;
+
       saleDetails.push({
         product_id: item.product_id,
         presentation_id: item.presentation_id,
@@ -280,6 +287,7 @@ export async function createSale(
         subtotal: item_subtotal,
         total: item_total,
         cost_price: costPrice,
+        commission_amount: commissionCop,
         notes: item.notes || null
       });
 
@@ -368,6 +376,7 @@ export async function createSale(
       credit_due_date,
       paid_amount: (sale_type === 'cash' || sale_type === 'mixed') ? paid_amount : 0,
       change_amount,
+      total_commission: totalCommission,
       status: sale_type === 'cash' ? 'completed' : 'pending',
       notes,
       quote_id: quote_id || null,

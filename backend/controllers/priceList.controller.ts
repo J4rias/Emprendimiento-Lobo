@@ -154,7 +154,7 @@ class PriceListController {
                             {
                                 model: ProductPresentation,
                                 as: 'presentation',
-                                attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency']
+                                attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency', 'package_commission', 'unit_commission']
                             }
                         ]
                     }

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { priceListService } from '../services/api/priceListService';
+import { presentationService } from '../services/api/presentationService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -32,6 +33,8 @@ interface PriceListDetail {
     frozen_price?: number | null;
     frozen_currency?: string;
     package_price_usd?: number;
+    package_commission?: number;
+    unit_commission?: number;
     package_price_cop_str?: string | undefined;
     server_updated_at?: string | null;
     [key: string]: unknown;
@@ -110,6 +113,21 @@ const PriceListsPage = () => {
         onConflict: autoSaveOnConflict,
     });
 
+    // Auto-save: comisión global de la presentación con debounce de 800ms
+    const autoSaveCommissionFn = useCallback(
+        (data: unknown) => {
+            const d = data as { presentation_id: number; [k: string]: unknown };
+            const payload: Record<string, unknown> = {};
+            if (d.package_commission !== undefined) payload.package_commission = d.package_commission;
+            if (d.unit_commission !== undefined) payload.unit_commission = d.unit_commission;
+            return presentationService.update(d.presentation_id, payload).then(() => {
+                toast.success('Comisión actualizada');
+            });
+        },
+        []
+    );
+    const { save: autoSaveCommission } = useAutoSave({ saveFn: autoSaveCommissionFn, delay: 800 });
+
     // ===================== STATUS HELPERS =====================
     const getCostInUSD = (cost: any, currency: string) => {
         if (!cost) return 0;
@@ -178,7 +196,9 @@ const PriceListsPage = () => {
                             is_frozen: existing.is_frozen || false,
                             frozen_price: existing.frozen_price ? parseFloat(existing.frozen_price) : null,
                             frozen_currency: existing.frozen_currency || 'USD',
-                            package_price_usd: parseFloat(existing.package_price_usd) || 0
+                            package_price_usd: parseFloat(existing.package_price_usd) || 0,
+                            package_commission: parseFloat(existing.presentation?.package_commission) || 0,
+                            unit_commission: parseFloat(existing.presentation?.unit_commission) || 0
                         };
                     } else {
                         // New product with stock that wasn't in the list
@@ -196,7 +216,9 @@ const PriceListsPage = () => {
                             margin_percentage: 0,
                             base_currency: 'USD',
                             native_currency: item.presentation?.purchase_currency || 'USD',
-                            package_price_usd: 0
+                            package_price_usd: 0,
+                            package_commission: parseFloat(item.presentation?.package_commission) || 0,
+                            unit_commission: parseFloat(item.presentation?.unit_commission) || 0
                         };
                     }
                 });
@@ -222,7 +244,9 @@ const PriceListsPage = () => {
                             is_frozen: d.is_frozen || false,
                             frozen_price: d.frozen_price ? parseFloat(d.frozen_price) : null,
                             frozen_currency: d.frozen_currency || 'USD',
-                            package_price_usd: parseFloat(d.package_price_usd) || 0
+                            package_price_usd: parseFloat(d.package_price_usd) || 0,
+                            package_commission: parseFloat(d.presentation?.package_commission) || 0,
+                            unit_commission: parseFloat(d.presentation?.unit_commission) || 0
                         });
                     }
                 });
@@ -255,7 +279,9 @@ const PriceListsPage = () => {
                     native_currency: item.presentation?.purchase_currency || 'USD',
                     is_frozen: false,
                     frozen_price: null,
-                    frozen_currency: 'USD'
+                    frozen_currency: 'USD',
+                    package_commission: parseFloat(item.presentation?.package_commission) || 0,
+                    unit_commission: parseFloat(item.presentation?.unit_commission) || 0
                 })));
             }
         } catch (err) {
@@ -373,6 +399,23 @@ const PriceListsPage = () => {
                 client_updated_at: item.server_updated_at || null
             });
         }
+    };
+
+    // Guarda la comisión (global por presentación) en product_presentations con debounce
+    const updateCommission = (index: number, field: 'package_commission' | 'unit_commission', value: string) => {
+        const item = { ...details[index] };
+        const numVal = parseFloat(value) || 0;
+        item[field] = numVal;
+        setDetails(prev => {
+            const updated = [...prev];
+            updated[index] = item;
+            return updated;
+        });
+
+        autoSaveCommission(`${item.presentation_id}-${field}`, {
+            presentation_id: item.presentation_id,
+            [field]: numVal
+        });
     };
 
     // Mutation: export CSV
@@ -541,13 +584,15 @@ const PriceListsPage = () => {
                                         <th className="px-4 py-3 text-right font-semibold text-gray-600">Costo Unit.</th>
                                         <th className="px-4 py-3 text-right font-semibold text-gray-600">Precio/Paquete COP</th>
                                         <th className="px-4 py-3 text-right font-semibold text-gray-600">Precio/Paquete USD</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-gray-600">Comisión/Paquete COP</th>
+                                        <th className="px-4 py-3 text-right font-semibold text-gray-600">Comisión/Unidad COP</th>
                                         <th className="px-4 py-3 text-right font-semibold text-gray-600">Margen %</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredDetails.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-8 text-center text-gray-500"> {/* 7 columns */}
+                                            <td colSpan={9} className="px-4 py-8 text-center text-gray-500"> {/* 9 columns */}
                                                 {details.length === 0
                                                     ? 'No hay productos con stock disponibles para esta lista.'
                                                     : 'No se encontraron productos que coincidan con la búsqueda.'}
@@ -640,6 +685,28 @@ const PriceListsPage = () => {
                                                             value={d.package_price_usd || ''}
                                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
                                                             className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            value={d.package_commission || ''}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'package_commission', e.target.value)}
+                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                            title="Comisión por paquete en COP (global de la presentación)"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            value={d.unit_commission || ''}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'unit_commission', e.target.value)}
+                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                            title="Comisión por unidad en COP (global de la presentación)"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">

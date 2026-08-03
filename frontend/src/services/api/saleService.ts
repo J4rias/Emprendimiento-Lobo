@@ -59,6 +59,11 @@ export const saleService = {
     return response.data;
   },
 
+  getCommissions: async (params: Record<string, string> = {}) => {
+    const response = await api.get('/sales/commissions', { params });
+    return response.data;
+  },
+
   getDailyClosure: async (params: Record<string, string> = {}) => {
     const response = await api.get('/sales/daily-closure', { params });
     return response.data;

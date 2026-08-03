@@ -824,6 +824,8 @@ async update(req: Request, res: Response, next: NextFunction) {
       package_price,
       package_cost,
       purchase_currency,
+      package_commission,
+      unit_commission,
       is_default,
       is_active
     } = req.body;
@@ -870,6 +872,8 @@ async update(req: Request, res: Response, next: NextFunction) {
         base_price: calcBasePrice,
         cost: calcCost,
         purchase_currency: purchase_currency || 'USD',
+        package_commission: package_commission || 0,
+        unit_commission: unit_commission || 0,
         is_default: is_default || false,
         is_active: is_active !== undefined ? is_active : true
       } as any, { transaction }) as any;

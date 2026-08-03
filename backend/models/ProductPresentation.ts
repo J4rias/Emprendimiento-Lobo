@@ -14,6 +14,8 @@ interface ProductPresentationAttributes {
   base_price: number;
   cost: number;
   purchase_currency: 'USD' | 'COP' | 'VES';
+  package_commission: number;
+  unit_commission: number;
   is_default: boolean;
   is_active: boolean;
   createdAt?: Date;
@@ -22,7 +24,7 @@ interface ProductPresentationAttributes {
 
 interface ProductPresentationCreationAttributes extends Optional<
   ProductPresentationAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'units_per_package' | 'base_price' | 'cost' | 'purchase_currency' | 'is_default' | 'is_active'
+  'id' | 'createdAt' | 'updatedAt' | 'units_per_package' | 'base_price' | 'cost' | 'purchase_currency' | 'package_commission' | 'unit_commission' | 'is_default' | 'is_active'
 > {}
 
 const ProductPresentation = sequelize.define<Model<ProductPresentationAttributes, ProductPresentationCreationAttributes>>(
@@ -100,6 +102,18 @@ const ProductPresentation = sequelize.define<Model<ProductPresentationAttributes
       allowNull: false,
       defaultValue: 'USD',
       comment: 'Moneda en la que se compró el producto'
+    },
+    package_commission: {
+      type: DataTypes.DECIMAL(18, 6),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Comisión fija por paquete (COP)'
+    },
+    unit_commission: {
+      type: DataTypes.DECIMAL(18, 6),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Comisión fija por unidad suelta (COP)'
     },
     is_default: {
       type: DataTypes.BOOLEAN,

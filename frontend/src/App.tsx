@@ -28,6 +28,7 @@ const SuppliersPage           = lazy(() => import('./pages/SuppliersPage'));
 const BrandsPage              = lazy(() => import('./pages/BrandsPage'));
 const ExchangeRatesPage       = lazy(() => import('./pages/ExchangeRatesPage'));
 const ReportsPage             = lazy(() => import('./pages/ReportsPage'));
+const CommissionsPage         = lazy(() => import('./pages/CommissionsPage'));
 const PurchaseOrdersPage      = lazy(() => import('./pages/PurchaseOrdersPage'));
 const PurchaseOrderCreatePage = lazy(() => import('./pages/PurchaseOrderCreatePage'));
 const PurchaseOrderReceivePage= lazy(() => import('./pages/PurchaseOrderReceivePage'));
@@ -78,6 +79,7 @@ const ROUTE_PERMISSIONS: Record<string, string> = {
   '/cuentas-por-pagar':        'suppliers.view',
   '/cuentas-por-cobrar':       'ar.view',
   '/reportes':                 'reports.view',
+  '/comisiones':               'commissions.view',
   '/cierre-caja':              'sales.collect',
   '/configuracion':            'settings.manage',
   '/tasas-cambio':             'settings.manage',
@@ -212,6 +214,7 @@ function AppRoutes() {
       <Route path="/cuentas-por-pagar" element={<PrivateRoute permission="suppliers.view"><AppLayout><SupplierResumenPage /></AppLayout></PrivateRoute>} />
       <Route path="/pre-pedidos" element={<PrivateRoute permission="pre_orders.view"><AppLayout><PreOrdersPage /></AppLayout></PrivateRoute>} />
       <Route path="/reportes" element={<PrivateRoute permission="reports.view"><AppLayout><ReportsPage /></AppLayout></PrivateRoute>} />
+      <Route path="/comisiones" element={<PrivateRoute permission="commissions.view"><AppLayout><CommissionsPage /></AppLayout></PrivateRoute>} />
       <Route path="/cuentas-por-cobrar" element={<PrivateRoute permission="ar.view"><AppLayout><AccountsReceivablePage /></AppLayout></PrivateRoute>} />
       <Route path="/cuentas-por-cobrar/clientes" element={<PrivateRoute permission="ar.view"><AppLayout><AccountsReceivablePage /></AppLayout></PrivateRoute>} />
       <Route path="/cuentas-por-cobrar/cliente/:id" element={<PrivateRoute permission="ar.view"><AppLayout><ARCustomerDetailPage /></AppLayout></PrivateRoute>} />

@@ -20,6 +20,7 @@ interface SaleAttributes {
   credit_amount: number;
   paid_amount: number;
   change_amount: number;
+  total_commission: number;
   status: 'pending' | 'completed' | 'cancelled' | 'returned' | 'delivered';
   notes: string | null;
   quote_id: number | null;
@@ -34,7 +35,7 @@ interface SaleAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface SaleCreationAttributes extends Optional<
   SaleAttributes,
-  'id' | 'createdAt' | 'updatedAt' | 'deleted_at' | 'sale_date' | 'sale_type' | 'exchange_rate' | 'subtotal' | 'tax_amount' | 'discount_amount' | 'total' | 'credit_amount' | 'paid_amount' | 'change_amount' | 'status'
+  'id' | 'createdAt' | 'updatedAt' | 'deleted_at' | 'sale_date' | 'sale_type' | 'exchange_rate' | 'subtotal' | 'tax_amount' | 'discount_amount' | 'total' | 'credit_amount' | 'paid_amount' | 'change_amount' | 'total_commission' | 'status'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -149,6 +150,12 @@ const Sale = sequelize.define<Model<SaleAttributes, SaleCreationAttributes>>(
       allowNull: false,
       defaultValue: 0.00,
       comment: 'Vuelto entregado'
+    },
+    total_commission: {
+      type: DataTypes.DECIMAL(18, 6),
+      allowNull: false,
+      defaultValue: 0.00,
+      comment: 'Comisión total de la venta (COP)'
     },
     status: {
       type: DataTypes.ENUM('pending', 'completed', 'cancelled', 'returned', 'delivered'),

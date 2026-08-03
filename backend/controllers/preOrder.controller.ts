@@ -356,6 +356,7 @@ export const convert = async (req: Request, res: Response) => {
 
     let subtotal = 0;
     let tax_amount = 0;
+    let totalCommission = 0;
     const saleDetails = [];
     let vesUsdRate = null;
 
@@ -391,6 +392,12 @@ export const convert = async (req: Request, res: Response) => {
         }
       }
 
+      // Comisión fija en COP (monto por paquete o por unidad suelta)
+      const commissionCop = is_unit
+        ? (parseFloat(item.quantity) * (parseFloat(presentation.unit_commission) || 0))
+        : (parseFloat(item.quantity) * (parseFloat(presentation.package_commission) || 0));
+      totalCommission += commissionCop;
+
       saleDetails.push({
         product_id: item.product_id,
         presentation_id: item.presentation_id,
@@ -403,7 +410,8 @@ export const convert = async (req: Request, res: Response) => {
         tax_amount: 0,
         subtotal: item_subtotal,
         total: item_subtotal,
-        cost_price: costPrice
+        cost_price: costPrice,
+        commission_amount: commissionCop
       });
 
       // Deduct inventory
@@ -430,6 +438,7 @@ export const convert = async (req: Request, res: Response) => {
       total,
       paid_amount,
       change_amount,
+      total_commission: totalCommission,
       credit_amount: 0,
       exchange_rate: exchangeRate,
       notes: saleBody.notes,
