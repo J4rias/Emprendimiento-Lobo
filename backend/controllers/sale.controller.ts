@@ -1179,3 +1179,96 @@ export const getSalesSummary = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Error al obtener resumen de ventas' });
   }
 };
+
+export const getCommissions = async (req: Request, res: Response) => {
+  try {
+    const { from, to, user_id, detail } = req.query as Record<string, string | undefined>;
+
+    const dateFrom = from ? parseLocalDate(from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const dateTo = to ? parseLocalDateEnd(to) : new Date();
+
+    const replacements: Record<string, unknown> = { dateFrom, dateTo };
+    let userFilter = '';
+    if (user_id) {
+      userFilter = 'AND s.user_id = :user_id';
+      replacements.user_id = parseInt(user_id, 10);
+    }
+
+    // Total por vendedor (excluye ventas canceladas y soft-deleted)
+    const byVendedor = await sequelize.query(`
+      SELECT
+        s.user_id,
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS full_name,
+        COUNT(DISTINCT s.id) AS sale_count,
+        ROUND(COALESCE(SUM(sd.commission_amount), 0), 2) AS total_commission_cop
+      FROM sale_details sd
+      INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
+      INNER JOIN users u ON u.id = s.user_id
+      WHERE s.status != 'cancelled'
+        AND s.sale_date BETWEEN :dateFrom AND :dateTo
+        ${userFilter}
+      GROUP BY s.user_id, u.first_name, u.last_name
+      ORDER BY total_commission_cop DESC
+    `, { replacements, type: sequelize.QueryTypes.SELECT }) as any[];
+
+    const totalCommission = byVendedor.reduce((acc, v) => acc + (parseFloat(v.total_commission_cop) || 0), 0);
+
+    // Desglose por producto (opcional, para ver la composición de la comisión)
+    let productDetail: any[] = [];
+    if (detail === 'true') {
+      productDetail = await sequelize.query(`
+        SELECT
+          s.user_id,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS full_name,
+          sd.product_id,
+          p.name AS product_name,
+          COUNT(DISTINCT s.id) AS sale_count,
+          SUM(CASE WHEN sd.is_unit = 1 THEN sd.quantity ELSE 0 END) AS units_sold,
+          SUM(CASE WHEN sd.is_unit = 0 THEN sd.quantity ELSE 0 END) AS packages_sold,
+          ROUND(COALESCE(SUM(sd.commission_amount), 0), 2) AS total_commission_cop
+        FROM sale_details sd
+        INNER JOIN sales s ON s.id = sd.sale_id AND s.deleted_at IS NULL
+        INNER JOIN users u ON u.id = s.user_id
+        INNER JOIN products p ON p.id = sd.product_id
+        WHERE s.status != 'cancelled'
+          AND s.sale_date BETWEEN :dateFrom AND :dateTo
+          ${userFilter}
+        GROUP BY s.user_id, u.first_name, u.last_name, sd.product_id, p.name
+        ORDER BY total_commission_cop DESC
+      `, { replacements, type: sequelize.QueryTypes.SELECT }) as any[];
+    }
+
+    res.json({
+      data: {
+        period: {
+          from: dateFrom,
+          to: dateTo
+        },
+        currency: 'COP',
+        summary: {
+          total_commission_cop: Math.round(totalCommission),
+          vendedor_count: byVendedor.length
+        },
+        by_vendedor: byVendedor.map((v) => ({
+          user_id: v.user_id,
+          full_name: v.full_name,
+          sale_count: parseInt(v.sale_count) || 0,
+          total_commission_cop: Math.round(parseFloat(v.total_commission_cop) || 0)
+        })),
+        detail: productDetail.map((d) => ({
+          user_id: d.user_id,
+          full_name: d.full_name,
+          product_id: d.product_id,
+          product_name: d.product_name,
+          sale_count: parseInt(d.sale_count) || 0,
+          units_sold: parseInt(d.units_sold) || 0,
+          packages_sold: parseInt(d.packages_sold) || 0,
+          total_commission_cop: Math.round(parseFloat(d.total_commission_cop) || 0)
+        }))
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting commissions:', error);
+    res.status(500).json({ message: 'Error al obtener comisiones' });
+  }
+};

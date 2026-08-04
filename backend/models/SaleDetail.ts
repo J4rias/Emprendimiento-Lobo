@@ -17,6 +17,7 @@ interface SaleDetailAttributes {
   subtotal: number;
   total: number;
   cost_price: number | null;
+  commission_amount: number;
   notes: string | null;
   is_unit: boolean;
   created_at?: Date;
@@ -27,7 +28,7 @@ interface SaleDetailAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface SaleDetailCreationAttributes extends Optional<
   SaleDetailAttributes,
-  'id' | 'created_at' | 'updated_at' | 'deleted_at' | 'discount_percent' | 'discount_amount' | 'tax_percent' | 'tax_amount' | 'is_unit'
+  'id' | 'created_at' | 'updated_at' | 'deleted_at' | 'discount_percent' | 'discount_amount' | 'tax_percent' | 'tax_amount' | 'commission_amount' | 'is_unit'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -123,6 +124,12 @@ const SaleDetail = sequelize.define<Model<SaleDetailAttributes, SaleDetailCreati
       type: DataTypes.DECIMAL(15, 2),
       allowNull: true,
       comment: 'Precio de costo al momento de la venta (para cálculo de rentabilidad)'
+    },
+    commission_amount: {
+      type: DataTypes.DECIMAL(18, 6),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Comisión de la línea en COP (congelada al vender)'
     },
     notes: {
       type: DataTypes.TEXT,

@@ -26,6 +26,7 @@ import {
   ArrowLineLeft,
   ArrowLineRight,
   ClockCounterClockwise,
+  HandCoins,
 } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
@@ -118,6 +119,7 @@ const MENU: MenuSection[] = [
       { name: 'Ventas',       icon: ShoppingCart, path: '/ventas',       permission: 'sales.view'        },
       { name: 'Cotizaciones', icon: ReadCvLogo,   path: '/cotizaciones', permission: 'sales.quotes.view' },
       { name: 'Pre-Pedidos',  icon: Robot,        path: '/pre-pedidos',  permission: 'pre_orders.view'   },
+      { name: 'Comisiones',   icon: HandCoins,    path: '/comisiones',   permission: 'commissions.view' },
     ],
   },
   {

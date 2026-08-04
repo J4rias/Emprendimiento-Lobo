@@ -23,7 +23,7 @@ export async function getProductsWithStock() {
 
   const allPresentations = await ProductPresentation.findAll({
     where: { product_id: { [Op.in]: productIds }, is_active: true },
-    attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency', 'product_id']
+    attributes: ['id', 'name', 'units_per_package', 'package_cost', 'cost', 'purchase_currency', 'package_commission', 'unit_commission', 'product_id']
   }) as any[];
 
   const presentationsByProductId: Record<number, any[]> = {};

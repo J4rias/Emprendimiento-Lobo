@@ -25,6 +25,8 @@ export const CreatePresentationSchema = z.object({
   presentation_type_id: z.coerce.number().int().positive().optional().nullable(),
   package_price: z.coerce.number().min(0).optional(),
   package_cost: z.coerce.number().min(0).optional(),
+  package_commission: z.coerce.number().min(0).default(0).optional(),
+  unit_commission: z.coerce.number().min(0).default(0).optional(),
   is_default: z.boolean().optional(),
   is_active: z.boolean().optional(),
 }).passthrough();
@@ -36,6 +38,8 @@ export const UpdatePresentationSchema = z.object({
   presentation_type_id: z.coerce.number().int().positive().optional().nullable(),
   package_price: z.coerce.number().min(0).optional(),
   package_cost: z.coerce.number().min(0).optional(),
+  package_commission: z.coerce.number().min(0).optional(),
+  unit_commission: z.coerce.number().min(0).optional(),
   is_default: z.boolean().optional(),
   is_active: z.boolean().optional(),
 }).passthrough();
