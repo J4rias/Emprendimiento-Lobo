@@ -87,15 +87,8 @@ tmp/orchestrator-report.md
 scripts/ts_model_orchestrator.py
 scripts/ts_model_orchestrator_gemma4.py
 scripts/ts_controller_orchestrator_gemma4.py
-scripts/orq4_model_configs.py
 scripts/bench_gemma4.py
-scripts/orq5_*.py
-scripts/orq6_*.py
-scripts/orq7_*.py
-scripts/orq8_*.py
-scripts/orq9_*.py
-scripts/orq10_*.py
-scripts/orq11_*.py
+scripts/orq*.py
 scripts/__pycache__/
 scripts/api-tests/__pycache__/
 frontend/serve-preview.cjs
