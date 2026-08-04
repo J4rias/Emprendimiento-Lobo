@@ -1124,7 +1124,7 @@ export const getSalesSummary = async (req: Request, res: Response) => {
       WHERE s.status IN ('completed','pending')
         AND sp.payment_date BETWEEN :startWin AND :endWin
         AND (
-          s.sale_type = 'credit'
+          s.sale_type IN ('credit', 'pos_pending')
           OR (s.sale_type = 'mixed' AND s.sale_date < :startWin)
         )
       GROUP BY sp.currency

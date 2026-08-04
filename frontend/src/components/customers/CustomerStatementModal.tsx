@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { X, Receipt, ArrowDownRight, ArrowUpRight, CircleNotch, Info, Repeat, CaretDown, CaretRight, CreditCard } from '@phosphor-icons/react';
 import { customerService } from '../../services/api/customerService';
 import { saleService } from '../../services/api/saleService';
+import { exchangeRateService } from '../../services/api/exchangeRateService';
+import { calculateEffectiveRate } from '../../utils/exchangeRateUtils';
+import { convertPaymentLinesToBackend, adjustPaymentLinesForChange, PaymentLine as PaymentLineUtil } from '../../utils/paymentUtils';
+import { COP_TOLERANCE } from '../../hooks/usePOS';
+import CheckoutModal from '../sales/CheckoutModal';
 import { LOCALE, formatDateShort } from '../../utils/formatUtils';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { PaymentLine, ExchangeRate } from '../../types';
 
 const formatCurrency = (amount: number | string, currency?: string): string => {
     const value = parseFloat(String(amount)) || 0;
@@ -69,7 +75,7 @@ const SaleDetailExpanded = ({ transaction, currency }: SaleDetailExpandedProps) 
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap gap-4 text-xs text-gray-600">
-                <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : 'Crédito'}</span>
+                <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : detail.sale_type === 'pos_pending' ? 'Pendiente de Cobro' : 'Crédito'}</span>
                 <span><span className="font-medium">Estado:</span> {detail.status === 'completed' ? 'Completada' : detail.status === 'pending' ? 'Pendiente' : 'Cancelada'}</span>
                 <span><span className="font-medium">Tasa:</span> {rate.toLocaleString(LOCALE)} COP/USD</span>
             </div>
@@ -298,16 +304,20 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
     const [selectedCurrency, setSelectedCurrency] = useState('COP');
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    // Payment Modal State
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    // Checkout Modal State (same CheckoutModal as POS/SalesPage)
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-    const [paymentData, setPaymentData] = useState({
-        amount: '',
-        method: 'cash',
-        reference: '',
-        notes: ''
+    const [checkoutPaymentLines, setCheckoutPaymentLines] = useState<PaymentLineUtil[]>([]);
+    const [checkoutNotes, setCheckoutNotes] = useState('');
+    const [collectSaving, setCollectSaving] = useState(false);
+
+    // Exchange rates for CheckoutModal
+    const { data: ratesData } = useQuery({
+        queryKey: ['exchange-rates'],
+        queryFn: () => exchangeRateService.getLatest(),
+        staleTime: 5 * 60_000,
     });
-    const [submittingPayment, setSubmittingPayment] = useState(false);
+    const exchangeRates: ExchangeRate[] = ratesData?.data || [];
+    const copPerUSD = calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
 
     useEffect(() => {
         if (customer?.id) {
@@ -365,77 +375,49 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
     };
 
     const handleOpenPaymentModal = (transaction: Transaction) => {
+        setCheckoutPaymentLines([]);
+        setCheckoutNotes('');
         setSelectedTransaction(transaction);
-        const credit = statementData?.summary?.[selectedCurrency]?.available_credit || 0;
-        const pending = getPendingInCurrency(transaction);
-        const cashAmount = Math.max(0, pending - credit);
-        setPaymentData({
-            amount: cashAmount > 0 ? cashAmount.toFixed(2) : '',
-            method: 'cash',
-            reference: '',
-            notes: ''
-        });
-        setShowPaymentModal(true);
     };
 
-    const handlePaymentSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const credit = statementData?.summary?.[selectedCurrency]?.available_credit || 0;
-        const pending = getPendingInCurrency(selectedTransaction!);
-        const creditToApply = Math.min(credit, pending);
-        const cashAmount = parseFloat(paymentData.amount) || 0;
-
-        if (cashAmount <= 0 && creditToApply <= 0) {
-            toast.error('Debe ingresar un monto válido mayor a 0');
-            return;
+    const handleCollectPayment = async () => {
+        if (checkoutPaymentLines.length === 0) {
+            return toast.error('Agrega al menos una forma de pago');
         }
+        const t = selectedTransaction;
+        if (!t) return;
 
-        setSubmittingPayment(true);
+        const saleId = t.original_data!.id;
+        const rate = parseFloat(t.original_data!.exchange_rate) || copPerUSD;
+        const remainingUSD = parseFloat(String(t.original_data!.total || 0)) - parseFloat(String(t.original_data!.paid_amount || 0));
+        const saleTotalCOP = remainingUSD * rate;
+
+        setCollectSaving(true);
         try {
-            const saleId = selectedTransaction!.original_data!.id;
-            const rate = parseFloat(selectedTransaction!.original_data!.exchange_rate) || 1;
-
-            const payment_lines: any[] = [];
-            if (creditToApply > 0) {
-                payment_lines.push({
-                    amount: creditToApply,
-                    method: 'credit_balance',
-                    currency: selectedCurrency,
-                    exchange_rate: rate,
-                    reference: ''
-                });
-            }
-            if (cashAmount > 0) {
-                payment_lines.push({
-                    amount: cashAmount,
-                    method: paymentData.method,
-                    currency: selectedCurrency,
-                    exchange_rate: rate,
-                    reference: paymentData.reference
-                });
-            }
+            const { adjustedLines } = adjustPaymentLinesForChange(
+                checkoutPaymentLines, saleTotalCOP, rate, 'COP', COP_TOLERANCE
+            );
+            const backendLines = convertPaymentLinesToBackend(adjustedLines, exchangeRates, rate);
 
             await saleService.addPayment(saleId, {
-                payment_lines,
-                notes: paymentData.notes
+                payment_lines: backendLines,
+                notes: checkoutNotes || undefined,
             } as any);
 
             toast.success('Pago registrado exitosamente');
+            setSelectedTransaction(null);
 
-            // Refresh the statement data before closing modal
+            // Refresh the statement data
             setLoading(true);
             await fetchStatement();
             setLoading(false);
 
-            setShowPaymentModal(false);
-            setSelectedTransaction(null);
-
             queryClient.invalidateQueries({ queryKey: ['sales'] });
-        } catch (err: any) {
-            console.error('Error adding payment:', err);
-            toast.error(err.response?.data?.message || 'Error al registrar el pago');
+        } catch (err: unknown) {
+            const error = err as any;
+            toast.error(error?.response?.data?.message || 'Error al registrar el pago');
         } finally {
-            setSubmittingPayment(false);
+            setCollectSaving(false);
         }
     };
 
@@ -641,7 +623,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                                         t.isInternal ? 'text-purple-600' : 'text-green-600'
                                                                                     }`}>
                                                                                     {t.type === 'charge'
-                                                                                        ? (t.original_data?.sale_type === 'cash' ? 'Venta Contado' : 'Nota de Débito (Venta)')
+                                                                                        ? (t.original_data?.sale_type === 'cash' ? 'Venta Contado' : t.original_data?.sale_type === 'pos_pending' ? 'Pendiente de Cobro' : 'Nota de Débito (Venta)')
                                                                                         : t.type === 'credit' ? 'Nota de Crédito (Devolución)'
                                                                                             : t.isInternal ? 'Uso de Saldo a Favor' : 'Pago Recibido'}
                                                                                 </span>
@@ -725,153 +707,45 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                 </div>
             </div>
 
-            {/* Payment Modal */}
-            {showPaymentModal && selectedTransaction && (
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 transition-opacity" onClick={() => !submittingPayment && setShowPaymentModal(false)}>
-                            <div className="absolute inset-0 bg-gray-900 opacity-75 backdrop-blur-sm"></div>
-                        </div>
-
-                        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle w-full max-w-md">
-                            {/* Header */}
-                            <div className="bg-gradient-to-r from-emerald-700 to-emerald-900 px-6 py-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <CreditCard className="h-6 w-6 text-emerald-200" />
-                                        <div>
-                                            <h3 className="text-xl font-bold text-white leading-tight">Registrar Abono</h3>
-                                            <p className="text-emerald-200 text-sm font-medium">{selectedTransaction.reference}</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => !submittingPayment && setShowPaymentModal(false)}
-                                        className="text-white hover:text-red-300 hover:bg-white/10 p-2 rounded-full transition-colors"
-                                        title="Cerrar"
-                                    >
-                                        <X className="h-6 w-6" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <form onSubmit={handlePaymentSubmit} className="p-6 space-y-4">
-                                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                                    <p className="text-xs text-emerald-800 font-semibold">Monto Facturado</p>
-                                    <p className="text-lg font-bold text-emerald-900">
-                                        {formatCurrency(selectedTransaction.amount, selectedCurrency)}
-                                    </p>
-                                </div>
-
-                                {statementData?.summary?.[selectedCurrency]?.available_credit > 0 && (
-                                    <div className="bg-primary-50 p-3 rounded-lg border border-primary-200 flex items-center justify-between gap-2">
-                                        <div>
-                                            <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
-                                            <p className="text-base font-bold text-primary-700">
-                                                {formatCurrency(Math.min(Number(statementData.summary[selectedCurrency].available_credit), getPendingInCurrency(selectedTransaction)), selectedCurrency)}
-                                            </p>
-                                        </div>
-                                        <p className="text-xs text-primary-600 font-medium text-right">Descontado del<br/>monto a pagar</p>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Monto a Abonar ({selectedCurrency})
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
-                                            {selectedCurrency === 'COP' ? '$' : selectedCurrency}
-                                        </span>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="0.01"
-                                            step="0.01"
-                                            value={paymentData.amount}
-                                            onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
-                                            className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-lg"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Método de Pago
-                                        </label>
-                                        <select
-                                            required
-                                            value={paymentData.method}
-                                            onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                        >
-                                            <option value="cash">Efectivo</option>
-                                            <option value="card">Tarjeta / Punto</option>
-                                            <option value="transfer">Transferencia</option>
-                                            <option value="check">Cheque</option>
-                                            <option value="credit_balance">Saldo a Favor</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Referencia
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={paymentData.reference}
-                                            onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                            placeholder="Ej. #12345"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Notas adicionales
-                                    </label>
-                                    <textarea
-                                        value={paymentData.notes}
-                                        onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                        rows={2}
-                                        placeholder="Observaciones sobre el pago..."
-                                    ></textarea>
-                                </div>
-
-                                <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => !submittingPayment && setShowPaymentModal(false)}
-                                        disabled={submittingPayment}
-                                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={submittingPayment}
-                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
-                                    >
-                                        {submittingPayment ? (
-                                            <>
-                                                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
-                                                Procesando...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CreditCard className="w-4 h-4" />
-                                                Registrar Abono
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Checkout Modal (same as POS / SalesPage) */}
+            {selectedTransaction && (() => {
+                const rate = parseFloat(selectedTransaction.original_data?.exchange_rate) || copPerUSD;
+                const remainingUSD = Math.max(0,
+                    parseFloat(String(selectedTransaction.original_data?.total || 0))
+                    - parseFloat(String(selectedTransaction.original_data?.paid_amount || 0))
+                );
+                const saleType = selectedTransaction.original_data?.sale_type || 'credit';
+                return (
+                    <CheckoutModal
+                        show={!!selectedTransaction}
+                        onClose={() => !collectSaving && setSelectedTransaction(null)}
+                        subtotal={remainingUSD}
+                        discount={0}
+                        tax={0}
+                        total={remainingUSD}
+                        totalCOP={remainingUSD * rate}
+                        copPerUSD={rate}
+                        paymentLines={checkoutPaymentLines}
+                        setPaymentLines={setCheckoutPaymentLines as React.Dispatch<React.SetStateAction<PaymentLine[]>>}
+                        customer={null}
+                        onCustomerSelect={null}
+                        saleType={saleType === 'pos_pending' ? 'cash' : saleType}
+                        notes={checkoutNotes}
+                        setNotes={setCheckoutNotes}
+                        exchangeRates={exchangeRates}
+                        displayCurrency="COP"
+                        onComplete={handleCollectPayment}
+                        saving={collectSaving}
+                        isAdmin={false}
+                        mode="collect"
+                        allowCredit={false}
+                        title={saleType === 'pos_pending'
+                            ? `Cobrar Venta — ${selectedTransaction.reference}`
+                            : `Abonar Pago — ${selectedTransaction.reference}`}
+                        confirmLabel={saleType === 'pos_pending' ? 'Cobrar' : 'Registrar Abono'}
+                    />
+                );
+            })()}
         </div>
     );
 };

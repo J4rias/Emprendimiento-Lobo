@@ -87,7 +87,7 @@ const SaleExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-4 text-xs text-gray-600">
-        <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : 'Crédito'}</span>
+        <span><span className="font-medium">Tipo:</span> {detail.sale_type === 'cash' ? 'Contado' : detail.sale_type === 'pos_pending' ? 'Pendiente de Cobro' : 'Crédito'}</span>
         <span><span className="font-medium">Estado:</span> {detail.status === 'completed' ? 'Completada' : detail.status === 'pending' ? 'Pendiente' : 'Cancelada'}</span>
         <span><span className="font-medium">Tasa:</span> {rate.toLocaleString(LOCALE)} COP/USD</span>
         {transaction.original_data?.due_date && (

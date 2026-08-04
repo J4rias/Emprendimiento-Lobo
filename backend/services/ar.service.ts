@@ -48,7 +48,7 @@ export async function getARSummary(filters: ARSummaryFilters) {
     FROM sales s
     LEFT JOIN customers c ON s.customer_id = c.id
     LEFT JOIN users u ON s.user_id = u.id
-    WHERE s.sale_type = 'credit'
+    WHERE s.sale_type IN ('credit', 'mixed', 'pos_pending')
       AND s.status NOT IN ('cancelled', 'returned')
       AND s.deleted_at IS NULL
       AND s.paid_amount < s.total - 0.001
@@ -185,7 +185,7 @@ export async function getCustomerAging(filters: CustomerAgingFilters) {
       c.credit_days as customer_credit_days, c.status as customer_status
     FROM sales s
     LEFT JOIN customers c ON s.customer_id = c.id
-    WHERE s.sale_type = 'credit'
+    WHERE s.sale_type IN ('credit', 'mixed', 'pos_pending')
       AND s.status NOT IN ('cancelled', 'returned')
       AND s.deleted_at IS NULL
       AND s.paid_amount < s.total - 0.001
@@ -394,7 +394,7 @@ export async function reverseSalePayment(paymentId: string, adminId: number, pin
       const [laterPayments] = await sequelize.query(
         `SELECT COUNT(*) as cnt FROM sale_payments sp
          JOIN sales s ON s.id = sp.sale_id
-         WHERE s.customer_id = ? AND s.sale_type = 'credit' AND s.status NOT IN ('cancelled')
+         WHERE s.customer_id = ? AND s.sale_type IN ('credit', 'mixed', 'pos_pending') AND s.status NOT IN ('cancelled')
            AND sp.created_at > (SELECT created_at FROM sale_payments WHERE id = ?)
            AND sp.reversed_at IS NULL AND sp.id != ?`,
         { replacements: [pay.customer_id, paymentId, paymentId], transaction: t }

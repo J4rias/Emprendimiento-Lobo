@@ -48,12 +48,12 @@ async function buildCustomerStatement(customerId: any) {
   });
   if (!customer) return null;
 
-  // 1. Ventas a crédito + Pagos (con eager load)
+  // 1. Ventas a crédito/mixtas/pendientes de cobro + Pagos (con eager load)
   const sales: any[] = await Sale.findAll({
     where: {
       customer_id: customerId,
       status: { [Op.notIn]: ['cancelled'] },
-      sale_type: 'credit'
+      sale_type: { [Op.in]: ['credit', 'mixed', 'pos_pending'] }
     },
     attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'exchange_rate', 'sale_type', 'status', 'credit_due_date', 'user_id'],
     include: [{
@@ -310,7 +310,7 @@ async function getCustomerCreditBlock(customerId: any) {
   const allSales = await Sale.findAll({
     where: {
       customer_id: customerId,
-      sale_type: 'credit',
+      sale_type: { [Op.in]: ['credit', 'mixed', 'pos_pending'] },
       status: { [Op.notIn]: ['cancelled', 'returned'] }
     },
     attributes: ['id', 'sale_number', 'sale_date', 'total', 'paid_amount', 'credit_due_date']

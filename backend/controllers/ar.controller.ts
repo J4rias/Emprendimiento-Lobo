@@ -167,7 +167,7 @@ async function exportInvoicesCSV(req: Request, res: Response, next: NextFunction
       FROM sales s
       LEFT JOIN customers c ON s.customer_id = c.id
       LEFT JOIN users u ON s.user_id = u.id
-      WHERE s.sale_type = 'credit'
+      WHERE s.sale_type IN ('credit', 'mixed', 'pos_pending')
         AND s.status NOT IN ('cancelled', 'returned')
         AND s.deleted_at IS NULL
         AND s.paid_amount < s.total - 0.001
@@ -240,7 +240,7 @@ async function exportCustomersCSV(req: Request, res: Response, next: NextFunctio
         c.credit_days as customer_credit_days
       FROM sales s
       LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE s.sale_type = 'credit'
+      WHERE s.sale_type IN ('credit', 'mixed', 'pos_pending')
         AND s.status NOT IN ('cancelled', 'returned')
         AND s.deleted_at IS NULL
         AND s.paid_amount < s.total - 0.001

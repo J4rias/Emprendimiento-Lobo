@@ -5,10 +5,9 @@ import { useTableSort } from '../hooks/useTableSort';
 import { toast } from 'sonner';
 import {
   Calendar, CurrencyDollar, TrendUp, ShoppingBag,
-  XCircle, Printer, DeviceMobile, CreditCard, FileCsv,
+  XCircle, Printer, DeviceMobile, FileCsv,
 } from '@phosphor-icons/react';
 import { saleService } from '../services/api/saleService';
-import { customerService } from '../services/api/customerService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { convertPaymentLinesToBackend, adjustPaymentLinesForChange, PaymentLine as PaymentLineUtil } from '../utils/paymentUtils';
@@ -117,8 +116,6 @@ const SalesPage = () => {
   const [selectedSale, setSelectedSale]   = useState<SaleDetail | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [paymentSale, setPaymentSale]     = useState<SaleDetail | null>(null);
-  const [paymentData, setPaymentData]     = useState({ amount_cop: '', method: 'cash', reference: '', notes: '' });
-  const [customerCreditBalance, setCustomerCreditBalance] = useState({ usd: 0, cop: 0 });
   const [returnSale, setReturnSale]       = useState<SaleDetail | null>(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [cancelSaleId, setCancelSaleId]   = useState<number | null>(null);
@@ -215,19 +212,6 @@ const SalesPage = () => {
     onError: (err: unknown) => {
       const error = err as any;
       toast.error(error?.response?.data?.message || 'Error al cancelar la venta');
-    },
-  });
-
-  const paymentMutation = useMutation({
-    mutationFn: (vars: { saleId: number; payment_lines: SalePayment[]; notes?: string }) => saleService.addPayment(vars.saleId, vars as unknown as SalePayment),
-    onSuccess: () => {
-      toast.success('Pago registrado exitosamente');
-      setPaymentSale(null);
-      invalidateSales();
-    },
-    onError: (err: unknown) => {
-      const error = err as any;
-      toast.error(error?.response?.data?.message || 'Error al registrar el pago');
     },
   });
 
@@ -390,29 +374,9 @@ const SalesPage = () => {
   };
 
   const handleOpenPaymentModal = async (sale: SaleDetail) => {
-    if (sale.sale_type === 'pos_pending') {
-      // Open full CheckoutModal for initial collection
-      setCheckoutPaymentLines([]);
-      setCheckoutNotes('');
-      setPaymentSale(sale);
-      return;
-    }
-    // credit/mixed abonos — simple modal
+    setCheckoutPaymentLines([]);
+    setCheckoutNotes('');
     setPaymentSale(sale);
-    setCustomerCreditBalance({ usd: 0, cop: 0 });
-    const pendingUSD = parseFloat(String(sale.total)) - parseFloat(String(sale.paid_amount || 0));
-    const rate = parseFloat(String(sale.exchange_rate)) || 1;
-    let pendingCOP = Math.ceil(pendingUSD * rate);
-    if (sale.customer_id) {
-      try {
-        const data = await customerService.getCreditBalance(sale.customer_id);
-        if (data.credit_balance_cop > 0) {
-          setCustomerCreditBalance({ usd: data.credit_balance_usd, cop: data.credit_balance_cop });
-          pendingCOP = Math.max(0, pendingCOP - data.credit_balance_cop);
-        }
-      } catch (_) {}
-    }
-    setPaymentData({ amount_cop: pendingCOP > 0 ? String(pendingCOP) : '', method: 'cash', reference: '', notes: '' });
   };
 
   const handleCollectPayment = async () => {
@@ -467,39 +431,6 @@ const SalesPage = () => {
     } catch {
       toast.error('Error al cargar el detalle de la venta para devolución');
     }
-  };
-
-  const handlePaymentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentSale) return;
-    if (!paymentData.amount_cop || parseFloat(paymentData.amount_cop) <= 0) {
-      return toast.error('Debe ingresar un monto válido mayor a 0');
-    }
-    const rate = Number(paymentSale.exchange_rate) || calculateEffectiveRate('USD', 'COP', exchangeRates) || 1;
-    const cashAmount = parseFloat(paymentData.amount_cop);
-    const remainingCOP = Math.ceil((parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))) * rate);
-
-    const payment_lines: SalePayment[] = [{
-      id: 0,
-      amount: cashAmount,
-      method: paymentData.method,
-      currency: 'COP',
-      exchange_rate: rate,
-      reference: paymentData.reference || undefined,
-    }];
-    if (customerCreditBalance.cop > 0) {
-      const creditToApply = Math.min(customerCreditBalance.cop, Math.max(0, remainingCOP - cashAmount));
-      if (creditToApply > 0) {
-        payment_lines.push({
-          id: 0,
-          amount: creditToApply,
-          method: 'credit_balance',
-          currency: 'COP',
-          exchange_rate: rate,
-        });
-      }
-    }
-    paymentMutation.mutate({ saleId: paymentSale.id, payment_lines, notes: paymentData.notes });
   };
 
   const handlePrintTicket = () => {
@@ -761,8 +692,8 @@ const SalesPage = () => {
         calculateEffectiveRate={calculateEffectiveRate as any}
       />
 
-      {/* ── CheckoutModal for pos_pending collection ──────────────────────── */}
-      {paymentSale?.sale_type === 'pos_pending' && (
+      {/* ── CheckoutModal for payment collection (pos_pending, credit, mixed) ── */}
+      {paymentSale && (
         <CheckoutModal
           show={!!paymentSale}
           onClose={() => !collectSaving && setPaymentSale(null)}
@@ -783,7 +714,7 @@ const SalesPage = () => {
             tradeName: paymentSale.customer.tradeName,
           } : null}
           onCustomerSelect={null}
-          saleType="cash"
+          saleType={paymentSale.sale_type === 'pos_pending' ? 'cash' : paymentSale.sale_type}
           notes={checkoutNotes}
           setNotes={setCheckoutNotes}
           exchangeRates={exchangeRates}
@@ -793,106 +724,12 @@ const SalesPage = () => {
           isAdmin={false}
           mode="collect"
           allowCredit={false}
-          title={`Cobrar Venta — ${paymentSale.sale_number}`}
-          confirmLabel="Cobrar"
+          title={paymentSale.sale_type === 'pos_pending'
+            ? `Cobrar Venta — ${paymentSale.sale_number}`
+            : `Abonar Pago — ${paymentSale.sale_number}`}
+          confirmLabel={paymentSale.sale_type === 'pos_pending' ? 'Cobrar' : 'Registrar Abono'}
         />
       )}
-
-      {/* ── Payment modal (abonos for credit/mixed) ───────────────────────── */}
-      <Modal
-        open={!!paymentSale && paymentSale.sale_type !== 'pos_pending'}
-        onClose={() => !paymentMutation.isPending && setPaymentSale(null)}
-        title={`Registrar Abono — ${paymentSale?.sale_number || ''}`}
-        size="md"
-      >
-        {paymentSale && (
-          <form onSubmit={handlePaymentSubmit} className="space-y-4">
-            <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 flex justify-between items-center">
-              <div>
-                <p className="text-xs text-emerald-800 font-semibold">Saldo Pendiente (Aprox)</p>
-                <p className="text-lg font-bold text-emerald-900">
-                  {copFormat(parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0)), paymentSale.exchange_rate)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-emerald-800 font-semibold">Cliente</p>
-                <p className="text-sm font-medium text-emerald-900 truncate max-w-[150px]">
-                  {paymentSale.customer?.firstName || 'Cliente'}
-                </p>
-              </div>
-            </div>
-
-            {customerCreditBalance.cop > 0 && (
-              <div className="bg-primary-50 p-3 rounded-lg border border-primary-200 flex justify-between items-center">
-                <div>
-                  <p className="text-xs text-primary-800 font-semibold">Saldo a Favor del Cliente</p>
-                  <p className="text-lg font-bold text-primary-900">
-                    {formatCOP(customerCreditBalance.cop)}
-                  </p>
-                </div>
-                <div className="text-right text-xs text-primary-700">
-                  <p>Descontado del</p>
-                  <p>monto a pagar</p>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Monto a Abonar (COP)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  step="1"
-                  value={paymentData.amount_cop}
-                  onChange={(e) => setPaymentData(p => ({ ...p, amount_cop: e.target.value }))}
-                  className="w-full pl-8 pr-4 h-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 font-medium text-lg"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Método de Pago"
-                required
-                value={paymentData.method}
-                onChange={(e) => setPaymentData(p => ({ ...p, method: e.target.value }))}
-              >
-                <option value="cash">Efectivo</option>
-                <option value="card">Tarjeta / Punto</option>
-                <option value="transfer">Transferencia</option>
-              </Select>
-              <Input
-                label="Referencia"
-                type="text"
-                value={paymentData.reference}
-                onChange={(e) => setPaymentData(p => ({ ...p, reference: e.target.value }))}
-                placeholder="Ej. #12345"
-              />
-            </div>
-
-            <Textarea
-              label="Notas adicionales"
-              value={paymentData.notes}
-              onChange={(e) => setPaymentData(p => ({ ...p, notes: e.target.value }))}
-              rows={2}
-              placeholder="Observaciones sobre el pago..."
-            />
-
-            <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={() => setPaymentSale(null)} disabled={paymentMutation.isPending}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="success" loading={paymentMutation.isPending}>
-                <CreditCard className="w-4 h-4" /> Registrar Abono
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
 
       {/* ── Cancel modal ──────────────────────────────────────────────────────── */}
       <Modal
