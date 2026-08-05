@@ -40,6 +40,11 @@ export const METHODS_BY_CURRENCY = {
 // Tolerancia de redondeo para diferencias de conversión multi-moneda
 export const COP_TOLERANCE = 40;
 
+// Recargo del 7% para ventas por unidad suelta en pocas cantidades
+export const UNIT_SURCHARGE_FACTOR = 1.07;
+export const unitSurchargeApplies = (item: any): boolean =>
+  !!item.sellByUnit && item.quantity < (item.units_per_package || 1) / 2;
+
 const POS_RATES_PREFIX = 'pos_custom_rates_';
 export const getSavedRate = (currency: string, mode = 'COP'): number | null => {
   try {
@@ -668,10 +673,10 @@ export function usePOS() {
 
   // ============= SURCHARGE & EFFECTIVE PRICE =============
   const applyUnitSurcharge = useCallback((usdUnitPrice: number, item: any) => {
-    if (!item.sellByUnit || item.quantity >= (item.units_per_package || 1) / 2) return usdUnitPrice;
+    if (!unitSurchargeApplies(item)) return usdUnitPrice;
     const copRate = calculateEffectiveRate('USD', 'COP', exchangeRates);
-    if (!copRate || copRate <= 0) return usdUnitPrice * 1.07;
-    const copRounded = Math.round(usdUnitPrice * copRate * 1.07 / 100) * 100;
+    if (!copRate || copRate <= 0) return usdUnitPrice * UNIT_SURCHARGE_FACTOR;
+    const copRounded = Math.round(usdUnitPrice * copRate * UNIT_SURCHARGE_FACTOR / 100) * 100;
     return copRounded / copRate;
   }, [exchangeRates]);
 
@@ -696,10 +701,15 @@ export function usePOS() {
       // recalcular unit_price para que line_total * rate dé un COP exacto.
       if (item.is_frozen && item.frozen_price && (item.frozen_currency || 'USD') !== 'USD' && copRate > 0) {
         const fp = typeof item.frozen_price === 'string' ? parseFloat(item.frozen_price) : item.frozen_price;
-        const frozenUnit = item.sellByUnit
+        let frozenUnit = item.sellByUnit
           ? fp / (item.units_per_package || 1)
           : fp;
-        const lineTotalCOP = Math.ceil(frozenUnit * item.quantity);
+        // Reaplicar recargo por unidad (mismo redondeo a 100 COP que applyUnitSurcharge);
+        // sin esto el precio persistido perdía el 7% y el cajero cobraba de menos
+        if (unitSurchargeApplies(item)) {
+          frozenUnit = Math.round(frozenUnit * UNIT_SURCHARGE_FACTOR / 100) * 100;
+        }
+        const lineTotalCOP = Math.round(frozenUnit * item.quantity);
         unitPriceUSD = lineTotalCOP / copRate / item.quantity;
       }
 
@@ -749,7 +759,11 @@ export function usePOS() {
     try {
       // Adjust payment lines for change (vuelto) using shared utility
       const { adjustedLines, changeAmount } = saleType === 'cash'
-        ? adjustPaymentLinesForChange(paymentLines, totalCOP, copPerUSD, displayCurrency, COP_TOLERANCE)
+        ? adjustPaymentLinesForChange(
+            paymentLines, totalCOP, copPerUSD, displayCurrency, COP_TOLERANCE,
+            // En modo USD el vuelto se entrega a la tasa editable del modal
+            displayCurrency === 'USD' ? (getSavedRate('changeRate', 'COP') || copPerUSD) : copPerUSD
+          )
         : { adjustedLines: paymentLines, changeCOP: 0, changeAmount: '0.00' } as { adjustedLines: PaymentLine[]; changeCOP: number; changeAmount: string };
 
       const result = await saleService.createSale({

@@ -258,7 +258,7 @@ const ReportsPage = () => {
             total_quantity: parseFloat(String((item.dataValues as Record<string, unknown>)?.total_quantity || item.total_quantity || 0)),
             num_sales:      parseInt(String((item.dataValues as Record<string, unknown>)?.num_sales || item.num_sales || 0)),
             total_usd:      parseFloat(String((item.dataValues as Record<string, unknown>)?.total_usd || item.total_usd || 0)),
-            total_cop:      Math.ceil(parseFloat(String((item.dataValues as Record<string, unknown>)?.total_cop || item.total_cop || 0))),
+            total_cop:      Math.round(parseFloat(String((item.dataValues as Record<string, unknown>)?.total_cop || item.total_cop || 0))),
           }));
           return {
             stats: {
@@ -396,7 +396,7 @@ const ReportsPage = () => {
             ['Número', 'Fecha', 'Cliente', 'Tipo', 'Estado', 'Total COP'],
             allSales.map((sale: Sale) => {
               const rate     = parseFloat(String(sale.exchange_rate)) || 1;
-              const totalCOP = Math.ceil((parseFloat(String(sale.total)) || 0) * rate);
+              const totalCOP = Math.round((parseFloat(String(sale.total)) || 0) * rate);
               return [sale.sale_number, formatDateShort(sale.sale_date), getCustomerName((sale as unknown as { customer?: Customer | null }).customer), getSaleTypeLabel(sale.sale_type), sale.status, totalCOP];
             })
           );
@@ -451,7 +451,7 @@ const ReportsPage = () => {
         downloadCSV(
           `ventas_por_producto_${dateRange.start_date}_${dateRange.end_date}`,
           ['SKU', 'Producto', 'Cant. Vendida', '# Ventas', 'Total USD', 'Total COP'],
-          (reportData as ProductSale[]).map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.num_sales, parseFloat(String(item.total_usd || 0)).toFixed(2), Math.ceil(item.total_cop || 0)])
+          (reportData as ProductSale[]).map(item => [item.product?.sku || '', item.product?.name || '', item.total_quantity, item.num_sales, parseFloat(String(item.total_usd || 0)).toFixed(2), Math.round(item.total_cop || 0)])
         );
         break;
       case 'low_stock':

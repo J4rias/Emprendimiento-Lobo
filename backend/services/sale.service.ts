@@ -12,6 +12,7 @@ import InventoryMovement from '../models/InventoryMovement';
 import PosReservation from '../models/PosReservation';
 import ExchangeRate from '../models/ExchangeRate';
 import CreditNote from '../models/CreditNote';
+import PriceListDetail from '../models/PriceListDetail';
 import CreditNoteDetail from '../models/CreditNoteDetail';
 import { recordLedgerEntry } from './customerLedger.service';
 
@@ -29,6 +30,66 @@ export class ServiceError extends Error {
     this.status = status;
     this.extra = extra;
   }
+}
+
+// ─── Recargo por unidad ─────────────────────────────────────────────────────
+// Réplica server-side de usePOS.applyUnitSurcharge: +7% en ventas por unidad
+// suelta cuando la cantidad es menor a medio paquete. El POS lo aplica en el
+// cliente; aquí se garantiza que el precio persistido lo incluya aunque el
+// cliente haya enviado el precio limpio (bug histórico con precios frozen COP).
+const UNIT_SURCHARGE_FACTOR = 1.07;
+const SURCHARGE_TOLERANCE_COP = 2;
+
+function unitSurchargeApplies(isUnit: boolean, quantity: number, unitsPerPackage: number): boolean {
+  return isUnit && quantity < (unitsPerPackage || 1) / 2;
+}
+
+/**
+ * Si el item vendido por unidad en pocas cantidades llegó con el precio "limpio"
+ * de la lista (sin el 7%), devuelve el precio con recargo; si el precio ya trae
+ * el recargo o es un override manual distinto, lo respeta tal cual.
+ */
+function enforceUnitSurcharge(
+  receivedUnitUSD: number,
+  quantity: number,
+  presentation: any,
+  priceDetail: any | null,
+  exchangeRate: number
+): number {
+  if (!priceDetail) return receivedUnitUSD;
+
+  const upp = presentation.units_per_package || 1;
+
+  // Precio unitario "limpio" según la lista, en USD, replicando buildSaleItems
+  let cleanUnitUSD: number;
+  let surchargedUnitUSD: number;
+
+  if (priceDetail.is_frozen && priceDetail.frozen_price && (priceDetail.frozen_currency || 'USD') === 'COP' && exchangeRate > 1) {
+    const frozenUnitCOP = parseFloat(priceDetail.frozen_price) / upp;
+    cleanUnitUSD = Math.round(frozenUnitCOP * quantity) / exchangeRate / quantity;
+    const surchargedUnitCOP = Math.round(frozenUnitCOP * UNIT_SURCHARGE_FACTOR / 100) * 100;
+    surchargedUnitUSD = Math.round(surchargedUnitCOP * quantity) / exchangeRate / quantity;
+  } else {
+    cleanUnitUSD = parseFloat(priceDetail.unit_price) || 0;
+    if (cleanUnitUSD <= 0) return receivedUnitUSD;
+    if (exchangeRate > 1) {
+      const surchargedCOP = Math.round(cleanUnitUSD * exchangeRate * UNIT_SURCHARGE_FACTOR / 100) * 100;
+      surchargedUnitUSD = surchargedCOP / exchangeRate;
+    } else {
+      surchargedUnitUSD = cleanUnitUSD * UNIT_SURCHARGE_FACTOR;
+    }
+  }
+
+  // Comparar totales de línea en COP con tolerancia de redondeo
+  const rate = exchangeRate > 1 ? exchangeRate : 1;
+  const receivedLineCOP = receivedUnitUSD * rate * quantity;
+  const cleanLineCOP = cleanUnitUSD * rate * quantity;
+
+  if (Math.abs(receivedLineCOP - cleanLineCOP) <= SURCHARGE_TOLERANCE_COP * Math.max(1, quantity)) {
+    logger.warn(`enforceUnitSurcharge: precio limpio recibido, aplicando +7% (presentation ${presentation.id}, qty ${quantity})`);
+    return surchargedUnitUSD;
+  }
+  return receivedUnitUSD;
 }
 
 // ─── Number generation ──────────────────────────────────────────────────────
@@ -120,9 +181,10 @@ export async function createSale(
 
     let paid_amount = 0;
     if ((sale_type === 'cash' || sale_type === 'mixed') && cashLines.length > 0) {
+      // Suma NETA: las líneas negativas (vuelto COP) restan, igual que en addPayment
       paid_amount = cashLines.reduce((sum: number, line: any) => {
         const amount = parseFloat(line.amount) || 0;
-        if (amount <= 0) return sum;
+        if (amount === 0) return sum;
         const rate = parseFloat(line.exchange_rate) || 1;
         return sum + (amount / rate);
       }, 0);
@@ -171,6 +233,20 @@ export async function createSale(
     const productMap = new Map<number, any>((productRows as any[]).map((p: any) => [p.id, p]));
     const presentationMap = new Map<number, any>((presentationRows as any[]).map((p: any) => [p.id, p]));
     const inventoryMap = new Map<number, any>((inventoryRows as any[]).map((i: any) => [i.product_id, i]));
+
+    // Lista de precios del cliente, para validar el recargo por unidad server-side
+    const priceDetailMap = new Map<number, any>();
+    const hasUnitItems = items.some((i: any) => unitSurchargeApplies(i.is_unit || false, i.quantity, presentationMap.get(i.presentation_id)?.units_per_package || 1));
+    if (hasUnitItems) {
+      const customerRow = await Customer.findByPk(customer_id, { attributes: ['id', 'price_list_id'], transaction }) as any;
+      if (customerRow?.price_list_id) {
+        const plRows = await PriceListDetail.findAll({
+          where: { price_list_id: customerRow.price_list_id, presentation_id: { [Op.in]: presentationIds } },
+          transaction
+        }) as any[];
+        for (const d of plRows) priceDetailMap.set(d.presentation_id, d);
+      }
+    }
 
     const reservationMap = new Map<number, number>();
     if (session_id && tab_id) {
@@ -223,8 +299,17 @@ export async function createSale(
         throw new ServiceError(400, `No hay registro de inventario para ${product.name}`);
       }
 
-      const unit_price = item.unit_price || presentation.base_price;
+      let unit_price = item.unit_price || presentation.base_price;
       const is_unit = item.is_unit || false;
+      if (unitSurchargeApplies(is_unit, item.quantity, presentation.units_per_package || 1)) {
+        unit_price = enforceUnitSurcharge(
+          parseFloat(unit_price) || 0,
+          item.quantity,
+          presentation,
+          priceDetailMap.get(item.presentation_id) || null,
+          parseFloat(String(exchange_rate)) || 1
+        );
+      }
       const item_subtotal = unit_price * item.quantity;
       const item_discount = item.discount_percent ? (item_subtotal * item.discount_percent / 100) : 0;
       const taxable_amount = item_subtotal - item_discount;
@@ -400,7 +485,9 @@ export async function createSale(
       let creditBalanceDeductionUSD = 0;
 
       for (const payLine of cashLines) {
-        if (parseFloat(payLine.amount) <= 0) continue;
+        // Persistir también las líneas negativas (vuelto COP entregado): sin ellas
+        // el cierre de caja suma el efectivo bruto y el cuadre físico descuadra
+        if (parseFloat(payLine.amount) === 0 || isNaN(parseFloat(payLine.amount))) continue;
         paymentBatch.push({
           sale_id: sale.id,
           payment_date: new Date(),
@@ -711,8 +798,9 @@ export async function addPayment(
     const createdPayments: any[] = [];
     let addPayCreditBalanceUSD = 0;
 
-    // Only create SalePayment records for real payments (not change lines)
-    for (const payLine of realLines) {
+    // Persist real payments AND change lines (negative COP): sin las negativas el
+    // cierre de caja suma el efectivo bruto sin restar el vuelto entregado
+    for (const payLine of [...realLines, ...changeLines]) {
       const amountUSD = (parseFloat(payLine.amount) || 0) / (parseFloat(payLine.exchange_rate) || 1);
 
       const payment = await SalePayment.create({

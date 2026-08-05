@@ -911,7 +911,9 @@ function TabletCheckoutModal({
                 )}
               </div>
               {isUSD && changeCOP > 0 && (() => {
-                const changeUSD = changeCOP / copPerUSD;
+                // Misma base redondeada a 100 que usa adjustPaymentLinesForChange,
+                // para que lo mostrado coincida con lo registrado (igual que CheckoutModal)
+                const changeUSD = roundToNearest100COP(changeCOP) / copPerUSD;
                 const rawVueltoCOP = Math.round(changeUSD * changeRate);
                 const vueltoRounded = roundToNearest100COP(rawVueltoCOP);
                 return (

@@ -196,7 +196,7 @@ const PaymentExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) =>
 const CreditNoteExpandedDetail = ({ transaction }: { transaction: LedgerEntry }) => {
   const note = transaction.original_data!;
   const rate = parseFloat(note.exchange_rate || note.sale?.exchange_rate || 1);
-  const totalCOP = Math.ceil(parseFloat(note.total || 0) * rate);
+  const totalCOP = Math.round(parseFloat(note.total || 0) * rate);
   const refundLabels: Record<string, string> = {
     credit_balance: 'Monedero (Saldo a Favor)', cash: 'Efectivo',
     transfer: 'Transferencia', none: 'Sin reembolso'

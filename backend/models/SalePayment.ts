@@ -13,6 +13,8 @@ interface SalePaymentAttributes {
   reference: string | null;
   bank_id: number | null;
   notes: string | null;
+  reversed_at: Date | null;
+  reversed_by: number | null;
   created_by: number;
   createdAt?: Date;
   updatedAt?: Date;
@@ -21,7 +23,7 @@ interface SalePaymentAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface SalePaymentCreationAttributes extends Optional<
   SalePaymentAttributes,
-  'id' | 'payment_date' | 'currency' | 'exchange_rate' | 'createdAt' | 'updatedAt'
+  'id' | 'payment_date' | 'currency' | 'exchange_rate' | 'reversed_at' | 'reversed_by' | 'createdAt' | 'updatedAt'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -84,6 +86,16 @@ const SalePayment = sequelize.define<Model<SalePaymentAttributes, SalePaymentCre
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Notas del pago'
+    },
+    reversed_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha de reversión del pago (null = vigente)'
+    },
+    reversed_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Usuario que revirtió el pago'
     },
     created_by: {
       type: DataTypes.INTEGER,

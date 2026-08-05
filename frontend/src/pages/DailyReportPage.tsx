@@ -32,6 +32,7 @@ interface DailyReport {
     salesCount: number;
     creditTotalUSD: number;
     creditCollectedByCurrency: Record<string, number>;
+    creditCollectedCashByCurrency?: Record<string, number>;
     cashRefunds: {
         refund_count: number;
         refund_cop?: number;
@@ -97,6 +98,28 @@ const DailyReportPage = () => {
         if (currency === 'COP') return Math.round(val).toLocaleString(LOCALE);
         return val.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
+
+    // Fórmula ÚNICA del cuadre físico (usada por UI e impresión):
+    // efectivo de ventas del día + abonos de crédito en efectivo − devoluciones en efectivo
+    const physicalCashByCurrency = (rep: DailyReport): [string, number][] => {
+        const refundMap = rep.cashRefunds?.refund_by_currency || {};
+        const creditCash = rep.creditCollectedCashByCurrency || {};
+        const currencies = new Set([
+            ...Object.keys(rep.paymentsBreakdown || {}),
+            ...Object.keys(creditCash),
+            ...Object.keys(refundMap),
+        ]);
+        return [...currencies]
+            .map((cur): [string, number] => {
+                const cash = (rep.paymentsBreakdown?.[cur] as AnyObj)?.cash || 0;
+                return [cur, cash + (creditCash[cur] || 0) - ((refundMap as AnyObj)[cur] || 0)];
+            })
+            .filter(([, amount]) => amount !== 0);
+    };
+
+    const usdtReceived = (rep: DailyReport): number =>
+        Object.values(rep.paymentsBreakdown || {})
+            .reduce((sum: number, methods) => sum + ((methods as AnyObj).usdt || 0), 0);
 
     const handlePrint = () => {
         if (!report) return;
@@ -165,26 +188,16 @@ const DailyReportPage = () => {
                 ` : ''}
                 <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">CUADRE FÍSICO (EFECTIVO)</div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
-                    ${(() => {
-                        const refundMap = report.cashRefunds?.refund_by_currency || {};
-                        return Object.entries(report.paymentsBreakdown || {})
-                            .map(([currency, methods]) => {
-                                const cash = (methods as AnyObj).cash || 0;
-                                const refund = (refundMap as AnyObj)[currency] || 0;
-                                return [currency, cash - refund] as [string, number];
-                            })
-                            .filter(([, amount]) => amount !== 0)
-                            .map(([currency, amount]) =>
-                                `<tr>
-                                    <td style="font-size:13px; font-weight:bold;">${currency}</td>
-                                    <td style="text-align:right; font-size:15px; font-weight:bold;">${fmtAmount(amount, currency)}</td>
-                                </tr>`
-                            ).join('');
-                    })()}
+                    ${physicalCashByCurrency(report)
+                        .map(([currency, amount]) =>
+                            `<tr>
+                                <td style="font-size:13px; font-weight:bold;">${currency}</td>
+                                <td style="text-align:right; font-size:15px; font-weight:bold;">${fmtAmount(amount, currency)}</td>
+                            </tr>`
+                        ).join('')}
                 </table>
                 ${(() => {
-                    const usdtTotal = Object.values(report.paymentsBreakdown || {})
-                        .reduce((sum: number, methods) => sum + ((methods as AnyObj).usdt || 0), 0);
+                    const usdtTotal = usdtReceived(report);
                     if (!usdtTotal) return '';
                     return `<div style="font-weight:bold; font-size:12px; margin-bottom:4px;">USDT recibido</div>
                     <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
@@ -246,15 +259,13 @@ const DailyReportPage = () => {
             ) : (
                 <div className="space-y-6 print-container">
 
-                    {/* Totales recibidos por moneda (neto: pagos − devoluciones COP) */}
+                    {/* Totales recibidos por moneda (bruto — coincide con el Desglose Físico;
+                        el neto con devoluciones y abonos vive en el Cuadre Físico) */}
                     {(() => {
-                        const refundCOP = report.cashRefunds?.refund_cop || Object.values(report.cashRefunds?.refund_by_currency || {}).reduce((s, v) => s + v, 0);
                         const currencyTotals = Object.entries(report.paymentsBreakdown || {}).map(([currency, methods]) => {
-                            let total = Object.entries(methods)
+                            const total = Object.entries(methods)
                                 .filter(([k]) => k !== '_salesCount')
                                 .reduce((sum: number, [, amount]) => sum + (amount as number), 0);
-                            // Subtract cash refunds from COP (all refunds are in COP)
-                            if (currency === 'COP') total -= refundCOP;
                             return [currency, total] as [string, number];
                         }).filter(([, total]) => total > 0);
 
@@ -375,7 +386,7 @@ const DailyReportPage = () => {
                                                         <span className="text-sm text-gray-600">{getMethodLabel(method)}</span>
                                                         <span className="font-semibold text-gray-900 tabular-nums">
                                                             {currency === 'USD' ? '$' : ''}
-                                                            {(amount as number).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                            {fmtAmount(amount as number, currency)}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -383,7 +394,7 @@ const DailyReportPage = () => {
                                             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center text-sm font-bold">
                                                 <span className="text-gray-600">Total {currency}:</span>
                                                 <span className="text-gray-900 tabular-nums">
-                                                    {paymentMethods.reduce((a, [, b]) => a + (b as number), 0).toLocaleString(LOCALE, { minimumFractionDigits: currency === 'COP' ? 0 : 2, maximumFractionDigits: 2 })}
+                                                    {fmtAmount(paymentMethods.reduce((a, [, b]) => a + (b as number), 0), currency)}
                                                 </span>
                                             </div>
                                         </div>
@@ -394,20 +405,14 @@ const DailyReportPage = () => {
                         </div>
                     </Card>
 
-                    {/* Cuadre Físico — solo efectivo por moneda, menos devoluciones */}
+                    {/* Cuadre Físico — efectivo ventas + abonos cash − devoluciones (fórmula única) */}
                     {(() => {
                         const refundMap = report.cashRefunds?.refund_by_currency || {};
-                        const cashByCurrency = Object.entries(report.paymentsBreakdown || {})
-                            .map(([currency, methods]) => {
-                                const cash = (methods as AnyObj).cash || 0;
-                                const refund = (refundMap as AnyObj)[currency] || 0;
-                                return [currency, cash - refund] as [string, number];
-                            })
-                            .filter(([, amount]) => amount !== 0);
-                        // USDT total across all currencies
-                        const usdtTotal: number = Object.values(report.paymentsBreakdown || {})
-                            .reduce((sum: number, methods) => sum + ((methods as AnyObj).usdt || 0), 0);
+                        const cashByCurrency = physicalCashByCurrency(report);
+                        const usdtTotal = usdtReceived(report);
                         const hasAnyRefund = Object.values(refundMap).some((v) => (v as number) > 0);
+                        const creditCash = report.creditCollectedCashByCurrency || {};
+                        const hasCreditCash = Object.values(creditCash).some((v) => (v as number) > 0);
                         if (cashByCurrency.length === 0 && !hasAnyRefund && !usdtTotal) return null;
                         return (
                             <div className="bg-gray-900 text-white p-6 rounded-lg shadow-sm">
@@ -427,6 +432,11 @@ const DailyReportPage = () => {
                                         <p className="text-xs text-teal-300 uppercase tracking-wide mb-1">USDT recibido</p>
                                         <p className="text-xl font-bold text-teal-200">$ {fmtAmount(usdtTotal, 'USD')}</p>
                                     </div>
+                                )}
+                                {hasCreditCash && (
+                                    <p className="text-xs text-gray-400 mt-2">
+                                        Incluye abonos de crédito en efectivo: {Object.entries(creditCash).filter(([, v]) => (v as number) > 0).map(([cur, amt]) => `${cur === 'USD' ? '$ ' : ''}${fmtAmount(amt as number, cur)} ${cur}`).join(' / ')}
+                                    </p>
                                 )}
                                 {hasAnyRefund && (
                                     <p className="text-xs text-gray-400 mt-2">

@@ -188,7 +188,8 @@ export function useCheckoutPayments({
   const lineCOP = (l: PaymentLine) => Math.round(l.amount * (parseFloat(String(l.cop_rate)) || 1));
   const creditCOP = paymentLines.filter(l => l.method === 'credit').reduce((s, l) => s + lineCOP(l), 0);
   const paidCOP = cashLines.reduce((sum, l) => sum + lineCOP(l), 0);
-  const effectiveTotalCOP = totalCOP - creditCOP;
+  // Math.round: mismo tratamiento que adjustPaymentLinesForChange (elimina ruido float del total)
+  const effectiveTotalCOP = Math.round(totalCOP) - creditCOP;
   const rawChangeCOP = paidCOP - effectiveTotalCOP;
   const changeCOP = Math.abs(rawChangeCOP) <= COP_TOLERANCE ? 0 : rawChangeCOP;
   // Vuelto rounded to nearest 100 COP (smallest bill denomination for change)

@@ -733,6 +733,10 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // En raw queries sequelize serializa Date en hora local; usar strings UTC
+    // explícitos para que la ventana coincida con la de los queries del ORM
+    const toUtcSql = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
+
     // === SALES STATS (by sale_date) ===
     const salesWhere: any = {
       sale_date: { [Op.between]: [startOfDay, endOfDay] },
@@ -763,7 +767,7 @@ export const getDailyClosure = async (req: Request, res: Response) => {
          AND s.sale_type != 'pos_pending'
          ${user_id ? 'AND s.user_id = :user_id' : ''}`,
       {
-        replacements: { startOfDay, endOfDay, ...(user_id ? { user_id } : {}) },
+        replacements: { startOfDay: toUtcSql(startOfDay), endOfDay: toUtcSql(endOfDay), ...(user_id ? { user_id } : {}) },
         type: sequelize.QueryTypes.SELECT
       }
     );
@@ -798,7 +802,8 @@ export const getDailyClosure = async (req: Request, res: Response) => {
     if (todaySaleIds.length > 0) {
       const paymentWhere: any = {
         payment_date: { [Op.between]: [startOfDay, endOfDay] },
-        sale_id: { [Op.in]: todaySaleIds }
+        sale_id: { [Op.in]: todaySaleIds },
+        reversed_at: { [Op.is]: null }
       };
       if (user_id) paymentWhere.created_by = user_id;
 
@@ -841,7 +846,8 @@ export const getDailyClosure = async (req: Request, res: Response) => {
 
     // === CREDIT COLLECTIONS (payments today for old credit/mixed sales) ===
     const creditCollectionWhere: any = {
-      payment_date: { [Op.between]: [startOfDay, endOfDay] }
+      payment_date: { [Op.between]: [startOfDay, endOfDay] },
+      reversed_at: { [Op.is]: null }
     };
     if (user_id) creditCollectionWhere.created_by = user_id;
 
@@ -851,30 +857,47 @@ export const getDailyClosure = async (req: Request, res: Response) => {
         model: Sale,
         as: 'sale',
         where: {
+          // Excluir ventas canceladas: sus cobros no deben sumar al cierre
+          status: { [Op.in]: ['completed', 'pending'] },
           [Op.or]: [
             { sale_type: 'credit' },
-            { sale_date: { [Op.lt]: startOfDay }, sale_type: 'mixed' }
+            // pos_pending con pago parcial hoy (sigue siendo pos_pending)
+            { sale_type: 'pos_pending' },
+            // mixed de días anteriores: el abono de hoy es cobranza
+            { sale_date: { [Op.lt]: startOfDay }, sale_type: 'mixed' },
+            // pos_pending de días anteriores ya cobrado por completo (pasó a
+            // 'cash' al pagarse): un pago de hoy sobre una venta cash de otro
+            // día solo puede ser una cobranza — sin esto ese efectivo entraba
+            // a la caja pero no aparecía en ningún bloque del cierre
+            { sale_date: { [Op.lt]: startOfDay }, sale_type: 'cash' }
           ]
         } as any,
         attributes: []
       }],
       attributes: [
         'currency',
+        'payment_method',
         [sequelize.fn('SUM', sequelize.col('SalePayment.amount')), 'total_amount']
       ],
-      group: ['currency'],
+      group: ['currency', 'payment_method'],
       raw: true
     }) as any[];
 
     const creditCollectedByCurrency: any = {};
+    // Solo efectivo: lo que entra físicamente a la caja, para el cuadre físico
+    const creditCollectedCashByCurrency: any = {};
     creditCollections.forEach((c: any) => {
-      creditCollectedByCurrency[c.currency || 'USD'] = parseFloat(c.total_amount) || 0;
+      const curr = c.currency || 'USD';
+      const amount = parseFloat(c.total_amount) || 0;
+      creditCollectedByCurrency[curr] = (creditCollectedByCurrency[curr] || 0) + amount;
+      if (c.payment_method === 'cash') {
+        creditCollectedCashByCurrency[curr] = (creditCollectedCashByCurrency[curr] || 0) + amount;
+      }
     });
 
     // === CASH REFUNDS FROM CREDIT NOTES (devoluciones en efectivo) ===
     // ALL cash refunds are physically given in COP regardless of sale currency.
     // cn.total is in USD, cn.exchange_rate converts to COP at the time of refund.
-    const toUtcSql = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
     const cashRefundResult = await sequelize.query(
       `SELECT
          COALESCE(SUM(cn.total * cn.exchange_rate), 0) AS refund_cop,
@@ -924,6 +947,7 @@ export const getDailyClosure = async (req: Request, res: Response) => {
         creditTotalUSD,
         paymentsBreakdown,
         creditCollectedByCurrency,
+        creditCollectedCashByCurrency,
         cashRefunds,
         posPending: {
           count: posPendingCount,

@@ -224,7 +224,7 @@ export default function CheckoutModal({
               }
               const formatted = effectiveCurrency === 'USD'
                 ? remainingInCurrency.toFixed(2)
-                : Math.ceil(remainingInCurrency).toLocaleString(LOCALE);
+                : Math.round(remainingInCurrency).toLocaleString(LOCALE);
               return (
                 <p className="text-sm font-semibold text-orange-600">{formatted} {effectiveCurrency} restantes</p>
               );
@@ -278,7 +278,9 @@ export default function CheckoutModal({
               )}
             </div>
             {isUSD && changeCOP > 0 && (() => {
-              const changeUSD = changeCOP / copPerUSD;
+              // Misma base redondeada a 100 que usa adjustPaymentLinesForChange,
+              // para que lo mostrado coincida con lo registrado
+              const changeUSD = roundToNearest100COP(changeCOP) / copPerUSD;
               const rawVueltoCOP = Math.round(changeUSD * changeRate);
               const vueltoRounded = roundToNearest100COP(rawVueltoCOP);
               return (

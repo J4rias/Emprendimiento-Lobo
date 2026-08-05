@@ -147,7 +147,7 @@ const InventoryPage = () => {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const formatCOP = (val: number) =>
-    new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.ceil(val));
+    new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Math.round(val));
 
   const toCOP = (amount: number, fromCurrency: string = 'USD'): number | null => {
     if (!amount || amount === 0) return 0;

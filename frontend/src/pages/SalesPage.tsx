@@ -11,7 +11,7 @@ import { saleService } from '../services/api/saleService';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
 import { convertPaymentLinesToBackend, adjustPaymentLinesForChange, PaymentLine as PaymentLineUtil } from '../utils/paymentUtils';
-import { COP_TOLERANCE } from '../hooks/usePOS';
+import { COP_TOLERANCE, getSavedRate } from '../hooks/usePOS';
 import CheckoutModal from '../components/sales/CheckoutModal';
 import { formatDate, formatCOP, formatUSD, formatDateShort, formatByCurrency } from '../utils/formatUtils';
 import { localToday, localMonthStart } from '../utils/dateUtils';
@@ -248,7 +248,7 @@ const SalesPage = () => {
     const cnCount    = parseInt(String(row.cn_count || 0));
     const cnTotalCOP = parseFloat(String(row.cn_total_cop || 0));
     const rate       = parseFloat(String(row.exchange_rate || 1));
-    const netCOP     = Math.ceil(saleTotal * rate) - Math.ceil(cnTotalCOP);
+    const netCOP     = Math.round(saleTotal * rate - cnTotalCOP);
 
     // pos_pending: show full total as pending
     if (row.sale_type === 'pos_pending' && row.status === 'pending') {
@@ -337,7 +337,7 @@ const SalesPage = () => {
             STATUS_LABEL[s.status] || s.status,
             t.toFixed(2),
             r,
-            Math.ceil(t * r),
+            Math.round(t * r),
           ];
         })
       );
@@ -387,12 +387,15 @@ const SalesPage = () => {
     if (!sale) return;
     const rate = parseFloat(String(sale.exchange_rate)) || copPerUSD;
     const remainingUSD = parseFloat(String(sale.total)) - parseFloat(String(sale.paid_amount || 0));
-    const saleTotalCOP = remainingUSD * rate;
+    // Math.round: elimina ruido float (evita totales tipo 15001 y descuadres de vuelto)
+    const saleTotalCOP = Math.round(remainingUSD * rate);
 
     setCollectSaving(true);
     try {
       const { adjustedLines } = adjustPaymentLinesForChange(
-        checkoutPaymentLines, saleTotalCOP, rate, sale.currency_mode || 'COP', COP_TOLERANCE
+        checkoutPaymentLines, saleTotalCOP, rate, sale.currency_mode || 'COP', COP_TOLERANCE,
+        // En modo USD el vuelto se entrega a la tasa editable del modal
+        (sale.currency_mode || 'COP') === 'USD' ? (getSavedRate('changeRate', 'COP') || rate) : rate
       );
       const backendLines = convertPaymentLinesToBackend(adjustedLines, exchangeRates, rate);
 
@@ -701,7 +704,7 @@ const SalesPage = () => {
           discount={0}
           tax={0}
           total={parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))}
-          totalCOP={(parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD)}
+          totalCOP={Math.round((parseFloat(String(paymentSale.total)) - parseFloat(String(paymentSale.paid_amount || 0))) * (parseFloat(String(paymentSale.exchange_rate)) || copPerUSD))}
           copPerUSD={parseFloat(String(paymentSale.exchange_rate)) || copPerUSD}
           paymentLines={checkoutPaymentLines}
           setPaymentLines={setCheckoutPaymentLines as React.Dispatch<React.SetStateAction<PaymentLine[]>>}

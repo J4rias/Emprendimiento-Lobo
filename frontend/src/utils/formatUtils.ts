@@ -2,7 +2,9 @@
  * Formatters estándar del sistema.
  *
  * Reglas de negocio (no cambiar sin revisar el resto del sistema):
- *  - VES y COP: enteros (Math.ceil), separador de miles con punto, locale es-VE.
+ *  - VES y COP: enteros (Math.round), separador de miles con punto, locale es-VE.
+ *    Math.round y no Math.ceil: el ceil inflaba montos por ruido de punto
+ *    flotante (15000.0000001 → 15.001) y difería del ticket y del arqueo.
  *  - USD: siempre 2 decimales.
  *  - Fechas: locale es-VE.
  */
@@ -19,18 +21,18 @@ export const formatMoney = (amount: number | string, currency = '$', decimals = 
     })}`;
 };
 
-/** COP: entero redondeado hacia arriba, miles con punto. Ej: "COP 15.261.884" */
+/** COP: entero redondeado, miles con punto. Ej: "COP 15.261.884" */
 export const formatCOP = (amount: number | string): string => {
     const val = parseFloat(String(amount));
     if (isNaN(val)) return 'COP 0';
-    return `COP ${Math.ceil(val).toLocaleString(LOCALE)}`;
+    return `COP ${Math.round(val).toLocaleString(LOCALE)}`;
 };
 
-/** VES: entero redondeado hacia arriba, miles con punto. Ej: "Bs 1.128.815" */
+/** VES: entero redondeado, miles con punto. Ej: "Bs 1.128.815" */
 export const formatVES = (amount: number | string): string => {
     const val = parseFloat(String(amount));
     if (isNaN(val)) return 'Bs 0';
-    return `Bs ${Math.ceil(val).toLocaleString(LOCALE)}`;
+    return `Bs ${Math.round(val).toLocaleString(LOCALE)}`;
 };
 
 /** USD: siempre 2 decimales. Ej: "$ 1.320,50" */

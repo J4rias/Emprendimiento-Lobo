@@ -100,6 +100,10 @@ export function adjustPaymentLinesForChange(
   copPerUSD: number,
   displayCurrency: string,
   copTolerance: number = COP_TOLERANCE,
+  // Tasa COP/USD a la que se entrega físicamente el vuelto (editable en el
+  // modal en modo USD). Si difiere de copPerUSD, la línea negativa registra
+  // los COP realmente entregados con su exchange_rate correspondiente.
+  changeDeliveryRate: number = copPerUSD,
 ): AdjustResult {
   // Round totalCOP to integer to eliminate floating-point noise (e.g. 59000.0001 → 59000)
   const totalCOPRounded = Math.round(totalCOP);
@@ -113,7 +117,9 @@ export function adjustPaymentLinesForChange(
     .filter(l => l.method === 'credit')
     .reduce((s, l) => s + lineCOP(l), 0);
   const rawChangeCOP = paidCOP - (totalCOPRounded - creditCOP);
-  const changeCOP = Math.abs(rawChangeCOP) <= copTolerance ? 0 : Math.max(0, rawChangeCOP);
+  // Redondear a 100 desde el inicio: el cajero entrega el vuelto redondeado,
+  // así lo registrado coincide con lo mostrado/entregado físicamente
+  const changeCOP = Math.abs(rawChangeCOP) <= copTolerance ? 0 : roundToNearest100COP(Math.max(0, rawChangeCOP));
   const changeAmount = (changeCOP / copPerUSD).toFixed(2);
 
   let adjustedLines = paymentLines;
@@ -131,14 +137,27 @@ export function adjustPaymentLinesForChange(
       }
     }
 
-    // 2. Remaining change → vuelto always given in COP cash, rounded to nearest 100
+    // 2. Remaining change → vuelto always given in COP cash (ya redondeado a 100)
     if (remainingChange > copTolerance) {
-      adjustedLines.push({
-        currency: 'COP',
-        method: 'cash',
-        amount: -roundToNearest100COP(remainingChange),
-        cop_rate: 1,
-      });
+      const deliveryRate = changeDeliveryRate > 0 ? changeDeliveryRate : copPerUSD;
+      if (deliveryRate !== copPerUSD) {
+        // Vuelto entregado a tasa distinta (modo USD con tasa editable): registrar
+        // los COP físicos entregados; cop_rate ajusta el equivalente USD
+        const deliveredCOP = roundToNearest100COP(Math.round((remainingChange / copPerUSD) * deliveryRate));
+        adjustedLines.push({
+          currency: 'COP',
+          method: 'cash',
+          amount: -deliveredCOP,
+          cop_rate: deliveryRate > 0 ? copPerUSD / deliveryRate : 1,
+        });
+      } else {
+        adjustedLines.push({
+          currency: 'COP',
+          method: 'cash',
+          amount: -remainingChange,
+          cop_rate: 1,
+        });
+      }
     }
   }
 
