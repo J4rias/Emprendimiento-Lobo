@@ -20,7 +20,7 @@ import Barcode from '../models/Barcode';
 // Other requires that are not models/sequelize/express → leave as require()
 const logger = require('../config/logger');
 const { sequelize } = require('../config/database');
-const { getLowStock: _getLowStock, getExpiringProducts: _getExpiringProducts, getInventoryValuation } = require('../services/inventory.service');
+const { getLowStock: _getLowStock, getExpiringProducts: _getExpiringProducts, getInventoryValuation, resolveCategoryIds } = require('../services/inventory.service');
 
 class InventoryController {
   constructor() {
@@ -58,7 +58,9 @@ class InventoryController {
           ];
         }
         if (category_id) {
-          productSearchWhere.category_id = category_id;
+          // Incluye la categoría y todas sus subcategorías
+          const categoryIds = await resolveCategoryIds(category_id);
+          productSearchWhere.category_id = { [Op.in]: categoryIds };
         }
 
         // Only active products
@@ -278,8 +280,8 @@ class InventoryController {
   // Get low stock products
   async getLowStock(req: Request, res: Response, next: NextFunction) {
     try {
-      const { warehouse_id } = req.query as Record<string, string>;
-      const data = await _getLowStock(warehouse_id);
+      const { warehouse_id, category_id } = req.query as Record<string, string>;
+      const data = await _getLowStock(warehouse_id, category_id);
       res.json({ data, count: data.length });
     } catch (error) {
       logger.error('Error in getLowStock', { error: (error as Error).message });
@@ -431,8 +433,8 @@ class InventoryController {
   // Get products about to expire
   async getExpiringProducts(req: Request, res: Response, next: NextFunction) {
     try {
-      const { days = '30', warehouse_id } = req.query as Record<string, string>;
-      const data = await _getExpiringProducts(parseInt(days), warehouse_id);
+      const { days = '30', warehouse_id, category_id } = req.query as Record<string, string>;
+      const data = await _getExpiringProducts(parseInt(days), warehouse_id, category_id);
       res.json({ data, count: data.length });
     } catch (error) {
       logger.error('Error in getExpiringProducts', { error: (error as Error).message });
@@ -443,8 +445,8 @@ class InventoryController {
   // Get inventory valuation
   async getValuation(req: Request, res: Response, next: NextFunction) {
     try {
-      const { warehouse_id } = req.query as Record<string, string>;
-      const data = await getInventoryValuation(warehouse_id);
+      const { warehouse_id, category_id } = req.query as Record<string, string>;
+      const data = await getInventoryValuation(warehouse_id, category_id);
       res.json({ data });
     } catch (error) {
       logger.error('Error in getValuation', { error: (error as Error).message });

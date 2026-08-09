@@ -1,6 +1,13 @@
 import api from './axios';
 import type { Pagination, Category } from '../../types';
 
+export interface CategoryListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  is_active?: boolean;
+}
+
 interface CategoryListResponse {
   data: Category[];
   pagination: Pagination;
@@ -12,7 +19,7 @@ interface CategoryResponse {
 }
 
 export const categoryService = {
-  getAll: async (params = {}): Promise<CategoryListResponse> => {
+  getAll: async (params: CategoryListParams = {}): Promise<CategoryListResponse> => {
     const response = await api.get('/categories', { params });
     return response.data;
   },

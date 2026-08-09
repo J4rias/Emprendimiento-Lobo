@@ -9,16 +9,60 @@ import ExchangeRate from '../models/ExchangeRate';
 
 const logger = require('../config/logger');
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// 'all' (o vacío) significa "sin filtrar por depósito"
+function warehouseFilter(warehouseId?: string | number): string | number | null {
+  if (!warehouseId || warehouseId === 'all') return null;
+  return warehouseId;
+}
+
+// Una categoría padre debe incluir los productos de sus subcategorías.
+// Devuelve null cuando no hay filtro de categoría.
+export async function resolveCategoryIds(categoryId?: string | number): Promise<number[] | null> {
+  if (!categoryId) return null;
+
+  const rootId = parseInt(String(categoryId), 10);
+  if (Number.isNaN(rootId)) return null;
+
+  const ids = [rootId];
+  let frontier = [rootId];
+
+  // Árbol poco profundo: se recorre por niveles hasta agotar descendientes
+  while (frontier.length > 0) {
+    const children = await Category.findAll({
+      where: { parent_id: { [Op.in]: frontier } } as any,
+      attributes: ['id'],
+      raw: true
+    }) as any[];
+
+    frontier = children.map(c => c.id).filter((id: number) => !ids.includes(id));
+    ids.push(...frontier);
+  }
+
+  return ids;
+}
+
+// where del include de Product: activo + (opcionalmente) categoría y descendientes
+function productWhere(categoryIds: number[] | null): any {
+  const where: any = { is_active: true };
+  if (categoryIds) where.category_id = { [Op.in]: categoryIds };
+  return where;
+}
+
 // ─── getLowStock ──────────────────────────────────────────────────────────────
 
-export async function getLowStock(warehouseId?: string | number) {
+export async function getLowStock(warehouseId?: string | number, categoryId?: string | number) {
   const where: any = {};
-  if (warehouseId) where.warehouse_id = warehouseId;
+  const wh = warehouseFilter(warehouseId);
+  if (wh) where.warehouse_id = wh;
+
+  const categoryIds = await resolveCategoryIds(categoryId);
 
   const inventory = await Inventory.findAll({
     where,
     include: [
-      { model: Product, as: 'product', where: { is_active: true }, include: [{ model: Category, as: 'category' }] },
+      { model: Product, as: 'product', where: productWhere(categoryIds), include: [{ model: Category, as: 'category' }] },
       { model: Warehouse, as: 'warehouse' }
     ],
     order: [[{ model: Product, as: 'product' }, 'name', 'ASC']]
@@ -31,7 +75,7 @@ export async function getLowStock(warehouseId?: string | number) {
 
 // ─── getExpiringProducts ──────────────────────────────────────────────────────
 
-export async function getExpiringProducts(days: number, warehouseId?: string | number) {
+export async function getExpiringProducts(days: number, warehouseId?: string | number, categoryId?: string | number) {
   const expirationDate = new Date();
   expirationDate.setDate(expirationDate.getDate() + days);
 
@@ -39,12 +83,15 @@ export async function getExpiringProducts(days: number, warehouseId?: string | n
     expiration_date: { [Op.lte]: expirationDate, [Op.gte]: new Date() },
     quantity: { [Op.gt]: 0 }
   };
-  if (warehouseId) where.warehouse_id = warehouseId;
+  const wh = warehouseFilter(warehouseId);
+  if (wh) where.warehouse_id = wh;
+
+  const categoryIds = await resolveCategoryIds(categoryId);
 
   return await Batch.findAll({
     where,
     include: [
-      { model: Product, as: 'product', where: { is_active: true }, include: [{ model: Category, as: 'category' }] },
+      { model: Product, as: 'product', where: productWhere(categoryIds), include: [{ model: Category, as: 'category' }] },
       { model: Warehouse, as: 'warehouse' }
     ],
     order: [['expiration_date', 'ASC']]
@@ -53,13 +100,16 @@ export async function getExpiringProducts(days: number, warehouseId?: string | n
 
 // ─── getValuation ─────────────────────────────────────────────────────────────
 
-export async function getInventoryValuation(warehouseId?: string | number) {
+export async function getInventoryValuation(warehouseId?: string | number, categoryId?: string | number) {
   const where: any = {};
-  if (warehouseId) where.warehouse_id = warehouseId;
+  const wh = warehouseFilter(warehouseId);
+  if (wh) where.warehouse_id = wh;
+
+  const categoryIds = await resolveCategoryIds(categoryId);
 
   const inventory = await Inventory.findAll({
     where,
-    include: [{ model: Product, as: 'product', where: { is_active: true }, include: [{ model: ProductPresentation, as: 'presentations' }] }]
+    include: [{ model: Product, as: 'product', where: productWhere(categoryIds), include: [{ model: ProductPresentation, as: 'presentations' }] }]
   }) as any[];
 
   const totalsByCurrency: any = { USD: 0, COP: 0, VES: 0 };

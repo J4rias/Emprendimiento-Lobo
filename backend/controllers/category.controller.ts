@@ -9,12 +9,15 @@ class CategoryController {
   // Get all categories
   async getAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page: pageStr = '1', limit: limitStr = '50', search } = req.query as Record<string, string>;
+      const { page: pageStr = '1', limit: limitStr = '50', search, is_active } = req.query as Record<string, string>;
       const page = parseInt(pageStr, 10);
       const limit = parseInt(limitStr, 10);
       const offset = (page - 1) * limit;
 
       const where: any = {};
+      if (is_active !== undefined) {
+        where.is_active = is_active === 'true' || is_active === '1';
+      }
       if (search) {
         where[Op.or] = [
           { name: { [Op.like]: `%${search}%` } },

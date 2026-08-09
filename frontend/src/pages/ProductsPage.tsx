@@ -147,10 +147,11 @@ const ProductsPage = () => {
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const data = await categoryService.getAll();
+      // Sin limit el backend pagina de a 50 y el desplegable quedaría truncado
+      const data = await categoryService.getAll({ limit: 1000 });
       return data.data || [];
     },
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: brands = [] } = useQuery<Brand[]>({

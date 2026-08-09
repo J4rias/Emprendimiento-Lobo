@@ -15,7 +15,7 @@ import type { BadgeVariant, Column } from '../components/ui';
 import { MovementTypeBadge, isPositiveMovement, MOVEMENT_TYPE_OPTIONS } from '../components/inventory/MovementTypeBadge';
 import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 import { downloadCSV } from '../utils/csvUtils';
-import { formatDate, formatUSD } from '../utils/formatUtils';
+import { formatDate, formatUSD, formatByCurrency } from '../utils/formatUtils';
 import type { InventoryItem, ProductPresentation } from '../types';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -235,14 +235,13 @@ const InventoryDetailPage = () => {
   // ─── Costo ────────────────────────────────────────────────────────────────
 
   const costValue = (() => {
-    const sym = CURRENCIES.find(c => c.code === effectiveCurrency)?.symbol || '$';
+    // formatByCurrency ya incluye el prefijo de moneda ($ / COP / Bs) y los
+    // decimales que corresponden — no se le agrega sufijo para no duplicarlo
     if (!needsConversion || !conversionData) {
-      const raw = parseFloat(String(defaultPresentation?.cost || 0));
-      return `${sym} ${raw.toFixed(2)} ${originalCurrency}`;
+      return formatByCurrency(parseFloat(String(defaultPresentation?.cost || 0)), originalCurrency);
     }
     if (conversionData.error) return 'Tasa no disponible';
-    return `${sym} ${parseFloat(String(conversionData.converted_amount || 0)).toFixed(2)} ${effectiveCurrency}`;
-    // Note: costValue is a composite string with currency suffix, not a pure price display — kept as-is.
+    return formatByCurrency(parseFloat(String(conversionData.converted_amount || 0)), effectiveCurrency);
   })();
 
   // ─── Columnas del kardex ──────────────────────────────────────────────────
@@ -448,13 +447,13 @@ const InventoryDetailPage = () => {
                     <span className="font-medium">Uds/paquete:</span> {pres.units_per_package}
                   </div>
                   <div>
-                    <span className="font-medium">Costo paquete:</span> {formatUSD(Number(presExt.package_cost || 0))} {String(presExt.purchase_currency || '')}
+                    <span className="font-medium">Costo paquete:</span> {formatByCurrency(Number(presExt.package_cost || 0), String(presExt.purchase_currency || 'USD'))}
                   </div>
                   <div>
                     <span className="font-medium">Precio paquete:</span> {formatUSD(Number(presExt.package_price || 0))}
                   </div>
                   <div>
-                    <span className="font-medium">Costo unitario:</span> {formatUSD(Number(presExt.cost || 0))}
+                    <span className="font-medium">Costo unitario:</span> {formatByCurrency(Number(presExt.cost || 0), String(presExt.purchase_currency || 'USD'))}
                   </div>
                 </div>
                 {presExt.barcode ? (

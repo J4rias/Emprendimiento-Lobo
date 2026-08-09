@@ -10,7 +10,7 @@ import {
   CheckCircle, CircleNotch, WarningCircle, ClipboardText, ArrowsLeftRight,
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { formatMoney, formatDateShort } from '../utils/formatUtils';
+import { formatByCurrency, formatDateShort } from '../utils/formatUtils';
 import { downloadCSV } from '../utils/csvUtils';
 import { exchangeRateService } from '../services/api/exchangeRateService';
 import { calculateEffectiveRate } from '../utils/exchangeRateUtils';
@@ -104,12 +104,13 @@ const InventoryPage = () => {
   const warehouses = warehousesData?.data || [];
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'active'],
     queryFn: async () => {
-      const res = await categoryService.getAll({ limit: 200 });
+      // Solo activas: el inventario únicamente lista productos activos
+      const res = await categoryService.getAll({ limit: 1000, is_active: true });
       return res?.data || [];
     },
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: ratesData } = useQuery({
@@ -119,27 +120,31 @@ const InventoryPage = () => {
   });
   const exchangeRates = ratesData?.data || [];
 
+  // Los KPIs comparten los filtros de depósito y categoría con la tabla
+  const scopeParams = {
+    warehouse_id: selectedWarehouse === 'all' ? undefined : Number(selectedWarehouse),
+    category_id: selectedCategory ? Number(selectedCategory) : undefined,
+  };
+
   const { data: lowStockData } = useQuery({
-    queryKey: ['lowStock'],
-    queryFn: () => inventoryService.getLowStock(),
+    queryKey: ['lowStock', selectedWarehouse, selectedCategory],
+    queryFn: () => inventoryService.getLowStock(scopeParams),
     refetchOnWindowFocus: true,
     staleTime: 30000,
     refetchInterval: 60000,
   });
 
   const { data: expiringData } = useQuery({
-    queryKey: ['expiring'],
-    queryFn: () => inventoryService.getExpiringProducts({ days: 30 }),
+    queryKey: ['expiring', selectedWarehouse, selectedCategory],
+    queryFn: () => inventoryService.getExpiringProducts({ days: 30, ...scopeParams }),
     refetchOnWindowFocus: true,
     staleTime: 30000,
     refetchInterval: 60000,
   });
 
   const { data: valuationData } = useQuery<{ data: ValuationData }>({
-    queryKey: ['valuation', selectedWarehouse],
-    queryFn: () => inventoryService.getValuation({
-      warehouse_id: selectedWarehouse === 'all' ? undefined : Number(selectedWarehouse),
-    }),
+    queryKey: ['valuation', selectedWarehouse, selectedCategory],
+    queryFn: () => inventoryService.getValuation(scopeParams),
     refetchOnWindowFocus: true,
     staleTime: 30000,
     refetchInterval: 60000,
@@ -179,6 +184,8 @@ const InventoryPage = () => {
 
   const hasActiveFilters   = filters.lowStock || filters.expiring || filters.outOfStock;
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+  // Incluye también los selectores de arriba, para saber si "Limpiar" hace algo
+  const hasAnyFilter = hasActiveFilters || !!selectedCategory || selectedWarehouse !== 'all' || !!searchTerm;
 
   const handleClearFilters = () => {
     setSearchTerm('');
@@ -426,7 +433,7 @@ const InventoryPage = () => {
                 <p><strong>Conteo Rápido:</strong> Ajusta el stock de múltiples productos a la vez sin salir de la página. Los cambios se guardan automáticamente.</p>
                 <p><strong>Ajuste individual:</strong> El botón de lápiz en cada fila abre un formulario para ajustar un producto específico.</p>
                 <p><strong>Stock Bajo:</strong> Productos en o por debajo del punto de reorden configurado.</p>
-                <p><strong>Valor Inventario:</strong> Costo estimado basado en el costo de compra de la presentación por defecto (en USD).</p>
+                <p><strong>Valor Inventario:</strong> Costo estimado basado en el costo de compra de la presentación por defecto, convertido a COP.</p>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
@@ -567,7 +574,13 @@ const InventoryPage = () => {
               )}
             </Button>
 
-            <Button variant="secondary" size="icon" onClick={handleClearFilters} title="Limpiar filtros">
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={handleClearFilters}
+              disabled={!hasAnyFilter}
+              title="Limpiar filtros"
+            >
               <ArrowClockwise className="w-4 h-4" />
             </Button>
 
@@ -649,7 +662,7 @@ const InventoryPage = () => {
                         )}
                       </td>
                       <td className="px-6 py-3 text-center text-sm text-gray-400">
-                        {bultos} bultos + {unidades} sueltas
+                        {bultos} {bultos === 1 ? 'bulto' : 'bultos'} + {unidades} {unidades === 1 ? 'suelta' : 'sueltas'}
                       </td>
                       <td className="px-6 py-3 text-center bg-primary-50/20">
                         <input
@@ -749,7 +762,7 @@ const InventoryPage = () => {
                           <span className="text-sm text-gray-500">{currency}</span>
                         </div>
                         <p className="text-lg font-bold text-gray-900">
-                          {formatMoney(Number(value), currencyInfo?.symbol)}
+                          {formatByCurrency(Number(value), currency)}
                         </p>
                         {conversion && (
                           <div className="mt-2 pt-2 border-t border-gray-200">

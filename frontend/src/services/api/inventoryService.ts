@@ -9,6 +9,15 @@ export interface InventoryListParams {
   date_to?: string;
   warehouse_id?: number;
   product_id?: number;
+  category_id?: number;
+}
+
+// Filtros de alcance compartidos por los KPIs (valuación, stock bajo, por vencer)
+export interface InventoryScopeParams {
+  warehouse_id?: number;
+  category_id?: number;
+  days?: number;
+  limit?: number;
 }
 
 interface InventoryListResponse {
@@ -49,17 +58,17 @@ export const inventoryService = {
     return response.data;
   },
 
-  getLowStock: async (params?: Record<string, unknown>) => {
+  getLowStock: async (params?: InventoryScopeParams) => {
     const response = await api.get('/inventory/alerts/low-stock', { params });
     return response.data;
   },
 
-  getExpiringProducts: async (params?: Record<string, unknown>) => {
+  getExpiringProducts: async (params?: InventoryScopeParams) => {
     const response = await api.get('/inventory/alerts/expiring', { params });
     return response.data;
   },
 
-  getValuation: async (params?: Record<string, unknown>) => {
+  getValuation: async (params?: InventoryScopeParams) => {
     const response = await api.get('/inventory/valuation', { params });
     return response.data;
   },
