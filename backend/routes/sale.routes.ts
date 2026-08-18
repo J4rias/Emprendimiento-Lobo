@@ -57,6 +57,12 @@ router.get('/product-sales',
   saleController.getProductSales
 );
 
+router.get('/payments-report',
+  auth,
+  authorize('sales.view'),
+  saleController.getPaymentsReport
+);
+
 router.get('/commissions',
   auth,
   authorize('commissions.view'),

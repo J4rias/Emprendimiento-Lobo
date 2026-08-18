@@ -1204,6 +1204,131 @@ export const getSalesSummary = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Detalle de pagos recibidos en un rango de fechas — una fila por línea de
+ * `sale_payments`, con la venta y el cajero que la registró.
+ *
+ * A diferencia del cierre de caja (que agrupa y separa cobranzas de ventas del
+ * día), esto es el libro plano de caja: sirve para auditar el arqueo línea a
+ * línea y para exportarlo a CSV. Incluye las líneas negativas (vueltos) y las
+ * reversadas, con `reversed_at` visible, para que nada quede fuera del rastro.
+ */
+export const getPaymentsReport = async (req: Request, res: Response) => {
+  try {
+    const { date_from, date_to, user_id, currency, payment_method } =
+      req.query as Record<string, string | undefined>;
+
+    const dateFrom = date_from ? parseLocalDate(date_from) : parseLocalDate(localToday());
+    const dateTo = date_to ? parseLocalDateEnd(date_to) : parseLocalDateEnd(localToday());
+
+    const replacements: Record<string, unknown> = { dateFrom, dateTo };
+    const filters: string[] = [];
+    if (user_id) {
+      filters.push('AND sp.created_by = :user_id');
+      replacements.user_id = parseInt(user_id, 10);
+    }
+    if (currency) {
+      filters.push('AND sp.currency = :currency');
+      replacements.currency = currency;
+    }
+    if (payment_method) {
+      filters.push('AND sp.payment_method = :payment_method');
+      replacements.payment_method = payment_method;
+    }
+    const extraFilters = filters.join('\n        ');
+
+    const payments = await sequelize.query(`
+      SELECT
+        sp.id,
+        sp.sale_id,
+        s.sale_number,
+        s.sale_type,
+        s.status AS sale_status,
+        -- Formateadas como string de reloj de pared: las columnas DATETIME
+        -- guardan la hora local del negocio, y devolverlas como Date haría que
+        -- el navegador les aplicara un offset de zona horaria (una venta del
+        -- mediodía se veía como 7 a.m.). En este reporte la hora es el dato.
+        DATE_FORMAT(s.sale_date, '%Y-%m-%d %H:%i:%s') AS sale_date,
+        s.currency_mode,
+        DATE_FORMAT(sp.payment_date, '%Y-%m-%d %H:%i:%s') AS payment_date,
+        sp.currency,
+        sp.payment_method,
+        sp.amount,
+        sp.exchange_rate,
+        sp.reference,
+        DATE_FORMAT(sp.reversed_at, '%Y-%m-%d %H:%i:%s') AS reversed_at,
+        b.name AS bank_name,
+        sp.created_by AS cashier_id,
+        TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS cashier_name,
+        COALESCE(
+          c.business_name,
+          NULLIF(TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))), '')
+        ) AS customer_name
+      FROM sale_payments sp
+      INNER JOIN sales s ON s.id = sp.sale_id AND s.deleted_at IS NULL
+      LEFT JOIN users u ON u.id = sp.created_by
+      LEFT JOIN customers c ON c.id = s.customer_id
+      LEFT JOIN banks b ON b.id = sp.bank_id
+      WHERE sp.payment_date BETWEEN :dateFrom AND :dateTo
+        ${extraFilters}
+      ORDER BY sp.payment_date ASC, sp.id ASC
+    `, { replacements, type: sequelize.QueryTypes.SELECT }) as any[];
+
+    // Totales por divisa/método — solo líneas vigentes (las reversadas nunca
+    // quedaron en la caja, igual que en getDailyClosure)
+    const active = payments.filter((p) => !p.reversed_at);
+
+    const byCurrencyMethod: Record<string, Record<string, { count: number; amount: number }>> = {};
+    const cashByCurrency: Record<string, number> = {};
+    for (const p of active) {
+      const curr = p.currency || 'USD';
+      const method = p.payment_method;
+      const amount = parseFloat(p.amount) || 0;
+      if (!byCurrencyMethod[curr]) byCurrencyMethod[curr] = {};
+      if (!byCurrencyMethod[curr][method]) byCurrencyMethod[curr][method] = { count: 0, amount: 0 };
+      byCurrencyMethod[curr][method].count += 1;
+      byCurrencyMethod[curr][method].amount += amount;
+      if (method === 'cash') cashByCurrency[curr] = (cashByCurrency[curr] || 0) + amount;
+    }
+
+    res.json({
+      data: {
+        period: { from: dateFrom, to: dateTo },
+        summary: {
+          payment_count: active.length,
+          reversed_count: payments.length - active.length,
+          sale_count: new Set(active.map((p) => p.sale_id)).size,
+          by_currency_method: byCurrencyMethod,
+          cash_by_currency: cashByCurrency
+        },
+        payments: payments.map((p) => ({
+          id: p.id,
+          sale_id: p.sale_id,
+          sale_number: p.sale_number,
+          sale_type: p.sale_type,
+          sale_status: p.sale_status,
+          sale_date: p.sale_date,
+          currency_mode: p.currency_mode,
+          payment_date: p.payment_date,
+          currency: p.currency,
+          payment_method: p.payment_method,
+          amount: parseFloat(p.amount) || 0,
+          exchange_rate: p.exchange_rate !== null ? parseFloat(p.exchange_rate) : null,
+          reference: p.reference,
+          bank_name: p.bank_name,
+          reversed_at: p.reversed_at,
+          cashier_id: p.cashier_id,
+          cashier_name: p.cashier_name || '',
+          customer_name: p.customer_name || 'Cliente General'
+        }))
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting payments report:', error);
+    res.status(500).json({ message: 'Error al obtener el detalle de pagos' });
+  }
+};
+
 export const getCommissions = async (req: Request, res: Response) => {
   try {
     const { from, to, user_id, detail } = req.query as Record<string, string | undefined>;

@@ -353,3 +353,73 @@ describe('GET /api/purchase-orders — pagination', () => {
     expect(Array.isArray(items)).toBe(true);
   });
 });
+
+// ─── Payments report ────────────────────────────────────────────────────────
+
+describe('GET /api/sales/payments-report', () => {
+  const range = { date_from: '2026-01-01', date_to: '2026-12-31' };
+
+  it('returns period, summary and payment lines', async () => {
+    const res = await request(app)
+      .get('/api/sales/payments-report')
+      .query(range)
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toBeDefined();
+    expect(res.body.data).toHaveProperty('period');
+    expect(res.body.data.summary).toHaveProperty('payment_count');
+    expect(res.body.data.summary).toHaveProperty('reversed_count');
+    expect(res.body.data.summary).toHaveProperty('sale_count');
+    expect(res.body.data.summary).toHaveProperty('cash_by_currency');
+    expect(Array.isArray(res.body.data.payments)).toBe(true);
+  });
+
+  it('returns amounts as numbers and dates as wall-clock strings', async () => {
+    const res = await request(app)
+      .get('/api/sales/payments-report')
+      .query(range)
+      .set('Authorization', `Bearer ${authToken}`);
+    const rows = res.body.data.payments;
+    if (rows.length === 0) return;
+    const p = rows[0];
+    expect(typeof p.amount).toBe('number');
+    expect(p.sale_number).toBeDefined();
+    // Sin sufijo Z ni offset: la hora guardada es la del negocio y el
+    // navegador no debe reinterpretarla en otra zona horaria
+    expect(p.payment_date).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(p.sale_date).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('summary totals only count non-reversed lines', async () => {
+    const res = await request(app)
+      .get('/api/sales/payments-report')
+      .query(range)
+      .set('Authorization', `Bearer ${authToken}`);
+    const { summary, payments } = res.body.data;
+    const active = payments.filter((p) => !p.reversed_at);
+    expect(summary.payment_count).toBe(active.length);
+    expect(summary.reversed_count).toBe(payments.length - active.length);
+
+    const cashCOP = active
+      .filter((p) => p.currency === 'COP' && p.payment_method === 'cash')
+      .reduce((s, p) => s + p.amount, 0);
+    expect(summary.cash_by_currency.COP || 0).toBeCloseTo(cashCOP, 2);
+  });
+
+  it('filters by currency and payment_method', async () => {
+    const res = await request(app)
+      .get('/api/sales/payments-report')
+      .query({ ...range, currency: 'COP', payment_method: 'cash' })
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(200);
+    for (const p of res.body.data.payments) {
+      expect(p.currency).toBe('COP');
+      expect(p.payment_method).toBe('cash');
+    }
+  });
+
+  it('requires authentication', async () => {
+    const res = await request(app).get('/api/sales/payments-report').query(range);
+    expect(res.status).toBe(401);
+  });
+});
