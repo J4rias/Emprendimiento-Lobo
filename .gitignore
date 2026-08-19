@@ -72,6 +72,7 @@ scripts/api-tests/
 scripts/api_test_orchestrator.py
 tmp/api-test-state.json
 tmp/orq*-state.json
+tmp/orq*-report.md
 
 # Claude Code
 .claude/
@@ -89,6 +90,7 @@ scripts/ts_model_orchestrator_gemma4.py
 scripts/ts_controller_orchestrator_gemma4.py
 scripts/bench_gemma4.py
 scripts/orq*.py
+scripts/glm.py
 scripts/__pycache__/
 scripts/api-tests/__pycache__/
 frontend/serve-preview.cjs
