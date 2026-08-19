@@ -56,9 +56,12 @@ export const getCatalog = async (req: Request, res: Response) => {
 
       // Top products (most sold in last 30 days)
       sequelize.query(`
-        SELECT sd.product_id, SUM(sd.quantity) AS total_sold
+        SELECT sd.product_id,
+               SUM(CASE WHEN sd.is_unit = 1 THEN sd.quantity
+                        ELSE sd.quantity * COALESCE(pp.units_per_package, 1) END) AS total_sold
         FROM sale_details sd
         JOIN sales s ON s.id = sd.sale_id
+        LEFT JOIN product_presentations pp ON pp.id = sd.presentation_id
         WHERE s.sale_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
           AND s.status IN ('completed', 'pending')
         GROUP BY sd.product_id

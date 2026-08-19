@@ -27,7 +27,7 @@ interface SalesStats {
   average_ticket_cop: number;
 }
 interface InventoryStats { total_items: number; }
-interface PurchasesStats { total_orders: number; total_amount: number; average_order: number; }
+interface PurchasesStats { total_orders: number; totals_by_currency: Record<string, { total: number; count: number }>; }
 interface TopProductsStats { total_products: number; total_revenue: number; total_units_sold: number; }
 interface ProductSalesStats { total_products: number; total_units: number; total_usd: number; total_cop: number; }
 interface LowStockStats { critical_items: number; }
@@ -113,11 +113,12 @@ const getSaleTypeLabel = (type: string) => {
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
-interface StatCardProps { label: string; value: string | number; }
-const StatCard = ({ label, value }: StatCardProps) => (
+interface StatCardProps { label: string; value: string | number; subtitle?: string; }
+const StatCard = ({ label, value, subtitle }: StatCardProps) => (
   <Card variant="compact">
     <p className="text-sm text-gray-600 mb-1">{label}</p>
     <p className="text-2xl font-bold text-gray-900">{value}</p>
+    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
   </Card>
 );
 
@@ -250,12 +251,18 @@ const ReportsPage = () => {
         case 'purchases': {
           const poRes  = await purchaseOrderService.getAll({ ...adj, limit: 1000 });
           const poList = (poRes.data || poRes.purchaseOrders || []) as PurchaseOrder[];
-          const totalAmount = poList.reduce((sum, po) => sum + parseFloat(String(po.total || 0)), 0);
+          // Las OC conviven en USD, COP y VES: sumarlas juntas da un número sin significado
+          const totalsByCurrency = poList.reduce<Record<string, { total: number; count: number }>>((acc, po) => {
+            const curr = po.currency || 'USD';
+            const bucket = acc[curr] || (acc[curr] = { total: 0, count: 0 });
+            bucket.total += parseFloat(String(po.total || 0));
+            bucket.count += 1;
+            return acc;
+          }, {});
           return {
             stats: {
-              total_orders:  poList.length,
-              total_amount:  totalAmount,
-              average_order: poList.length > 0 ? totalAmount / poList.length : 0,
+              total_orders:       poList.length,
+              totals_by_currency: totalsByCurrency,
             },
             data: poList,
           };
@@ -569,8 +576,16 @@ const ReportsPage = () => {
         return (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <StatCard label="Total Órdenes" value={(stats as PurchasesStats).total_orders} />
-            <StatCard label="Monto Total" value={formatUSD((stats as PurchasesStats).total_amount || 0)} />
-            <StatCard label="Promedio por Orden" value={formatUSD((stats as PurchasesStats).average_order || 0)} />
+            {Object.entries((stats as PurchasesStats).totals_by_currency || {})
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([curr, { total, count }]) => (
+                <StatCard
+                  key={curr}
+                  label={`Comprado en ${curr}`}
+                  value={formatByCurrency(total, curr)}
+                  subtitle={`${count} ${count === 1 ? 'orden' : 'órdenes'} · prom. ${formatByCurrency(total / count, curr)}`}
+                />
+              ))}
           </div>
         );
       case 'top_products':
