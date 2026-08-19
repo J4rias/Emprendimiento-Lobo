@@ -77,9 +77,9 @@ export const getSales = async (req: Request, res: Response) => {
             { model: ProductPresentation, as: 'presentation', attributes: ['id', 'name'] },
             { model: Batch, as: 'batch', attributes: ['id', 'batch_number', 'expiration_date'] }
           ]},
-          { model: Customer, as: 'customer' },
+          { model: Customer, as: 'customer', paranoid: false },
           { model: Warehouse, as: 'warehouse' },
-          { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'] },
+          { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'], paranoid: false },
           { model: SalePayment, as: 'payments', include: [
             { model: User, as: 'creator', attributes: ['id', 'username', 'first_name', 'last_name'] }
           ]}
@@ -144,7 +144,7 @@ export const getSales = async (req: Request, res: Response) => {
     const { count, rows } = await Sale.findAndCountAll({
       where,
       include: [
-        { model: Customer, as: 'customer' },
+        { model: Customer, as: 'customer', paranoid: false },
         {
           model: Warehouse,
           as: 'warehouse',
@@ -153,6 +153,7 @@ export const getSales = async (req: Request, res: Response) => {
         {
           model: User,
           as: 'seller',
+          paranoid: false,
           attributes: ['id', 'username', 'first_name', 'last_name']
         }
       ],
@@ -234,7 +235,8 @@ export const getSaleById = async (req: Request, res: Response) => {
         },
         {
           model: Customer,
-          as: 'customer'
+          as: 'customer',
+          paranoid: false,
         },
         {
           model: Warehouse,
@@ -243,6 +245,7 @@ export const getSaleById = async (req: Request, res: Response) => {
         {
           model: User,
           as: 'seller',
+          paranoid: false,
           attributes: ['id', 'username', 'first_name', 'last_name']
         },
         {
@@ -289,9 +292,9 @@ export const getSaleBySaleNumber = async (req: Request, res: Response) => {
             { model: Batch, as: 'batch', attributes: ['id', 'batch_number', 'expiration_date'] }
           ]
         },
-        { model: Customer, as: 'customer' },
+        { model: Customer, as: 'customer', paranoid: false },
         { model: Warehouse, as: 'warehouse' },
-        { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'] },
+        { model: User, as: 'seller', attributes: ['id', 'username', 'first_name', 'last_name'], paranoid: false },
         {
           model: SalePayment,
           as: 'payments',
@@ -343,9 +346,9 @@ export const updateSale = async (req: Request, res: Response) => {
 
     const updatedSale = await Sale.findByPk(id, {
       include: [
-        { model: Customer, as: 'customer' },
+        { model: Customer, as: 'customer', paranoid: false },
         { model: Warehouse, as: 'warehouse' },
-        { model: User, as: 'seller' }
+        { model: User, as: 'seller', paranoid: false }
       ]
     }) as any;
 
@@ -980,7 +983,8 @@ export const validateCreditPin = async (req: Request, res: Response) => {
        INNER JOIN roles r ON u.role_id = r.id
        WHERE r.name = 'Administrador'
          AND u.credit_pin IS NOT NULL
-         AND u.is_active = 1`,
+         AND u.is_active = 1
+         AND u.deleted_at IS NULL`,
       { type: sequelize.QueryTypes.SELECT }
     );
 

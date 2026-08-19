@@ -191,11 +191,19 @@ class CustomerController {
       const customer = await Customer.findByPk(id) as any;
       if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
 
+      // No dejar ir a un cliente con deuda: sus ventas a crédito quedarían sin dueño visible
+      const creditUsed = parseFloat(customer.credit_used) || 0;
+      if (creditUsed > 0) {
+        return res.status(400).json({
+          message: `No se puede eliminar: el cliente tiene una deuda pendiente de $${creditUsed.toFixed(2)}`
+        });
+      }
+
       const salesCount = await Sale.count({ where: { customer_id: id } });
       await customer.destroy();
 
       const message = salesCount > 0
-        ? 'Cliente desactivado exitosamente (tiene ventas asociadas)'
+        ? 'Cliente desactivado exitosamente (se conserva su historial de ventas)'
         : 'Cliente eliminado exitosamente';
       res.json({ message });
     } catch (error) {

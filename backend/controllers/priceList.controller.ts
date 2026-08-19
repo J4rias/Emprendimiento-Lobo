@@ -438,6 +438,13 @@ class PriceListController {
                 return res.status(404).json({ message: 'Lista de precios no encontrada' });
             }
 
+            // La lista por defecto sostiene los precios del POS: sin ella el sistema queda sin tarifa base
+            if (priceList.is_default) {
+                return res.status(400).json({
+                    message: 'No se puede eliminar la lista de precios por defecto. Marca otra como predeterminada primero.'
+                });
+            }
+
             await priceList.destroy();
 
             res.json({ message: 'Lista de precios eliminada' });

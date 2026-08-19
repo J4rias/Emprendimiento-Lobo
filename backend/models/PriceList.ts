@@ -100,7 +100,7 @@ const PriceList = sequelize.define<Model<PriceListAttributes, PriceListCreationA
     tableName: 'price_lists',
     timestamps: true,
     underscored: true,
-    paranoid: false,
+    paranoid: true,
     indexes: [
       {
         fields: ['code']

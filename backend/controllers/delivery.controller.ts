@@ -112,6 +112,7 @@ export const getAllDeliveries = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email', 'phone']
         },
         {
@@ -171,6 +172,7 @@ export const getDeliveryById = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email', 'phone', 'address']
         },
         {
@@ -346,6 +348,7 @@ export const createDelivery = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         },
         {
@@ -445,6 +448,7 @@ export const updateDelivery = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         }
       ]

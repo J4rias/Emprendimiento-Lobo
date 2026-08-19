@@ -393,6 +393,8 @@ CREATE TABLE IF NOT EXISTS customers (
   discount_percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
   status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
   notes TEXT NULL,
+  -- Legacy: la migración 20260706000001 la traduce a deleted_at y la 20260819000002 la elimina.
+  -- No borrar de aquí: el backfill de 20260706000001 la necesita en una instalación limpia.
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

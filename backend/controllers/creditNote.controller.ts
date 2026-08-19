@@ -123,6 +123,7 @@ export const getAllCreditNotes = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'document_type', 'document_number', 'email', 'phone']
         },
         {
@@ -195,6 +196,7 @@ export const getCreditNoteById = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'trade_name', 'type', 'email', 'phone', 'address']
         },
         {
@@ -455,6 +457,7 @@ export const createCreditNote = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         },
         {
@@ -533,7 +536,8 @@ export const approveCreditNote = async (req: Request, res: Response) => {
         },
         {
           model: Customer,
-          as: 'customer'
+          as: 'customer',
+          paranoid: false,
         }
       ],
       transaction
@@ -683,6 +687,7 @@ export const approveCreditNote = async (req: Request, res: Response) => {
         {
           model: Customer,
           as: 'customer',
+          paranoid: false,
           attributes: ['id', 'first_name', 'last_name', 'business_name', 'type', 'email']
         },
         {

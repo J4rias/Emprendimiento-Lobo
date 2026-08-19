@@ -44,8 +44,8 @@ export const getCatalog = async (req: Request, res: Response) => {
           ROUND(pld.unit_price, 2) AS unit_price,
           CASE WHEN i.quantity <= pp.units_per_package * 2 THEN 1 ELSE 0 END AS low_stock
         FROM price_list_details pld
-        JOIN products p ON p.id = pld.product_id AND p.is_active = 1
-        JOIN categories c ON c.id = p.category_id AND c.is_active = 1
+        JOIN products p ON p.id = pld.product_id AND p.is_active = 1 AND p.deleted_at IS NULL
+        JOIN categories c ON c.id = p.category_id AND c.is_active = 1 AND c.deleted_at IS NULL
         JOIN product_presentations pp ON pp.id = pld.presentation_id
         LEFT JOIN packaging_types pkt ON pkt.id = pp.packaging_type_id
         JOIN inventory i ON i.product_id = p.id AND i.quantity > 0

@@ -256,7 +256,7 @@ export async function getCustomerActivity(daysInt: number, minPurchases: number)
     WHERE s.status != 'cancelled'
       AND s.deleted_at IS NULL
       AND s.sale_date >= :dateFrom
-      AND c.is_deleted = 0
+      AND c.deleted_at IS NULL
     GROUP BY c.id
     HAVING total_purchases >= :minPurchases
     ORDER BY total_purchases DESC

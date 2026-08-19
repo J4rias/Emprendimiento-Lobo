@@ -546,9 +546,9 @@ export async function createSale(
             { model: ProductPresentation, as: 'presentation' }
           ]
         },
-        { model: Customer, as: 'customer' },
+        { model: Customer, as: 'customer', paranoid: false },
         { model: Warehouse, as: 'warehouse' },
-        { model: User, as: 'seller' }
+        { model: User, as: 'seller', paranoid: false }
       ]
     }) as any;
 

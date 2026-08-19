@@ -22,7 +22,9 @@ export const sequelize = new Sequelize(
       timestamps: true,
       underscored: true,
       createdAt: 'created_at',
-      updatedAt: 'updated_at'
+      updatedAt: 'updated_at',
+      // Los modelos con paranoid:true usan esta columna (migración 20260706000001)
+      deletedAt: 'deleted_at'
     }
   }
 );

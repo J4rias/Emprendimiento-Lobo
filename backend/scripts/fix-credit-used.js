@@ -21,7 +21,7 @@ async function run() {
              credit_used, 
              (credit_limit - credit_used) as disponible
       FROM customers 
-      WHERE credit_limit > 0 AND is_deleted = 0
+      WHERE credit_limit > 0 AND deleted_at IS NULL
       ORDER BY id
     `);
 
@@ -87,7 +87,7 @@ async function run() {
              credit_used, 
              (credit_limit - credit_used) as disponible
       FROM customers 
-      WHERE credit_limit > 0 AND is_deleted = 0
+      WHERE credit_limit > 0 AND deleted_at IS NULL
       ORDER BY id
     `);
         final.forEach(c => {

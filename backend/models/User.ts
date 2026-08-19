@@ -113,7 +113,7 @@ const User = sequelize.define<Model<UserAttributes, UserCreationAttributes>>(
   {
     tableName: 'users',
     timestamps: true,
-    paranoid: false,
+    paranoid: true,
     hooks: {
       beforeCreate: async (user: any) => {
         if (user.password) {
