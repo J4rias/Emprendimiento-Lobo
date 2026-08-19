@@ -165,8 +165,10 @@ export const getStats = async (req: Request, res: Response) => {
     const approved = await PreOrder.count({ where: { status: 'approved' } });
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // `created_at`, no `createdAt`: el define global de config/database.ts nombra
+    // así el atributo, y con camelCase Sequelize no lo mapea (500 silencioso).
     const todayCount = await PreOrder.count({
-      where: { createdAt: { [Op.gte]: today } }
+      where: { created_at: { [Op.gte]: today } } as any
     });
 
     res.json({
@@ -302,12 +304,20 @@ export const convert = async (req: Request, res: Response) => {
       is_unit: d.is_unit
     }));
 
-    // Get current exchange rate for the sale
-    let exchangeRate = 1;
+    // Tasa vigente para la venta. Sin tasa NO se convierte: caer a 1 grababa una
+    // venta en COP como si su total fuera USD, y el pre-pedido llega del bot,
+    // sin nadie mirando. Mejor fallar aquí que corromper cierre y cartera.
+    let exchangeRate: number;
     try {
       const copUsd = await (ExchangeRate as any).getRate('COP', 'USD');
-      exchangeRate = copUsd > 0 ? 1 / copUsd : 1; // Store as COP per USD
-    } catch (e) { /* fallback to 1 */ }
+      if (!copUsd || copUsd <= 0) throw new Error('tasa COP/USD no disponible');
+      exchangeRate = 1 / copUsd; // Se guarda como COP por USD
+    } catch (e: any) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: 'No se puede convertir el pre-pedido: no hay tasa de cambio COP/USD vigente. Carga la tasa del día e intenta de nuevo.'
+      });
+    }
 
     // Create a minimal sale request body
     // The sale will be created as cash type with no payment (to be completed at POS)

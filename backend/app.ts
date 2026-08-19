@@ -157,6 +157,8 @@ app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/price-lists', priceListRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/accounts-receivable', arRoutes);
+// Alias: atlas-bot llama /api/ar/summary y /api/ar/customers (erp.ts:442,455)
+app.use('/api/ar', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
 app.use('/api/banks', require('./routes/bank.routes'));
 app.use('/api/audit-logs', auditLogRoutes);

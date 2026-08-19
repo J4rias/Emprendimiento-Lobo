@@ -9,10 +9,12 @@ import { CreatePriceListSchema, UpdatePriceListSchema, UpdateDetailSchema, Dupli
 const router = Router();
 
 // Get active price lists (for POS) – must be BEFORE /:id
+// `sales.create` es el acceso del POS; `price_lists.view` es el de atlas-bot,
+// que necesita los precios para responder en Messenger y no debe poder vender.
 router.get(
     '/active',
     authenticate,
-    authorize('sales.create'),
+    authorize('sales.create', 'price_lists.view'),
     priceListController.getActive
 );
 

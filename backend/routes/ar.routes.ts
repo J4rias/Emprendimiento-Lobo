@@ -18,12 +18,14 @@ router.get('/customers/:id/statement', authenticate, authorize('ar.view'), arCon
 router.get('/export/invoices',  authenticate, authorize('ar.view'), arController.exportInvoicesCSV);
 router.get('/export/customers', authenticate, authorize('ar.view'), arController.exportCustomersCSV);
 
-// ─── Reversión de abonos ──────────────────────────────────────────────────────
-router.post('/payments/:paymentId/reverse', authenticate, authorize('ar.view'), validateZod(ReversePaymentSchema), arController.reversePayment);
+// ─── Escritura: exige ar.manage, no ar.view ───────────────────────────────────
+// `ar.view` es lectura y lo tienen el Contador y la API key de atlas-bot. Estas
+// tres rutas mueven el libro de caja o el PIN que autoriza el crédito.
+router.post('/payments/:paymentId/reverse', authenticate, authorize('ar.manage'), validateZod(ReversePaymentSchema), arController.reversePayment);
 
 // ─── PIN de admin ─────────────────────────────────────────────────────────────
-router.get('/admin-pin/status',    authenticate, authorize('ar.view'), arController.getAdminPinStatus);
-router.post('/admin-pin/validate', authenticate, authorize('ar.view'), validateZod(ValidateAdminPinSchema), arController.validateAdminPin);
-router.put('/admin-pin',           authenticate, authorize('ar.view'), validateZod(UpdateArSchema), arController.setAdminPin);
+router.get('/admin-pin/status',    authenticate, authorize('ar.view'),   arController.getAdminPinStatus);
+router.post('/admin-pin/validate', authenticate, authorize('ar.manage'), validateZod(ValidateAdminPinSchema), arController.validateAdminPin);
+router.put('/admin-pin',           authenticate, authorize('ar.manage'), validateZod(UpdateArSchema), arController.setAdminPin);
 
 export = router;
