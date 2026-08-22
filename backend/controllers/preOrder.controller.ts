@@ -215,10 +215,20 @@ export const approve = async (req: Request, res: Response) => {
       return res.status(400).json({ message: `No se puede aprobar un pre-pedido con estado "${preOrder.status}"` });
     }
 
+    // approved_by es INTEGER (FK a users) — siempre el usuario autenticado, nunca un
+    // string arbitrario del body. Si el caller (ej. el bot de Telegram) manda quién
+    // aprobó realmente en su lado, se anota en notes sin pisar las notas originales
+    // del cliente, en vez de descartarlo en silencio.
+    const { approved_by: approvedByName, notes: approvalNotes } = req.body as { approved_by?: string; notes?: string };
+    const annotation = [approvedByName ? `Aprobado por: ${approvedByName}` : null, approvalNotes || null]
+      .filter(Boolean)
+      .join(' — ');
+
     await preOrder.update({
       status: 'approved',
       approved_by: (req as any).user.id,
-      approved_at: new Date()
+      approved_at: new Date(),
+      ...(annotation ? { notes: preOrder.notes ? `${preOrder.notes}\n[${annotation}]` : `[${annotation}]` } : {}),
     });
 
     res.json({ data: preOrder });
@@ -238,10 +248,18 @@ export const reject = async (req: Request, res: Response) => {
       return res.status(400).json({ message: `No se puede rechazar un pre-pedido con estado "${preOrder.status}"` });
     }
 
+    // Mismo criterio que approve(): approved_by queda como el usuario autenticado;
+    // quién rechazó realmente y el motivo se anotan en notes sin pisar las originales.
+    const { approved_by: rejectedByName, notes: rejectionNotes } = req.body as { approved_by?: string; notes?: string };
+    const annotation = [rejectedByName ? `Rechazado por: ${rejectedByName}` : null, rejectionNotes || null]
+      .filter(Boolean)
+      .join(' — ');
+
     await preOrder.update({
       status: 'rejected',
       approved_by: (req as any).user.id,
-      approved_at: new Date()
+      approved_at: new Date(),
+      ...(annotation ? { notes: preOrder.notes ? `${preOrder.notes}\n[${annotation}]` : `[${annotation}]` } : {}),
     });
 
     res.json({ data: preOrder });
