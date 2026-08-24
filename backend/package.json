@@ -16,7 +16,8 @@
     "test:coverage": "jest --coverage --coverageReporters=html",
     "audit:ci": "pnpm audit --audit-level=high",
     "validate:schema": "tsx scripts/validate-schema.ts",
-    "check:paranoid": "tsx scripts/check-paranoid.ts"
+    "check:paranoid": "tsx scripts/check-paranoid.ts",
+    "db:purge-test-data": "tsx scripts/purge-test-data.ts"
   },
   "keywords": [
     "inventory",
