@@ -20,6 +20,7 @@ const sizeClasses: Record<string, string> = {
   md: 'w-96',
   lg: 'w-[480px]',
   xl: 'w-[600px]',
+  '2xl': 'w-[720px]',
 }
 
 interface SheetProps {
@@ -28,7 +29,7 @@ interface SheetProps {
   title?: React.ReactNode
   children?: React.ReactNode
   side?: 'right' | 'left'
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   className?: string
 }
 
@@ -48,7 +49,7 @@ export function Sheet({ open, onClose, title, children, side = 'right', size = '
         />
         <Dialog.Content
           className={cn(
-            'fixed z-50 flex flex-col bg-white shadow-xl border-gray-200',
+            'fixed z-50 flex flex-col bg-white shadow-xl border-gray-200 max-w-[95vw]',
             'data-[state=open]:animate-in data-[state=closed]:animate-out duration-200',
             posClass,
             animClass,

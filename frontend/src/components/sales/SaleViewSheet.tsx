@@ -96,7 +96,7 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
   if (!sale) return null;
 
   return (
-    <Sheet open={open} onClose={onClose} title={`Detalle de Venta — ${sale.sale_number}`} size="xl">
+    <Sheet open={open} onClose={onClose} title={`Detalle de Venta — ${sale.sale_number}`} size="2xl">
       {/* Print actions — solo cuando el pago ya fue procesado */}
       {sale.sale_type !== 'pos_pending' && (
         <div className="flex gap-2 mb-5">
