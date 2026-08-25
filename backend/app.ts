@@ -38,6 +38,7 @@ const priceListRoutes = require('./routes/priceList.routes');
 const posRoutes = require('./routes/pos.routes');
 const arRoutes = require('./routes/ar.routes');
 const preOrderRoutes = require('./routes/preOrder.routes');
+const paymentReceiptIntakeRoutes = require('./routes/paymentReceiptIntake.routes');
 const auditLogRoutes = require('./routes/auditLog.routes');
 
 const app = express();
@@ -160,6 +161,7 @@ app.use('/api/accounts-receivable', arRoutes);
 // Alias: atlas-bot llama /api/ar/summary y /api/ar/customers (erp.ts:442,455)
 app.use('/api/ar', arRoutes);
 app.use('/api/pre-orders', preOrderRoutes);
+app.use('/api/payment-receipts', paymentReceiptIntakeRoutes);
 app.use('/api/banks', require('./routes/bank.routes'));
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/client-errors', require('./routes/clientError.routes'));

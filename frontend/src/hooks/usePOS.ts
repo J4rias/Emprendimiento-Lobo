@@ -805,7 +805,7 @@ export function usePOS() {
 
   const handleCompleteSale = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
-    if (!customer) { toast.error('Selecciona un cliente'); return; }
+    if (!customer) { toast.error('Selecciona un cliente'); setShowCustomerSearch(true); return; }
     if (paymentLines.length === 0) { toast.error('Agrega al menos una forma de pago'); return; }
 
     if (saleType === 'credit') {
@@ -864,7 +864,7 @@ export function usePOS() {
 
   const sendToCashier = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }
-    if (!customer) { toast.error('Selecciona un cliente'); return; }
+    if (!customer) { toast.error('Selecciona un cliente'); setShowCustomerSearch(true); return; }
     if (cart.length === 0) { toast.error('Agrega al menos un producto'); return; }
 
     setSaving(true);

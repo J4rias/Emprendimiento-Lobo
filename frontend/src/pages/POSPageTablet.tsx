@@ -11,11 +11,12 @@ import { useCompany } from '../context/CompanyContext';
 import POSTabsTablet from '../components/pos/POSTabsTablet';
 import StockConflictAlert from '../components/pos/StockConflictAlert';
 import CustomerSearch from '../components/CustomerSearch';
+import ImageUpload from '../components/common/ImageUpload';
 import { Textarea, ConfirmDialog } from '../components/ui';
 import {
   MagnifyingGlass, X, WarningCircle, CheckCircle, User,
   Package, Lock, Money, CreditCard, DeviceMobile,
-  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight
+  Hash, Printer, Clock, Repeat, CaretDown, CaretUp, UserPlus, CircleNotch, ArrowRight, Camera
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import type { Product, ProductPresentation } from '../types/models';
@@ -133,7 +134,13 @@ const POSPageTablet = () => {
               if (scrollHeight - scrollTop - clientHeight < 200) pos.loadMoreProducts();
             }}
           >
-            {pos.loadingProducts ? (
+            {pos.tabs.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-base text-gray-500 text-center max-w-xs">
+                  Abre una venta nueva ("+ Nuevo", arriba) para empezar a agregar productos.
+                </p>
+              </div>
+            ) : pos.loadingProducts ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-base text-gray-500">Cargando productos...</p>
               </div>
@@ -690,8 +697,10 @@ function TabletCheckoutModal({
   const {
     isUSD, sSym, fmtTotal, fmtCOP, fmtLine,
     newPayCurrency, newPayMethod, newPayAmount, newPayRate, newPayBank,
+    newPayReference, newPayReceiptUrl,
     changeRate, showCustomerSearch, banks,
     setNewPayAmount, setNewPayRate, setNewPayBank, setChangeRate, setShowCustomerSearch,
+    setNewPayReference, setNewPayReceiptUrl,
     handleCurrencyChange, handleMethodChange, addPaymentLine,
     cashLines, creditCOP, paidCOP, effectiveTotalCOP, rawChangeCOP, changeCOP, vueltoCOP,
     availableMethods, hasCreditLine, filteredBanks, effectiveCurrency,
@@ -803,6 +812,12 @@ function TabletCheckoutModal({
                               : `${parseFloat(String(line.cop_rate)).toFixed(2)} COP/${line.currency}`}
                           </span>
                         )}
+                        {line.reference && (
+                          <span className="text-xs text-gray-400">ref. {line.reference}</span>
+                        )}
+                        {line.receipt_url && (
+                          <Camera className="w-4 h-4 text-green-600" aria-label="Con comprobante" />
+                        )}
                       </div>
                       <button onClick={() => setPaymentLines(paymentLines.filter((_: PaymentLine, j: number) => j !== i))} className="p-2 rounded-lg active:bg-red-100">
                         <X className="w-5 h-5 text-red-500" />
@@ -822,27 +837,44 @@ function TabletCheckoutModal({
                 <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                   {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
-                {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
-                  <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
-                    <option value="">Banco</option>
-                    {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
-                  </select>
-                )}
-                {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
-                  <>
-                    <label className="text-sm text-gray-500 whitespace-nowrap">
-                      {newPayMethod === 'usdt' ? 'COP/USDT' : (isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`)}:
-                    </label>
-                    <input
-                      type="number"
-                      value={newPayRate}
-                      onChange={(e) => setNewPayRate(e.target.value)}
-                      className="w-28 px-3 py-3 border border-blue-400 bg-white rounded-xl text-base text-right"
-                      step="0.01"
-                    />
-                  </>
-                )}
               </div>
+              {(newPayMethod === 'transfer' || newPayMethod === 'usdt') && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
+                    <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+                      <option value="">Banco</option>
+                      {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                    </select>
+                  )}
+                  {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
+                    <span className="flex items-center gap-1">
+                      <label className="text-sm text-gray-500 whitespace-nowrap">
+                        {newPayMethod === 'usdt' ? 'COP/USDT' : (isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`)}:
+                      </label>
+                      <input
+                        type="number"
+                        value={newPayRate}
+                        onChange={(e) => setNewPayRate(e.target.value)}
+                        className="w-28 px-3 py-3 border border-blue-400 bg-white rounded-xl text-base text-right"
+                        step="0.01"
+                      />
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    value={newPayReference}
+                    onChange={(e) => setNewPayReference(e.target.value)}
+                    placeholder="Referencia (opcional)"
+                    className="min-w-[10rem] flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white"
+                  />
+                  <ImageUpload
+                    type="receipts"
+                    compact
+                    value={newPayReceiptUrl}
+                    onChange={(v) => setNewPayReceiptUrl(typeof v === 'string' ? v : v[0] || '')}
+                  />
+                </div>
+              )}
               {(() => {
                 const remainingCOP = effectiveTotalCOP - paidCOP;
                 if (remainingCOP <= COP_TOLERANCE) return null;

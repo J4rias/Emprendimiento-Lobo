@@ -10,6 +10,8 @@ export interface PaymentLine {
   cop_rate: number;
   display_rate?: number;
   bank_id?: number;
+  reference?: string | null;
+  receipt_url?: string | null;
 }
 
 export interface BackendPaymentLine {
@@ -18,6 +20,8 @@ export interface BackendPaymentLine {
   amount: number;
   exchange_rate: number;
   bank_id?: number;
+  reference?: string | null;
+  receipt_url?: string | null;
 }
 
 // Re-export RateRecord as ExchangeRate for backward compatibility
@@ -73,6 +77,8 @@ export function convertPaymentLinesToBackend(
       amount: line.amount,
       exchange_rate: copPerUSD,
       ...(line.bank_id && { bank_id: line.bank_id }),
+      ...(line.reference && { reference: line.reference }),
+      ...(line.receipt_url && { receipt_url: line.receipt_url }),
     };
     if (line.currency === 'USD') {
       base.exchange_rate = copPerUSD / (parseFloat(String(line.cop_rate)) || copPerUSD);

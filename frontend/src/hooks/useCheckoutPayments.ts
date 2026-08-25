@@ -40,6 +40,8 @@ export interface UseCheckoutPaymentsReturn {
   newPayAmount: string;
   newPayRate: number | string;
   newPayBank: string;
+  newPayReference: string;
+  newPayReceiptUrl: string;
   changeRate: number;
   showCustomerSearch: boolean;
   banks: Bank[];
@@ -47,6 +49,8 @@ export interface UseCheckoutPaymentsReturn {
   setNewPayAmount: (v: string) => void;
   setNewPayRate: (v: number | string) => void;
   setNewPayBank: (v: string) => void;
+  setNewPayReference: (v: string) => void;
+  setNewPayReceiptUrl: (v: string) => void;
   setChangeRate: (v: number) => void;
   setShowCustomerSearch: (v: boolean) => void;
   // Handlers
@@ -98,6 +102,8 @@ export function useCheckoutPayments({
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayRate, setNewPayRate] = useState<number | string>(() => getCOPRate(isUSD ? 'USD' : 'COP'));
   const [newPayBank, setNewPayBank] = useState('');
+  const [newPayReference, setNewPayReference] = useState('');
+  const [newPayReceiptUrl, setNewPayReceiptUrl] = useState('');
   const [changeRate, setChangeRate] = useState(() => getSavedRate('changeRate', 'COP') || Math.round(copPerUSD));
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
@@ -114,6 +120,8 @@ export function useCheckoutPayments({
     setNewPayAmount('');
     setNewPayRate(getCOPRate(def));
     setNewPayBank('');
+    setNewPayReference('');
+    setNewPayReceiptUrl('');
   }, [displayCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handlers
@@ -131,6 +139,8 @@ export function useCheckoutPayments({
   const handleMethodChange = useCallback((method: string) => {
     setNewPayMethod(method);
     setNewPayBank('');
+    setNewPayReference('');
+    setNewPayReceiptUrl('');
     if (method === 'usdt') {
       setNewPayRate(getSavedRate('usdt', 'COP') || copPerUSD);
     } else {
@@ -172,15 +182,29 @@ export function useCheckoutPayments({
       ? -1
       : paymentLines.findIndex(l => l.currency === backendCurrency && l.method === newPayMethod);
     const bankId = (newPayMethod === 'transfer' && newPayBank) ? parseInt(newPayBank) : undefined;
-    if (existingIdx >= 0) {
+    const canHaveReceipt = newPayMethod === 'transfer' || newPayMethod === 'usdt';
+    const reference = (canHaveReceipt && newPayReference.trim()) ? newPayReference.trim() : undefined;
+    const receiptUrl = (canHaveReceipt && newPayReceiptUrl) ? newPayReceiptUrl : undefined;
+    // Con referencia/foto no se acumula en una línea existente: cada comprobante
+    // es una operación bancaria distinta, aunque coincidan moneda y método.
+    const idx = (reference || receiptUrl) ? -1 : existingIdx;
+    if (idx >= 0) {
       const updated = [...paymentLines];
-      updated[existingIdx] = { ...updated[existingIdx], amount: updated[existingIdx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
+      updated[idx] = { ...updated[idx], amount: updated[idx].amount + amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }) };
       setPaymentLines(updated);
     } else {
-      setPaymentLines([...paymentLines, { currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate, ...(displayRate && { display_rate: displayRate }), ...(bankId && { bank_id: bankId }) }]);
+      setPaymentLines([...paymentLines, {
+        currency: backendCurrency, method: newPayMethod, amount, cop_rate: copRate,
+        ...(displayRate && { display_rate: displayRate }),
+        ...(bankId && { bank_id: bankId }),
+        ...(reference && { reference }),
+        ...(receiptUrl && { receipt_url: receiptUrl }),
+      }]);
     }
     setNewPayAmount('');
-  }, [newPayAmount, newPayMethod, newPayRate, newPayBank, isUSD, effectiveCurrency, copPerUSD, displayCurrency, paymentLines, setPaymentLines]);
+    setNewPayReference('');
+    setNewPayReceiptUrl('');
+  }, [newPayAmount, newPayMethod, newPayRate, newPayBank, newPayReference, newPayReceiptUrl, isUSD, effectiveCurrency, copPerUSD, displayCurrency, paymentLines, setPaymentLines]);
 
   // Derived values
   const hasCreditLine = paymentLines.some(l => l.method === 'credit');
@@ -219,12 +243,16 @@ export function useCheckoutPayments({
     newPayAmount,
     newPayRate,
     newPayBank,
+    newPayReference,
+    newPayReceiptUrl,
     changeRate,
     showCustomerSearch,
     banks,
     setNewPayAmount,
     setNewPayRate,
     setNewPayBank,
+    setNewPayReference,
+    setNewPayReceiptUrl,
     setChangeRate,
     setShowCustomerSearch,
     handleCurrencyChange,

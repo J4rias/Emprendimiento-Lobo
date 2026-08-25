@@ -73,6 +73,12 @@ const processImages = async (req: Request, res: Response, next: NextFunction) =>
           resizeOptions = { width: 800, height: 600, fit: 'inside' };
           quality = 75;
           break;
+        case 'receipts':
+          // Comprobante a revisar, no un ícono: menos compresión que products/temp
+          // para no perder legibilidad de montos/referencias pequeños en la foto.
+          resizeOptions = { width: 1400, height: 1400, fit: 'inside' };
+          quality = 90;
+          break;
         default:
           resizeOptions = { width: 600, height: 600, fit: 'inside' };
       }

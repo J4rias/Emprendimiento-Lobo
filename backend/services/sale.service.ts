@@ -497,6 +497,7 @@ export async function createSale(
           exchange_rate: payLine.exchange_rate || 1,
           reference: payLine.reference || null,
           bank_id: payLine.bank_id || null,
+          receipt_url: payLine.receipt_url || null,
           created_by: userId
         });
         if (payLine.method === 'credit_balance' && customer_id) {
@@ -812,6 +813,7 @@ export async function addPayment(
         exchange_rate: payLine.exchange_rate || 1,
         reference: payLine.reference || null,
         bank_id: payLine.bank_id || null,
+        receipt_url: payLine.receipt_url || null,
         notes: notes || null,
         created_by: userId
       } as any, { transaction }) as any;

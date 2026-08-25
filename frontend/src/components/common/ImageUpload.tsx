@@ -5,7 +5,7 @@ import api from '../../services/api/axios';
 interface ImageUploadProps {
   value?: string | string[];
   onChange: (value: string | string[]) => void;
-  type?: 'brands' | 'products' | 'temp';
+  type?: 'brands' | 'products' | 'temp' | 'receipts';
   multiple?: boolean;
   maxFiles?: number;
   accept?: string;
@@ -14,6 +14,8 @@ interface ImageUploadProps {
   previewSize?: string;
   placeholder?: string;
   disabled?: boolean;
+  /** Botón pequeño en vez del dropzone completo — para formularios angostos (ej. línea de pago). */
+  compact?: boolean;
 }
 
 const ImageUpload = ({
@@ -27,7 +29,8 @@ const ImageUpload = ({
   showPreview = true,
   previewSize = 'w-32 h-32', // Tailwind classes for preview size
   placeholder = 'Click para subir imagen',
-  disabled = false
+  disabled = false,
+  compact = false,
 }: ImageUploadProps): React.JSX.Element => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -178,6 +181,48 @@ const ImageUpload = ({
       </div>
     );
   };
+
+  if (compact) {
+    const singleValue = Array.isArray(value) ? value[0] : value;
+    return (
+      <div className={`inline-flex items-center gap-1 ${className}`}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          onChange={handleInputChange}
+          className="hidden"
+          disabled={disabled}
+        />
+        {singleValue ? (
+          <>
+            <a
+              href={singleValue.startsWith('http') ? singleValue : `${baseUrl}${singleValue}`}
+              target="_blank" rel="noreferrer"
+              className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1.5"
+            >
+              <Camera className="h-3.5 w-3.5" /> Comprobante adjunto
+            </a>
+            {!disabled && (
+              <button type="button" onClick={removeImage} className="text-red-500 hover:text-red-700">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={disabled || uploading}
+            className="flex items-center gap-1 text-xs text-gray-600 bg-white border border-gray-300 rounded px-2 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <Camera className="h-3.5 w-3.5" /> {uploading ? `Subiendo ${uploadProgress}%` : 'Adjuntar foto'}
+          </button>
+        )}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-2 ${className}`}>

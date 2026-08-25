@@ -22,8 +22,10 @@ router.get('/alerts/low-stock', inventoryController.getLowStock);
 // Get expiring products
 router.get('/alerts/expiring', inventoryController.getExpiringProducts);
 
-// Get inventory valuation
-router.get('/valuation', inventoryController.getValuation);
+// Get inventory valuation — costos/valorización, a diferencia de cantidades/stock
+// (esas quedan sin authorize a propósito, ver feedback_warehouse / permission_asymmetries:
+// el Cajero no tiene inventory.view y necesita consultar existencias igual)
+router.get('/valuation', authorize('inventory.view'), inventoryController.getValuation);
 
 // Get inventory movements history
 router.get('/movements', inventoryController.getMovements);

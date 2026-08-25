@@ -9,6 +9,7 @@ import { COP_TOLERANCE } from '../../hooks/usePOS';
 import CheckoutModal from '../sales/CheckoutModal';
 import { LOCALE, formatDateShort } from '../../utils/formatUtils';
 import { toast } from 'sonner';
+import { useAuth } from '../../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PaymentLine, ExchangeRate } from '../../types';
 
@@ -297,6 +298,7 @@ interface CustomerStatementModalProps {
 }
 
 const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalProps) => {
+    const { hasPermission } = useAuth();
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -604,7 +606,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                                     }
                                                                                     {t.reference || '-'}
                                                                                 </button>
-                                                                                {isCharge && t.original_data?.status !== 'completed' && (parseFloat(t.original_data?.total || 0) - parseFloat(t.original_data?.paid_amount || 0)) > 0.01 && (
+                                                                                {isCharge && hasPermission('sales.collect') && t.original_data?.status !== 'completed' && (parseFloat(t.original_data?.total || 0) - parseFloat(t.original_data?.paid_amount || 0)) > 0.01 && (
                                                                                     <button
                                                                                         onClick={() => handleOpenPaymentModal(t)}
                                                                                         className="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors font-medium flex items-center gap-1"

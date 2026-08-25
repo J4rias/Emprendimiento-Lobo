@@ -12,6 +12,7 @@ interface SalePaymentAttributes {
   amount: number;
   reference: string | null;
   bank_id: number | null;
+  receipt_url: string | null;
   notes: string | null;
   reversed_at: Date | null;
   reversed_by: number | null;
@@ -23,7 +24,7 @@ interface SalePaymentAttributes {
 // 2. Atributos opcionales en creación: id + timestamps + campos con defaultValue
 interface SalePaymentCreationAttributes extends Optional<
   SalePaymentAttributes,
-  'id' | 'payment_date' | 'currency' | 'exchange_rate' | 'reversed_at' | 'reversed_by' | 'createdAt' | 'updatedAt'
+  'id' | 'payment_date' | 'currency' | 'exchange_rate' | 'reversed_at' | 'reversed_by' | 'receipt_url' | 'createdAt' | 'updatedAt'
 > {}
 
 // 3. sequelize.define con los genéricos
@@ -81,6 +82,11 @@ const SalePayment = sequelize.define<Model<SalePaymentAttributes, SalePaymentCre
       type: DataTypes.INTEGER,
       allowNull: true,
       comment: 'Banco (si aplica)'
+    },
+    receipt_url: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'URL de la foto del comprobante (transferencia/USDT), si se adjuntó'
     },
     notes: {
       type: DataTypes.TEXT,

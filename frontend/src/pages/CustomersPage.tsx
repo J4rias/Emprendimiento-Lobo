@@ -329,7 +329,9 @@ const CustomersPage = () => {
       render: (_: unknown, row: CustomerRow) => (
         <div className="flex gap-1">
           <ViewAction onClick={() => handleView(row)} />
-          <StatementAction onClick={() => handleShowStatement(row)} />
+          {hasPermission('ar.view') && (
+            <StatementAction onClick={() => handleShowStatement(row)} />
+          )}
           {hasPermission('customers.update') && (
             <EditAction onClick={() => handleEdit(row)} />
           )}

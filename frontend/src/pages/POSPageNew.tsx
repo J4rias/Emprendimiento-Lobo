@@ -162,7 +162,13 @@ const POSPage = () => {
               if (scrollHeight - scrollTop - clientHeight < 200) pos.loadMoreProducts();
             }}
           >
-            {pos.loadingProducts ? (
+            {pos.tabs.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500 text-center max-w-xs">
+                  Abre una venta nueva ("+ Nuevo", arriba) para empezar a agregar productos.
+                </p>
+              </div>
+            ) : pos.loadingProducts ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">Cargando productos...</p>
               </div>

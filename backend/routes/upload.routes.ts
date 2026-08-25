@@ -43,7 +43,7 @@ const handleMulterError = (error: any, req: Request, res: Response, next: NextFu
 };
 
 // Subir una sola imagen
-router.post('/', authorize('products.update'), ...uploadSingle('image'), handleMulterError, (req: Request, res: Response) => {
+router.post('/', authorize('products.update', 'sales.collect'), ...uploadSingle('image'), handleMulterError, (req: Request, res: Response) => {
   try {
     if (!(req as any).processedFiles || (req as any).processedFiles.length === 0) {
       return res.status(400).json({

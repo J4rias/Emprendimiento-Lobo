@@ -162,6 +162,8 @@ export interface PaymentLine {
   cop_rate: number;
   display_rate?: number;
   bank_id?: number | null;
+  reference?: string | null;
+  receipt_url?: string | null;
 }
 
 export interface BackendPaymentLine {
@@ -170,4 +172,6 @@ export interface BackendPaymentLine {
   amount: number;
   exchange_rate: number;
   bank_id?: number | null;
+  reference?: string | null;
+  receipt_url?: string | null;
 }

@@ -52,7 +52,8 @@ interface PriceListRecord {
 }
 
 const PriceListsPage = () => {
-    useAuth();
+    const { hasPermission } = useAuth();
+    const canEdit = hasPermission('price_lists.update');
 
     // Editor state
     const [editorOpen, setEditorOpen] = useState(false);
@@ -623,26 +624,38 @@ const PriceListsPage = () => {
                                                             {d.base_currency === 'USD' ? (
                                                                 <>
                                                                     <div className="flex items-center gap-1">
-                                                                        <button
-                                                                            onClick={() => toggleFreeze(realIdx)}
-                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
-                                                                            title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
-                                                                        >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
-                                                                        </button>
+                                                                        {canEdit && (
+                                                                            <button
+                                                                                onClick={() => toggleFreeze(realIdx)}
+                                                                                className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                                title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
+                                                                            >
+                                                                                {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+                                                                            </button>
+                                                                        )}
                                                                         <span className="text-gray-500 font-medium text-xs">COP</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            step="100"
-                                                                            min="0"
-                                                                            value={
-                                                                                d.is_frozen && d.frozen_currency === 'COP'
-                                                                                ? (d.frozen_price ?? '')
-                                                                                : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
-                                                                            }
-                                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
-                                                                        />
+                                                                        {canEdit ? (
+                                                                            <input
+                                                                                type="number"
+                                                                                step="100"
+                                                                                min="0"
+                                                                                value={
+                                                                                    d.is_frozen && d.frozen_currency === 'COP'
+                                                                                    ? (d.frozen_price ?? '')
+                                                                                    : (d.package_price_cop_str !== undefined ? d.package_price_cop_str : (d.package_price ? Math.round(d.package_price * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)) : ''))
+                                                                                }
+                                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_cop', e.target.value)}
+                                                                                className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="w-24 px-2 py-1 text-right font-medium text-gray-900">
+                                                                                {formatCOP(
+                                                                                    d.is_frozen && d.frozen_currency === 'COP'
+                                                                                    ? (d.frozen_price || 0)
+                                                                                    : (d.package_price_cop_str !== undefined ? Number(d.package_price_cop_str) : Math.round((d.package_price || 0) * (calculateEffectiveRate('USD', 'COP', exchangeRates) || 1)))
+                                                                                )}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="text-gray-500 font-medium text-[11px]">
                                                                         USD {
@@ -656,58 +669,84 @@ const PriceListsPage = () => {
                                                             ) : (
                                                                 <>
                                                                     <div className="flex items-center gap-1">
-                                                                        <button
-                                                                            onClick={() => toggleFreeze(realIdx)}
-                                                                            className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
-                                                                            title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
-                                                                        >
-                                                                            {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
-                                                                        </button>
+                                                                        {canEdit && (
+                                                                            <button
+                                                                                onClick={() => toggleFreeze(realIdx)}
+                                                                                className={`p-1 rounded transition-colors ${d.is_frozen ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                                                title={d.is_frozen ? "Descongelar precio" : "Congelar precio"}
+                                                                            >
+                                                                                {d.is_frozen ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+                                                                            </button>
+                                                                        )}
                                                                         <span className="text-gray-500 font-medium text-xs">{d.base_currency}</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            step={d.base_currency === 'COP' ? "100" : "0.01"}
-                                                                            min="0"
-                                                                            value={d.package_price || ''}
-                                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price', e.target.value)}
-                                                                            className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
-                                                                        />
+                                                                        {canEdit ? (
+                                                                            <input
+                                                                                type="number"
+                                                                                step={d.base_currency === 'COP' ? "100" : "0.01"}
+                                                                                min="0"
+                                                                                value={d.package_price || ''}
+                                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price', e.target.value)}
+                                                                                className={`w-24 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium ${d.is_frozen ? 'bg-primary-50 border-primary-200' : 'border-gray-300'}`}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="w-24 px-2 py-1 text-right font-medium text-gray-900">
+                                                                                {d.base_currency === 'COP' ? formatCOP(d.package_price || 0) : formatUSD(d.package_price || 0)}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </>
                                                             )}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <input
-                                                            type="number"
-                                                            step="0.5"
-                                                            min="0"
-                                                            value={d.package_price_usd || ''}
-                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
-                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
-                                                        />
+                                                        {canEdit ? (
+                                                            <input
+                                                                type="number"
+                                                                step="0.5"
+                                                                min="0"
+                                                                value={d.package_price_usd || ''}
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDetailPrice(realIdx, 'package_price_usd', e.target.value)}
+                                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                            />
+                                                        ) : (
+                                                            <span className="w-24 px-2 py-1 inline-block text-right font-medium text-gray-900">
+                                                                {formatUSD(d.package_price_usd || 0)}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="0"
-                                                            value={d.package_commission || ''}
-                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'package_commission', e.target.value)}
-                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
-                                                            title="Comisión por paquete en COP (global de la presentación)"
-                                                        />
+                                                        {canEdit ? (
+                                                            <input
+                                                                type="number"
+                                                                step="1"
+                                                                min="0"
+                                                                value={d.package_commission || ''}
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'package_commission', e.target.value)}
+                                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                                title="Comisión por paquete en COP (global de la presentación)"
+                                                            />
+                                                        ) : (
+                                                            <span className="w-24 px-2 py-1 inline-block text-right font-medium text-gray-900">
+                                                                {formatCOP(d.package_commission || 0)}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="0"
-                                                            value={d.unit_commission || ''}
-                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'unit_commission', e.target.value)}
-                                                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
-                                                            title="Comisión por unidad en COP (global de la presentación)"
-                                                        />
+                                                        {canEdit ? (
+                                                            <input
+                                                                type="number"
+                                                                step="1"
+                                                                min="0"
+                                                                value={d.unit_commission || ''}
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCommission(realIdx, 'unit_commission', e.target.value)}
+                                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-primary-200 focus:border-transparent font-medium"
+                                                                title="Comisión por unidad en COP (global de la presentación)"
+                                                            />
+                                                        ) : (
+                                                            <span className="w-24 px-2 py-1 inline-block text-right font-medium text-gray-900">
+                                                                {formatCOP(d.unit_commission || 0)}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         {(() => {

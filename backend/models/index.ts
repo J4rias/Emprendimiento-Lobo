@@ -41,6 +41,7 @@ import PosReservation from './PosReservation';
 import PreOrder from './PreOrder';
 import PreOrderDetail from './PreOrderDetail';
 import Bank from './Bank';
+import PaymentReceiptIntake from './PaymentReceiptIntake';
 import AuditLog from './AuditLog';
 import CustomerLedger from './CustomerLedger';
 
@@ -237,6 +238,9 @@ SalePayment.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 // SalePayment - Bank (optional)
 SalePayment.belongsTo(Bank, { foreignKey: 'bank_id', as: 'bank' });
 Bank.hasMany(SalePayment, { foreignKey: 'bank_id', as: 'salePayments' });
+
+// PaymentReceiptIntake - SalePayment (optional, se llena cuando exista matching)
+PaymentReceiptIntake.belongsTo(SalePayment, { foreignKey: 'sale_payment_id', as: 'salePayment' });
 
 // Supplier - SupplierContact (One to Many)
 Supplier.hasMany(SupplierContact, { foreignKey: 'supplier_id', as: 'contacts' });
@@ -466,4 +470,5 @@ export {
   Bank,
   AuditLog,
   CustomerLedger,
+  PaymentReceiptIntake,
 };
