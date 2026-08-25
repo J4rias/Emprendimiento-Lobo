@@ -830,53 +830,78 @@ function TabletCheckoutModal({
 
             {/* Add payment */}
             <div className="border-2 border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
-              <div className="flex gap-2 items-center">
-                <select value={newPayCurrency} onChange={(e) => handleCurrencyChange(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={newPayCurrency}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                  className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white"
+                >
+                  <option value="">Moneda</option>
                   {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                 </select>
-                <select value={newPayMethod} onChange={(e) => handleMethodChange(e.target.value)} className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
+                <select
+                  value={newPayMethod}
+                  onChange={(e) => handleMethodChange(e.target.value)}
+                  disabled={!newPayCurrency}
+                  className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  {!newPayCurrency && <option value="">Método</option>}
                   {availableMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </div>
+
               {(newPayMethod === 'transfer' || newPayMethod === 'usdt') && (
-                <div className="flex flex-wrap gap-2 items-center">
-                  {(newPayMethod === 'transfer' || newPayMethod === 'usdt') && filteredBanks.length > 0 && (
-                    <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
-                      <option value="">Banco</option>
-                      {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
-                    </select>
-                  )}
-                  {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
-                    <span className="flex items-center gap-1">
-                      <label className="text-sm text-gray-500 whitespace-nowrap">
-                        {newPayMethod === 'usdt' ? 'COP/USDT' : (isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`)}:
-                      </label>
-                      <input
-                        type="number"
-                        value={newPayRate}
-                        onChange={(e) => setNewPayRate(e.target.value)}
-                        className="w-28 px-3 py-3 border border-blue-400 bg-white rounded-xl text-base text-right"
-                        step="0.01"
-                      />
-                    </span>
-                  )}
-                  <input
-                    type="text"
-                    value={newPayReference}
-                    onChange={(e) => setNewPayReference(e.target.value)}
-                    placeholder="Referencia (opcional)"
-                    className="min-w-[10rem] flex-1 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white"
-                  />
-                  <ImageUpload
-                    type="receipts"
-                    compact
-                    capture="environment"
-                    value={newPayReceiptUrl}
-                    onChange={(v) => setNewPayReceiptUrl(typeof v === 'string' ? v : v[0] || '')}
-                  />
+                <div className="space-y-2 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Detalle de la transferencia
+                  </p>
+                  <div className="flex gap-2 items-center">
+                    {filteredBanks.length > 0 && (
+                      <select
+                        value={newPayBank}
+                        onChange={(e) => setNewPayBank(e.target.value)}
+                        className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white"
+                      >
+                        <option value="">Banco</option>
+                        {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                      </select>
+                    )}
+                    {(effectiveCurrency !== displayCurrency || newPayMethod === 'usdt') && (
+                      <span className="flex items-center gap-1 shrink-0">
+                        <label className="text-sm text-gray-500 whitespace-nowrap">
+                          {newPayMethod === 'usdt' ? 'COP/USDT' : (isUSD ? `${effectiveCurrency}/USD` : `COP/${effectiveCurrency}`)}:
+                        </label>
+                        <input
+                          type="number"
+                          value={newPayRate}
+                          onChange={(e) => setNewPayRate(e.target.value)}
+                          className="w-24 px-3 py-3 border border-blue-400 bg-white rounded-xl text-base text-right"
+                          step="0.01"
+                        />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={newPayReference}
+                      onChange={(e) => setNewPayReference(e.target.value)}
+                      placeholder="Referencia (opcional)"
+                      className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-xl text-base bg-white"
+                    />
+                    <ImageUpload
+                      type="receipts"
+                      compact
+                      capture="environment"
+                      value={newPayReceiptUrl}
+                      onChange={(v) => setNewPayReceiptUrl(typeof v === 'string' ? v : v[0] || '')}
+                      className="shrink-0"
+                    />
+                  </div>
                 </div>
               )}
               {(() => {
+                if (!newPayCurrency) return null;
                 const remainingCOP = effectiveTotalCOP - paidCOP;
                 if (remainingCOP <= COP_TOLERANCE) return null;
                 let remainingInCurrency: number;
@@ -901,11 +926,16 @@ function TabletCheckoutModal({
                   type="number"
                   value={newPayAmount}
                   onChange={(e) => setNewPayAmount(e.target.value)}
-                  placeholder={`Monto en ${effectiveCurrency}`}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-base"
+                  disabled={!newPayCurrency}
+                  placeholder={newPayCurrency ? `Monto en ${effectiveCurrency}` : 'Selecciona una moneda primero'}
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-base disabled:bg-gray-100 disabled:text-gray-400"
                   onKeyDown={(e) => e.key === 'Enter' && addPaymentLine()}
                 />
-                <button onClick={addPaymentLine} className="w-14 bg-blue-600 text-white rounded-xl text-xl font-bold active:bg-blue-700">
+                <button
+                  onClick={addPaymentLine}
+                  disabled={!newPayCurrency}
+                  className="w-14 bg-blue-600 text-white rounded-xl text-xl font-bold active:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
                   +
                 </button>
               </div>

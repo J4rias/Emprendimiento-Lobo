@@ -40,6 +40,7 @@ backend/public/uploads/brands/*
 backend/public/uploads/products/*
 !backend/public/uploads/products/placeholder.png
 backend/public/uploads/temp/
+backend/public/uploads/receipts/*
 
 # Test coverage
 coverage/

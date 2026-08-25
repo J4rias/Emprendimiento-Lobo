@@ -97,8 +97,10 @@ export function useCheckoutPayments({
   }, [isUSD, copPerUSD, displayCurrency, exchangeRates]);
 
   // State
-  const [newPayCurrency, setNewPayCurrency] = useState(isUSD ? 'USD' : 'COP');
-  const [newPayMethod, setNewPayMethod] = useState('cash');
+  // Sin moneda preseleccionada a propósito: el cajero debe elegirla siempre,
+  // para no arrastrar por error la moneda de la línea anterior.
+  const [newPayCurrency, setNewPayCurrency] = useState('');
+  const [newPayMethod, setNewPayMethod] = useState('');
   const [newPayAmount, setNewPayAmount] = useState('');
   const [newPayRate, setNewPayRate] = useState<number | string>(() => getCOPRate(isUSD ? 'USD' : 'COP'));
   const [newPayBank, setNewPayBank] = useState('');
@@ -114,11 +116,9 @@ export function useCheckoutPayments({
   }, []);
 
   useEffect(() => {
-    const def = isUSD ? 'USD' : 'COP';
-    setNewPayCurrency(def);
-    setNewPayMethod('cash');
+    setNewPayCurrency('');
+    setNewPayMethod('');
     setNewPayAmount('');
-    setNewPayRate(getCOPRate(def));
     setNewPayBank('');
     setNewPayReference('');
     setNewPayReceiptUrl('');
@@ -127,6 +127,7 @@ export function useCheckoutPayments({
   // Handlers
   const handleCurrencyChange = useCallback((code: string) => {
     setNewPayCurrency(code);
+    if (!code) { setNewPayMethod(''); return; }
     if (isUSD && code !== 'USD') {
       setNewPayRate(getSavedRate(code, 'USD') || calculateEffectiveRate('USD', code, exchangeRates) || 1);
     } else {
@@ -204,6 +205,11 @@ export function useCheckoutPayments({
     setNewPayAmount('');
     setNewPayReference('');
     setNewPayReceiptUrl('');
+    setNewPayBank('');
+    // Vuelve a exigir moneda en la siguiente línea — evita arrastrar por error
+    // la moneda de la línea que se acaba de agregar.
+    setNewPayCurrency('');
+    setNewPayMethod('');
   }, [newPayAmount, newPayMethod, newPayRate, newPayBank, newPayReference, newPayReceiptUrl, isUSD, effectiveCurrency, copPerUSD, displayCurrency, paymentLines, setPaymentLines]);
 
   // Derived values
@@ -219,9 +225,11 @@ export function useCheckoutPayments({
   // Vuelto rounded to nearest 100 COP (smallest bill denomination for change)
   const vueltoCOP = changeCOP > 0 ? roundToNearest100COP(changeCOP) : 0;
 
-  const availableMethods = PAYMENT_METHODS.filter(m =>
-    (METHODS_BY_CURRENCY[effectiveCurrency as keyof typeof METHODS_BY_CURRENCY] || ['cash']).includes(m.id)
-  );
+  const availableMethods = effectiveCurrency
+    ? PAYMENT_METHODS.filter(m =>
+        (METHODS_BY_CURRENCY[effectiveCurrency as keyof typeof METHODS_BY_CURRENCY] || ['cash']).includes(m.id)
+      )
+    : [];
 
   const fmtTotal = useCallback((usdVal: number) =>
     isUSD ? formatUSD(usdVal).replace('$ ', '') : formatCOP(usdVal * copPerUSD).replace('COP ', ''),
