@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, DeviceMobile } from '@phosphor-icons/react';
+import { Printer, DeviceMobile, Camera } from '@phosphor-icons/react';
 import { Sheet, Badge, Button } from '../ui';
 import { formatCOP, formatUSD, formatDateShort, LOCALE } from '../../utils/formatUtils';
 
@@ -51,8 +51,16 @@ interface SalePaymentView {
   exchange_rate?: number | string;
   payment_method?: string;
   payment_date?: string;
+  reference?: string | null;
+  receipt_url?: string | null;
   [key: string]: unknown;
 }
+
+const receiptFullUrl = (url: string): string => {
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  const baseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/api$/, '') || window.location.origin;
+  return `${baseUrl}${url}`;
+};
 
 interface SaleRecord {
   sale_number?: string;
@@ -182,6 +190,20 @@ const SaleViewSheet: React.FC<SaleViewSheetProps> = ({ open, onClose, sale, onPr
                         {p.currency} {parseFloat(String(p.amount || 0)).toLocaleString(LOCALE, { minimumFractionDigits: p.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 })}
                         {' @ '}{parseFloat(String(p.exchange_rate || 1)).toFixed(2)} | Equiv: {formatUSD(equivUSD ?? 0)}
                       </p>
+                    )}
+                    {(p.reference || p.receipt_url) && (
+                      <div className="flex items-center gap-2 pl-1 text-[10px] text-gray-500">
+                        {p.reference && <span>Ref: {p.reference}</span>}
+                        {p.receipt_url && (
+                          <a
+                            href={receiptFullUrl(p.receipt_url)}
+                            target="_blank" rel="noreferrer"
+                            className="flex items-center gap-0.5 text-primary-600 hover:underline"
+                          >
+                            <Camera className="w-3 h-3" /> Ver comprobante
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

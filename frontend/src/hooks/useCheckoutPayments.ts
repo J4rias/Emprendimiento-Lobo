@@ -181,7 +181,7 @@ export function useCheckoutPayments({
     const existingIdx = (displayRate || isUSDT)
       ? -1
       : paymentLines.findIndex(l => l.currency === backendCurrency && l.method === newPayMethod);
-    const bankId = (newPayMethod === 'transfer' && newPayBank) ? parseInt(newPayBank) : undefined;
+    const bankId = ((newPayMethod === 'transfer' || newPayMethod === 'usdt') && newPayBank) ? parseInt(newPayBank) : undefined;
     const canHaveReceipt = newPayMethod === 'transfer' || newPayMethod === 'usdt';
     const reference = (canHaveReceipt && newPayReference.trim()) ? newPayReference.trim() : undefined;
     const receiptUrl = (canHaveReceipt && newPayReceiptUrl) ? newPayReceiptUrl : undefined;

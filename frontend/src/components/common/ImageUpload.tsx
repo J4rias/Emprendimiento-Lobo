@@ -16,6 +16,8 @@ interface ImageUploadProps {
   disabled?: boolean;
   /** Botón pequeño en vez del dropzone completo — para formularios angostos (ej. línea de pago). */
   compact?: boolean;
+  /** 'environment' abre la cámara trasera directo en móvil/tablet (en vez del selector de galería/cámara). Ignorado en desktop. */
+  capture?: 'user' | 'environment';
 }
 
 const ImageUpload = ({
@@ -31,6 +33,7 @@ const ImageUpload = ({
   placeholder = 'Click para subir imagen',
   disabled = false,
   compact = false,
+  capture,
 }: ImageUploadProps): React.JSX.Element => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -190,6 +193,7 @@ const ImageUpload = ({
           ref={fileInputRef}
           type="file"
           accept={accept}
+          capture={capture}
           onChange={handleInputChange}
           className="hidden"
           disabled={disabled}
@@ -231,6 +235,7 @@ const ImageUpload = ({
         ref={fileInputRef}
         type="file"
         accept={accept}
+        capture={multiple ? undefined : capture}
         multiple={multiple}
         onChange={handleInputChange}
         className="hidden"

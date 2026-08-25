@@ -840,7 +840,7 @@ function TabletCheckoutModal({
               </div>
               {(newPayMethod === 'transfer' || newPayMethod === 'usdt') && (
                 <div className="flex flex-wrap gap-2 items-center">
-                  {newPayMethod === 'transfer' && filteredBanks.length > 0 && (
+                  {(newPayMethod === 'transfer' || newPayMethod === 'usdt') && filteredBanks.length > 0 && (
                     <select value={newPayBank} onChange={(e) => setNewPayBank(e.target.value)} className="px-3 py-3 border border-gray-300 rounded-xl text-base bg-white">
                       <option value="">Banco</option>
                       {filteredBanks.map((b: Bank) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
@@ -870,6 +870,7 @@ function TabletCheckoutModal({
                   <ImageUpload
                     type="receipts"
                     compact
+                    capture="environment"
                     value={newPayReceiptUrl}
                     onChange={(v) => setNewPayReceiptUrl(typeof v === 'string' ? v : v[0] || '')}
                   />
