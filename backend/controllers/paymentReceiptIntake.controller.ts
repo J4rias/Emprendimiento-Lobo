@@ -41,7 +41,12 @@ class PaymentReceiptIntakeController {
         const confidence = parseFloat(body.confidence);
         if (!isNaN(confidence)) data.confidence = confidence;
       }
-      if (body.image_url) data.image_url = String(body.image_url);
+      const processedFiles = (req as any).processedFiles;
+      if (processedFiles && processedFiles.length > 0) {
+        data.image_url = processedFiles[0].url;
+      } else if (body.image_url) {
+        data.image_url = String(body.image_url);
+      }
       data.raw_payload = body;
 
       const intake = await PaymentReceiptIntake.create(data as any);
