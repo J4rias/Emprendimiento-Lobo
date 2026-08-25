@@ -860,7 +860,10 @@ export function usePOS() {
     await performSale(adminId);
   };
 
-  const canCollectPayment = hasPermission('sales.collect');
+  // `payments.receive` es el interruptor global de cobro (ver
+  // backend/middleware/requireMoneyIn.ts): sin él no se puede hacer entrar
+  // dinero por ningún módulo, aunque se tenga el permiso del módulo.
+  const canCollectPayment = hasPermission('sales.collect') && hasPermission('payments.receive');
 
   const sendToCashier = async () => {
     if (!selectedPriceList) { toast.error('Selecciona una lista de precios'); return; }

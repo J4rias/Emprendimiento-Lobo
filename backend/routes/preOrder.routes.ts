@@ -4,6 +4,7 @@ import { CreatePreOrderSchema, ConvertPreOrderSchema } from '../schemas/preOrder
 const preOrderController = require('../controllers/preOrder.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const requireMoneyIn = require('../middleware/requireMoneyIn');
 
 const router = Router();
 
@@ -47,6 +48,7 @@ router.post('/:id/reject',
 router.post('/:id/convert',
   auth,
   authorize('pre_orders.approve'),
+  requireMoneyIn,
   validateZod(ConvertPreOrderSchema),
   preOrderController.convert
 );

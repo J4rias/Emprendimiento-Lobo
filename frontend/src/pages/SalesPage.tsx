@@ -516,7 +516,7 @@ const SalesPage = () => {
       render: (_v: unknown, row: SaleRow) => (
         <div className="flex items-center gap-1">
           <ViewAction onClick={() => handleViewDetail(row.id)} />
-          {(row.sale_type === 'credit' || row.sale_type === 'mixed' || row.sale_type === 'pos_pending') && row.status === 'pending' && hasPermission('sales.collect') && (
+          {(row.sale_type === 'credit' || row.sale_type === 'mixed' || row.sale_type === 'pos_pending') && row.status === 'pending' && hasPermission('sales.collect') && hasPermission('payments.receive') && (
             <PaymentAction onClick={() => handleOpenPaymentModal(row as unknown as SaleDetail)} title={row.sale_type === 'pos_pending' ? 'Cobrar' : 'Abonar Pago'} />
           )}
           {row.status === 'completed' && hasPermission('credit_notes.create') && (

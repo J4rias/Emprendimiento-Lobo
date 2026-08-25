@@ -606,7 +606,7 @@ const CustomerStatementModal = ({ customer, onClose }: CustomerStatementModalPro
                                                                                     }
                                                                                     {t.reference || '-'}
                                                                                 </button>
-                                                                                {isCharge && hasPermission('sales.collect') && t.original_data?.status !== 'completed' && (parseFloat(t.original_data?.total || 0) - parseFloat(t.original_data?.paid_amount || 0)) > 0.01 && (
+                                                                                {isCharge && hasPermission('sales.collect') && hasPermission('payments.receive') && t.original_data?.status !== 'completed' && (parseFloat(t.original_data?.total || 0) - parseFloat(t.original_data?.paid_amount || 0)) > 0.01 && (
                                                                                     <button
                                                                                         onClick={() => handleOpenPaymentModal(t)}
                                                                                         className="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors font-medium flex items-center gap-1"

@@ -4,6 +4,7 @@ import { CreateSaleSchema, UpdateSaleSchema, ValidateCreditPinSchema, CancelSale
 const saleController = require('../controllers/sale.controller');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const requireMoneyIn = require('../middleware/requireMoneyIn');
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.post('/validate-credit-pin',
 router.post('/',
   auth,
   authorize('sales.create'),
+  requireMoneyIn,
   validateZod(CreateSaleSchema),
   saleController.createSale
 );
@@ -92,6 +94,7 @@ router.post('/:id/cancel',
 router.post('/:id/payments',
   auth,
   authorize('sales.collect'),
+  requireMoneyIn,
   validateZod(AddPaymentSchema),
   saleController.addPayment
 );
